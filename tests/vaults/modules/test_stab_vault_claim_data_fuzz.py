@@ -218,6 +218,17 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                     )
                     is_paused = False
 
+                if (
+                    stability_pool.totalBalances(alpha_token) == 0
+                    and alpha_token.balanceOf(stability_pool)
+                    <= stability_pool.totalClaimableBalances(alpha_token)
+                ):
+                    alpha_token.transfer(
+                        stability_pool,
+                        EIGHTEEN_DECIMALS,
+                        sender=alpha_token_whale,
+                    )
+
                 active_addresses = [_asset_address(asset) for asset in active_assets]
                 is_active = token_address in active_addresses
                 if not is_active and price == 0:
@@ -326,13 +337,14 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                     )
                     is_paused = False
 
-                # Existing holders retain the ability to exit through every
-                # claim-data lifecycle state.
-                with boa.env.anchor():
+                # Persist a real full exit so later prune/activate see an empty
+                # cohort. Replenish unreserved stab custody before a later
+                # liquidation receipt, or that receipt reverts `nothing to transfer`.
+                if stability_pool.userBalances(bob, alpha_token) != 0:
                     withdrawn, _ = stability_pool.withdrawTokensFromVault(
                         bob,
                         alpha_token,
-                        max(amount, 10**15),
+                        MAX_UINT256,
                         bob,
                         sender=teller.address,
                     )

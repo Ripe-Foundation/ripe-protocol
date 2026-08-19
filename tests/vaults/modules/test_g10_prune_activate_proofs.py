@@ -9,6 +9,7 @@ from pathlib import Path
 
 import boa
 import pytest
+from eth_utils import keccak
 
 from conf_utils import (
     claim_from_stability_pool,
@@ -21,6 +22,7 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 ACTIVATION_THRESHOLD = 10 * 10**16
 RETENTION_THRESHOLD = 5 * 10**16
+LIVE_RESIDUAL_DIVISOR = 10**10
 CLAIM_ASSET_ABSENT = 0
 CLAIM_ASSET_DORMANT = 1
 CLAIM_ASSET_ACTIVE = 2
@@ -108,6 +110,24 @@ def _assert_balances_unchanged(before, after):
     assert [row[1] for row in after["rows"]] == [row[1] for row in before["rows"]]
     assert [row[2] for row in after["rows"]] == [row[2] for row in before["rows"]]
     assert [row[3] for row in after["rows"]] == [row[3] for row in before["rows"]]
+
+
+def _claimable_balance_slot(claim_asset, stab_asset):
+    inner = keccak(
+        (9).to_bytes(32, "big") + int(stab_asset.address, 16).to_bytes(32, "big")
+    )
+    return int.from_bytes(
+        keccak(inner + int(claim_asset.address, 16).to_bytes(32, "big")),
+        "big",
+    )
+
+
+def _dust_logs(contract, claim_asset):
+    return [
+        log
+        for log in filter_logs(contract, "ClaimAssetDeactivated")
+        if log.claimAsset == claim_asset.address
+    ]
 
 
 def _exit_cohort(stability_pool, stab, user, teller):
@@ -231,8 +251,9 @@ def test_g10_prune_identity_unpaused_and_paused(
     stability_pool.pruneClaimableAssets(alpha_token, [], sender=sally)
     stability_pool.pruneClaimableAssets(alpha_token, [unknown], sender=sally)
     stability_pool.pruneClaimableAssets(ZERO_ADDRESS, [bravo_token], sender=sally)
+    noop_logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
     _assert_balances_unchanged(before, _list_snapshot(stability_pool, alpha_token, [bravo_token, charlie_token, unknown]))
-    assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
+    assert noop_logs == []
     assert stability_pool.getTotalValue(alpha_token) == nav_before
 
     # High-positive quote retains. Independently priced.
@@ -405,8 +426,10 @@ def test_g10_prune_zero_balance_active_is_legacy_direct_storage(
         ACTIVATION_THRESHOLD, bob, auction_house, green_token, savings_green,
     )
     # Ordinary reduce already auto-removes at zero. Force the leftover row.
-    stability_pool.eval(
-        f"stabVault.claimableBalances[{alpha_token.address}][{bravo_token.address}] = 0"
+    boa.env.set_storage(
+        stability_pool.address,
+        _claimable_balance_slot(bravo_token, alpha_token),
+        0,
     )
     assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) != 0
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=sally)
@@ -1578,7 +1601,156 @@ def test_g10_partial_claim_then_deposit_does_not_capture(
     assert abs(attack_withdrawn - control_withdrawn) <= 1
 
 
-def test_g10_swap_with_claimable_green_still_dust_unlists(
+def _seed_green_claim(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+    green_token,
+    savings_green,
+    whale,
+    auction_house,
+    pair_amount,
+):
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    green_token.transfer(stability_pool, pair_amount, sender=whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, 1, green_token, pair_amount, bob, green_token, savings_green,
+        sender=auction_house.address,
+    )
+    assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
+    return pair_amount
+
+
+def _swap_green_to_leftover(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    auction_house,
+    leftover,
+    mock_price_source,
+):
+    prev = stability_pool.claimableBalances(alpha_token, green_token)
+    consume = prev - leftover
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    bravo_token.transfer(stability_pool, 1, sender=bravo_token_whale)
+    burned = stability_pool.swapWithClaimableGreen(
+        alpha_token, consume, bravo_token, 1, green_token,
+        sender=auction_house.address,
+    )
+    logs = _dust_logs(stability_pool, green_token)
+    assert burned == consume
+    return prev, logs
+
+
+def test_g10_swap_with_claimable_green_meaningful_residual_stays_listed(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    """A leftover just under $0.05 is meaningful, not microscopic, while shares remain."""
+    pair_amount = _seed_green_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, green_token, savings_green, whale, auction_house,
+        ACTIVATION_THRESHOLD,
+    )
+    leftover = RETENTION_THRESHOLD - 1
+    assert leftover > pair_amount // LIVE_RESIDUAL_DIVISOR
+    _, logs = _swap_green_to_leftover(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        green_token, auction_house, leftover, mock_price_source,
+    )
+    assert logs == []
+    assert stability_pool.claimableBalances(alpha_token, green_token) == leftover
+    assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_swap_with_claimable_green_zero_residual_uses_reason_zero(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    _seed_green_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, green_token, savings_green, whale, auction_house,
+        ACTIVATION_THRESHOLD,
+    )
+    _, logs = _swap_green_to_leftover(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        green_token, auction_house, 0, mock_price_source,
+    )
+    assert len(logs) == 1
+    assert logs[0].reason == DEACTIVATION_ZERO
+    assert logs[0].balance == 0
+    assert stability_pool.claimableBalances(alpha_token, green_token) == 0
+    assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ABSENT
+
+
+@pytest.mark.parametrize("extra, expect_dust", [(0, True), (1, False)])
+def test_g10_swap_with_claimable_green_live_inclusive_boundary(
+    extra,
+    expect_dust,
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    pair_amount = _seed_green_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, green_token, savings_green, whale, auction_house,
+        ACTIVATION_THRESHOLD,
+    )
+    leftover = pair_amount // LIVE_RESIDUAL_DIVISOR + extra
+    prev, logs = _swap_green_to_leftover(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        green_token, auction_house, leftover, mock_price_source,
+    )
+    assert leftover < RETENTION_THRESHOLD
+    assert stability_pool.claimableBalances(alpha_token, green_token) == leftover
+    if expect_dust:
+        assert len(logs) == 1
+        assert logs[0].reason == DEACTIVATION_DUST
+        assert logs[0].balance == leftover
+        assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_DORMANT
+        assert stability_pool.indexOfClaimableAsset(alpha_token, green_token) == 0
+        assert leftover <= prev // LIVE_RESIDUAL_DIVISOR
+    else:
+        assert logs == []
+        assert leftover == prev // LIVE_RESIDUAL_DIVISOR + 1
+        assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_swap_with_claimable_green_empty_cohort_dust_unlists(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -1593,28 +1765,487 @@ def test_g10_swap_with_claimable_green_still_dust_unlists(
     savings_green,
 ):
     _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
-    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
-    pair_amount = ACTIVATION_THRESHOLD
-    green_token.transfer(stability_pool, pair_amount, sender=whale)
+    green_token.transfer(stability_pool, RETENTION_THRESHOLD, sender=whale)
     stability_pool.swapForLiquidatedCollateral(
-        alpha_token, 1, green_token, pair_amount, bob, green_token, savings_green,
+        alpha_token, 1, green_token, RETENTION_THRESHOLD, bob, green_token, savings_green,
         sender=auction_house.address,
     )
+    assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_DORMANT
+    _exit_cohort(stability_pool, alpha_token, bob, teller)
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    top_up = ACTIVATION_THRESHOLD - RETENTION_THRESHOLD
+    green_token.transfer(stability_pool, top_up, sender=whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, 1, green_token, top_up, bob, green_token, savings_green,
+        sender=auction_house.address,
+    )
+    pair_amount = stability_pool.claimableBalances(alpha_token, green_token)
+    assert pair_amount == ACTIVATION_THRESHOLD
     assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
     leftover = RETENTION_THRESHOLD - 1
-    consume = pair_amount - leftover
-    bravo_token.transfer(stability_pool, 1, sender=bravo_token_whale)
-    burned = stability_pool.swapWithClaimableGreen(
-        alpha_token, consume, bravo_token, 1, green_token,
-        sender=auction_house.address,
+    assert leftover > pair_amount // LIVE_RESIDUAL_DIVISOR
+    _, logs = _swap_green_to_leftover(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        green_token, auction_house, leftover, mock_price_source,
     )
-    logs = [
-        log for log in filter_logs(stability_pool, "ClaimAssetDeactivated")
-        if log.claimAsset == green_token.address
-    ]
-    assert burned == consume
-    assert stability_pool.claimableBalances(alpha_token, green_token) == leftover
     assert len(logs) == 1
     assert logs[0].reason == DEACTIVATION_DUST
     assert logs[0].balance == leftover
+    assert stability_pool.claimableBalances(alpha_token, green_token) == leftover
+    assert stability_pool.totalClaimableBalances(green_token) == leftover
+    assert green_token.balanceOf(stability_pool) == leftover
     assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_DORMANT
+
+
+def test_g10_live_eighteen_decimal_inclusive_boundary_via_one_dollar_redeem(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    pile = EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        pile, bob, auction_house, green_token, savings_green,
+    )
+    bound = pile // LIVE_RESIDUAL_DIVISOR
+    vault_id = vault_book.getRegId(stability_pool)
+
+    def _redeem_to(leftover):
+        consume = pile - leftover
+        green_token.transfer(bob, consume, sender=whale)
+        green_token.approve(teller, consume, sender=bob)
+        redeem_from_stability_pool(
+            teller, vault_id, bravo_token, consume, bob, sender=bob,
+        )
+        return _dust_logs(teller, bravo_token)
+
+    with boa.env.anchor():
+        logs = _redeem_to(bound)
+        assert len(logs) == 1
+        assert logs[0].reason == DEACTIVATION_DUST
+        assert logs[0].balance == bound
+        assert stability_pool.claimableBalances(alpha_token, bravo_token) == bound
+        assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
+
+    logs = _redeem_to(bound + 1)
+    assert logs == []
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == bound + 1
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_live_p_less_than_d_no_nonzero_residual_qualifies(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 3 * 10**34)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    pile = 10
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        pile, bob, auction_house, green_token, savings_green,
+    )
+    assert pile < LIVE_RESIDUAL_DIVISOR
+    vault_id = vault_book.getRegId(stability_pool)
+    claim_from_stability_pool(
+        teller, vault_id, alpha_token, bravo_token, 27 * 10**16, sender=bob,
+    )
+    logs = _dust_logs(teller, bravo_token)
+    leftover = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert logs == []
+    assert leftover != 0
+    assert leftover > pile // LIVE_RESIDUAL_DIVISOR
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_usd_below_retention_without_microscopic_ratio_stays_listed(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    pile = 30 * 10**16
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        pile, bob, auction_house, green_token, savings_green,
+    )
+    leftover = 4 * 10**16
+    consume = pile - leftover
+    vault_id = vault_book.getRegId(stability_pool)
+    green_token.transfer(bob, consume, sender=whale)
+    green_token.approve(teller, consume, sender=bob)
+    redeem_from_stability_pool(
+        teller, vault_id, bravo_token, consume, bob, sender=bob,
+    )
+    logs = _dust_logs(teller, bravo_token)
+    assert leftover > pile // LIVE_RESIDUAL_DIVISOR
+    assert leftover < RETENTION_THRESHOLD
+    assert logs == []
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_microscopic_ratio_at_retention_usd_stays_listed(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    credit_engine,
+):
+    pile = 5 * 10**26
+    leftover = pile // LIVE_RESIDUAL_DIVISOR
+    assert leftover == RETENTION_THRESHOLD
+    green_token.mint(whale, pile, sender=credit_engine.address)
+    _seed_green_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, green_token, savings_green, whale, auction_house,
+        pile,
+    )
+    _, logs = _swap_green_to_leftover(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        green_token, auction_house, leftover, mock_price_source,
+    )
+    assert logs == []
+    assert leftover <= pile // LIVE_RESIDUAL_DIVISOR
+    assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_six_decimal_live_inclusive_boundary(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    governance,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    six = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "G10 Six",
+        "G10S6",
+        6,
+        0,
+        name="g10_six_claim",
+    )
+    six.mint(alice, 100_000 * 10**6, sender=governance.address)
+    setAssetConfig(six)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    mock_price_source.setPrice(six, EIGHTEEN_DECIMALS)
+    pile = LIVE_RESIDUAL_DIVISOR  # 10,000 whole 6dp tokens
+    _record_claim(
+        stability_pool, alpha_token, six, alice,
+        pile, bob, auction_house, green_token, savings_green,
+    )
+    bound = pile // LIVE_RESIDUAL_DIVISOR
+    vault_id = vault_book.getRegId(stability_pool)
+
+    def _redeem_to(leftover):
+        consume_tokens = pile - leftover
+        payment = consume_tokens * EIGHTEEN_DECIMALS // (10 ** six.decimals())
+        green_token.transfer(bob, payment, sender=whale)
+        green_token.approve(teller, payment, sender=bob)
+        redeem_from_stability_pool(
+            teller, vault_id, six, payment, bob, sender=bob,
+        )
+        return _dust_logs(teller, six)
+
+    with boa.env.anchor():
+        logs = _redeem_to(bound)
+        assert len(logs) == 1
+        assert logs[0].reason == DEACTIVATION_DUST
+        assert logs[0].balance == bound
+        assert stability_pool.getClaimAssetState(alpha_token, six) == CLAIM_ASSET_DORMANT
+
+    logs = _redeem_to(bound + 1)
+    assert logs == []
+    assert stability_pool.getClaimAssetState(alpha_token, six) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_wrong_low_quote_near_total_only_unlists_bounded_residual(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    pile = EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        pile, bob, auction_house, green_token, savings_green,
+    )
+    mock_price_source.setPrice(bravo_token, 10**15)
+    leftover = pile // LIVE_RESIDUAL_DIVISOR
+    consume_tokens = pile - leftover
+    payment = consume_tokens * 10**15 // EIGHTEEN_DECIMALS
+    vault_id = vault_book.getRegId(stability_pool)
+    green_token.transfer(bob, payment, sender=whale)
+    green_token.approve(teller, payment, sender=bob)
+    redeem_from_stability_pool(
+        teller, vault_id, bravo_token, payment, bob, sender=bob,
+    )
+    logs = _dust_logs(teller, bravo_token)
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == leftover
+    assert len(logs) == 1
+    assert logs[0].reason == DEACTIVATION_DUST
+    assert logs[0].balance == leftover
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
+
+
+def test_g10_wrong_low_quote_meaningful_residual_stays_listed(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    pile = 11 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        pile, bob, auction_house, green_token, savings_green,
+    )
+    mock_price_source.setPrice(bravo_token, 10**15)
+    payment = 10**15
+    vault_id = vault_book.getRegId(stability_pool)
+    green_token.transfer(bob, payment, sender=whale)
+    green_token.approve(teller, payment, sender=bob)
+    redeem_from_stability_pool(
+        teller, vault_id, bravo_token, payment, bob, sender=bob,
+    )
+    logs = _dust_logs(teller, bravo_token)
+    leftover = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert leftover > pile // LIVE_RESIDUAL_DIVISOR
+    assert leftover != 0
+    assert logs == []
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_dust_unlists_frees_slot_preserves_ledger_and_reactivates(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    pile = EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        pile, bob, auction_house, green_token, savings_green,
+    )
+    leftover = pile // LIVE_RESIDUAL_DIVISOR
+    consume = pile - leftover
+    vault_id = vault_book.getRegId(stability_pool)
+    green_token.transfer(bob, consume, sender=whale)
+    green_token.approve(teller, consume, sender=bob)
+    redeem_from_stability_pool(
+        teller, vault_id, bravo_token, consume, bob, sender=bob,
+    )
+    logs = _dust_logs(teller, bravo_token)
+    assert len(logs) == 1
+    assert logs[0].reason == DEACTIVATION_DUST
+    assert logs[0].balance == leftover
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 0
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == leftover
+    assert stability_pool.totalClaimableBalances(bravo_token) == leftover
+    assert bravo_token.balanceOf(stability_pool) == leftover
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
+
+    added = ACTIVATION_THRESHOLD
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        added, bob, auction_house, green_token, savings_green,
+    )
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == leftover + added
+    assert stability_pool.totalClaimableBalances(bravo_token) == leftover + added
+
+
+def test_g10_live_prune_is_noop_on_surviving_nonzero_residual(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    sally,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    pair_amount = _seed_green_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, green_token, savings_green, whale, auction_house,
+        ACTIVATION_THRESHOLD,
+    )
+    leftover = pair_amount // LIVE_RESIDUAL_DIVISOR + 1
+    _swap_green_to_leftover(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        green_token, auction_house, leftover, mock_price_source,
+    )
+    assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
+    stability_pool.pruneClaimableAssets(alpha_token, [green_token], sender=sally)
+    logs = _dust_logs(stability_pool, green_token)
+    assert logs == []
+    assert stability_pool.claimableBalances(alpha_token, green_token) == leftover
+    assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
+
+
+def test_g10_empty_cohort_partial_redemption_dust_unlists(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    dormant = 9 * 10**16
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        dormant, bob, auction_house, green_token, savings_green,
+    )
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
+    _exit_cohort(stability_pool, alpha_token, bob, teller)
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    top_up = 21 * 10**16
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        top_up, bob, auction_house, green_token, savings_green,
+    )
+    pile = dormant + top_up
+    assert pile == 30 * 10**16
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    leftover = 4 * 10**16
+    consume = pile - leftover
+    vault_id = vault_book.getRegId(stability_pool)
+    green_token.transfer(bob, consume, sender=whale)
+    green_token.approve(teller, consume, sender=bob)
+    redeem_from_stability_pool(
+        teller, vault_id, bravo_token, consume, bob, sender=bob,
+    )
+    logs = _dust_logs(teller, bravo_token)
+    assert leftover > pile // LIVE_RESIDUAL_DIVISOR
+    assert len(logs) == 1
+    assert logs[0].reason == DEACTIVATION_DUST
+    assert logs[0].balance == leftover
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == leftover
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT

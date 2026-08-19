@@ -792,16 +792,18 @@ def test_activate_under_charlie_governor_and_lite_pause(
     _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller,
                mock_price_source)
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    dormant_amount = ACTIVATION_THRESHOLD - 1
     _record_claim(stability_pool, alpha_token, bravo_token, bravo_token_whale,
-                  10 * EIGHTEEN_DECIMALS, bob, auction_house, green_token,
+                  dormant_amount, bob, auction_house, green_token,
                   savings_green)
-    mock_price_source.setPrice(bravo_token, 10**15)
-    stability_pool.pruneClaimableAssets(alpha_token, [bravo_token],
-                                        sender=alice)
-    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    assert stability_pool.getClaimAssetState(
+        alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
+    _exit_cohort(stability_pool, alpha_token, bob, teller)
+    exact_price = _exact_floor(dormant_amount)
+    mock_price_source.setPrice(bravo_token, exact_price)
     ledger_before = _claim_ledger(stability_pool, alpha_token, bravo_token)
 
-    # --- governor arm
+    # --- governor arm: real empty-cohort seating
     assert switchboard_charlie.pause(stability_pool.address, True,
                                     sender=governance.address)
     assert stability_pool.isPaused()
@@ -818,7 +820,7 @@ def test_activate_under_charlie_governor_and_lite_pause(
     mock_price_source.setPrice(bravo_token, 10**15)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token],
                                         sender=alice)
-    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, exact_price)
 
     # --- lite arm (governance-enableable: liteSigners() is [] at launch)
     assert not mission_control.canPerformLiteAction(alice)

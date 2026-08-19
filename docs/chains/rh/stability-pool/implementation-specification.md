@@ -104,6 +104,43 @@ The final owner decisions and security corrections are:
     cap-`12` prescriptive text below remains historical design context and is
     superseded by this as-built decision.
 
+## Current normative membership (2026-08-19)
+
+These are the live StabVault constants and residual rules. Older
+prescriptive passages below that still say cap `12` or `$0.10`/`$0.25`
+are pre-existing drift in the historical design record; they are not
+caused by this residual-policy change.
+
+| Item | Current rule |
+| --- | --- |
+| Active cap | `MAX_ACTIVE_CLAIM_ASSETS = 20` |
+| Maintenance batch | `MAX_CLAIM_ASSET_MAINTENANCE = 15` |
+| Activation threshold | `$0.10` (`10 * 10**16`) |
+| Retention threshold | `$0.05` (`5 * 10**16`) |
+| Live nonzero prune | no-op for every nonzero row |
+| Empty-cohort custody deficit | skip (`continue`), do not quote |
+| Activation | empty-cohort only (`totalBalances == 0`); `canActivateClaimAsset` returns early when the book is live |
+| Zero residual | `DEACTIVATION_ZERO`; unlist only |
+| Empty-cohort dust | priced leftover below `$0.05` → `DEACTIVATION_DUST` |
+| Live microscopic dust | leftover below `$0.05` and `R <= P // 10**10` (inclusive) → `DEACTIVATION_DUST` |
+| Live meaningful leftover | below `$0.05` but `R > P // 10**10` → remain active |
+| Unavailable/zero USD | never classified as dust |
+| Surviving residual | unlist does not erase pair balance, aggregate liability, or custody; a later receipt may accumulate and reactivate |
+
+Owner decision 2026-08-19: residual membership is centralized in
+`_reduceClaimableBalances` and applies to claim, redeem, and
+`swapWithClaimableGreen`. That supersedes the earlier call-site-only
+`remainingUsdValue = 0` placement and the GREEN exclusion. It supersedes
+20-cap stickiness only for microscopic residuals. Meaningful live
+residuals stay sticky. Live prune and empty-only activation are
+unchanged.
+
+**Recovery:** consume a meaningful dormant balance through configured
+redemption after the oracle price is correct. Do not redeem while the
+oracle remains wrong-low. Before removing a former claim asset’s price
+feed, verify `totalClaimableBalances[asset] == 0` and that no active
+row depends on it.
+
 Final bytecode and ABI evidence is:
 
 | Measurement | Result |

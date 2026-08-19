@@ -118,6 +118,7 @@ DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
 RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
+LIVE_RESIDUAL_DIVISOR: constant(uint256) = 10 ** 10
 
 CLAIM_ASSET_ABSENT: constant(uint256) = 0
 CLAIM_ASSET_DORMANT: constant(uint256) = 1
@@ -686,6 +687,8 @@ def _getValueOfClaimableAssets(
         # future value between cohorts, so valuation must fail closed.  The
         # aggregate custody check also covers this asset's liabilities to every
         # stability-asset cohort, not only the pair currently being valued.
+        # PriceDesk floors a nonzero amount at a nonzero price to one USD-value
+        # unit; an unavailable price still fails closed.
         assert staticcall IERC20(asset).balanceOf(self) >= self.totalClaimableBalances[asset] # dev: claim custody deficit
         claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, True)
         assert claimValue != 0 # dev: no price for claim asset
@@ -798,8 +801,6 @@ def _claimFromStabilityPool(
             remainingUsdValue = 1 # very small dust, trigger removal
         else:
             remainingUsdValue = numerator // claimAmount
-    if vaultData.totalBalances[_stabAsset] != 0:
-        remainingUsdValue = 0
     self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset, remainingUsdValue)
 
     # move tokens to recipient
@@ -1046,8 +1047,6 @@ def _redeemFromStabilityPool(
                 remainingUsdValue = 1 # very small dust, trigger removal
             else:
                 remainingUsdValue = numerator // maxClaimableAmount
-        if vaultData.totalBalances[stabAsset] != 0:
-            remainingUsdValue = 0
         self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance, remainingUsdValue)
 
         # move tokens to recipient
@@ -1207,6 +1206,8 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
 @external
 def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, uint256, uint256):
     # pause not modeled; execute still asserts isPaused
+    if vaultData.totalBalances[_stabAsset] != 0:
+        return False, 0, 0
     greenToken: address = empty(address)
     savingsGreen: address = empty(address)
     priceDesk: address = empty(address)
@@ -1215,8 +1216,7 @@ def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, u
     capacityRemaining: uint256 = 0
     usdValue, capacityRemaining = self._getClaimAssetActivationData(_stabAsset, _claimAsset, greenToken, savingsGreen, priceDesk)
     return (
-        vaultData.totalBalances[_stabAsset] == 0
-        and usdValue >= ACTIVATION_USD_THRESHOLD
+        usdValue >= ACTIVATION_USD_THRESHOLD
         and capacityRemaining != 0
     ), usdValue, capacityRemaining
 
@@ -1394,9 +1394,24 @@ def _reduceClaimableBalances(
         self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_ZERO)
         return
 
-    # remove claimable asset if remaining USD value is dust (RETENTION $0.05) - only remove from iterable list
-    if _remainingUsdValue != 0 and _remainingUsdValue < RETENTION_USD_THRESHOLD:
-        self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_DUST)
+    # Dust-delist only when remaining USD is a priced value below RETENTION
+    # $0.05. Zero/unavailable USD is never dust. An empty cohort may
+    # dust-deactivate any such residual; a live cohort may only when the
+    # leftover is microscopic: R <= P // LIVE_RESIDUAL_DIVISOR.
+    if (
+        _remainingUsdValue != 0
+        and _remainingUsdValue < RETENTION_USD_THRESHOLD
+    ):
+        if (
+            vaultData.totalBalances[_stabAsset] == 0
+            or newClaimableBalance
+               <= _prevClaimableBalance // LIVE_RESIDUAL_DIVISOR
+        ):
+            self._removeClaimableAsset(
+                _stabAsset,
+                _claimAsset,
+                DEACTIVATION_DUST,
+            )
 
 
 # deregister claimable asset

@@ -3638,7 +3638,7 @@ def test_stab_vault_claims_dust_removal_below_threshold(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Live-share partial claim below $0.05 keeps the row on the iterable."""
+    """Live-share partial claim below $0.05 stays listed unless the leftover is microscopic."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3671,7 +3671,7 @@ def test_stab_vault_claims_dust_removal_below_threshold(
     claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
-    # Shares remain, so remainingUsdValue is forced to 0 and the row stays listed.
+    # Shares remain and the leftover is well above P // 10**10, so the row stays listed.
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
     assert bravo_index_after == bravo_index_before
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
@@ -3754,7 +3754,7 @@ def test_stab_vault_claims_dust_balance_preserved(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Claim and total balances stay intact after a live-share dust residual."""
+    """Claim and total balances stay intact after a live-share sub-$0.05 residual."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3779,7 +3779,7 @@ def test_stab_vault_claims_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.26, leaving a $0.04 residual that stays ACTIVE while shares remain.
+    # Claim $0.26, leaving a $0.04 residual that stays ACTIVE: below $0.05 but not microscopic.
     claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
@@ -3813,7 +3813,7 @@ def test_stab_vault_claims_dust_readdition_after_removal(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """A later receipt adds onto a live-share dust residual that stayed listed."""
+    """A later receipt adds onto a live-share sub-$0.05 residual that stayed listed."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3884,7 +3884,7 @@ def test_stab_vault_claims_dust_precision_loss_triggers_removal(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """A one-wei residual after a live-share claim stays listed."""
+    """A one-wei residual after a live-share claim stays listed when P < 10**10."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3908,8 +3908,9 @@ def test_stab_vault_claims_dust_precision_loss_triggers_removal(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.27, which is 9 of 10 token wei and leaves 1 wei. Live shares
-    # force remainingUsdValue to 0, so the row stays ACTIVE.
+    # Claim $0.27, which is 9 of 10 token wei and leaves 1 wei. P < 10**10, so
+    # no nonzero live residual is microscopic; remainingUsdValue=1 is not enough
+    # to unlist while shares remain.
     claim_usd_value = 27 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 

@@ -174,36 +174,8 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
         ) == 1
         existing_receipt_gas = boa.env.get_gas_used() - gas_before
 
-    with boa.env.anchor():
-        for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
-            mock_price_source.setPrice(token, 2 * 10**17)
-        gas_before = boa.env.get_gas_used()
-        stability_pool.pruneClaimableAssets(
-            alpha_token,
-            claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE],
-            sender=alice,
-        )
-        prune_gas = boa.env.get_gas_used() - gas_before
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
-            MAX_ACTIVE_CLAIM_ASSETS
-        )
-
-        stability_pool.pause(True, sender=switchboard_alpha.address)
-        for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
-            mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-        gas_before = boa.env.get_gas_used()
-        stability_pool.activateClaimAssets(
-            alpha_token,
-            claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE],
-            sender=alice,
-        )
-        activation_gas = boa.env.get_gas_used() - gas_before
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
-            MAX_ACTIVE_CLAIM_ASSETS
-        )
-
     setGeneralConfig()
-    for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
+    for token in claim_tokens:
         setAssetConfig(token)
 
     with boa.env.anchor():
@@ -231,6 +203,75 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
             sender=teller.address,
         ) != 0
         claim_many_gas = boa.env.get_gas_used() - gas_before
+
+    # Last-share exit cannot finish while priced claimables remain in NAV.
+    for start in range(0, MAX_ACTIVE_CLAIM_ASSETS, MAX_CLAIM_ASSET_MAINTENANCE):
+        drain = [
+            (alpha_token.address, token.address, MAX_UINT256)
+            for token in claim_tokens[start:start + MAX_CLAIM_ASSET_MAINTENANCE]
+        ]
+        assert stability_pool.claimManyFromStabilityPool(
+            bob,
+            drain,
+            bob,
+            False,
+            sender=teller.address,
+        ) != 0
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
+
+    stability_pool.withdrawTokensFromVault(
+        bob,
+        alpha_token,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert stability_pool.totalBalances(alpha_token) == 0
+
+    alpha_token.transfer(
+        stability_pool,
+        MAX_ACTIVE_CLAIM_ASSETS * EIGHTEEN_DECIMALS,
+        sender=alpha_token_whale,
+    )
+    for token in claim_tokens:
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            token,
+            alice,
+            ACTIVATION_THRESHOLD,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
+
+    gas_before = boa.env.get_gas_used()
+    stability_pool.pruneClaimableAssets(
+        alpha_token,
+        claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE],
+        sender=alice,
+    )
+    prune_gas = boa.env.get_gas_used() - gas_before
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
+
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    gas_before = boa.env.get_gas_used()
+    stability_pool.activateClaimAssets(
+        alpha_token,
+        claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE],
+        sender=alice,
+    )
+    activation_gas = boa.env.get_gas_used() - gas_before
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
 
     print(
         "STABILITY_ACTIVE_CLAIM_CEILING_GAS",

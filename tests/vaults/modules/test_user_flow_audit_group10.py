@@ -554,8 +554,8 @@ def test_g10_can_activate_helper_not_exported_and_source_semantics(
     green_token, savings_green,
 ):
     """`canActivateClaimAsset` is NOT callable on the StabilityPool contract.
-    The live-book predicate lives on the StabVault module source; removing
-    `totalBalances == 0` from that return must fail this test.
+    The live-book predicate is an early return on the StabVault module source;
+    removing that `totalBalances != 0` gate must fail this test.
     """
     pool = stability_pool
     with pytest.raises(Exception):
@@ -565,12 +565,16 @@ def test_g10_can_activate_helper_not_exported_and_source_semantics(
     start = source.index("def canActivateClaimAsset(")
     end = source.index("def _getClaimAssetActivationData(")
     body = source[start:end]
-    assert "vaultData.totalBalances[_stabAsset] == 0" in body
+    assert "vaultData.totalBalances[_stabAsset] != 0" in body
+    assert "return False, 0, 0" in body
+    assert body.index("if vaultData.totalBalances[_stabAsset] != 0:") < body.index(
+        "self._getStabAddys()"
+    )
     assert "usdValue >= ACTIVATION_USD_THRESHOLD" in body
     assert "capacityRemaining != 0" in body
     assert "isPaused" in body  # comment only; execute still asserts pause
     return_block = body[body.index("return ("):]
-    assert "vaultData.totalBalances[_stabAsset] == 0" in return_block
+    assert "vaultData.totalBalances[_stabAsset]" not in return_block
 
     # equivalent keeper preflight from exported getters
     stab = alpha_token
