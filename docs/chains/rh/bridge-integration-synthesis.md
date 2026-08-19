@@ -17,6 +17,7 @@ Source records:
 - [`across-settlement-evaluation.md`](across-settlement-evaluation.md)
 - [`relay-settlement-evaluation.md`](relay-settlement-evaluation.md)
 - [`bridge-integration-security-review.md`](bridge-integration-security-review.md)
+- [`fast-lane-payout-contract-spec.md`](fast-lane-payout-contract-spec.md)
 - API/web implementation plan: [Ripe API PR #30](https://github.com/Ripe-Foundation/api/pull/30)
 
 ## Recommendation
