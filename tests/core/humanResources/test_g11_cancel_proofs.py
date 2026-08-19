@@ -6,7 +6,6 @@ from conf_utils import assert_reverted_call, filter_logs
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from contracts.modules import Contributor
 from tests.core.humanResources.g11_proof_helpers import (
-    release_live_hr_reserve,
     charlie_pause,
     deploy_clone,
     official_delta_cancel,
@@ -382,7 +381,6 @@ def _grant_snapshot(
     aid=None,
 ):
     snap = {
-        "reserved": ledger.hrReservedCompensation(),
         "budget": ledger.ripeAvailForHr(),
         "vault": ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token),
         "comp": contributor.compensation(),
@@ -398,6 +396,19 @@ def _grant_snapshot(
         snap["has_pending"] = switchboard_delta.hasPendingAction(aid)
         snap["confirm_block"] = switchboard_delta.getActionConfirmationBlock(aid)
     return snap
+
+
+def _swap_ripe_runtime(ripe_token, path):
+    original = ripe_token.env.get_code(ripe_token.address)
+    # stomp keeps storage and rebinds Boa's source map so # dev: reasons
+    # from the mutant (not the original RipeToken) appear in traces.
+    boa.load_partial(path).stomp(ripe_token.address)
+    return original
+
+
+def _restore_ripe_runtime(ripe_token, original):
+    ripe_token.env.set_code(ripe_token.address, original)
+    ripe_token.env.register_contract(ripe_token.address, ripe_token)
 
 
 
@@ -529,7 +540,6 @@ def test_g11_official_delta_cancel_pre_cliff_after_cash_refunds_full_and_burns(
     assert p > 0
     assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == p
     orig = c.compensation()
-    reserved = ledger.hrReservedCompensation()
     supply = ripe_token.totalSupply()
     budget = ledger.ripeAvailForHr()
     _, ok = official_delta_cancel(switchboard_delta, governance, c)
@@ -537,8 +547,41 @@ def test_g11_official_delta_cancel_pre_cliff_after_cash_refunds_full_and_burns(
     assert c.compensation() == 0
     assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == 0
     assert ledger.ripeAvailForHr() == budget + orig
-    assert ledger.hrReservedCompensation() == reserved - orig
     assert ripe_token.totalSupply() == supply - p
+
+
+def test_g11_pre_cliff_cancel_burn_returns_false_rolls_back(
+    contributor_contract,
+    setupRipeGovVaultConfig,
+    switchboard_delta,
+    governance,
+    owner_address,
+    ripe_token,
+    ripe_gov_vault,
+    ledger,
+    human_resources,
+):
+    _prep(setupRipeGovVaultConfig)
+    c = contributor_contract
+    travel_to_ts(c.startTime() + 1)
+    p = c.cashRipeCheck(sender=owner_address)
+    assert p > 0
+    aid = _initiate_mature_cancel(switchboard_delta, governance, c)
+    snap = _grant_snapshot(
+        human_resources, ledger, c, ripe_gov_vault, ripe_token, switchboard_delta, aid
+    )
+    original = _swap_ripe_runtime(
+        ripe_token, "tests/core/humanResources/Group11BurnFalseRipe.vy"
+    )
+    try:
+        with pytest.raises(BoaError) as exc:
+            switchboard_delta.executePendingAction(aid, sender=governance.address)
+        assert_reverted_call(exc.value, "ripe burn failed", switchboard_delta)
+    finally:
+        _restore_ripe_runtime(ripe_token, original)
+    assert _grant_snapshot(
+        human_resources, ledger, c, ripe_gov_vault, ripe_token, switchboard_delta, aid
+    ) == snap
 
 
 def test_g11_pre_cliff_cash_then_unfrozen_after_cliff_cancel_leaves_cashed_notional(
@@ -554,7 +597,6 @@ def test_g11_pre_cliff_cash_then_unfrozen_after_cliff_cancel_leaves_cashed_notio
     ripe_gov_vault,
 ):
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c, _ = deploy_clone(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
@@ -569,7 +611,6 @@ def test_g11_pre_cliff_cash_then_unfrozen_after_cliff_cancel_leaves_cashed_notio
     claimed = c.totalClaimed()
     assert claimed >= p
     assert ledger.ripeAvailForHr() == budget + (orig - claimed)
-    assert ledger.hrReservedCompensation() == claimed
 
 
 def test_g11_frozen_after_pre_cliff_cash_refunds_c_minus_p_and_leaves_p(
@@ -585,7 +626,6 @@ def test_g11_frozen_after_pre_cliff_cash_refunds_c_minus_p_and_leaves_p(
     ripe_gov_vault,
 ):
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c, _ = deploy_clone(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
@@ -596,7 +636,6 @@ def test_g11_frozen_after_pre_cliff_cash_refunds_c_minus_p_and_leaves_p(
     travel_to_ts(c.cliffTime() + 1)
     orig = c.compensation()
     budget = ledger.ripeAvailForHr()
-    assert ledger.hrReservedCompensation() == orig
     pos = ripe_gov_vault.getTotalAmountForUser(c, ripe_token)
     assert pos == p
     _, ok = official_delta_cancel(switchboard_delta, governance, c)
@@ -604,7 +643,6 @@ def test_g11_frozen_after_pre_cliff_cash_refunds_c_minus_p_and_leaves_p(
     assert c.totalClaimed() == p
     assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == p
     assert ledger.ripeAvailForHr() == budget + (orig - p)
-    assert ledger.hrReservedCompensation() == p
 
 
 def test_g11_pre_cliff_cancel_with_empty_vault_still_refunds_full_c(
@@ -628,10 +666,8 @@ def test_g11_pre_cliff_cancel_with_empty_vault_still_refunds_full_c(
     ripe_gov_vault.withdrawContributorTokensToBurn(c.address, sender=human_resources.address)
     assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == 0
     orig = c.compensation()
-    reserved = ledger.hrReservedCompensation()
     budget = ledger.ripeAvailForHr()
     _, ok = official_delta_cancel(switchboard_delta, governance, c)
     assert ok is True
     assert c.compensation() == 0
     assert ledger.ripeAvailForHr() == budget + orig
-    assert ledger.hrReservedCompensation() == reserved - orig

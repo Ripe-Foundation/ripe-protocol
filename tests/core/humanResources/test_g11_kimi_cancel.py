@@ -16,8 +16,8 @@ Key semantics proven here:
 - after cliff: no burn, clone keeps cashed RIPE, unlockTime unchanged
 - frozen + after-cliff: cash-first returns 0 -> forfeits vested-but-uncashed
   RIPE (measured against the identical unfrozen cancel)
-- near-uint256 ripeAvailForHr overwrite: MAX setter reverts while reserved > 0;
-  a legal write then cancel succeeds
+- near-uint256 ripeAvailForHr overwrite: MAX setter succeeds with a live grant;
+  cancel clamps unrepresentable credit
 - pause rollback: mature Delta cancel + Charlie/HR pause -> execute reverts,
   Delta pending survives, unpause -> same pending executes
 """

@@ -6,8 +6,8 @@
   confirm returns False and leaves no extra clone
 - Delta overwrite of ripeAvailForHr between initiate and confirm: False
   confirm, no clone, no NewContributorConfirmed, no NewContributorCancelled
-- budget-liveness: MAX overwrite reverts while reserved > 0; a legal write
-  then cancel succeeds
+- budget-liveness: MAX overwrite succeeds with a live grant; cancel clamps
+  unrepresentable credit
 - Delta setters: real initiate+execute validation boundaries
 - cross-field feasibility: minCliff > maxVest execute reverts
 - startDelay = uint256.max is rejected at initiate even when maxStartDelay is 0
@@ -20,7 +20,6 @@ import pytest
 from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from contracts.modules import Contributor
-from tests.core.humanResources.g11_proof_helpers import release_live_hr_reserve
 
 
 WEEK = 7 * 24 * 3600
@@ -177,33 +176,24 @@ def test_g11_delta_overwrite_between_initiate_and_confirm(
     assert len(filter_logs(human_resources, "NewContributorCancelled")) == 0
 
 
-def test_g11_budget_liveness_near_uint256_overwrite_blocks_cancel(
+def test_g11_budget_liveness_near_uint256_overwrite_allows_cancel(
     human_resources, setupHrConfig, setupLedgerBalance, setupRipeGovVaultConfig,
     ripe_token, ledger, switchboard_delta, governance, valid_contributor_terms,
 ):
-    """MAX budget write reverts while cancel-credit liability > 0; a legal write then cancel succeeds."""
+    """MAX budget write succeeds with a live grant; cancel at MAX clamps credit to 0."""
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c = _deploy(human_resources, setupHrConfig, setupLedgerBalance, governance, valid_contributor_terms)
     _travel_to_ts(c.startTime() + 10)
 
-    budget_before = ledger.ripeAvailForHr()
     big_aid = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(big_aid, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
-    assert switchboard_delta.actionType(big_aid) != 0
+    assert switchboard_delta.executePendingAction(big_aid, sender=governance.address)
+    assert ledger.ripeAvailForHr() == MAX_UINT256
 
-    fix_aid = switchboard_delta.setRipeAvailableForHr(
-        MAX_UINT256 - ledger.hrReservedCompensation(), sender=governance.address
-    )
-    assert _delta_execute(switchboard_delta, governance, fix_aid)
     cancel_aid = switchboard_delta.cancelPaycheckForContributor(c.address, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
     assert switchboard_delta.executePendingAction(cancel_aid, sender=governance.address)
     assert c.compensation() == 0
-    assert ledger.hrReservedCompensation() == 0
     assert ledger.ripeAvailForHr() == MAX_UINT256
 
 

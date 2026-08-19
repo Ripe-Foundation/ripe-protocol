@@ -18,8 +18,6 @@ from g11_claude_helpers import (
     terms,
     travel_to,
 )
-from tests.core.humanResources.g11_proof_helpers import release_live_hr_reserve
-
 BLOCK_DELTA = 12
 
 
@@ -156,37 +154,26 @@ def test_g11c_real_delta_budget_overwrite_between_initiate_and_confirm_fails_clo
     assert human_resources.pendingContributor(aid_hr).owner == ZERO_ADDRESS
 
 
-def test_g11c_near_max_budget_overwrite_makes_cancel_revert_and_a_staged_fix_recovers(
+def test_g11c_near_max_budget_overwrite_allows_cancel(
     human_resources, mission_control, switchboard_delta, contributor_template,
     ledger, governance, setupRipeGovVaultConfig, ripe_token, alice, bob,
 ):
-    """MAX budget write reverts while cancel-credit liability > 0; a legal write then cancel succeeds."""
+    """MAX budget write succeeds with a live grant; cancel at MAX clamps credit to 0."""
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c = make_contributor(human_resources, mission_control, switchboard_delta,
                          contributor_template, ledger, governance,
                          terms(owner=alice, manager=bob))
-    comp = c.compensation()
     travel_to(c.startTime() + 10)  # pre-cliff
 
-    budget_before = ledger.ripeAvailForHr()
     aid_hi = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    with pytest.raises(BoaError):
-        switchboard_delta.executePendingAction(aid_hi, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
-    assert switchboard_delta.hasPendingAction(aid_hi)
+    assert switchboard_delta.executePendingAction(aid_hi, sender=governance.address)
+    assert ledger.ripeAvailForHr() == MAX_UINT256
 
-    aid_fix = switchboard_delta.setRipeAvailableForHr(
-        MAX_UINT256 - ledger.hrReservedCompensation(), sender=governance.address
-    )
-    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    assert switchboard_delta.executePendingAction(aid_fix, sender=governance.address)
     aid_cancel = switchboard_delta.cancelPaycheckForContributor(c.address, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
     assert switchboard_delta.executePendingAction(aid_cancel, sender=governance.address)
     assert c.compensation() == 0
-    assert ledger.hrReservedCompensation() == 0
     assert ledger.ripeAvailForHr() == MAX_UINT256
 
 
@@ -406,33 +393,24 @@ def test_g11c_ledger_pause_makes_confirm_revert_atomically_with_no_orphan_clone(
     assert ledger.ripeAvailForHr() == avail_before - comp
 
 
-def test_g11c_near_max_budget_also_blocks_an_after_cliff_cancel(
+def test_g11c_near_max_budget_allows_after_cliff_cancel(
     human_resources, mission_control, switchboard_delta, contributor_template,
     ledger, governance, setupRipeGovVaultConfig, ripe_token, alice, bob,
 ):
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c = make_contributor(human_resources, mission_control, switchboard_delta,
                          contributor_template, ledger, governance,
                          terms(owner=alice, manager=bob))
     travel_to(c.cliffTime() + 24 * 3600)
-    budget_before = ledger.ripeAvailForHr()
     aid_hi = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    with pytest.raises(BoaError):
-        switchboard_delta.executePendingAction(aid_hi, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
-    aid_ok = switchboard_delta.setRipeAvailableForHr(
-        MAX_UINT256 - ledger.hrReservedCompensation(), sender=governance.address
-    )
-    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    assert switchboard_delta.executePendingAction(aid_ok, sender=governance.address)
+    assert switchboard_delta.executePendingAction(aid_hi, sender=governance.address)
+    assert ledger.ripeAvailForHr() == MAX_UINT256
     claimed_before = c.totalClaimed()
-    orig = c.compensation()
     aid_cancel = switchboard_delta.cancelPaycheckForContributor(c.address, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
     assert switchboard_delta.executePendingAction(aid_cancel, sender=governance.address)
     claimed = c.totalClaimed()
     assert claimed >= claimed_before
-    assert ledger.hrReservedCompensation() == claimed
     assert c.compensation() == claimed
+    assert ledger.ripeAvailForHr() == MAX_UINT256

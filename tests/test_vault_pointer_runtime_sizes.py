@@ -15,11 +15,11 @@ EXPECTED_RUNTIME_BYTES = {
     "Teller": 24556,
     "TellerUtils": 9091,
     "BondRoom": 10927,
-    "Ledger": 13451,
+    "Ledger": 13306,
     "Lootbox": 24444,
     "RebaseErc20": 11411,
     "RipeGov": 23878,
-    "HumanResources": 12956,
+    "HumanResources": 13041,
     "AuctionHouse": 24528,
     "CreditEngine": 24502,
     "CreditRedeem": 8303,
@@ -106,6 +106,13 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "UndyVaultPrices": len(undy_vault_prices.env.get_code(undy_vault_prices.address)),
         "wsuperOETHbPrices": len(wsuper_oethb_prices.env.get_code(wsuper_oethb_prices.address)),
     }
+    print("DEPLOYED_RUNTIME_BYTES", deployed_runtime_bytes)
+
+    headroom = {
+        name: EIP170_LIMIT - size for name, size in deployed_runtime_bytes.items()
+    }
+    print("DEPLOYED_RUNTIME_HEADROOM", headroom)
+
     oversized = {
         name: size
         for name, size in deployed_runtime_bytes.items()

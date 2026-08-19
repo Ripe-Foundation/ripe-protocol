@@ -170,17 +170,3 @@ def overflow_compensation(elapsed=2):
     safe = MAX_UINT256 // elapsed
     return safe, safe + 1
 
-
-def release_live_hr_reserve(switchboard_delta, governance, ledger):
-    """Official-cancel leftover live clones. Ended grants stay reserved."""
-    n = ledger.numContributors()
-    for i in range(1, n):
-        addr = ledger.contributors(i)
-        c = Contributor.at(addr)
-        if c.compensation() == 0:
-            continue
-        if boa.env.evm.patch.timestamp >= c.endTime():
-            continue
-        _, ok = official_delta_cancel(switchboard_delta, governance, c)
-        assert ok is True
-

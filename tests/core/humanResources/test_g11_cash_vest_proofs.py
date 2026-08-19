@@ -8,7 +8,6 @@ from conf_utils import assert_reverted_call, filter_logs
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from contracts.modules import Contributor
 from tests.core.humanResources.g11_proof_helpers import (
-    release_live_hr_reserve,
     HR_ID,
     charlie_pause,
     expected_vested,
@@ -559,7 +558,6 @@ def test_g11_custom_template_saturates_both_aggregate_views(
     switchboard_delta,
     ledger,
 ):
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     template = boa.load_partial(
         "tests/core/humanResources/Group11OverflowViewContributor.vy"
     ).deploy_as_blueprint()
@@ -576,7 +574,6 @@ def test_g11_custom_template_saturates_both_aggregate_views(
         addrs.append(filter_logs(human_resources, "NewContributorConfirmed")[0].contributorAddr)
     assert human_resources.getTotalCompensation() == MAX_UINT256
     assert human_resources.getTotalClaimed() == MAX_UINT256
-    assert ledger.hrReservedCompensation() == valid_contributor_terms["compensation"] * 2
 
 
 def test_g11_hq_mint_gate_is_hr_id_15(ripe_hq, human_resources):

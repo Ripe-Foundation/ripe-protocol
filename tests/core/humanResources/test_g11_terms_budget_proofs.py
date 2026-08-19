@@ -4,7 +4,6 @@ from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from contracts.modules import Contributor
 from tests.core.humanResources.g11_proof_helpers import (
-    release_live_hr_reserve,
     MONTH_IN_SECONDS,
     WEEK_IN_SECONDS,
     YEAR_IN_SECONDS,
@@ -155,37 +154,16 @@ def test_g11_near_uint256_budget_overwrite_keeps_cancel_live(
     governance,
     ledger,
 ):
-    """MAX setter reverts while cancel-credit liability > 0; a legal write then cancel succeeds."""
+    """MAX budget write succeeds with a live grant; cancel at MAX clamps credit to 0."""
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c, _ = deploy_clone(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
-    liability = ledger.hrReservedCompensation()
-    assert liability == c.compensation()
-    assert ledger.hrReservedCompensation() == c.compensation()
-    budget_before = ledger.ripeAvailForHr()
-    aid_max = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
-    travel_to_block(switchboard_delta.getActionConfirmationBlock(aid_max))
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(aid_max, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
-    assert switchboard_delta.actionType(aid_max) != 0
-    assert filter_logs(switchboard_delta, "RipeAvailableForHrSet") == []
-
-    cap = MAX_UINT256 - liability
-    official_delta_budget(switchboard_delta, governance, cap)
-    assert ledger.ripeAvailForHr() == cap
-    aid_over = switchboard_delta.setRipeAvailableForHr(cap + 1, sender=governance.address)
-    travel_to_block(switchboard_delta.getActionConfirmationBlock(aid_over))
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(aid_over, sender=governance.address)
-
+    official_delta_budget(switchboard_delta, governance, MAX_UINT256)
+    assert ledger.ripeAvailForHr() == MAX_UINT256
     aid, ok = official_delta_cancel(switchboard_delta, governance, c)
     assert ok is True
     assert c.compensation() == 0
-    assert ledger.hrReservedCompensation() == 0
-    official_delta_budget(switchboard_delta, governance, MAX_UINT256)
     assert ledger.ripeAvailForHr() == MAX_UINT256
 
 
@@ -199,28 +177,16 @@ def test_g11_near_uint256_budget_overwrite_cancel_rolls_back_then_retry_after_co
     governance,
     ledger,
 ):
-    """MAX setter reverts while liability > 0; a legal write then cancel succeeds."""
+    """MAX write then cancel succeeds immediately; unrepresentable credit is discarded."""
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c, _ = deploy_clone(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
-    orig = c.compensation()
-    budget_before = ledger.ripeAvailForHr()
-    aid_max = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
-    travel_to_block(switchboard_delta.getActionConfirmationBlock(aid_max))
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(aid_max, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
-    assert switchboard_delta.actionType(aid_max) != 0
-    official_delta_budget(
-        switchboard_delta, governance, MAX_UINT256 - ledger.hrReservedCompensation()
-    )
+    official_delta_budget(switchboard_delta, governance, MAX_UINT256)
     aid, ok = official_delta_cancel(switchboard_delta, governance, c)
     assert ok is True
     assert c.compensation() == 0
-    assert ledger.hrReservedCompensation() == 0
-    assert ledger.ripeAvailForHr() == MAX_UINT256 - orig + orig
+    assert ledger.ripeAvailForHr() == MAX_UINT256
 
 
 def test_g11_overflow_compensation_create_succeeds_under_uncapped_max(
@@ -640,15 +606,11 @@ def test_g11_no_clones_allows_max_budget_write(
     governance,
     ledger,
 ):
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
-    assert ledger.hrReservedCompensation() == 0
     official_delta_budget(switchboard_delta, governance, MAX_UINT256)
     assert ledger.ripeAvailForHr() == MAX_UINT256
 
 
-
-
-def test_g11_full_cash_leaves_reserved_and_blocks_max_budget(
+def test_g11_full_cash_allows_max_budget_write(
     human_resources,
     setupHrConfig,
     setupLedgerBalance,
@@ -658,9 +620,8 @@ def test_g11_full_cash_leaves_reserved_and_blocks_max_budget(
     governance,
     ledger,
 ):
-    """Finished vest does not release reserved. MAX setter stays blocked."""
+    """Finished vest does not block a MAX budget write."""
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c, _ = deploy_clone(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
@@ -668,16 +629,11 @@ def test_g11_full_cash_leaves_reserved_and_blocks_max_budget(
     travel_to_ts(c.endTime())
     assert c.cashRipeCheck(sender=c.owner()) == orig
     assert c.totalClaimed() == orig
-    assert ledger.hrReservedCompensation() == orig
-    budget_before = ledger.ripeAvailForHr()
-    aid = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
-    travel_to_block(switchboard_delta.getActionConfirmationBlock(aid))
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
+    official_delta_budget(switchboard_delta, governance, MAX_UINT256)
+    assert ledger.ripeAvailForHr() == MAX_UINT256
 
 
-def test_g11_after_cliff_partial_cash_cancel_leaves_cashed_notional(
+def test_g11_after_cliff_partial_cash_cancel_credits_remainder(
     human_resources,
     setupHrConfig,
     setupLedgerBalance,
@@ -687,9 +643,8 @@ def test_g11_after_cliff_partial_cash_cancel_leaves_cashed_notional(
     governance,
     ledger,
 ):
-    """Post-cliff cancel refunds C-P and leaves leftover P in reserved."""
+    """Post-cliff cancel refunds C-P exactly when below the ceiling."""
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c, _ = deploy_clone(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
@@ -703,10 +658,9 @@ def test_g11_after_cliff_partial_cash_cancel_leaves_cashed_notional(
     claimed = c.totalClaimed()
     assert claimed >= p
     assert ledger.ripeAvailForHr() == budget + (orig - claimed)
-    assert ledger.hrReservedCompensation() == claimed
 
 
-def test_g11_pre_cliff_cash_then_rest_at_end_leaves_reserved(
+def test_g11_pre_cliff_cash_then_rest_at_end_allows_max_budget(
     human_resources,
     setupHrConfig,
     setupLedgerBalance,
@@ -717,7 +671,6 @@ def test_g11_pre_cliff_cash_then_rest_at_end_leaves_reserved(
     ledger,
 ):
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     c, _ = deploy_clone(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
@@ -729,31 +682,11 @@ def test_g11_pre_cliff_cash_then_rest_at_end_leaves_reserved(
     rest = c.cashRipeCheck(sender=c.owner())
     assert rest == orig - p
     assert c.totalClaimed() == orig
-    assert ledger.hrReservedCompensation() == orig
-    budget_before = ledger.ripeAvailForHr()
-    aid = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
-    travel_to_block(switchboard_delta.getActionConfirmationBlock(aid))
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
+    official_delta_budget(switchboard_delta, governance, MAX_UINT256)
+    assert ledger.ripeAvailForHr() == MAX_UINT256
 
 
-def test_g11_hr_layer_over_refund_reverts_and_leaves_reserve_and_budget(
-    contributor_contract,
-    human_resources,
-    ledger,
-):
-    c = contributor_contract
-    reserved = ledger.hrReservedCompensation()
-    budget = ledger.ripeAvailForHr()
-    with boa.reverts("hr reserve underflow"):
-        human_resources.refundAfterCancelPaycheck(reserved + 1, False, sender=c.address)
-    assert ledger.hrReservedCompensation() == reserved
-    assert ledger.ripeAvailForHr() == budget
-    assert c.compensation() != 0
-
-
-def test_g11_setter_after_pre_cliff_cash_still_uses_full_grant_notional(
+def test_g11_pre_cliff_cash_cancel_still_credits_full_grant(
     human_resources,
     setupHrConfig,
     setupLedgerBalance,
@@ -763,9 +696,8 @@ def test_g11_setter_after_pre_cliff_cash_still_uses_full_grant_notional(
     governance,
     ledger,
 ):
-    """After pre-cliff cash P, setter headroom is still C+B, not C-P+B."""
+    """After pre-cliff cash P, cancel still credits full C when below the ceiling."""
     setupRipeGovVaultConfig()
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     a_terms = _valid(
         valid_contributor_terms,
         owner="0x" + "d1" * 20,
@@ -792,27 +724,10 @@ def test_g11_setter_after_pre_cliff_cash_still_uses_full_grant_notional(
     assert boa.env.evm.patch.timestamp < a.cliffTime()
     p = a.cashRipeCheck(sender=a.owner())
     assert p > 0
-    assert ledger.hrReservedCompensation() == c_amt + b.compensation()
 
-    budget_before = ledger.ripeAvailForHr()
-    aid_max = switchboard_delta.setRipeAvailableForHr(MAX_UINT256, sender=governance.address)
-    travel_to_block(switchboard_delta.getActionConfirmationBlock(aid_max))
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(aid_max, sender=governance.address)
-    assert ledger.ripeAvailForHr() == budget_before
-
-    gap_write = MAX_UINT256 - (c_amt - p)
-    aid_gap = switchboard_delta.setRipeAvailableForHr(gap_write, sender=governance.address)
-    travel_to_block(switchboard_delta.getActionConfirmationBlock(aid_gap))
-    with boa.reverts("exceeds hr budget headroom"):
-        switchboard_delta.executePendingAction(aid_gap, sender=governance.address)
-
-    legal = MAX_UINT256 - (c_amt + b.compensation())
-    official_delta_budget(switchboard_delta, governance, legal)
-    assert ledger.ripeAvailForHr() == legal
     budget_pre_cancel = ledger.ripeAvailForHr()
     _, ok = official_delta_cancel(switchboard_delta, governance, a)
     assert ok is True
     assert a.compensation() == 0
+    assert b.compensation() == b_terms["compensation"]
     assert ledger.ripeAvailForHr() == budget_pre_cancel + c_amt
-    assert ledger.hrReservedCompensation() == b.compensation()

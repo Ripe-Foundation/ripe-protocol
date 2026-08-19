@@ -50,7 +50,7 @@ def test_g11c_cash_vest_timestamp_boundaries_owner_manager_and_delta(
     owner, manager = c.owner(), c.manager()
     start, cliff, end = c.startTime(), c.cliffTime(), c.endTime()
     comp = c.compensation()
-    avail_after_reserve = ledger.ripeAvailForHr()
+    avail_after_create = ledger.ripeAvailForHr()
 
     # --- before startTime: 0, no mint
     s0 = snapshot(ripe_gov_vault, ripe_token, ledger, human_resources, c)
@@ -85,8 +85,8 @@ def test_g11c_cash_vest_timestamp_boundaries_owner_manager_and_delta(
     assert position(ripe_gov_vault, owner, ripe_token) == before["owner_pos"]
     assert ripe_token.balanceOf(human_resources) == before["hr_bal"]
     assert c.totalClaimed() == before["claimed"] + expected
-    # budget was reserved at addHrContributor; cash does NOT decrement again
-    assert ledger.ripeAvailForHr() == avail_after_reserve == before["avail"]
+    # create already decremented the budget; cash does not change it
+    assert ledger.ripeAvailForHr() == avail_after_create == before["avail"]
 
     # --- second cash in the same timestamp: 0, no mint, no event
     s = ripe_token.totalSupply()
@@ -128,7 +128,7 @@ def test_g11c_cash_vest_timestamp_boundaries_owner_manager_and_delta(
     assert ripe_token.totalSupply() == s
     # conservation: minted == clone position == totalClaimed, budget untouched by cash
     assert position(ripe_gov_vault, c, ripe_token) == c.totalClaimed() == comp
-    assert ledger.ripeAvailForHr() == avail_after_reserve
+    assert ledger.ripeAvailForHr() == avail_after_create
     assert ripe_token.balanceOf(c) == 0
     assert ripe_token.balanceOf(human_resources) == 0
 
@@ -250,7 +250,6 @@ def test_g11c_official_cash_cannot_exceed_get_claimable(
     travel_to(c.startTime() + 1)
     claimable = c.getClaimable()
     supply = ripe_token.totalSupply()
-    reserved = ledger.hrReservedCompensation()
     avail = ledger.ripeAvailForHr()
     assert c.cashRipeCheck(sender=c.owner()) == claimable
     assert ripe_token.totalSupply() == supply + claimable
@@ -258,7 +257,6 @@ def test_g11c_official_cash_cannot_exceed_get_claimable(
     assert c.getClaimable() == 0
     assert c.cashRipeCheck(sender=c.owner()) == 0
     assert ripe_token.totalSupply() == supply + claimable
-    assert ledger.hrReservedCompensation() == reserved
     assert ledger.ripeAvailForHr() == avail
 
 

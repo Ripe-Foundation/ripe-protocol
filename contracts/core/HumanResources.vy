@@ -456,8 +456,9 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     a: addys.Addys = addys._getAddys()
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
-    # refund ledger 
-    extcall Ledger(a.ledger).refundRipeAfterCancelPaycheck(_amount)
+    budget: uint256 = staticcall Ledger(a.ledger).ripeAvailForHr()
+    creditedAmount: uint256 = min(_amount, max_value(uint256) - budget)
+    extcall Ledger(a.ledger).refundRipeAfterCancelPaycheck(creditedAmount)
 
     if not _shouldBurnPosition:
         return

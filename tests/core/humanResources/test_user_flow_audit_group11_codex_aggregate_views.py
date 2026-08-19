@@ -4,7 +4,6 @@ import boa
 
 from conf_utils import filter_logs
 from tests.core.humanResources.g11_proof_helpers import (
-    release_live_hr_reserve,
     official_delta_cancel,
 )
 
@@ -87,7 +86,6 @@ def test_g11_custom_template_can_overflow_both_aggregate_views(
     terms = dict(valid_contributor_terms)
     setupHrConfig(_contribTemplate=custom_template.address, _maxCompensation=0)
 
-    release_live_hr_reserve(switchboard_delta, governance, ledger)
     _set_hr_budget(switchboard_delta, governance, ledger, terms["compensation"] * 2)
     addr1 = _confirm(human_resources, governance, terms)
     terms2 = dict(terms)
@@ -96,7 +94,6 @@ def test_g11_custom_template_can_overflow_both_aggregate_views(
 
     assert human_resources.getTotalCompensation() == UINT256_MAX
     assert human_resources.getTotalClaimed() == UINT256_MAX
-    assert ledger.hrReservedCompensation() == terms["compensation"] * 2
     for addr in (addr1, addr2):
         _, ok = official_delta_cancel(
             switchboard_delta, governance, type("Handle", (), {"address": addr})()
