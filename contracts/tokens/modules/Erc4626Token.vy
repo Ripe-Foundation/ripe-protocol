@@ -11,8 +11,8 @@ from contracts.tokens.modules import Erc20Token as token
 from ethereum.ercs import IERC20
 
 interface AssetToken:
-    def isPaused() -> bool: view
     def blacklisted(_addr: address) -> bool: view
+    def isPaused() -> bool: view
 
 event Deposit:
     sender: indexed(address)
@@ -48,18 +48,6 @@ def asset() -> address:
 @external
 def totalAssets() -> uint256:
     return staticcall IERC20(ASSET).balanceOf(self)
-
-
-@view
-@internal
-def _assetBlocked() -> bool:
-    return staticcall AssetToken(ASSET).isPaused() or staticcall AssetToken(ASSET).blacklisted(self)
-
-
-@view
-@internal
-def _zeroBacking() -> bool:
-    return token.totalSupply != 0 and staticcall IERC20(ASSET).balanceOf(self) == 0
 
 
 ############
@@ -327,3 +315,18 @@ def getLastUnderlying(_shares: uint256) -> uint256:
 @external
 def pricePerShare() -> uint256:
     return self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)
+
+
+# utils
+
+
+@view
+@internal
+def _assetBlocked() -> bool:
+    return staticcall AssetToken(ASSET).isPaused() or staticcall AssetToken(ASSET).blacklisted(self)
+
+
+@view
+@internal
+def _zeroBacking() -> bool:
+    return token.totalSupply != 0 and staticcall IERC20(ASSET).balanceOf(self) == 0

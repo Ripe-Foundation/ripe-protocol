@@ -11,8 +11,8 @@ interface RipeHq:
     def canMintGreen(_addr: address) -> bool: view
     def canMintRipe(_addr: address) -> bool: view
     def hasPendingGovChange() -> bool: view
-    def greenToken() -> address: view
     def savingsGreen() -> address: view
+    def greenToken() -> address: view
     def governance() -> address: view
     def ripeToken() -> address: view
 
