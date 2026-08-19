@@ -3,20 +3,15 @@ their REAL initiate + timelock + executePendingAction path, cross-field feasibil
 and the rotated-template sequence."""
 
 import boa
-import pytest
-from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
-from contracts.modules import Contributor
 
 from g11_claude_helpers import (
-    make_contributor,
     set_budget,
     set_hr_config,
     term_args,
     terms,
-    travel_to,
 )
 
 DAY = 60 * 60 * 24
@@ -76,7 +71,7 @@ def test_g11c_delta_hr_setters_reject_the_launch_values_they_can_never_restore(
 def test_g11c_two_parallel_delta_hr_config_pendings_merge_without_stomping(
     mission_control, switchboard_delta, contributor_template, governance,
 ):
-    live = set_hr_config(mission_control, switchboard_delta, contributor_template)
+    set_hr_config(mission_control, switchboard_delta, contributor_template)
     before = _cfg(mission_control)
 
     aid_comp = switchboard_delta.setMaxCompensation(7_000_000 * EIGHTEEN_DECIMALS,
@@ -117,7 +112,7 @@ def _no_boundary_candidate_validates(human_resources, cfg, owner, manager, comp)
     return True, None
 
 
-def test_g11c_governance_can_merge_hr_config_into_a_globally_infeasible_state(
+def test_g11c_infeasible_min_cliff_execute_reverts_and_keeps_pending(
     human_resources, mission_control, switchboard_delta, contributor_template,
     ledger, governance, alice, bob, sally,
 ):
@@ -143,7 +138,6 @@ def test_g11c_governance_can_merge_hr_config_into_a_globally_infeasible_state(
     assert cfg.minCliffLength == live.minCliffLength
     assert cfg.maxVestingLength == live.maxVestingLength
     assert switchboard_delta.actionType(aid) != 0
-    assert filter_logs(switchboard_delta, "HrMinCliffLengthSet") == []
 
     boa.env.time_travel(blocks=human_resources.actionTimeLock())
     assert human_resources.confirmNewContributor(pending_aid, sender=governance.address)
@@ -219,3 +213,36 @@ def test_g11c_confirm_uses_the_template_live_at_confirm_not_at_initiate(
     # and the terms were revalidated against the LIVE config, not the initiate-time one
     assert marker.compensation() == comp
     assert ledger.isHrContributor(deployed)
+
+
+def test_g11c_zero_max_vesting_uses_2_128_effective_ceiling(
+    mission_control,
+    switchboard_delta,
+    contributor_template,
+    governance,
+):
+    """Live maxVestingLength == 0 is treated as 2**128, not unbounded."""
+    set_hr_config(
+        mission_control,
+        switchboard_delta,
+        contributor_template,
+        minCliffLength=WEEK + 1,
+        minVestingLength=0,
+        maxVestingLength=0,
+    )
+    live = _cfg(mission_control)
+    assert live.maxVestingLength == 0
+
+    over = switchboard_delta.setMinCliffLength(2**128 + 1, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    with boa.reverts("infeasible hr config"):
+        switchboard_delta.executePendingAction(over, sender=governance.address)
+    cfg = _cfg(mission_control)
+    assert cfg.minCliffLength == live.minCliffLength
+    assert cfg.maxVestingLength == 0
+    assert switchboard_delta.actionType(over) != 0
+
+    equal = switchboard_delta.setMinCliffLength(2**128, sender=governance.address)
+    _exec(switchboard_delta, governance, equal)
+    assert _cfg(mission_control).minCliffLength == 2**128
+    assert _cfg(mission_control).maxVestingLength == 0

@@ -7,10 +7,8 @@ do with a stored term.
 
 import boa
 import pytest
-from boa.contracts.base_evm_contract import BoaError
 
-from constants import MAX_UINT256, ZERO_ADDRESS
-from conf_utils import assert_reverted_call, filter_logs
+from constants import MAX_UINT256
 
 from g11_claude_helpers import (
     make_contributor,
@@ -112,24 +110,7 @@ def test_g11c_lock_matrix_seeded_owner_prevshares_at_or_above_precision(
         human_resources.initiateNewContributor(*term_args(t), sender=governance.address)
 
 
-def test_g11c_lock_matrix_overflow_sized_term_permanently_strands_the_position(
-    human_resources,
-    mission_control,
-    switchboard_delta,
-    contributor_template,
-    ledger,
-    governance,
-    alice,
-):
-    """Overflow-sized depositLockDuration is rejected at initiate."""
-    t = terms(owner=alice, depositLockDuration=MAX_UINT256)
-    set_hr_config(mission_control, switchboard_delta, contributor_template)
-    set_budget(ledger, switchboard_delta, t["compensation"])
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(*term_args(t), sender=governance.address)
-
-
-def test_g11c_after_cliff_cancel_does_not_release_an_overflow_stranded_position(
+def test_g11c_overflow_sized_deposit_lock_is_rejected_at_initiate(
     human_resources,
     mission_control,
     switchboard_delta,

@@ -8,10 +8,9 @@ Freeze is not an ownership freeze: handoffs proceed while frozen; the real
 cancellation window is measured in blocks.
 """
 import boa
-import pytest
 
 from conf_utils import filter_logs
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from contracts.modules import Contributor
 
 

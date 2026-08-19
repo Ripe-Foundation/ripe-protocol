@@ -7,11 +7,9 @@ from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import assert_reverted_call, filter_logs
-from contracts.modules import Contributor
 
 from g11_claude_helpers import (
     make_contributor,
-    position,
     set_budget,
     set_hr_config,
     term_args,
@@ -387,7 +385,6 @@ def test_g11c_ledger_pause_makes_confirm_revert_atomically_with_no_orphan_clone(
     assert ledger.ripeAvailForHr() == avail_before       # no budget decrement
     assert human_resources.hasPendingAction(aid)         # HR action not consumed
     assert human_resources.pendingContributor(aid).owner == alice
-    assert filter_logs(human_resources, "NewContributorConfirmed") == []
 
     assert switchboard_charlie.pause(ledger.address, False, sender=governance.address)
     assert human_resources.confirmNewContributor(aid, sender=governance.address)

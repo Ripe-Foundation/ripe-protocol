@@ -12,7 +12,8 @@ Key semantics proven here:
 - residue B (seeded via Teller-impersonation deposit, stated as
   deposit-permission-dependent) is burned along with the paycheck position
   while only the original compensation is refunded to ripeAvailForHr
-- exact cliffTime: cash-then-refund-remainder, no burn
+- cancel initiated at cliffTime: cash-then-refund-remainder, no burn
+  (Delta timelock then advances execution past the named boundary)
 - after cliff: no burn, clone keeps cashed RIPE, unlockTime unchanged
 - frozen + after-cliff: cash-first returns 0 -> forfeits vested-but-uncashed
   RIPE (measured against the identical unfrozen cancel)
@@ -22,10 +23,9 @@ Key semantics proven here:
   Delta pending survives, unpause -> same pending executes
 """
 import boa
-import pytest
 
 from conf_utils import filter_logs
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256
+from constants import EIGHTEEN_DECIMALS
 from contracts.modules import Contributor
 
 
@@ -78,7 +78,7 @@ def test_g11_cancel_before_start_full_refund_terminal_views(
     terms = valid_contributor_terms
     assert _ts() < c.startTime()
     avail0 = ledger.ripeAvailForHr()
-    assert avail0 == 0  # fixture reserved exactly compensation
+    assert avail0 == 0  # create consumed the fixture budget exactly
     supply0 = ripe_token.totalSupply()
 
     aid = _delta_cancel(switchboard_delta, governance, c)
@@ -98,7 +98,7 @@ def test_g11_cancel_before_start_full_refund_terminal_views(
     # second official cancel reverts (timestamp < endTime fails)
     aid2 = switchboard_delta.cancelPaycheckForContributor(c.address, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    with boa.reverts():
+    with boa.reverts("cannot cancel"):
         switchboard_delta.executePendingAction(aid2, sender=governance.address)
 
 
@@ -193,7 +193,7 @@ def test_g11_cancel_pre_cliff_residue_isolation(
     assert _pos(ripe_gov_vault, c.address, ripe_token) == residue + cashed
     supply_before_cancel = ripe_token.totalSupply()
     avail_before_cancel = ledger.ripeAvailForHr()
-    hr_ripe_before = ripe_token.balanceOf(human_resources)
+    assert ripe_token.balanceOf(human_resources) == 0
 
     aid = _delta_cancel(switchboard_delta, governance, c)
     assert switchboard_delta.executePendingAction(aid, sender=governance.address)
@@ -206,12 +206,13 @@ def test_g11_cancel_pre_cliff_residue_isolation(
     assert ripe_token.balanceOf(human_resources) == 0
 
 
-def test_g11_cancel_exact_cliff_and_after_cliff_no_burn(
+def test_g11_cancel_from_cliff_window_and_after_cliff_no_burn(
     human_resources, setupHrConfig, setupLedgerBalance, governance,
     valid_contributor_terms, setupRipeGovVaultConfig,
     ripe_gov_vault, ripe_token, ledger, switchboard_delta,
 ):
-    """Exact cliffTime: cancel cashes first (RipeCheckCashed.cashedBy == HR),
+    """Cancel initiated at cliffTime: Delta timelock then executes after the
+    named boundary. Cancel cashes first (RipeCheckCashed.cashedBy == HR),
     refunds only the unvested remainder, no burn. After-cliff: same shape.
     unlockTime is unchanged and the exit still routes through the two-step."""
     c = _deploy(human_resources, setupHrConfig, setupLedgerBalance, governance,
@@ -220,13 +221,9 @@ def test_g11_cancel_exact_cliff_and_after_cliff_no_burn(
     terms = valid_contributor_terms
     owner = terms["owner"]
 
-    # exact cliffTime cancel
+    # initiate at cliffTime; Delta timelock advances execution past that boundary
     _travel_to_ts(c.cliffTime())
-    vested_at_cliff = min(terms["compensation"],
-                          terms["compensation"] * (c.cliffTime() - c.startTime()) // terms["vestingLength"])
     aid = _delta_cancel(switchboard_delta, governance, c)
-    # delta timelock travel moves time but blocks only; timestamp may advance ~0 in boa
-    _travel_to_ts(c.cliffTime())  # ensure still exactly cliff
     supply0 = ripe_token.totalSupply()
     avail0 = ledger.ripeAvailForHr()
     unlock_before = c.unlockTime()
@@ -267,13 +264,13 @@ def test_g11_cancel_at_and_after_end_reverts(
     avail0 = ledger.ripeAvailForHr()
     _travel_to_ts(c.endTime())
     aid = _delta_cancel(switchboard_delta, governance, c)
-    with boa.reverts():  # "cannot cancel"
+    with boa.reverts("cannot cancel"):
         switchboard_delta.executePendingAction(aid, sender=governance.address)
     # after end: initiate + execute reverts too
     _travel_to_ts(c.endTime() + 100)
     aid2 = switchboard_delta.cancelPaycheckForContributor(c.address, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    with boa.reverts():
+    with boa.reverts("cannot cancel"):
         switchboard_delta.executePendingAction(aid2, sender=governance.address)
     assert ledger.ripeAvailForHr() == avail0  # no refund happened
 
@@ -297,7 +294,6 @@ def test_g11_frozen_after_cliff_cancel_forfeits_vested_uncashed(
     under an unfrozen cancel.
     """
     terms = valid_contributor_terms
-    owner = terms["owner"]
 
     def run(freeze: bool):
         c = _deploy(human_resources, setupHrConfig, setupLedgerBalance, governance,
@@ -365,7 +361,7 @@ def test_g11_cancel_pause_rollback_official_path(
     avail0 = ledger.ripeAvailForHr()
 
     assert switchboard_charlie.pause(human_resources.address, True, sender=governance.address)
-    with boa.reverts():
+    with boa.reverts("contract paused"):
         switchboard_delta.executePendingAction(aid, sender=governance.address)
     # full rollback: contributor state unchanged, delta pending alive
     assert c.compensation() == comp0

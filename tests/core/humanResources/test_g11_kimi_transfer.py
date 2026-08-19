@@ -15,12 +15,10 @@ through the same handle (titanoboa log cursors are per-handle and a later call
 through the same handle can disturb them).
 """
 import boa
-import pytest
 
 from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from contracts.modules import Contributor
-from tests.core.humanResources.contributor_test_utils import prepare_transferable_position
 
 
 PRECISION = 10**18
@@ -177,6 +175,7 @@ def test_g11_manager_initiate_and_confirm_pay_owner_at_initiate(
     redirect; changeOwnership during a pending transfer is blocked."""
     c = contributor_contract
     amt = _cash_position(c, setupRipeGovVaultConfig, owner_address)
+    assert amt > 0
     _travel_to_ts(c.unlockTime() + 1)
 
     c.initiateRipeTransfer(sender=manager_address)
@@ -212,6 +211,7 @@ def test_g11_reinitiate_restarts_confirm_block_and_owner_recovery(
     recipient is unchanged; delay cost is bounded by the owner's response."""
     c = contributor_contract
     amt = _cash_position(c, setupRipeGovVaultConfig, owner_address)
+    assert amt > 0
     _travel_to_ts(c.unlockTime() + 1)
     delay = c.keyActionDelay()
 
@@ -255,6 +255,7 @@ def test_g11_set_delay_after_initiate_does_not_retime(
     delay = c.keyActionDelay()
     c.initiateRipeTransfer(sender=owner_address)
     p0 = c.pendingRipeTransfer()
+    assert p0.confirmBlock == p0.initiatedBlock + delay
     max_delay = human_resources.maxActionTimeLock()
     c.setKeyActionDelay(max_delay, sender=owner_address)
     assert c.keyActionDelay() == max_delay
@@ -355,8 +356,8 @@ def test_g11_initiate_late_failure_atomicity(
     assert c.totalClaimed() == claimed0
     assert ripe_token.allowance(human_resources, teller) == allowance0
     assert _vault_pos(ripe_gov_vault, c.address, ripe_token) == clone_pos0
-    assert len(filter_logs(Contributor.at(c.address), "RipeCheckCashed")) == 0
-    assert len(filter_logs(Contributor.at(c.address), "RipeTransferInitiated")) == 0
+    assert len(filter_logs(c, "RipeCheckCashed")) == 0
+    assert len(filter_logs(c, "RipeTransferInitiated")) == 0
 
     # (ii) pending ownership change as the later revert (move past unlock first)
     _travel_to_ts(c.unlockTime() + 1)
@@ -366,7 +367,7 @@ def test_g11_initiate_late_failure_atomicity(
     assert ripe_token.totalSupply() == supply0
     assert c.totalClaimed() == claimed0
     assert _vault_pos(ripe_gov_vault, c.address, ripe_token) == clone_pos0
-    assert len(filter_logs(Contributor.at(c.address), "RipeCheckCashed")) == 0
+    assert len(filter_logs(c, "RipeCheckCashed")) == 0
     c.cancelOwnershipChange(sender=owner_address)
 
     # (iii) adjacent direct cash succeeds — proves the rollback was the late check
@@ -434,16 +435,7 @@ def test_g11_lock_matrix(
             base = max(refreshed, xfer_block)
             assert owner_data.unlock == base + dur, (dur, owner_data.unlock, base)
         else:
-            # seeded branch: weighted blend, new leg floored at 1
-            prev_remaining = min(owner_prev.unlock - xfer_block, FIXTURE_MAX_LOCK) if owner_prev.unlock > xfer_block else 1
-            prev_norm = owner_prev.lastShares // PRECISION
-            new_norm = amt // PRECISION if amt > PRECISION else 1
-            new_leg = max(dur, 1)
-            expected = xfer_block + (prev_norm * prev_remaining + new_norm * new_leg) // (prev_norm + new_norm)
-            # the confirm's optional cash mints additional shares into the owner
-            # position in the same tx; allow the observed unlock to sit between the
-            # pure-blend floor and the raw-duration ceiling, and pin the exact value
-            # via the vault's own view on the same inputs
+            # seeded branch: pin the exact unlock via the vault's own view
             view_expected = ripe_gov_vault.getWeightedLockOnTokenDeposit(
                 owner_data.lastShares - owner_prev.lastShares,  # new shares incl. cash
                 dur,

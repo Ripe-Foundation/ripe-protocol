@@ -4,7 +4,7 @@ import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import ZERO_ADDRESS
 from conf_utils import assert_reverted_call, filter_logs
 
 from g11_claude_helpers import make_contributor, position, terms, travel_to

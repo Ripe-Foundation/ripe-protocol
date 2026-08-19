@@ -1,6 +1,6 @@
 # Group 11 — trusted clone, HR refund clamp
 
-**Status: owner-approved 2026-08-19. Implemented in #195 @ c8eead4.**
+**Status: owner-approved 2026-08-19. Implemented in #195.**
 
 This brief is self-contained. It records the owner-approved
 no-Ledger redesign for Human Resources cancellation credit.
@@ -44,7 +44,13 @@ Approved 2026-08-19:
    rewritten after later min/max changes. Keep the static
    `D <= MAX_UINT256 - 2**64` overflow ceiling.
 
-This reverses draft 6’s previous no-saturation direction for
+Ruling 9 supersedes and reverses the earlier draft-6 ruling that
+HR create validation should be static slack only and must not
+read `ripeGovVaultConfig`. Draft 6 still applies to cash and
+final transfer: paycheck deposits remain live-clamped, and the
+stored term is forwarded raw on owner transfer.
+
+This also reverses draft 6’s previous no-saturation direction for
 Hunk 4. Draft 6 kept ordinary `budget += forfeitedAmount` and
 treated a MAX overwrite while live grants existed as a blocked
 or retryable path. The owner-approved clamp makes MAX writable
@@ -55,10 +61,10 @@ at any time and discards credit that cannot be represented.
 | Hunk | Change |
 | --- | --- |
 | 1 | Overflow-safe vest helper on Contributor. Keep `# dev: vesting length overflow`. |
-| 2 | `areValid` create bounds on Human Resources. |
+| 2 | `areValid` create bounds on Human Resources, including the live lock band. |
 | 3 | Saturating `getTotalClaimed` / `getTotalCompensation`. |
 | 4 | Human Resources refund clamp only. Ledger is byte-identical to the PR base. |
-| 5 | Infeasible `minCliff > maxVest` reverts on Delta execute. |
+| 5 | Infeasible `minCliff > effectiveMaxVest` reverts on Delta execute. |
 
 Hunks 1, 2, 3, and 5 remain. The trusted-clone ruling remains.
 
@@ -101,6 +107,18 @@ and false-return rollback stay. No `hrGrant`, no
 `hrCancelCreditLiability`, no `consumeHrContributorCash`, no
 `applyHrContributorSettlement`.
 
+Hunk 5 uses an effective vesting maximum at Delta execute:
+
+- configured `maxVestingLength`, when nonzero;
+- `2**128`, when configured max is zero.
+
+Require `minCliffLength <= effectiveMaxVestingLength`. Equality
+is accepted. A failed execute keeps the `# dev: infeasible hr
+config` reason, rolls back the config write, and leaves the
+pending action in place. HR still hard-caps
+`vestingLength <= 2**128`, so a zero configured max is not
+unbounded.
+
 ## Rejected reserve design (historical)
 
 The previous thin-Ledger draft added `hrReservedCompensation`:
@@ -121,3 +139,14 @@ or setter-headroom guard.
   budget, the budget increases by `C-P` exactly.
 - Official cash cannot remint: the trusted clone sends
   `getClaimable()` and increments `totalClaimed`.
+- A `MAX//2` grant can still exceed RipeGov/SharesVault
+  representable share output when fully cashed, and two such
+  grants can exceed remaining RIPE total-supply headroom. Those
+  are governance-only, unrealistic-value cases and remain out of
+  scope.
+- Pre-cliff cancellation withdraws and burns the Contributor’s
+  entire RIPE vault position, including unrelated RIPE deposited
+  to that address. Enabling third-party deposits or directing
+  other rewards to a Contributor can expose those tokens to
+  cancellation burn. This is accepted pre-existing behavior, not
+  introduced by #195.

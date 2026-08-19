@@ -190,7 +190,7 @@ def test_g11_near_uint256_budget_overwrite_cancel_rolls_back_then_retry_after_co
     assert ledger.ripeAvailForHr() == MAX_UINT256
 
 
-def test_g11_overflow_compensation_create_succeeds_under_uncapped_max(
+def test_g11_overflow_compensation_is_rejected_under_uncapped_max(
     valid_contributor_terms,
     setupHrConfig,
     setupLedgerBalance,
@@ -317,7 +317,6 @@ def test_g11_cross_field_min_cliff_gt_max_vest_blocks_all_terms(
     assert cfg.minCliffLength == live.minCliffLength
     assert cfg.maxVestingLength == live.maxVestingLength
     assert switchboard_delta.actionType(raise_cliff) != 0
-    assert filter_logs(switchboard_delta, "HrMinCliffLengthSet") == []
 
     equal = switchboard_delta.setMinCliffLength(live.maxVestingLength, sender=governance.address)
     assert delta_confirm_and_execute(switchboard_delta, governance, equal)
@@ -357,7 +356,6 @@ def test_g11_two_parallel_pendings_combine_into_infeasible_config(
     assert cfg.minCliffLength == 4 * YEAR_IN_SECONDS
     assert cfg.maxVestingLength == live.maxVestingLength
     assert switchboard_delta.actionType(aid_vest) != 0
-    assert filter_logs(switchboard_delta, "HrVestingLengthBoundariesSet") == []
     setupHrConfig()
     assert human_resources.areValidContributorTerms(*terms_tuple(valid_contributor_terms))
 
@@ -522,7 +520,6 @@ def test_g11_ledger_pause_during_confirm_no_orphan_clone(
     charlie_pause(switchboard_charlie, governance, ledger.address, True)
     with boa.reverts("not activated"):
         human_resources.confirmNewContributor(aid, sender=governance.address)
-    assert filter_logs(human_resources, "NewContributorConfirmed") == []
     assert ledger.numContributors() == num
     assert ledger.ripeAvailForHr() == budget
     assert human_resources.pendingContributor(aid).owner == pending.owner

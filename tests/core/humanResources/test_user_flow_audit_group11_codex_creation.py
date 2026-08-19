@@ -80,9 +80,10 @@ def test_g11_delta_budget_overwrite_revalidates_pending_hr_creation_without_term
     assert switchboard_delta.executePendingAction(budget_action, sender=governance.address)
     assert ledger.ripeAvailForHr() == 0
 
+    contributors_before = ledger.numContributors()
     assert human_resources.confirmNewContributor(pending, sender=governance.address) is False
     assert human_resources.pendingContributor(pending).owner == ZERO_ADDRESS
-    assert ledger.numContributors() == 0
+    assert ledger.numContributors() == contributors_before
     assert not filter_logs(human_resources, "NewContributorConfirmed")
     assert not filter_logs(human_resources, "NewContributorCancelled")
 

@@ -149,10 +149,6 @@ def pending_owner(contributor):
     return data.newOwner, data.initiatedBlock, data.confirmBlock
 
 
-def hr_pending_action(human_resources, aid):
-    return human_resources.pendingActions(aid)
-
-
 def owner_unlock(ripe_gov_vault, ripe_token, owner):
     return ripe_gov_vault.userGovData(owner, ripe_token).unlock
 
@@ -169,4 +165,3 @@ def cash_clamp(duration, min_lock, max_lock):
 def overflow_compensation(elapsed=2):
     safe = MAX_UINT256 // elapsed
     return safe, safe + 1
-

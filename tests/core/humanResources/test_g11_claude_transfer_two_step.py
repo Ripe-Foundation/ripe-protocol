@@ -5,7 +5,7 @@ import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256
+from constants import MAX_UINT256
 from conf_utils import assert_reverted_call, filter_logs
 
 from g11_claude_helpers import (
@@ -16,7 +16,6 @@ from g11_claude_helpers import (
     term_args,
     terms,
     travel_to,
-    unlock_block,
 )
 
 
@@ -291,7 +290,7 @@ def test_g11c_freeze_blocks_transfer_legs_and_cancel_paths_by_all_three_callers(
 
 def test_g11c_initiate_late_unlock_revert_rolls_back_the_nested_cash(
     human_resources, mission_control, switchboard_delta, contributor_template,
-    ledger, governance, setupRipeGovVaultConfig, ripe_gov_vault, ripe_token, alice, bob,
+    ledger, governance, setupRipeGovVaultConfig, ripe_gov_vault, ripe_token, teller, alice, bob,
 ):
     """(i) cash is entered first, then the unlock assert fails -> everything rolls back."""
     setupRipeGovVaultConfig()
@@ -310,7 +309,7 @@ def test_g11c_initiate_late_unlock_revert_rolls_back_the_nested_cash(
     assert c.totalClaimed() == claimed
     assert position(ripe_gov_vault, c, ripe_token) == pos
     assert ledger.ripeAvailForHr() == avail
-    assert ripe_token.allowance(human_resources, switchboard_delta) == 0
+    assert ripe_token.allowance(human_resources, teller) == 0
     assert filter_logs(c, "RipeCheckCashed") == []
     assert not c.hasPendingRipeTransfer()
 

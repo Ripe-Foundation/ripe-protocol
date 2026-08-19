@@ -3,7 +3,7 @@ import pytest
 from boa.contracts.base_evm_contract import BoaError
 
 from conf_utils import assert_reverted_call, filter_logs
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import MAX_UINT256
 from contracts.modules import Contributor
 from tests.core.humanResources.g11_proof_helpers import (
     PRECISION,
@@ -15,7 +15,6 @@ from tests.core.humanResources.g11_proof_helpers import (
     owner_self_deposit,
     owner_unlock,
     pending_transfer,
-    seed_ripe_gov_position,
     snapshot_econ,
     travel_to_block,
     travel_to_ts,
@@ -458,23 +457,7 @@ def test_g11_lock_matrix_cash_clamped_transfer_raw(
     assert clone_unlock(ripe_gov_vault, ripe_token, c) == cash_block + expected_cash
 
     travel_to_block(c.pendingRipeTransfer().confirmBlock)
-    if duration == MAX_UINT256 and branch == "below_precision":
-        pending = pending_transfer(c)
-        pos = ripe_gov_vault.getTotalAmountForUser(c, ripe_token)
-        with boa.reverts():
-            c.confirmRipeTransfer(False, sender=alice)
-        assert pending_transfer(c) == pending
-        assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == pos
-        return
-
     confirm_block = boa.env.evm.patch.block_number
-    if duration == MAX_UINT256 and branch == "at_or_above_precision":
-        pending = pending_transfer(c)
-        with boa.reverts():
-            c.confirmRipeTransfer(False, sender=alice)
-        assert pending_transfer(c) == pending
-        return
-
     c.confirmRipeTransfer(False, sender=alice)
     ev = filter_logs(c, "RipeTransferConfirmed")[0]
     assert ev.recipient == alice

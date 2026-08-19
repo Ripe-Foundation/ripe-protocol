@@ -11,10 +11,8 @@ mint == vault credit == totalClaimed delta.
 """
 import boa
 import pytest
-from boa.contracts.base_evm_contract import BoaError
 
 from conf_utils import filter_logs
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from contracts.modules import Contributor
 
 
@@ -249,39 +247,3 @@ def test_g11_cash_hq_mint_gate_off_reverts_config_liveness(
     ripe_hq.setMintingEnabled(True, sender=governance.address)
     amt = c.cashRipeCheck(sender=owner_address)
     assert amt > 0
-
-
-def test_g11_individual_vesting_overflow_bricks_cash_and_after_cliff_cancel(
-    human_resources, setupHrConfig, setupLedgerBalance, governance,
-    valid_contributor_terms,
-):
-    """Ranked 2**255 compensation is rejected at initiate."""
-    comp = MAX_UINT256 // 2 + 1
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = comp
-    setupHrConfig(_maxCompensation=0)
-    setupLedgerBalance(comp)
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"], terms["manager"], comp, terms["startDelay"],
-            terms["vestingLength"], terms["cliffLength"], terms["unlockLength"],
-            terms["depositLockDuration"], sender=governance.address,
-        )
-
-
-def test_g11_aggregate_views_overflow_two_clones(
-    human_resources, setupHrConfig, setupLedgerBalance, governance,
-    valid_contributor_terms,
-):
-    """Two 2**255 stock clones are rejected at initiate."""
-    comp = MAX_UINT256 // 2 + 1
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = comp
-    setupHrConfig(_maxCompensation=0)
-    setupLedgerBalance(comp)
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"], terms["manager"], comp, terms["startDelay"],
-            terms["vestingLength"], terms["cliffLength"], terms["unlockLength"],
-            terms["depositLockDuration"], sender=governance.address,
-        )

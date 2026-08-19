@@ -49,10 +49,10 @@ def test_g11_official_delta_cancel_before_start_full_refund_terminal(
     assert c.getTotalVested() == 0
     assert c.getClaimable() == 0
     assert c.getUnvestedComp() == 0
-    ev = filter_logs(c, "RipePaycheckCancelled")
-    if ev:
-        assert ev[0].forfeitedAmount == orig
-        assert ev[0].didReachCliff is False
+    ev = filter_logs(switchboard_delta, "RipePaycheckCancelled")
+    assert ev
+    assert ev[0].forfeitedAmount == orig
+    assert ev[0].didReachCliff is False
 
 
 def test_g11_official_delta_cancel_pre_cliff_no_cash(
@@ -124,7 +124,7 @@ def test_g11_residue_b_plus_p_burns_only_comp_refunds(
     assert ripe_token.totalSupply() == supply - (b + p)
 
 
-def test_g11_exact_cliff_cash_then_refund_remainder_no_burn(
+def test_g11_cancel_initiated_at_cliff_cashes_then_refunds_remainder(
     contributor_contract,
     setupRipeGovVaultConfig,
     switchboard_delta,
@@ -220,19 +220,14 @@ def test_g11_cancel_at_and_after_end_reverts(
     aid = switchboard_delta.cancelPaycheckForContributor(c.address, sender=governance.address)
     travel_to_block(switchboard_delta.getActionConfirmationBlock(aid))
     assert boa.env.evm.patch.timestamp >= c.endTime()
-    try:
-        ok = switchboard_delta.executePendingAction(aid, sender=governance.address)
-        assert ok is False
-    except BoaError:
-        ok = False
+    with boa.reverts("cannot cancel"):
+        switchboard_delta.executePendingAction(aid, sender=governance.address)
     assert c.compensation() == orig
     assert ledger.ripeAvailForHr() == budget
+    assert switchboard_delta.actionType(aid) != 0
     travel_to_ts(max(c.endTime() + 1, boa.env.evm.patch.timestamp))
-    if switchboard_delta.actionType(aid) != 0:
-        try:
-            switchboard_delta.executePendingAction(aid, sender=governance.address)
-        except BoaError:
-            pass
+    with boa.reverts("cannot cancel"):
+        switchboard_delta.executePendingAction(aid, sender=governance.address)
     assert c.compensation() == orig
     assert ledger.ripeAvailForHr() == budget
 

@@ -15,10 +15,9 @@
 - official create pause / Ledger pause atomicity
 """
 import boa
-import pytest
 
 from conf_utils import filter_logs
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import MAX_UINT256, ZERO_ADDRESS
 from contracts.modules import Contributor
 
 
@@ -395,7 +394,7 @@ def test_g11_create_pause_and_ledger_pause_atomicity(
     num0 = ledger.numContributors()  # 0 when empty; after one clone it is 2
     avail0 = ledger.ripeAvailForHr()
     assert switchboard_charlie.pause(ledger.address, True, sender=governance.address)
-    with boa.reverts():
+    with boa.reverts("not activated"):
         human_resources.confirmNewContributor(aid, sender=governance.address)
     assert ledger.numContributors() == num0  # no contributor-list entry
     assert ledger.ripeAvailForHr() == avail0  # no budget decrement
@@ -404,7 +403,7 @@ def test_g11_create_pause_and_ledger_pause_atomicity(
     assert switchboard_charlie.pause(ledger.address, False, sender=governance.address)
     assert human_resources.confirmNewContributor(aid, sender=governance.address)
     assert len(filter_logs(human_resources, "NewContributorConfirmed")) == 1
-    assert ledger.numContributors() == 2  # first clone: uid 1, num = 2
+    assert ledger.numContributors() == num0 + 1 + (1 if num0 == 0 else 0)
 
 
 def test_g11_owner_eq_manager_allowed_owner_eq_clone_not(

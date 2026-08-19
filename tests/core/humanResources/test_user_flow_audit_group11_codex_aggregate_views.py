@@ -43,34 +43,6 @@ def _confirm(human_resources, governance, terms):
     return events[0].contributorAddr
 
 
-def test_g11_normal_clones_can_overflow_get_total_compensation_after_budget_overwrite(
-    human_resources,
-    switchboard_delta,
-    governance,
-    ledger,
-    setupHrConfig,
-    valid_contributor_terms,
-):
-    """Two 2**255 stock clones are rejected at initiate."""
-    compensation = UINT256_MAX // 2 + 1
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = compensation
-    setupHrConfig(_maxCompensation=0)
-
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"],
-            terms["manager"],
-            terms["compensation"],
-            terms["startDelay"],
-            terms["vestingLength"],
-            terms["cliffLength"],
-            terms["unlockLength"],
-            terms["depositLockDuration"],
-            sender=governance.address,
-        )
-
-
 def test_g11_custom_template_can_overflow_both_aggregate_views(
     human_resources,
     switchboard_delta,

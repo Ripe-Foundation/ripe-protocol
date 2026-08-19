@@ -16,10 +16,8 @@ False without cancelling; at exact expiration it clears the pending and returns
 False.
 """
 import boa
-import pytest
 
 from conf_utils import filter_logs
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from contracts.modules import Contributor
 
 
@@ -89,6 +87,7 @@ def test_g11_delta_timelock_boundaries(
     expiration = switchboard_delta.pendingActions(aid).expiration
 
     # before confirmBlock: False, pending kept
+    assert boa.env.evm.patch.block_number < confirm_block
     assert switchboard_delta.executePendingAction(aid, sender=governance.address) is False
     assert switchboard_delta.actionType(aid) != 0
     assert switchboard_delta.hasPendingAction(aid)

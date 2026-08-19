@@ -58,31 +58,6 @@ def _advance_to_timestamp(timestamp):
     assert boa.env.evm.patch.timestamp == timestamp
 
 
-def test_g11_vesting_multiplication_overflow_bricks_cash_and_after_cliff_cancel(
-    human_resources,
-    governance,
-    setupHrConfig,
-    valid_contributor_terms,
-):
-    """Ranked 2**255 compensation is rejected at initiate."""
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = UINT256_MAX // 2 + 1
-    terms["startDelay"] = 0
-    setupHrConfig(_maxCompensation=0)
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"],
-            terms["manager"],
-            terms["compensation"],
-            terms["startDelay"],
-            terms["vestingLength"],
-            terms["cliffLength"],
-            terms["unlockLength"],
-            terms["depositLockDuration"],
-            sender=governance.address,
-        )
-
-
 def test_g11_vesting_product_boundary_predecessor_cashes_and_records_live_position(
     human_resources,
     switchboard_delta,
@@ -127,57 +102,6 @@ def test_g11_vesting_product_boundary_predecessor_cashes_and_records_live_positi
     assert contributor.totalClaimed() == expected
     assert ledger.ripeAvailForHr() == 0
     assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == expected
-
-
-def test_g11_extreme_compensation_can_fail_nested_cash_math_at_elapsed_one(
-    human_resources,
-    governance,
-    setupHrConfig,
-    valid_contributor_terms,
-):
-    """Ranked 2**255 compensation is rejected at initiate."""
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = UINT256_MAX // 2 + 1
-    terms["startDelay"] = 0
-    terms["vestingLength"] = 365 * 24 * 60 * 60
-    setupHrConfig(_maxCompensation=0)
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"],
-            terms["manager"],
-            terms["compensation"],
-            terms["startDelay"],
-            terms["vestingLength"],
-            terms["cliffLength"],
-            terms["unlockLength"],
-            terms["depositLockDuration"],
-            sender=governance.address,
-        )
-
-
-def test_g11_precliff_cancel_is_the_only_remaining_overflow_recovery(
-    human_resources,
-    governance,
-    setupHrConfig,
-    valid_contributor_terms,
-):
-    """Ranked 2**255 compensation is rejected at initiate."""
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = UINT256_MAX // 2 + 1
-    terms["startDelay"] = 0
-    setupHrConfig(_maxCompensation=0)
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"],
-            terms["manager"],
-            terms["compensation"],
-            terms["startDelay"],
-            terms["vestingLength"],
-            terms["cliffLength"],
-            terms["unlockLength"],
-            terms["depositLockDuration"],
-            sender=governance.address,
-        )
 
 
 def test_g11_near_uint_budget_overwrite_allows_precliff_cancel(

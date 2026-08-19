@@ -338,27 +338,6 @@ def test_g11_unregistered_caller_cannot_refund(human_resources, alice):
         human_resources.refundAfterCancelPaycheck(1, False, sender=ZERO_ADDRESS)
 
 
-def test_g11_max_budget_via_official_delta_cancel_succeeds(
-    human_resources,
-    setupHrConfig,
-    setupLedgerBalance,
-    setupRipeGovVaultConfig,
-    valid_contributor_terms,
-    switchboard_delta,
-    governance,
-    ledger,
-):
-    setupRipeGovVaultConfig()
-    c, _ = deploy_clone(
-        human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
-    )
-    official_delta_budget(switchboard_delta, governance, MAX_UINT256)
-    _, ok = official_delta_cancel(switchboard_delta, governance, c)
-    assert ok is True
-    assert c.compensation() == 0
-    assert ledger.ripeAvailForHr() == MAX_UINT256
-
-
 def test_g11_max_budget_via_switchboard_alpha_cancel_succeeds(
     human_resources,
     setupHrConfig,

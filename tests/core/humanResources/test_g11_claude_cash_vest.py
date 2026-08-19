@@ -15,16 +15,11 @@ from g11_claude_helpers import (
     make_contributor,
     position,
     set_budget,
-    set_hr_config,
     snapshot,
     term_args,
     terms,
     travel_to,
-    unlock_block,
 )
-from tests.core.humanResources.g11_proof_helpers import official_delta_cancel
-
-
 # ---------------------------------------------------------------- #1 boundaries
 
 
@@ -263,11 +258,7 @@ def test_g11c_official_cash_cannot_exceed_get_claimable(
 # ---------------------------------------------------------------- #1 overflow
 
 
-def _largest_safe_comp(elapsed):
-    return MAX_UINT256 // elapsed
-
-
-def test_g11c_individual_vesting_overflow_bricks_cash_and_after_cliff_cancel(
+def test_g11c_half_max_compensation_vests_and_above_cap_is_rejected(
     human_resources,
     mission_control,
     switchboard_delta,
@@ -275,59 +266,21 @@ def test_g11c_individual_vesting_overflow_bricks_cash_and_after_cliff_cancel(
     ledger,
     governance,
 ):
-    """Ranked 2**255 compensation is rejected at initiate; MAX//2 still creates."""
+    """MAX//2 creates and vests; MAX//2+1 is rejected by the compensation cap."""
     elapsed = 2
-    safe = _largest_safe_comp(elapsed)
-    assert safe * elapsed <= MAX_UINT256
-    with pytest.raises(Exception):
-        # not representable at elapsed == 1 -- documents why the brief demands elapsed >= 2
-        assert (MAX_UINT256 // 1 + 1) <= MAX_UINT256
-        raise AssertionError
-
+    safe = MAX_UINT256 // 2
     t_ok = terms(compensation=safe, startDelay=0)
     c_ok = make_contributor(
         human_resources, mission_control, switchboard_delta, contributor_template,
         ledger, governance, t_ok, budget=safe, maxCompensation=0,
     )
     travel_to(c_ok.startTime() + elapsed)
-    assert c_ok.getTotalVested() >= 0  # no revert
-    assert c_ok.getClaimable() >= 0
+    expected = safe * elapsed // t_ok["vestingLength"]
+    assert c_ok.getTotalVested() == expected
+    assert c_ok.getClaimable() == expected
 
     t_bad = terms(compensation=safe + 1, startDelay=0)
+    set_budget(ledger, switchboard_delta, safe + 1)
+    assert not human_resources.areValidContributorTerms(*term_args(t_bad))
     with boa.reverts("invalid terms"):
         human_resources.initiateNewContributor(*term_args(t_bad), sender=governance.address)
-    if c_ok.compensation() != 0:
-        _, ok = official_delta_cancel(switchboard_delta, governance, c_ok)
-        assert ok is True
-
-
-def test_g11c_pre_cliff_cancel_is_the_recovery_path_for_an_overflow_clone(
-    human_resources,
-    mission_control,
-    switchboard_delta,
-    contributor_template,
-    ledger,
-    governance,
-):
-    """Ranked 2**255 compensation is rejected at initiate."""
-    safe = _largest_safe_comp(2)
-    t = terms(compensation=safe + 1, startDelay=0)
-    set_hr_config(mission_control, switchboard_delta, contributor_template, maxCompensation=0)
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(*term_args(t), sender=governance.address)
-
-
-def test_g11c_hr_aggregate_views_overflow_only_when_summing_clones(
-    human_resources,
-    mission_control,
-    switchboard_delta,
-    contributor_template,
-    ledger,
-    governance,
-):
-    """Two 2**255 stock clones are rejected at initiate."""
-    half = MAX_UINT256 // 2 + 1
-    t1 = terms(owner="0x" + "31" * 20, compensation=half, startDelay=0)
-    set_hr_config(mission_control, switchboard_delta, contributor_template, maxCompensation=0)
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(*term_args(t1), sender=governance.address)

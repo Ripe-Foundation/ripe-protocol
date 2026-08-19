@@ -94,19 +94,6 @@ def test_g11_cash_clamp_and_final_transfer_raw_duration_matrix(
 
     clone_before = ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
     owner_amount_before = ripe_gov_vault.getTotalAmountForUser(owner_address, ripe_token)
-    if duration == UINT256_MAX:
-        with boa.reverts():
-            contributor.confirmRipeTransfer(False, sender=owner_address)
-        assert contributor.pendingRipeTransfer() == pending
-        assert (
-            ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
-            == clone_before
-        )
-        assert (
-            ripe_gov_vault.getTotalAmountForUser(owner_address, ripe_token)
-            == owner_amount_before
-        )
-        return
 
     # The RipeGov public helper is used only to record the raw-duration branch
     # result.  It is not a RipeGov product assertion.

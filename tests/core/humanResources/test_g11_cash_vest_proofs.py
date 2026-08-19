@@ -5,7 +5,7 @@ import pytest
 from boa.contracts.base_evm_contract import BoaError
 
 from conf_utils import assert_reverted_call, filter_logs
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from contracts.modules import Contributor
 from tests.core.humanResources.g11_proof_helpers import (
     HR_ID,
@@ -14,7 +14,6 @@ from tests.core.humanResources.g11_proof_helpers import (
     initiate_contributor,
     official_delta_budget,
     official_freeze,
-    overflow_compensation,
     snapshot_econ,
     terms_tuple,
     travel_to_ts,
@@ -154,14 +153,10 @@ def test_g11_cash_identity_manager_and_delta_governor(
     assert switchboard_delta.cashRipeCheckForContributor(
         c.address, sender=governance.address
     )
-    cash_logs = filter_logs(c, "RipeCheckCashed")
     sb_logs = filter_logs(switchboard_delta, "RipeCheckCashedFromSwitchboard")
     assert len(sb_logs) == 1
     assert sb_logs[0].cashedBy == governance.address
     assert sb_logs[0].amount == claimable
-    if cash_logs:
-        assert cash_logs[0].cashedBy == switchboard_delta.address
-        assert cash_logs[0].amount == claimable
     after = snapshot_econ(
         c, ripe_token, ripe_gov_vault, ledger, human_resources, owner_address, teller
     )
@@ -375,90 +370,6 @@ def test_g11_overflow_compensation_safe_cash_control(
     assert minted == vested
 
 
-def test_g11_overflow_compensation_cash_stays_callable(
-    valid_contributor_terms,
-    setupHrConfig,
-    setupLedgerBalance,
-    human_resources,
-    governance,
-):
-    """Create-gate: ranked 2**255 compensation is rejected at initiate."""
-    _, overflow_comp = overflow_compensation(2)
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = overflow_comp
-    setupHrConfig(_maxCompensation=0)
-    setupLedgerBalance(overflow_comp)
-    assert human_resources.areValidContributorTerms(*terms_tuple(terms)) is False
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"],
-            terms["manager"],
-            terms["compensation"],
-            terms["startDelay"],
-            terms["vestingLength"],
-            terms["cliffLength"],
-            terms["unlockLength"],
-            terms["depositLockDuration"],
-            sender=governance.address,
-        )
-
-
-def test_g11_overflow_clone_pre_cliff_cancel_still_recovers(
-    valid_contributor_terms,
-    setupHrConfig,
-    setupLedgerBalance,
-    human_resources,
-    governance,
-):
-    """Ranked 2**255 compensation is rejected at initiate."""
-    _, overflow_comp = overflow_compensation(2)
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = overflow_comp
-    setupHrConfig(_maxCompensation=0)
-    setupLedgerBalance(overflow_comp)
-    assert human_resources.areValidContributorTerms(*terms_tuple(terms)) is False
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"],
-            terms["manager"],
-            terms["compensation"],
-            terms["startDelay"],
-            terms["vestingLength"],
-            terms["cliffLength"],
-            terms["unlockLength"],
-            terms["depositLockDuration"],
-            sender=governance.address,
-        )
-
-
-def test_g11_overflow_clone_after_cliff_cancel_also_bricks(
-    valid_contributor_terms,
-    setupHrConfig,
-    setupLedgerBalance,
-    human_resources,
-    governance,
-):
-    """Ranked 2**255 compensation is rejected at initiate."""
-    _, overflow_comp = overflow_compensation(2)
-    terms = dict(valid_contributor_terms)
-    terms["compensation"] = overflow_comp
-    setupHrConfig(_maxCompensation=0)
-    setupLedgerBalance(overflow_comp)
-    assert human_resources.areValidContributorTerms(*terms_tuple(terms)) is False
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            terms["owner"],
-            terms["manager"],
-            terms["compensation"],
-            terms["startDelay"],
-            terms["vestingLength"],
-            terms["cliffLength"],
-            terms["unlockLength"],
-            terms["depositLockDuration"],
-            sender=governance.address,
-        )
-
-
 def test_g11_aggregate_compensation_sum_two_clones(
     valid_contributor_terms,
     setupHrConfig,
@@ -477,6 +388,7 @@ def test_g11_aggregate_compensation_sum_two_clones(
     with boa.reverts("invalid terms"):
         initiate_contributor(human_resources, governance, terms_bad)
 
+    n_before = ledger.numContributors()
     cap = MAX_UINT256 // 2
     for i in range(2):
         setupLedgerBalance(cap)
@@ -487,7 +399,7 @@ def test_g11_aggregate_compensation_sum_two_clones(
         aid = initiate_contributor(human_resources, governance, terms)
         boa.env.time_travel(blocks=human_resources.actionTimeLock())
         assert human_resources.confirmNewContributor(aid, sender=governance.address)
-    assert ledger.numContributors() == 3
+    assert ledger.numContributors() == n_before + 2 + (1 if n_before == 0 else 0)
     total = human_resources.getTotalCompensation()
     assert total == cap * 2
     assert total == MAX_UINT256 - 1
@@ -587,5 +499,3 @@ def test_g11_custom_template_saturates_both_aggregate_views(
 def test_g11_hq_mint_gate_is_hr_id_15(ripe_hq, human_resources):
     assert ripe_hq.getAddr(HR_ID) == human_resources.address
     assert ripe_hq.canMintRipe(human_resources.address)
-
-
