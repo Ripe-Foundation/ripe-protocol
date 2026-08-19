@@ -69,9 +69,6 @@ interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256) -> bool: nonpayable
 
-interface TokenBlacklist:
-    def blacklisted(_addr: address) -> bool: view
-
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
 
@@ -83,6 +80,9 @@ interface VaultRegistry:
 
 interface AddressRegistry:
     def getAddr(_regId: uint256) -> address: view
+
+interface TokenBlacklist:
+    def blacklisted(_addr: address) -> bool: view
 
 interface RipeHq:
     def governance() -> address: view
