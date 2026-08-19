@@ -26,15 +26,15 @@ models are different:
 
 | Product | Assets | Selected rail | Current disposition |
 | --- | --- | --- | --- |
-| Acquire collateral on Robinhood | USDC -> USDG, WETH -> WETH | **Across** | Preferred fast v1, two-step to the wallet and then into Ripe |
-| Transfer GREEN directly | GREEN | **CCIP** | Only approved current route |
-| Optional retail GREEN fast lane | GREEN | **Relay with a Ripe payout contract + solver EOA** | Blocked: H-1/H-2/H-4 owner gates plus H-3 engineering proof |
-| Transfer RIPE directly | RIPE | **CCIP** | Only route; no Ripe-operated fast lane |
+| Acquire collateral on Robinhood | USDC -> USDG, WETH -> WETH | **Across** | Available fast v1, two-step to the wallet and then into Ripe |
+| Transfer GREEN/RIPE directly today | GREEN, RIPE | **CCIP** | Live canonical route; four owner-supplied messages prove successful automatic execution for both tokens in both directions |
+| Optional fast protocol-token lane | GREEN, RIPE | **Relay with a Ripe payout contract + solver EOA** | Technically applicable to either token; blocked on the same H-1/H-2/H-4 owner gates plus H-3 engineering proof |
+| Across protocol-token lane | GREEN, RIPE | **Across after formal token onboarding** | Not a unilateral Ripe integration: requires an Ethereum settlement representation, compatible canonical-bridge adapters/routes, and Across DAO configuration |
 
-Across is already useful because its live Robinhood asset set matches Ripe's
-selected collateral set. It should move commodity collateral, not protocol
-tokens. A user can bridge USDC or WETH, deposit locally, and borrow or mint GREEN
-on Robinhood without moving GREEN across a bridge:
+Across is already usable because its live Robinhood asset set matches Ripe's
+selected collateral set. The currently deployable integration moves collateral,
+not protocol tokens. A user can bridge USDC or WETH, deposit locally, and borrow
+or mint GREEN on Robinhood without moving GREEN across a bridge:
 
 ```text
 Base USDC/WETH -> Across -> Robinhood USDG/WETH -> user wallet
@@ -50,12 +50,15 @@ is deferred pending its own price-path approval. Borrowing through the local
 CreditEngine does not depend on that PSM, but both paths require the destination
 Ripe deployment to exist first.
 
-CCIP remains the canonical direct GREEN/RIPE rail. Its current latency and
-automatic-execution path must be measured and repaired before treating a second
-bridge as the remedy. Relay remains a possible later retail GREEN overlay, not a
-canonical settlement replacement.
+CCIP remains the canonical direct GREEN/RIPE rail. The owner-supplied 2026-08-19
+messages correct the earlier untested-path premise: both Robinhood -> Base
+messages completed through the automatic OffRamp `execute(bytes32[2],bytes)`
+path, as did both Base -> Robinhood messages. Relay remains a possible
+inventory-backed overlay for either protocol token, not a canonical settlement
+replacement. Whether operating that inventory is worthwhile is an owner
+decision outside this technical record.
 
-## Why Across is collateral-only
+## Why Across v1 is collateral-only, and what token onboarding requires
 
 Across already has Base <-> Robinhood routes for the selected collateral. On the
 evaluated V4 path, `SpokePool` has no active token allowlist: an unsupported
@@ -65,9 +68,22 @@ revert. V5 was not evaluated and is not an authorized workaround.
 
 GREEN/RIPE settlement also requires Across DAO route onboarding and a canonical
 Ethereum settlement asset. Neither is under Ripe's unilateral control, and no
-such asset is configured or proven in this repository. Across GREEN/RIPE is
-therefore rejected explicitly at both API and client boundaries even if an
-upstream route list later claims support.
+such asset is configured or proven in this repository. A standard Across token
+integration therefore requires, in order:
+
+1. define the canonical Ethereum representation for each token;
+2. provide canonical bridge adapters that can move that representation between
+   Ethereum, Base, and Robinhood without granting Across independent mint
+   authority;
+3. have the Across DAO configure the HubPool L1 token and both
+   `poolRebalanceRoutes`; and
+4. have Across include the token in root-bundle construction so relayer refunds
+   and pool rebalances are executable.
+
+Until those steps are complete and verified onchain, Across GREEN/RIPE is
+rejected explicitly at both API and client boundaries even if an upstream route
+list claims support. This is a technical onboarding dependency, not a claim
+that Across can never support the tokens.
 
 Across collateral v1 has these hard admission controls:
 
@@ -115,42 +131,63 @@ flow. Atomic bridge-and-deposit would introduce a destination handler and make
 Across's mutable `updatedMessage` an instruction surface. It requires a new
 contract and separate adversarial review.
 
-## CCIP remains canonical, but is not operationally proven
+## CCIP remains canonical; live transfers now prove the send path
 
 The current implementation is Chainlink CCIP burn/mint, not CCTP/CCDP. Four
 GREEN/RIPE pools are registered, reciprocally wired, governance-owned, and
 `RipeHq`-authorized on Base and Robinhood. No new bridge address may join that
 mint-authorized set.
 
-Before optimizing around CCIP latency:
+The owner supplied four production messages on 2026-08-19. At the
+`2026-08-19T17:13:01Z` evidence cutoff:
 
-1. Execute and retain evidence for a real test transfer in both directions for
-   both tokens. The live-state capture performed no send.
+| Direction | Token | Message | State at cutoff | Observed delivery |
+| --- | --- | --- | --- | ---: |
+| Robinhood -> Base | RIPE | `0x43423...58fe` | `SUCCESS`; automatic OffRamp `execute` | 1,132 s |
+| Robinhood -> Base | GREEN | `0x880f6d...a9bb` | `SUCCESS`; automatic OffRamp `execute` | 1,165 s |
+| Base -> Robinhood | RIPE | `0x56fd97...97f` | `SUCCESS`; automatic OffRamp `execute` | 1,198 s |
+| Base -> Robinhood | GREEN | `0x351ed0...506bd` | `SUCCESS`; automatic OffRamp `execute` | 1,486 s |
+
+All four receipt transactions used selector `0xf58e03fc`, decoded as
+`execute(bytes32[2],bytes)`, and succeeded with 190,229, 190,262, 168,365, and
+168,398 total transaction gas respectively. All four messages carried a
+`90,000` destination token-gas amount. This disproves the claim that the lane
+had never run and proves automatic execution for these four live cases. It does
+not by itself measure the worst-case cold `releaseOrMint` subcall or prove every
+future payload will fit.
+
+Remaining technical hardening:
+
+1. Retain the four-message API and receipt evidence as a reproducible baseline.
 2. Measure the complete cold OffRamp destination path with the live tokens and
    current FeeQuoter configuration. The historical isolated cold
    `releaseOrMint` measurement was `95,902` gas against a historical `90,000`
-   combined default.
-3. Bind a Safe/live signer backend; the current script is fork/preflight-only.
+   combined default; the successful live executions bound real behavior but do
+   not expose that subcall's cold gas separately.
+3. Bind a Safe/live signer backend to the repository script if that script is
+   intended for operations; the owner transactions prove a live signer exists
+   outside it.
 4. Select explicit, independent rate-limit policies and a non-zero incident
    administrator for GREEN and RIPE. All four pools currently have rate limiting
    disabled and a zero `rateLimitAdmin`.
 5. Bind exact live creation provenance and supported retry/manual-execution
-   behavior before declaring automatic execution ready.
+   behavior.
 
 Base finality remains a latency floor. A fast bridge appears faster because a
 filler fronts capital before canonical finality; it does not remove finality or
 reorg risk. CCIP rate limits remain the size rail and, for RIPE, the future
 cross-chain arbitrage-capacity policy.
 
-## Conditional Relay GREEN topology
+## Conditional Relay protocol-token topology
 
-Relay can support the intended shape without receiving Ripe mint authority:
+Relay can support the same inventory-backed shape for GREEN or RIPE without
+receiving Ripe mint authority:
 
 ```text
-user deposits origin GREEN -> origin Relay Depository
-Ripe payout contract transfers destination GREEN -> user
+user deposits origin token -> origin Relay Depository
+Ripe payout contract transfers existing destination token -> user
 Relay Oracle/Hub attributes fill -> Ripe receives origin-chain receivable
-Ripe withdraws origin GREEN -> CCIP rebalances inventory to destination
+Ripe withdraws origin token -> CCIP rebalances inventory to destination
 ```
 
 Destination inventory stays in the Ripe-controlled payout contract. **Ripe's** Relay
@@ -166,7 +203,7 @@ HSM/MPC policy. The contract independently revalidates every signed order before
 payout. Under the pinned withdrawal path, that EOA can choose the receiver for
 its Hub receivable, so its compromise is another full-receivable-loss root.
 
-Relay GREEN is blocked until all of the following close:
+Each Relay token lane is blocked until all of the following close:
 
 ### H-4 first — accept or remove the deployed key risk
 
@@ -187,12 +224,12 @@ root of trust:
   inventory remains in a separate contract.
 
 Key custody was excluded from the relevant audit. Before design sign-off, Relay
-must answer how its two EOAs are secured and whether GREEN can use isolated,
+must answer how its two EOAs are secured and whether the Ripe lane can use isolated,
 delayed multisig/contract control or a token-isolated Depository. Ripe must also
 either obtain ERC-1271 solver/restricted-receiver support or approve a dedicated
 solver EOA under an audited HSM/MPC policy. Otherwise governance/treasury must
-explicitly accept a capped outstanding receivable as an instantaneous, uninsured
-100% loss. If a tolerable cap is too small for a useful lane, do not ship it.
+explicitly configure the capped outstanding receivable it accepts as exposed to
+instantaneous, uninsured 100% loss.
 
 ### H-1 — restore a fast-lane circuit breaker
 
@@ -248,7 +285,7 @@ The implementation needs four independent bounds:
 | Bound | What it limits | Enforcement |
 | --- | --- | --- |
 | Per-transfer quote cap | One user's fill | API display plus payout contract at execution |
-| Payout inventory ceiling | GREEN held in Ripe's destination hot contract | Treasury funding policy and on-chain balance/withdrawal controls |
+| Payout inventory ceiling | GREEN or RIPE held in Ripe's destination hot contract | Treasury funding policy and on-chain balance/withdrawal controls |
 | Relay receivable cap and age | Filled value not yet withdrawn from Relay | Chain-local payout allocation; governance-bounded aggregate |
 | CCIP rebalance backlog cap and age | Withdrawn origin inventory not yet restored on destination | Payout contract/reconciler, independently from Relay status |
 
@@ -294,23 +331,24 @@ synthesis. Any candidate is new custody/signing infrastructure and requires
 red-before-green unit/fuzz/invariant tests plus an independent audit before real
 funds.
 
-## Why RIPE stays CCIP-only
+## GREEN and RIPE have the same fast-fill mechanics
 
-Minting RIPE locally without a matching burn violates global supply
-conservation. A fast lane could therefore move only pre-existing inventory.
-Ripe should not operate a directional treasury float in its own governance
-token.
+From a contract standpoint, RIPE is not a different bridge design. A Relay lane
+for either token moves only pre-existing inventory:
 
-More importantly, Robinhood currently has no RIPE venue: the Curve and Aerodrome
-RIPE components are omitted/disabled, and the monitoring-only RIPE/WETH adapter
-is not a protocol venue. Arbitrage is venue-first. When a venue exists, market
-makers can hold bilateral inventory, trade locally, and batch-rebalance through
-CCIP. CCIP latency affects required inventory and spread; it does not require a
-bridge per trade.
+- the origin deposit transfers existing tokens into Relay's Depository;
+- the destination payout transfers existing tokens from a non-mint-authorized
+  Ripe contract;
+- no bridge component calls `RipeHq` minting; and
+- CCIP later burns on the inventory-surplus chain and mints the same amount on
+  the inventory-deficit chain.
 
-Sequence RIPE as: prove CCIP reliability, set a RIPE-specific rate policy,
-launch and qualify a venue, then measure demand. Only then reconsider a
-third-party retail fast lane. Do not make Ripe the RIPE solver.
+Global supply is conserved across deposit, payout, withdrawal, and rebalance.
+The technical implementation should deploy or configure independent per-token
+payout inventory, caps, accounting, pause state, and reconciliation so a fault
+or exhausted float in one token cannot consume the other's capacity. GREEN and
+RIPE then pass the same H-1 through H-4 gates. Whether Ripe chooses to supply
+either inventory is deliberately outside this document.
 
 ## API and web architecture
 
@@ -336,20 +374,20 @@ receivable, and operational backlog surfaces only if its owner gates close.
 
 ## Phase order
 
-1. **Measure and harden CCIP:** real transfers, full destination gas, signer
-   backend, provenance, retry path, and independent GREEN/RIPE rate policies.
+1. **Finish CCIP hardening:** retain the four live transfers, measure full
+   destination gas, bind the repository signer backend if operationally
+   required, record provenance/retry behavior, and set independent GREEN/RIPE
+   rate policies.
 2. **Build Across collateral v1:** two-step only, feature-gated until the
    Robinhood Ripe product is deployable; exact V4 selector/message and complete
    consent validation are phase zero.
 3. **Owner gate Relay before engineering:** resolve H-4 first, then H-1 and H-2.
-   Obtain formal GREEN onboarding, vendor key-custody answers, and an accepted
+   Obtain formal per-token onboarding, vendor key-custody answers, and an accepted
    exposure/loss budget plus solver-EOA policy or contract-account support.
-4. **Only if approved, design the GREEN payout and solver:** independent review,
+4. **Only if approved, design each token payout and solver lane:** independent review,
    a separately reviewed cross-chain exposure-transition proof/coordinator,
    unit/fuzz/invariant suite, testnet canary, capped treasury funding,
    monitoring, and incident rehearsal before any mainnet value.
-5. **RIPE venue first:** no RIPE fast-lane work until a real second venue and
-   market-maker demand exist.
 
 ## Required negative tests
 
@@ -372,7 +410,7 @@ Across collateral:
 - exact allowance, quote expiry, refund, replacement, cancellation, and status
   behavior are exercised end to end.
 
-Conditional Relay GREEN:
+Conditional Relay protocol token:
 
 - bridge pause, token pause, blacklist, unhealthy settlement, amount cap, age
   cap, and aggregate cap each prevent payout;
@@ -407,19 +445,16 @@ Stop rather than degrade when:
 - provider bytes cannot be completely decoded or reconstructed;
 - Across attempts GREEN/RIPE, `unsafeDeposit`, V5, a message, or an unevaluated
   wrapper;
-- Relay's accepted full-loss receivable cap is absent, exceeded, too old, or too
-  small for a useful lane;
+- Relay's accepted full-loss receivable cap is absent, exceeded, or too old;
 - Relay's deployed key model is neither migrated nor explicitly accepted;
 - the required Ripe solver EOA lacks approved HSM/MPC custody and explicit
   receiver-redirection risk acceptance, unless Relay adds a contract-account or
   restricted-receiver path;
 - blacklist policy cannot restore the settlement path;
-- a fast bridge asks for Ripe mint authority; or
-- a RIPE fast lane is proposed before a venue and independent market-maker
-  inventory exist.
+- a fast bridge asks for Ripe mint authority.
 
 The source/evidence records are suitable to merge as research. The Relay design
 is **not** signed off: H-1, H-2, and H-4 remain owner decisions. H-3 has a
 concrete fail-closed admission rule but remains an engineering gate until the
-exact GREEN order is enumerated, implemented, and tested. This document
+exact per-token order is enumerated, implemented, and tested. This document
 authorizes none of the later phases.
