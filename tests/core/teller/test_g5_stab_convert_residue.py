@@ -72,7 +72,7 @@ def test_convert_partial_clamp_strands_sgreen_in_teller(
 
     Historically the clamp debited the caller in full, credited only the
     headroom, and stranded the remainder on Teller. The call must now revert
-    `convert exceeds deposit limit` with caller GREEN/sGREEN, Teller
+    `cannot partially deposit held funds` with caller GREEN/sGREEN, Teller
     GREEN/sGREEN, pool custody, and pool shares all unchanged.
     """
     setGeneralConfig()
@@ -82,7 +82,7 @@ def test_convert_partial_clamp_strands_sgreen_in_teller(
     _fund_green(green_token, whale, teller, bob, CONVERT_AMOUNT)
     before = _convert_rollback_state(
         stability_pool, green_token, savings_green, teller, bob)
-    with boa.reverts("convert exceeds deposit limit"):
+    with boa.reverts("cannot partially deposit held funds"):
         teller.convertToSavingsGreenAndDepositIntoStabPool(
             bob, CONVERT_AMOUNT, sender=bob,
         )
@@ -156,7 +156,7 @@ def test_convert_partial_per_user_clamp_reverts_and_rolls_back(
     _fund_green(green_token, whale, teller, bob, CONVERT_AMOUNT)
     before = _convert_rollback_state(
         stability_pool, green_token, savings_green, teller, bob)
-    with boa.reverts("convert exceeds deposit limit"):
+    with boa.reverts("cannot partially deposit held funds"):
         teller.convertToSavingsGreenAndDepositIntoStabPool(
             bob, CONVERT_AMOUNT, sender=bob,
         )

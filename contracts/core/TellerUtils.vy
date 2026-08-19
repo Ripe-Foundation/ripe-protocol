@@ -165,7 +165,7 @@ def validateOnDeposit(
     amount = min(amount, availGlobalDeposit)
 
     if _areFundsHereAlready and not isRipeDepartment:
-        assert amount == _amount # dev: convert exceeds deposit limit
+        assert amount == _amount # dev: cannot partially deposit held funds
 
     # min balance
     assert amount + vd.userBalance >= config.minDepositBalance # dev: too small a balance
