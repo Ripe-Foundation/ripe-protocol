@@ -8,7 +8,8 @@ rev 4 — added H-4 custody exposure;
 rev 5 — H-3 Relay resolution retracted, H-4 ceiling corrected to receivable;
 rev 6 — bound effective Relay attribution, added live cross-layer privilege graph;
 rev 7 — added M-3, token-level denylist for the Across GREEN/RIPE footgun;
-rev 8 — added H-5, destination-side stranding on the live CCIP burn/mint path)
+rev 8 — added H-5, destination-side stranding on the live CCIP burn/mint path;
+rev 9 — added H-6 refill/drain asymmetry and M-4 age-cap liveness trap)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -545,6 +546,112 @@ has already been destroyed elsewhere. Concretely:
 Items 1 and 4 are prerequisites to sizing any RIPE transfer beyond the owner's
 existing canaries.
 
+### H-6 — `setMintingEnabled(false)` stops the fast lane's refill but not its drain
+
+**Severity: High (float loss during incident response). Applies to the proposed
+payout contract composed with the live CCIP lane. Added rev 9.**
+
+It is already recorded that a fast fill never consults `mintEnabled`: the fill is
+a plain `safeTransfer`, and `Erc20Token._transfer` (`:202-211`) checks
+`isPaused`, blacklist and balance only. The conclusion drawn from that was that
+a dedicated lane gate is needed because `setMintingEnabled(false)` no longer
+stops cross-chain movement. That is correct but it is only half of the
+interaction, and the missing half reverses the sign of the finding.
+
+The destination float is refilled over CCIP, and per H-5 that refill is a
+burn/mint transfer whose destination mint enters `RipeToken.mint` →
+`RipeHq.canMintRipe`, which returns `False` on `mintEnabled` alone
+(`contracts/registries/RipeHq.vy:392`) before reading any config. So the same
+single action has opposite effects on the two legs:
+
+| Leg | Path | Effect of destination `mintEnabled = False` |
+|---|---|---|
+| **Fill** (float out) | `safeTransfer` | **Unaffected — keeps running at full rate** |
+| **Refill** (float in) | CCIP `releaseOrMint` → `mint` | **Blocked, and the origin RIPE is already burned** |
+
+**The protocol's emergency lever therefore disables the safe leg and leaves the
+risky one running.** The resulting sequence during an incident that has nothing
+to do with bridging:
+
+1. Governance disables minting on the destination for an unrelated reason — bad
+   debt, an oracle fault, a depeg.
+2. Fills continue. The float drains at whatever rate demand sets.
+3. Every in-flight and subsequent CCIP replenishment strands (H-5): burned on
+   the origin, un-mintable on the destination.
+4. Stage-B notional and age climb, since "origin withdrawn, destination
+   inventory not yet restored" is exactly the state a stranded refill produces.
+5. The stage-B age cap eventually trips and halts the lane — *after* the drain,
+   not before it. Unpausing is a governance action, i.e. the same body already
+   consumed by the original incident.
+
+**Fix — gate the fill on both.** The lane check should be
+`lanePaused || !RipeHq(hq).mintEnabled()`, not `lanePaused` alone. This keeps the
+dedicated pause for lane-specific incidents, so halting the lane still does not
+require halting protocol issuance, while restoring `setMintingEnabled(false)` to
+a complete stop on cross-chain movement. Cost is one staticcall on the hot path.
+It does couple lane liveness to RipeHq, which is the correct direction — the
+lane failing closed on a RipeHq fault is the desired behaviour — but it should be
+a deliberate choice rather than an inherited one.
+
+**Second fix — do not size `maxStageBAge` off the happy path.** The measured
+CCIP hops are 18m52s–24m46s with a 44m11s observed round trip. A stranded
+message is not a slow message: recovery needs the destination condition cleared
+*and* a manual re-execution, which is unbounded in wall-clock and currently
+depends on a runbook that does not exist (H-5, item 4). A `maxStageBAge` chosen
+as a multiple of 44m11s will therefore fire on the first CCIP operational
+failure rather than on a genuine solvency problem.
+
+That conflation is itself the defect: a tripped cap is supposed to mean
+"exposure is too large or too old," and here it would mean "a CCIP message
+failed." The ledger should distinguish **in-flight** from **known-failed**
+replenishment and alarm immediately on the latter, rather than letting a failure
+age silently until it presents as a cap breach with no indication of cause.
+
+### M-4 — The age cap is the one control that can brick the contract enforcing it
+
+**Severity: Medium (liveness, self-inflicted). Implementation trap in the
+proposed two-stage ledger. Added rev 9.**
+
+The exposure ledger holds a per-entry `{orderId, amount, timestamp}` so that age
+is enforceable rather than only notional, and the age cap is correctly
+identified as mattering more than the notional one — Relay's withdrawal is gated
+on a vendor signature with no timeout, so *how long* exposure has been
+outstanding is the real signal.
+
+Enforcing "no outstanding entry older than `maxAge`" requires the oldest
+outstanding entry, and the obvious implementation iterates the entry set on
+every `fill`. That is O(n) on the hot path, it grows with volume, and it is
+reachable adversarially: a compromised solver key that cannot exceed the
+notional cap can still emit many minimum-size fills and raise the cost of every
+subsequent `fill` until the lane is unusable. The control most relied upon is
+the one whose naive implementation is a self-DoS.
+
+A FIFO head pointer makes it O(1), but only if entries clear in insertion order.
+Whether Relay's withdrawals settle in order is not established, and a single
+out-of-order settlement forces the head pointer to stall or the code to fall
+back to iteration.
+
+**Recommendation: add a third cap per stage — maximum outstanding entry count.**
+It bounds iteration cost directly, is O(1) to enforce, and it is the only one of
+the three caps that protects the contract's own liveness rather than the balance
+sheet. It also bounds the batch size that `recordWithdrawn`/`recordRestored`
+must handle, which matters because those must not be solver- or
+keeper-assertable and will therefore be batched governance or verified-keeper
+operations.
+
+**Separately, a framing correction for whoever implements the spec.** The check
+`order.outputAmount <= order.inputAmount` is described as "the solvency
+invariant: never pay out more than the deposit backing it." It is worth keeping,
+but it does not establish solvency. `inputAmount` is an assertion in a
+solver-signed order, not an observation of an origin deposit — the same spec
+states two paragraphs later that the contract cannot verify the deposit
+happened. Both numbers are therefore attacker-controlled under key compromise
+and the check passes trivially with `inputAmount == outputAmount`. Its real value
+is catching a *buggy* solver overpaying against a genuine deposit. Implemented
+from the current wording, a developer could reasonably believe the float is
+protected by an invariant that does not exist; the caps remain the only
+boundary, exactly as the spec's own conclusion says.
+
 ## Test obligations
 
 Whatever design lands, these must be red-before-green:
@@ -607,6 +714,18 @@ Whatever design lands, these must be red-before-green:
     config rather than intended config (H-5). This is the invariant that keeps a
     rate-limit policy from becoming a stranding trigger, and it silently breaks
     whenever either side is retuned alone.
+15. With destination `mintEnabled == False`, `fill` reverts (H-6). The paired
+    negative test is the one that fails today: assert that a fill *succeeds*
+    when the gate reads `lanePaused` alone, proving the coupling is what closes
+    it rather than some incidental check.
+16. A drain scenario, not a unit assertion: destination minting disabled, then N
+    fills, then N stranded replenishments. Assert the float is never depleted
+    below the point at which stage-B exposure would have halted the lane — i.e.
+    that the halt precedes the drain rather than following it (H-6).
+17. `fill` gas is bounded independent of outstanding entry count (M-4): fill to
+    the entry-count cap, then assert the next `fill`'s gas is within a fixed
+    bound of the first's. A gas-griefing test using minimum-size fills from a
+    valid solver signature must not be able to raise `fill` cost without bound.
 
 ## Sign-off
 
@@ -615,6 +734,13 @@ rev-4 rationale was wrong and is retracted; the required answer is now the
 effective-depositor and complete-order admission rule above, but H-3 remains an
 implementation/admission blocker until the exact GREEN route is enumerated and
 tested. No implementation or live GREEN-route conformance evidence exists yet.
+
+H-6 is the finding to act on while the payout contract is still a specification
+rather than code, because its fix is one clause in one check and its cost after
+the fact is float. It also demonstrates why the two lanes cannot be reviewed
+separately: the fill path and the refill path were each assessed correctly in
+isolation, and the defect is only visible when a single governance action is
+applied to both at once.
 
 H-5 applies to the lane the owner is already using, which makes it the only
 finding here that is not contingent on a future decision. It does not block the
