@@ -520,12 +520,20 @@ def test_g11_vest_helper_matches_python_muldiv(
         _maxVestingLength=0,
     )
     fixture_l = valid_contributor_terms["vestingLength"]
+    overflow_cases = [
+        (MAX_UINT256 // 2, fixture_l, 3),
+        (MAX_UINT256 // 2, fixture_l, fixture_l - 1),
+        (MAX_UINT256 // 2, 2**128, 2**128 - 1),
+    ]
+    for compensation, vest_len, elapsed in overflow_cases:
+        assert compensation * elapsed > MAX_UINT256
     cases = [
         (10**40, fixture_l, 2),
         (20_000_000 * EIGHTEEN_DECIMALS, 2, 1),
         (2**128 - 1, 2**128, 2**128 - 1),
         (1, 2**128, 1),
         (MAX_UINT256 // 2, fixture_l, 2),
+        *overflow_cases,
     ]
     rng = random.Random(11)
     for _ in range(5):
