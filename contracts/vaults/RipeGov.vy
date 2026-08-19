@@ -1061,16 +1061,21 @@ def refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.
 @view
 @internal
 def _refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> uint256:
-    # Courtesy zero: canExit lost, fee up while canExit was on, or boost down.
+    # Courtesy zero when any live term is worse: canExit lost, fee up while
+    # exit was already on, boost down, minLockDuration up, or maxLockDuration
+    # up. Any adverse change wins even if another term improves.
     # False/0 -> True/fee enables an optional paid exit; that is not a courtesy.
-    # minLock / maxLock changes do not rewrite an existing commitment.
     # Lazy: only a later touch while the worse config is still live persists
     # unlock=0. Restoring the old terms first removes the opportunity.
+    # Once recorded, restoring the previous config does not restore the lock.
+    # A later lock-forming action may establish a new lock.
     # This does not override Teller pause or shouldFreezeWhenBadDebt.
     if (
         (_prevTerms.canExit and not _newTerms.canExit)
         or (_prevTerms.canExit and _newTerms.exitFee > _prevTerms.exitFee)
         or _newTerms.maxLockBoost < _prevTerms.maxLockBoost
+        or _newTerms.minLockDuration > _prevTerms.minLockDuration
+        or _newTerms.maxLockDuration > _prevTerms.maxLockDuration
     ):
         return 0
     return _prevUnlock

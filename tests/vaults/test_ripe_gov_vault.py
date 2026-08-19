@@ -1806,6 +1806,17 @@ def test_ripe_gov_vault_are_key_terms_same_max_lock_duration_change(ripe_gov_vau
 # test_g6_* files stay on the isolation audit pin (Finding 1 as first shipped:
 # refresh always keeps unlock) and are intentionally not on rh.
 #
+# Owner-approved courtesy: while worse lock terms are live, the user's next
+# successful position touch releases the existing lock without an exit fee.
+# Once recorded, restoring the previous configuration does not restore the
+# old lock. If the previous terms are restored before a successful touch, no
+# courtesy release occurs. This supersedes contrary historical never-zero
+# guidance. A later lock-forming action may establish a new lock.
+#
+# Worse terms: canExit True→False; exitFee up while exit was already on;
+# maxLockBoost down; minLockDuration up; maxLockDuration up. Any adverse
+# change wins even if another term improves.
+#
 # Courtesy is lazy: the user must touch while the worse config is still live.
 # Restoring the old terms first removes the opportunity. Zeroing unlock does
 # not override Teller pause or shouldFreezeWhenBadDebt.
@@ -1847,7 +1858,7 @@ def test_ripe_gov_vault_refresh_unlock_max_duration_decreased(ripe_gov_vault):
 
 
 def test_ripe_gov_vault_refresh_unlock_max_duration_increased(ripe_gov_vault):
-    """Test refreshUnlock keeps original unlock when maxLockDuration increases"""
+    """Courtesy: raising maxLockDuration zeros the stored unlock."""
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 800   # locked for 800 blocks
@@ -1855,9 +1866,17 @@ def test_ripe_gov_vault_refresh_unlock_max_duration_increased(ripe_gov_vault):
     new_terms = _switchboard_lock_terms(100, 1200, 200_00, True, 10_00)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
+    assert new_unlock == 0
+
+
+def test_ripe_gov_vault_refresh_unlock_min_duration_increased(ripe_gov_vault):
+    """Courtesy: raising minLockDuration zeros the stored unlock."""
     
-    # Should keep original unlock since it's within new max
-    assert new_unlock == prev_unlock
+    current_block = boa.env.evm.patch.block_number
+    prev_unlock = current_block + 500
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(200, 1000, 200_00, True, 10_00)
+    assert ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms) == 0
 
 
 def test_ripe_gov_vault_refresh_unlock_terms_worse_and_max_changed(ripe_gov_vault):
@@ -1911,8 +1930,10 @@ def test_ripe_gov_vault_refresh_unlock_enabling_exit_keeps_prev(ripe_gov_vault):
         {"_canExit": False, "_exitFee": 0},
         {"_exitFee": 20_00},
         {"_maxLockBoost": 150_00},
+        {"_minLockDuration": 200},
+        {"_maxLockDuration": 1200},
     ],
-    ids=["can_exit_lost", "fee_up", "boost_down"],
+    ids=["can_exit_lost", "fee_up", "boost_down", "min_up", "max_up"],
 )
 def test_ripe_gov_vault_courtesy_ordinary_withdraw_is_free(
     ripe_gov_vault,
@@ -2036,6 +2057,17 @@ def test_ripe_gov_vault_enabling_exit_keeps_lock_and_paid_release(
     )
 
 
+@pytest.mark.parametrize(
+    "worse_kwargs",
+    [
+        {"_canExit": False, "_exitFee": 0},
+        {"_exitFee": 20_00},
+        {"_maxLockBoost": 150_00},
+        {"_minLockDuration": 200},
+        {"_maxLockDuration": 1200},
+    ],
+    ids=["can_exit_lost", "fee_up", "boost_down", "min_up", "max_up"],
+)
 def test_ripe_gov_vault_courtesy_restore_before_touch_keeps_lock(
     ripe_gov_vault,
     ripe_token,
@@ -2044,6 +2076,7 @@ def test_ripe_gov_vault_courtesy_restore_before_touch_keeps_lock(
     teller,
     switchboard_alpha,
     setupRipeGovVaultConfig,
+    worse_kwargs,
 ):
     setupRipeGovVaultConfig()
     deposit_amount = 100 * EIGHTEEN_DECIMALS
@@ -2051,7 +2084,7 @@ def test_ripe_gov_vault_courtesy_restore_before_touch_keeps_lock(
         ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount
     )
 
-    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    setupRipeGovVaultConfig(**worse_kwargs)
     setupRipeGovVaultConfig()
     ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
 
@@ -2061,6 +2094,51 @@ def test_ripe_gov_vault_courtesy_restore_before_touch_keeps_lock(
         ripe_gov_vault.withdrawTokensFromVault(
             bob, ripe_token, deposit_amount, bob, sender=teller.address
         )
+
+
+@pytest.mark.parametrize(
+    "worse_kwargs",
+    [
+        {"_canExit": False, "_exitFee": 0},
+        {"_exitFee": 20_00},
+        {"_maxLockBoost": 150_00},
+        {"_minLockDuration": 200},
+        {"_maxLockDuration": 1200},
+    ],
+    ids=["can_exit_lost", "fee_up", "boost_down", "min_up", "max_up"],
+)
+def test_ripe_gov_vault_courtesy_restore_after_touch_stays_unlocked(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+    worse_kwargs,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    data_before = _deposit_with_lock(
+        ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount
+    )
+    assert data_before.unlock > boa.env.evm.patch.block_number
+
+    setupRipeGovVaultConfig(**worse_kwargs)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+    setupRipeGovVaultConfig()
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    data_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert data_after.unlock == 0
+
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, deposit_amount, bob, sender=teller.address
+    )
+    assert withdrawn == deposit_amount
+    assert is_depleted
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
 
 
 def test_ripe_gov_vault_courtesy_top_up_uses_weighted_blend(
@@ -2131,8 +2209,19 @@ def test_ripe_gov_vault_courtesy_equal_top_up_relocks_at_weighted_duration(
     [
         {"_canExit": False, "_exitFee": 0, "_maxLockBoost": 300_00},
         {"_exitFee": 20_00, "_maxLockBoost": 300_00},
+        {"_minLockDuration": 200, "_maxLockBoost": 300_00},
+        {"_maxLockDuration": 1200, "_exitFee": 5_00},
+        {"_minLockDuration": 200, "_maxLockDuration": 400},
+        {"_maxLockDuration": 1200, "_minLockDuration": 50},
     ],
-    ids=["can_exit_lost_boost_up", "fee_up_boost_up"],
+    ids=[
+        "can_exit_lost_boost_up",
+        "fee_up_boost_up",
+        "min_up_boost_up",
+        "max_up_fee_down",
+        "min_up_max_down",
+        "max_up_min_down",
+    ],
 )
 def test_ripe_gov_vault_courtesy_adverse_dominates_favorable(
     ripe_gov_vault,
