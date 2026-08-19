@@ -206,15 +206,15 @@ def test_python_workflow_routes_validation_jobs_on_automatic_events():
     ]
 
     jobs = workflow["jobs"]
-    for job_name in (
-        "solidity",
-        "test",
-        "deployment-controls",
-        "snapshot-gas",
-    ):
-        assert "if" not in jobs[job_name], (
-            f"{job_name} must validate direct integration-branch pushes"
-        )
+    # Derived rather than checked against a list of job names: a new job
+    # arriving with an event gate is the same regression, and it would not
+    # appear in any list written here. rh-pr-gate is the sole exception --
+    # it aggregates the others, so it is a status check, not validation.
+    gated = {name for name, job in jobs.items() if "if" in job}
+    assert gated == {"rh-pr-gate"}, (
+        "Only rh-pr-gate may be event-gated; every validation job must run "
+        f"on direct integration-branch pushes: {sorted(gated)}"
+    )
 
     assert jobs["rh-pr-gate"]["if"] == (
         "${{ always() && (github.event_name == 'pull_request' || "
