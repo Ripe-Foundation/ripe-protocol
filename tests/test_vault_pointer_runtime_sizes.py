@@ -12,7 +12,7 @@ EIP170_LIMIT = 24_576
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16143,
+    "MissionControl": 16682,
     "SwitchboardAlpha": 24521,
     "SwitchboardBravo": 24364,
     "SwitchboardCharlie": 23873,
@@ -26,9 +26,9 @@ EXPECTED_RUNTIME_BYTES = {
     "RebaseErc20": 11411,
     "RipeGov": 23730,
     "HumanResources": 13292,
-    "AuctionHouse": 24528,
+    "AuctionHouse": 24501,
     "CreditEngine": 24502,
-    "CreditRedeem": 8303,
+    "CreditRedeem": 8329,
     "Deleverage": 24459,
     "StabilityPool": 24269,
     "BlueChipYieldPrices": 22749,
