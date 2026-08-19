@@ -7,7 +7,16 @@ from conf_utils import filter_logs
 from utils.clock_profiles import clock_profile
 
 
-@pytest.fixture
+# Module-scoped: every contract below is deployed by this fixture and none is
+# registered in RipeHq or any shared registry, so building the set per test only
+# re-paid the deployments. Titanoboa anchors every test call, so storage a test
+# writes into them -- including the direct curve.eval() writes in the snapshot
+# overflow tests -- still reverts before the next test runs.
+#
+# These objects are shared across the module. Boa reverts their EVM storage but
+# not their Python-side state, so do not read filter_logs, get_logs or
+# _computation from them.
+@pytest.fixture(scope="module")
 def local_curve_ref_system(governance, bob, sally, alice):
     green = boa.load(
         "contracts/mock/MockErc20.vy",

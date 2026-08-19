@@ -1963,23 +1963,22 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
 
     # The caller is locally trusted, but a full payoff still classifies the
     # position owner so earn-vault owners never pay full-payoff extras.
-    # Boa 0.2.7's revert renderer has a diagnostic-only bug when its sstore trace
-    # contains public HashMap[address, bool] writes. Removing this mock's trace
-    # entry does not change EVM storage; it only lets Boa render and match the
-    # production revert reason below.
-    mock_trace = boa.env.sstore_trace.pop(mock_undy_v2.address, None)
-    try:
-        with boa.reverts("mock underscore vault check"):
-            _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
+    # This used to pop mock_undy_v2 out of boa.env.sstore_trace around the
+    # reverts below, to dodge a diagnostic-only bug in Boa 0.2.7's revert
+    # renderer when the trace holds public HashMap[address, bool] writes.
+    # tests/conftest.py now clears that trace globally, but only at test
+    # boundaries -- setEarnVault above writes _earnVaults and
+    # _basicEarnVaults mid-test, after that clear. The two mechanisms are
+    # therefore not equivalent: if the renderer regresses here, the global
+    # fixture will not prevent it and the local pop has to come back.
+    with boa.reverts("mock underscore vault check"):
+        _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
-        # CreditEngine independently classifies Underscore owners on its read
-        # path, widening the configured registry's failure surface beyond
-        # Deleverage.
-        with boa.reverts("mock underscore vault check"):
-            credit_engine.getLatestUserDebtAndTerms(bob, False)
-    finally:
-        if mock_trace is not None:
-            boa.env.sstore_trace[mock_undy_v2.address] = mock_trace
+    # CreditEngine independently classifies Underscore owners on its read
+    # path, widening the configured registry's failure surface beyond
+    # Deleverage.
+    with boa.reverts("mock underscore vault check"):
+        credit_engine.getLatestUserDebtAndTerms(bob, False)
 
     # Restore the mock before reading the unchanged position.
     mock_undy_v2.setVaultCheckRevertAddress(ZERO_ADDRESS)
