@@ -742,9 +742,18 @@ Whether Relay's withdrawals settle in order is not established, and a single
 out-of-order settlement forces the head pointer to stall or the code to fall
 back to iteration.
 
-**Recommendation: add a third cap per stage — maximum outstanding entry count.**
-It is O(1) to check and bounds live storage plus the batch size that
-`recordWithdrawn`/`recordRestored` must handle. It does **not** make an entry
+**Recommendation: add a third cap — maximum outstanding entry count, enforced
+in aggregate at `fill`, not per stage.** Per-stage entry counts are useful
+health thresholds, but they cannot carry this guarantee: entries are created
+only by `fill`, moved between stages by verified transitions, and removed only
+by verified restoration, so an A->B transition changes both per-stage counts
+while leaving the total untouched. Worse, a verified transition must remain
+recordable even when the destination stage is at its limit — a remote fact
+cannot be refused because a local counter is full — so per-stage counts are not
+invariants at all and the sum of the two maxima does not bound live storage.
+Admission is the only point where entry creation can be refused, so the
+aggregate count checked at `fill` is what actually bounds storage and the batch
+size `recordWithdrawn`/`recordRestored` must handle. It is O(1) to check. It does **not** make an entry
 scan O(1); `fill` still must not scan. Use a structure with direct oldest lookup
 and arbitrary removal (for example, a chronological linked list when local
 timestamps are sufficient, or an indexed min-heap for authenticated remote
@@ -759,6 +768,73 @@ deposit happened. Both are therefore attacker-controlled under key compromise
 and the check passes trivially when they are equal. Its real value is catching a
 *buggy* solver overpaying against a genuine deposit. The aggregate cap remains
 the loss boundary.
+
+### M-5 — The Relay swap lane sells GREEN into Ripe's own borrow-rate reference pool
+
+**Severity: Medium (cost transferred to borrowers; not a fund-loss path).
+Applies to the swap-lane route that works today, not to the specced inventory
+lane. Added rev 10.**
+
+The measured Relay route for GREEN is two swaps around an ETH bridge: on Base
+`GREEN --[KyberSwap]--> ETH`, then ETH is bridged, then on Robinhood
+`ETH --[0x]--> GREEN`. Relay's solver never touches GREEN. The consequence
+already recorded is that a user "bridging GREEN" is really trading against both
+pools, and that this breaks the local peg at size. There is a second consequence
+that has not been connected, and it lands on Base rather than Robinhood.
+
+Ripe's borrow rate is a function of that pool. `CreditEngine._getDynamicBorrowRate`
+(`contracts/core/CreditEngine.vy:1065`) resolves `CURVE_PRICES_ID` from the
+`PriceDesk`, reads `CurvePrices.getCurrentGreenPoolStatus()`, and when the
+weighted GREEN ratio exceeds `dangerTrigger` applies both a `rateBoost` scaled by
+how far past the trigger the pool sits and a `dangerBoost` proportional to
+`numBlocksInDanger`. The protocol treats a GREEN-heavy reference pool as
+distress and prices credit accordingly. That is the intended design.
+
+**The direction that matters is the one the product wants.** Bridging GREEN
+*from Base to Robinhood* — the direction that puts GREEN on the new chain, the
+direction a launch would encourage — executes `GREEN -> ETH` on Base, which is a
+GREEN sale into the reference pool and moves the ratio toward the trigger. The
+reverse direction relieves it. So the flow the product is designed to generate
+is the flow that raises borrow rates for every Base borrower, and none of those
+borrowers took any action.
+
+**What is not the finding: single-transaction manipulation.** `getCurrentGreenPoolStatus`
+does not read spot state. `_getWeightedGreenRatio` (`contracts/priceSources/CurvePrices.vy:1093`)
+walks a ring buffer of snapshots chronologically, weights each by its duration,
+rejects out-of-order or future updates outright, and skips stale ones. A
+flash-loan or single-block imbalance does not move it. That defense is sound and
+this finding does not claim otherwise.
+
+The exposure is the opposite shape, which is why the TWAP does not address it: a
+sustained product flow is not manipulation, it is a genuine and persistent
+imbalance, and a duration-weighted average reports it faithfully. The control
+that stops manipulation is silent by design about real pressure.
+
+**Recommendation.** The existing "do not expose the swap lane until the
+Robinhood GREEN pool is deep" constraint is correct and should be recorded with
+this as its primary justification rather than peg optics alone, because this
+consequence is quantifiable and lands on a party who never opted in. Before any
+surfacing decision:
+
+1. **Measure the transfer function** — GREEN volume through the swap lane
+   against reference-pool ratio movement and the resulting `rateBoost` and
+   `dangerBoost` at current configuration. Until that number exists, "small
+   transfers are fine today" is a statement about the user's slippage only.
+2. **Alarm on the attribution gap.** A rate rise caused by bridge flow is
+   indistinguishable on-chain from one caused by market stress, and it is the
+   `dangerBoost` term — which accrues with `numBlocksInDanger` and unwinds
+   through a separate recovery path with hysteresis — that makes a transient
+   flow leave a persistent mark. Operators need to be able to tell the two
+   apart before they respond to one as if it were the other.
+3. **Treat this as an argument for the inventory lane on its merits.** The
+   specced 1:1 filler has no swap legs, so it exerts no reference-pool pressure
+   in either direction. That is a real advantage over the swap route
+   independent of price impact, and it has not been counted as one.
+
+Note this is a Base-side finding reached from Robinhood work, and it is
+unaffected by every bridge control in this review: no cap, pause, allowlist or
+denylist here touches it, because nothing about it is a bridge transaction from
+Ripe's contracts' point of view.
 
 ## Test obligations
 
