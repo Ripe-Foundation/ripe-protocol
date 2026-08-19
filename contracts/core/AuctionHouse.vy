@@ -1202,9 +1202,8 @@ def _buyFungibleAuction(
         return 0
 
     # pay green amount, pay back debt
-    assert collateralUsdValueSent <= maxCollateralUsdValue  # dev: collateral exceeds buy cap
-    greenRequired: uint256 = collateralUsdValueSent * (HUNDRED_PERCENT - discount) // HUNDRED_PERCENT
-    greenSpent: uint256 = greenRequired
+    assert collateralUsdValueSent <= maxCollateralUsdValue # dev: collateral exceeds buy cap
+    greenSpent: uint256 = collateralUsdValueSent * (HUNDRED_PERCENT - discount) // HUNDRED_PERCENT
     assert extcall IERC20(_a.greenToken).transfer(_a.creditEngine, greenSpent, default_return_value=True) # dev: could not transfer
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringAuctionPurchase(_liqUser, greenSpent, _a)
 

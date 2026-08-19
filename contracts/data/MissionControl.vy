@@ -779,18 +779,14 @@ def getGenLiqConfig() -> GenLiqConfig:
     for pData: cs.VaultLite in self.priorityLiqAssetVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
         if vaultAddr != empty(address):
-            priorityLiqAssetVaults.append(
-                VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset)
-            )
+            priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     # stability pool vault data
     priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []
     for pData: cs.VaultLite in self.priorityStabVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
         if vaultAddr != empty(address):
-            priorityStabVaults.append(
-                VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset)
-            )
+            priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     return GenLiqConfig(
         canLiquidate=self.genConfig.canLiquidate,
