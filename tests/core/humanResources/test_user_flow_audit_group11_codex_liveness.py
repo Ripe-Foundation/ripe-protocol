@@ -84,7 +84,7 @@ def test_g11_vesting_multiplication_overflow_bricks_cash_and_after_cliff_cancel(
         )
 
 
-def test_g11_vesting_product_boundary_predecessor_cashes_but_exposes_group6_position_liveness(
+def test_g11_vesting_product_boundary_predecessor_cashes_and_records_live_position(
     human_resources,
     switchboard_delta,
     governance,
