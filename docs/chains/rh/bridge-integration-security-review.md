@@ -501,6 +501,12 @@ Whatever design lands, these must be red-before-green:
     itself to move payout inventory: the contract independently revalidates the
     order, pause, limits, recipient, and exact amount. A hostile withdrawal
     receiver can lose at most the already-reserved receivable allocation.
+12. `deposit` of GREEN or RIPE into a listed Across SpokePool reverts at the
+    token, on a fork, from an address holding no Ripe privilege and using a
+    transaction Ripe's frontend did not construct — the third-party path, which
+    is the only one the client allowlist cannot reach (M-3). A companion test
+    proves the CCIP token pool is *not* blacklisted, so the approved route still
+    mints and burns.
 
 ## Sign-off
 
@@ -509,6 +515,12 @@ rev-4 rationale was wrong and is retracted; the required answer is now the
 effective-depositor and complete-order admission rule above, but H-3 remains an
 implementation/admission blocker until the exact GREEN route is enumerated and
 tested. No implementation or live GREEN-route conformance evidence exists yet.
+
+M-3 is the cheapest item on this list and the only one that closes a live
+exposure rather than gating a future one: the Across GREEN/RIPE footgun is
+reachable today, through paths Ripe's frontend does not mediate, and the control
+is a transaction Ripe can send unilaterally. It should not wait on the Relay
+decisions below.
 
 H-4 is the one that should be settled first. It is not a design detail to be
 refined during implementation — it asks whether the protocol is willing to
