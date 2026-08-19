@@ -16,7 +16,7 @@ EXPECTED_RUNTIME_BYTES = {
     "TellerUtils": 9091,
     "BondRoom": 10927,
     "Ledger": 13306,
-    "Lootbox": 24444,
+    "Lootbox": 24512,
     "RebaseErc20": 11411,
     "RipeGov": 23878,
     "HumanResources": 12542,

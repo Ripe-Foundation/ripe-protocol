@@ -324,7 +324,7 @@ def _claimLoot(
             # (`deregisterUserAsset` only checks the balance), so waiting costs nothing.
             if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
                 b: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, vaultId, asset)
-                if b.userPoints.balancePoints == 0:
+                if b.userPoints.balancePoints == 0 and b.userPoints.lastBalance == 0:
                     assetsToRemove.append(asset)
 
         # clean up user assets (storage optimization)
@@ -388,11 +388,12 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
+    config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
+    assert config.canClaimLoot # dev: loot claims disabled
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
     totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, a)
     if totalRipeForUser != 0:
-        config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
         self._handleRipeMint(_user, totalRipeForUser, False, config, coreRipeGovVaultId, a)
     return totalRipeForUser
 
@@ -756,11 +757,10 @@ def _getLatestGlobalDepositPoints(
     if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
         elapsedBlocks = block.number - globalPoints.lastUpdate
 
-    # update last update
+    if not _arePointsEnabled:
+        return globalPoints
     globalPoints.lastUpdate = block.number
-
-    # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return globalPoints
 
     # update ripe rewards points
@@ -791,11 +791,10 @@ def _getLatestAssetDepositPoints(
     if assetPoints.lastUpdate != 0 and block.number > assetPoints.lastUpdate:
         elapsedBlocks = block.number - assetPoints.lastUpdate
 
-    # update last update
+    if not _arePointsEnabled:
+        return assetPoints
     assetPoints.lastUpdate = block.number
-
-    # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return assetPoints
 
     # update ripe rewards points
@@ -827,11 +826,10 @@ def _getLatestUserDepositPoints(
     if userPoints.lastUpdate != 0 and block.number > userPoints.lastUpdate:
         elapsedBlocks = block.number - userPoints.lastUpdate
 
-    # update last update
+    if not _arePointsEnabled:
+        return userPoints
     userPoints.lastUpdate = block.number
-
-    # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return userPoints
 
     # add user balance points
@@ -891,36 +889,38 @@ def _getLatestDepositPoints(
     userPoints: UserDepositPoints = empty(UserDepositPoints)
     if _user != empty(address):
         userPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
-        userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
-        if userLootShare != 0 and not isRipeGovVault:
-            userLootShare = userLootShare // assetPoints.precision
-        assetPoints.lastBalance -= userPoints.lastBalance
-        assetPoints.lastBalance += userLootShare
-        userPoints.lastBalance = userLootShare
+    if _c.arePointsEnabled:
+        if _user != empty(address):
+            userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
+            if userLootShare != 0 and not isRipeGovVault:
+                userLootShare = userLootShare // assetPoints.precision
+            assetPoints.lastBalance -= userPoints.lastBalance
+            assetPoints.lastBalance += userLootShare
+            userPoints.lastBalance = userLootShare
 
-    # General-depositor USD is funded only when stakersPointsAlloc == 0.
-    # Valuation is aggregate: lastBalance * precision, never the caller rate.
-    # Dispatch: RipeGov → empty book → StabilityPool → sharesToAmount probe
-    # → nominal-compatible fallback → fund zero. All share conversions
-    # round down and cap at usable custody. A successful exact-32-byte
-    # sharesToAmount result is SharesVault-compatible even if it is zero.
-    # A failed probe plus totalBalances == usable custody is only
-    # nominal-compatible accounting, not a vault-type proof.
-    newAssetUsdValue: uint256 = 0
-    if assetConfig.stakersPointsAlloc == 0:
-        if isRipeGovVault:
-            newAssetUsdValue = self._getUsdValueForAmount(_asset, staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset), _a.priceDesk)
-        elif assetPoints.lastBalance != 0:
-            newAssetUsdValue = self._getUsdValueForAmount(
-                _asset,
-                self._getEligibleUnderlying(_vaultId, _vaultAddr, _asset, assetPoints.lastBalance, assetPoints.precision, _a.missionControl),
-                _a.priceDesk,
-            )
+        # General-depositor USD is funded only when stakersPointsAlloc == 0.
+        # Valuation is aggregate: lastBalance * precision, never the caller rate.
+        # Dispatch: RipeGov → empty book → StabilityPool → sharesToAmount probe
+        # → nominal-compatible fallback → fund zero. All share conversions
+        # round down and cap at usable custody. A successful exact-32-byte
+        # sharesToAmount result is SharesVault-compatible even if it is zero.
+        # A failed probe plus totalBalances == usable custody is only
+        # nominal-compatible accounting, not a vault-type proof.
+        newAssetUsdValue: uint256 = 0
+        if assetConfig.stakersPointsAlloc == 0:
+            if isRipeGovVault:
+                newAssetUsdValue = self._getUsdValueForAmount(_asset, staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset), _a.priceDesk)
+            elif assetPoints.lastBalance != 0:
+                newAssetUsdValue = self._getUsdValueForAmount(
+                    _asset,
+                    self._getEligibleUnderlying(_vaultId, _vaultAddr, _asset, assetPoints.lastBalance, assetPoints.precision, _a.missionControl),
+                    _a.priceDesk,
+                )
 
-    if newAssetUsdValue != assetPoints.lastUsdValue:
-        globalPoints.lastUsdValue -= assetPoints.lastUsdValue
-        globalPoints.lastUsdValue += newAssetUsdValue
-        assetPoints.lastUsdValue = newAssetUsdValue
+        if newAssetUsdValue != assetPoints.lastUsdValue:
+            globalPoints.lastUsdValue -= assetPoints.lastUsdValue
+            globalPoints.lastUsdValue += newAssetUsdValue
+            assetPoints.lastUsdValue = newAssetUsdValue
 
     return userPoints, assetPoints, globalPoints
 
@@ -1070,11 +1070,10 @@ def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _arePointsEnabled:
     if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
         elapsedBlocks = block.number - globalPoints.lastUpdate
 
-    # update last update
+    if not _arePointsEnabled:
+        return globalPoints
     globalPoints.lastUpdate = block.number
-
-    # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return globalPoints
 
     # update borrow points
@@ -1095,11 +1094,10 @@ def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _arePointsEnabled: boo
     if userPoints.lastUpdate != 0 and block.number > userPoints.lastUpdate:
         elapsedBlocks = block.number - userPoints.lastUpdate
 
-    # update last update
+    if not _arePointsEnabled:
+        return userPoints
     userPoints.lastUpdate = block.number
-
-    # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return userPoints
 
     # update borrow points
@@ -1135,9 +1133,10 @@ def _getLatestBorrowPoints(
         userDebt = userDebt // EIGHTEEN_DECIMALS
 
     # update `lastPrincipal`
-    globalPoints.lastPrincipal -= userPoints.lastPrincipal
-    globalPoints.lastPrincipal += userDebt
-    userPoints.lastPrincipal = userDebt
+    if _arePointsEnabled:
+        globalPoints.lastPrincipal -= userPoints.lastPrincipal
+        globalPoints.lastPrincipal += userDebt
+        userPoints.lastPrincipal = userDebt
 
     return userPoints, globalPoints
 

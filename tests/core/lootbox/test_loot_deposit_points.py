@@ -422,28 +422,28 @@ def test_loot_deposit_points_points_disabled(
     # update again
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-    # check results - no points should accumulate when disabled
+    # check results - clocks and snapshots stay frozen while disabled
     gp = ledger.globalDepositPoints()
-    assert gp.lastUsdValue == deposit_amount // EIGHTEEN_DECIMALS
+    assert gp.lastUsdValue == 0
     assert gp.ripeStakerPoints == 0
     assert gp.ripeVotePoints == 0
     assert gp.ripeGenPoints == 0
-    assert gp.lastUpdate == boa.env.evm.patch.block_number
+    assert gp.lastUpdate == 0
 
     ap = ledger.assetDepositPoints(vault_id, alpha_token)
     assert ap.balancePoints == 0
-    assert ap.lastBalance == deposit_amount // ap.precision
-    assert ap.lastUsdValue == deposit_amount // EIGHTEEN_DECIMALS
+    assert ap.lastBalance == 0
+    assert ap.lastUsdValue == 0
     assert ap.ripeStakerPoints == 0
     assert ap.ripeVotePoints == 0
     assert ap.ripeGenPoints == 0
-    assert ap.lastUpdate == boa.env.evm.patch.block_number
+    assert ap.lastUpdate == 0
     assert ap.precision == 10 ** 9
 
     up = ledger.userDepositPoints(bob, vault_id, alpha_token)
     assert up.balancePoints == 0
-    assert up.lastBalance == deposit_amount // ap.precision
-    assert up.lastUpdate == boa.env.evm.patch.block_number
+    assert up.lastBalance == 0
+    assert up.lastUpdate == 0
 
 
 def test_loot_deposit_points_balance_changes(
@@ -1229,7 +1229,7 @@ def test_loot_deposit_points_state_transitions(
     performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    
+
     # First update with points enabled
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
@@ -1254,9 +1254,11 @@ def test_loot_deposit_points_state_transitions(
     boa.env.time_travel(blocks=elapsed3)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-    # Check results
+    # F1 freeze: the disabled interval (elapsed2) is credited on the first enabled checkpoint.
     ap = ledger.assetDepositPoints(vault_id, alpha_token)
-    assert ap.balancePoints == (deposit_amount // ap.precision) * (elapsed1 + elapsed3)  # No points during disabled period
+    assert ap.balancePoints == (deposit_amount // ap.precision) * (
+        elapsed1 + elapsed2 + elapsed3
+    )
 
 
 def test_loot_deposit_points_small_numbers(
