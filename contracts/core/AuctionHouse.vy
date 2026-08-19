@@ -1273,12 +1273,15 @@ def _transferCollateral(
     _targetUsdValue: uint256,
     _a: addys.Addys,
 ) -> (uint256, uint256, bool, bool):
-    if staticcall Vault(_vaultAddr).getTotalAmountForUser(_fromUser, _asset) == 0:
+    userAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_fromUser, _asset)
+    maxAssetAmount: uint256 = 0
+    if userAmount != 0:
+        maxAssetAmount = self._getAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    previewAmount: uint256 = min(userAmount, maxAssetAmount)
+    # Skip when the maximum expected outflow produces zero creditable USD under the current quote.
+    # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
+    if maxAssetAmount == 0 or previewAmount <= (maxAssetAmount - 1) // _targetUsdValue:
         return 0, 0, False, True
-
-    maxAssetAmount: uint256 = self._getAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
-    if maxAssetAmount == 0:
-        return 0, 0, False, True # skip if cannot get price for this asset
 
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
