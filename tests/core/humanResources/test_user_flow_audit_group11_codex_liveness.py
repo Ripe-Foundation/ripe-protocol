@@ -99,9 +99,12 @@ def test_g11_vesting_product_boundary_predecessor_cashes_but_exposes_group6_posi
 
     A four-year duration keeps the first cash amount itself below the RipeGov
     share-conversion range, isolating the Contributor vesting multiplication
-    boundary from independent downstream arithmetic.  The final assertions are
-    explicitly off-scope Group 6 breadcrumbs: the position amount view and
-    later within-vault transfer use a different checked share/amount product.
+    boundary from independent downstream arithmetic.
+
+    On the audit pin the later amount view and within-vault transfer reverted
+    (Group 6 SharesVault product). Current ``rh`` no longer overflows that
+    view; this node keeps the Group 11 cash proof and records the live
+    position instead of requiring the old revert.
     """
     terms = dict(valid_contributor_terms)
     terms["compensation"] = UINT256_MAX // 2
@@ -125,33 +128,7 @@ def test_g11_vesting_product_boundary_predecessor_cashes_but_exposes_group6_posi
     assert ripe_gov_vault.userGovData(contributor, ripe_token).lastShares > 0
     assert contributor.totalClaimed() == expected
     assert ledger.ripeAvailForHr() == 0
-    with boa.reverts():
-        ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
-
-    # HR's hasRipeBalance uses a raw-share boolean, so the ordinary owner can
-    # still initiate.  The later RipeGov share-to-amount conversion prevents
-    # confirmation and rolls the whole HR transfer back.
-    _advance_to_timestamp(contributor.unlockTime() + 1)
-    contributor.initiateRipeTransfer(False, sender=terms["owner"])
-    pending = contributor.pendingRipeTransfer()
-    _advance_to_block(pending.confirmBlock)
-    transfer_snapshot = (
-        ripe_token.totalSupply(),
-        ripe_token.balanceOf(ripe_gov_vault),
-        contributor.totalClaimed(),
-        ripe_gov_vault.userGovData(contributor, ripe_token).lastShares,
-        ripe_gov_vault.userGovData(terms["owner"], ripe_token).lastShares,
-    )
-    with boa.reverts():
-        contributor.confirmRipeTransfer(False, sender=terms["owner"])
-    assert contributor.pendingRipeTransfer() == pending
-    assert (
-        ripe_token.totalSupply(),
-        ripe_token.balanceOf(ripe_gov_vault),
-        contributor.totalClaimed(),
-        ripe_gov_vault.userGovData(contributor, ripe_token).lastShares,
-        ripe_gov_vault.userGovData(terms["owner"], ripe_token).lastShares,
-    ) == transfer_snapshot
+    assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == expected
 
 
 def test_g11_extreme_compensation_can_fail_nested_cash_math_at_elapsed_one(
