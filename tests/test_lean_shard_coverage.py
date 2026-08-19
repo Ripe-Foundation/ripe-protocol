@@ -394,8 +394,18 @@ def test_python_workflow_cache_restore_fallbacks_are_ordered():
 
 
 def test_python_workflow_uses_full_history_for_python_tests():
-    checkout = _step(_workflow()["jobs"]["test"], "Check out source")
-    assert checkout["with"]["fetch-depth"] == "0"
+    # tests/config/test_defaults_robinhood.py pins a historical commit and
+    # reads config/BluePrint.py out of it with `git show`. That file runs in
+    # the lean config shard, so a shallow checkout fails the test job outright.
+    # Both checkouts are pinned so that shortening either one has to be a
+    # deliberate edit rather than an invisible speedup.
+    depths = {
+        job_name: step["with"]["fetch-depth"]
+        for job_name, job in _workflow()["jobs"].items()
+        for step in job.get("steps", [])
+        if "fetch-depth" in (step.get("with") or {})
+    }
+    assert depths == {"test": "0", "deployment-controls": "0"}
 
 
 def test_python_workflow_bounds_every_job_runtime():
