@@ -650,7 +650,7 @@ def test_g10_1a_activate_reverts_while_deficit_then_replenish_restores(
     assert stability_pool.getTotalValue(alpha_token) > alpha_token.balanceOf(stability_pool.address)
 
 
-def test_g10_1b_low_quote_prune_then_deposit_captures_omitted_value(
+def test_g10_1b_low_quote_prune_then_deposit_cannot_capture_omitted_value(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -1482,7 +1482,6 @@ def test_g10_partial_claim_then_deposit_does_not_capture(
         with boa.env.anchor():
             _setup(price, donate)
             max_usd, max_amount = _claim_bounds(price)
-            user_shares = stability_pool.userBalances(bob, alpha_token)
             total_shares = stability_pool.totalBalances(alpha_token)
             total_value = stability_pool.getTotalValue(alpha_token)
             return max_usd, max_amount, total_shares, total_value
@@ -1856,7 +1855,6 @@ def test_g10_live_p_less_than_d_no_nonzero_residual_qualifies(
     alpha_token_whale,
     bravo_token_whale,
     bob,
-    alice,
     teller,
     auction_house,
     mock_price_source,

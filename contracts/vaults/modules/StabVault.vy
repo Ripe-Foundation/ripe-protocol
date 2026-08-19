@@ -118,6 +118,11 @@ DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
 RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
+# Live residual delisting is bounded to R <= P // 10**10. This caps omitted
+# membership to one ten-billionth of the prior per-cohort pair. A correctly
+# priced $100M pair implies at most approximately $0.01 of omitted residual.
+# For a 6-decimal asset, one base unit can qualify only when P >= 10**10 raw
+# units, i.e. 10,000 whole tokens.
 LIVE_RESIDUAL_DIVISOR: constant(uint256) = 10 ** 10
 
 CLAIM_ASSET_ABSENT: constant(uint256) = 0

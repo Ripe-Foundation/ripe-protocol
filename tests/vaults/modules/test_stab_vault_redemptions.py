@@ -2057,7 +2057,6 @@ def test_stab_vault_redeem_fragmented_claims_refunds_profit(
     )
 
     # Calculate actual values
-    refund = green_budget - green_spent
     bravo_received = bravo_token.balanceOf(bob)
     redeemed_value = bravo_received * claim_price // EIGHTEEN_DECIMALS
 
@@ -2084,7 +2083,7 @@ def test_stab_vault_redeem_fragmented_claims_refunds_profit(
 DUST_USD_THRESHOLD = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 
 
-def test_stab_vault_redemptions_dust_removal_below_threshold(
+def test_stab_vault_redemptions_meaningful_live_residual_stays_listed(
     stability_pool,
     alpha_token,
     bravo_token,

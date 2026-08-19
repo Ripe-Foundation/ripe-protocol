@@ -3621,7 +3621,7 @@ DUST_USD_THRESHOLD = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 CLAIM_ASSET_ACTIVE = 2
 
 
-def test_stab_vault_claims_dust_removal_below_threshold(
+def test_stab_vault_claims_meaningful_live_residual_stays_listed(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -3796,7 +3796,7 @@ def test_stab_vault_claims_dust_balance_preserved(
     _test(expected_remaining, remaining_total)
 
 
-def test_stab_vault_claims_dust_readdition_after_removal(
+def test_stab_vault_claims_receipt_accumulates_on_listed_live_residual(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -3867,7 +3867,7 @@ def test_stab_vault_claims_dust_readdition_after_removal(
     assert total_balance == dust_balance + new_claimable
 
 
-def test_stab_vault_claims_dust_precision_loss_triggers_removal(
+def test_stab_vault_claims_precision_loss_retains_when_p_less_than_d(
     stability_pool,
     alpha_token,
     bravo_token,

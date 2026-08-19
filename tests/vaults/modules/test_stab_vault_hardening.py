@@ -250,6 +250,8 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
         MAX_ACTIVE_CLAIM_ASSETS
     )
 
+    for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
+        mock_price_source.setPrice(token, 10**15)
     gas_before = boa.env.get_gas_used()
     stability_pool.pruneClaimableAssets(
         alpha_token,
@@ -258,9 +260,11 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     )
     prune_gas = boa.env.get_gas_used() - gas_before
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
-        MAX_ACTIVE_CLAIM_ASSETS
+        MAX_ACTIVE_CLAIM_ASSETS - MAX_CLAIM_ASSET_MAINTENANCE
     )
 
+    for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
     stability_pool.pause(True, sender=switchboard_alpha.address)
     gas_before = boa.env.get_gas_used()
     stability_pool.activateClaimAssets(
@@ -278,6 +282,8 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
         f"deposit={deposit_gas[-1]}",
         f"withdrawal={withdrawal_gas[-1]}",
         f"claim_many={claim_many_gas}",
+        f"prune={prune_gas}",
+        f"activation={activation_gas}",
         f"active_claim_assets={MAX_ACTIVE_CLAIM_ASSETS}",
         f"maintenance_batch={MAX_CLAIM_ASSET_MAINTENANCE}",
     )

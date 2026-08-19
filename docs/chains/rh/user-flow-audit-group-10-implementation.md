@@ -32,10 +32,24 @@
 > `totalClaimableBalances[asset] == 0` and that no active row depends
 > on it.
 >
+> **Test node ID mapping** (names that stated the opposite of the
+> current assertions; historical citations below keep the old IDs):
+>
+> - `test_g10_1b_low_quote_prune_then_deposit_captures_omitted_value`
+>   → `test_g10_1b_low_quote_prune_then_deposit_cannot_capture_omitted_value`
+> - `test_prune_reenables_share_actions_while_claim_custody_is_still_short`
+>   → `test_prune_does_not_reenable_share_actions_while_claim_custody_is_still_short`
+> - `test_g10_low_quote_prune_lets_new_depositor_capture_restored_claim_nav`
+>   → `test_g10_low_quote_prune_does_not_let_new_depositor_capture_restored_claim_nav`
+> - `test_high_quote_activate_lets_an_exiting_holder_take_phantom_value`
+>   → `test_high_quote_activate_does_not_let_an_exiting_holder_take_phantom_value`
+>
 > The historical work order below remains the 2026-08-18 Group 10
 > implementation trail (rows A–G, call-site `remainingUsdValue = 0`,
 > GREEN out of scope). Do not treat those superseded rows as the
 > current production policy.
+
+## Historical work order — superseded 2026-08-19
 
 Work order for a **fresh agent**. Not a second audit. **Read this
 entire file once before any edit.** The traps are pre-classified

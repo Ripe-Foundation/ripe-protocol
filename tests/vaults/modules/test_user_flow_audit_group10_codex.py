@@ -721,8 +721,9 @@ def test_g10_activate_capacity_order_charlie_pause_and_recovery(
     # A retained row cannot be evicted by scoped maintenance merely to make
     # room: at its high quote, permissionless prune is a no-op.
     stability_pool.pruneClaimableAssets(alpha_token, [winner], sender=bob)
+    prune_logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
     assert stability_pool.getClaimAssetState(alpha_token, winner) == ACTIVE
-    assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
+    assert prune_logs == []
 
     # A later keeper has no priority and finds a silent capacity skip.
     stability_pool.activateClaimAssets(alpha_token, [loser], sender=bob)

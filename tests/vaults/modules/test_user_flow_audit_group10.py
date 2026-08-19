@@ -393,7 +393,7 @@ def test_g10_dust_prune_of_undercustodied_row_must_keep_nav_actions_blocked(
 # ---------------------------------------------------------------------------
 
 
-def test_g10_low_quote_prune_lets_new_depositor_capture_restored_claim_nav(
+def test_g10_low_quote_prune_does_not_let_new_depositor_capture_restored_claim_nav(
     stability_pool, alpha_token, alpha_token_whale, bravo_token,
     bravo_token_whale, governance, alice, bob, teller, auction_house,
     switchboard_alpha, mock_price_source, green_token, savings_green,

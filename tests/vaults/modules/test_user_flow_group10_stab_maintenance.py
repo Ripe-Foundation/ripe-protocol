@@ -85,7 +85,7 @@ def _claim_ledger(stability_pool, stab_asset, claim_asset):
 ########################################################################
 
 
-def test_prune_reenables_share_actions_while_claim_custody_is_still_short(
+def test_prune_does_not_reenable_share_actions_while_claim_custody_is_still_short(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -397,7 +397,7 @@ def test_low_quote_prune_moves_value_from_existing_to_new_shareholders(
     assert attack[1] == control[1]
 
 
-def test_high_quote_activate_lets_an_exiting_holder_take_phantom_value(
+def test_high_quote_activate_does_not_let_an_exiting_holder_take_phantom_value(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -820,6 +820,8 @@ def test_activate_under_charlie_governor_and_lite_pause(
     mock_price_source.setPrice(bravo_token, 10**15)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token],
                                         sender=alice)
+    assert stability_pool.getClaimAssetState(
+        alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
     mock_price_source.setPrice(bravo_token, exact_price)
 
     # --- lite arm (governance-enableable: liteSigners() is [] at launch)
