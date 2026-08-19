@@ -8,7 +8,6 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
 E18 = EIGHTEEN_DECIMALS
-OWNER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 HQ_EMPTY_SAVINGS_GREEN = """
 # @version 0.4.3
 
@@ -362,7 +361,7 @@ def test_g12_impl_revoke_to_zero_while_gated(
 ):
     """One gate × one revoke method, from a live nonzero allowance.
     permit(..., 0) also asserts nonce increment."""
-    owner = Account.from_key(OWNER_KEY)
+    owner = Account.create()
     with boa.env.anchor():
         green_token.transfer(owner.address, 4 * E18, sender=whale)
         green_token.approve(bob, 3 * E18, sender=owner.address)
