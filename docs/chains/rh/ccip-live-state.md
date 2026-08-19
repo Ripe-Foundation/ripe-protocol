@@ -1,6 +1,6 @@
 # CCIP live state and remaining operational gates
 
-Status: **LIVE TOPOLOGY CONFIRMED; OPERATIONAL DISPOSITIONS REMAIN OPEN**
+Status: **LIVE TOPOLOGY AND PRODUCTION TRANSFERS CONFIRMED; OPERATIONAL DISPOSITIONS REMAIN OPEN**
 
 Evidence snapshot: [ccip-live-snapshot-20260811.json](evidence/ccip-live-snapshot-20260811.json)
 
@@ -47,7 +47,33 @@ capabilities are active onchain. That corrects the old repository status.
 
 It does **not** prove operational readiness, authorize another transaction, or prove
 that an arbitrary transfer will execute automatically. In particular, no cross-chain
-send was performed while producing this evidence.
+send was performed while producing the original 2026-08-11 topology evidence.
+
+## 2026-08-19 production-transfer update
+
+The owner subsequently supplied four production CCIP messages, one for each
+token and direction. This corrects any later inference that the live path had
+never been exercised. At the `2026-08-19T17:13:01Z` cutoff:
+
+| Direction | Token | Message ID | State | Delivery / receipt |
+| --- | --- | --- | --- | --- |
+| Robinhood -> Base | RIPE | `0x43423eb2827630c5888d6f183ac8a9d2e233b7d117a362dd16f0e40d54fd58fe` | `SUCCESS` | 1,132 seconds; `0x95dde4aa866dd848125749f6af87e9a34f1cc808c93662cd00e95b60e600ec34` |
+| Robinhood -> Base | GREEN | `0x880f6d8445e45b75823b75b8b463af00278d1da5f1be14c04840c11ca740a9bb` | `SUCCESS` | 1,165 seconds; `0xc1e5c55ec8b5572d309c1d5349c2ac8b02ab73f47fa6f12f3c957bd65584d31c` |
+| Base -> Robinhood | RIPE | `0x56fd97fe36fb08033fb0533883b16c501e01e413ce87d872d3ae74a3491ec97f` | `SUCCESS` | 1,198 seconds; `0xda735ce964a4de0b28d4cfc7337ef801f2c8720012063f56376130ee37fd4323` |
+| Base -> Robinhood | GREEN | `0x351ed02f27de5eda6bd62fdba5df3f6af7f9f948e57b1b0b8c8d5cdf40a506bd` | `SUCCESS` | 1,486 seconds; `0xebf2ae00014222409eb6173ca5503034590b935c8fb208f1b6f68ac7081a0067` |
+
+All four successful destination transactions called the relevant OffRamp with
+selector `0xf58e03fc`, decoded as `execute(bytes32[2],bytes)`, and had successful
+receipts using 190,229, 190,262, 168,365, and 168,398 total transaction gas.
+Each CCIP message carried a `90,000` destination token-gas amount. These are
+automatic executions, not owner manual retries.
+
+This proves that both live token pools completed both directions with the
+current configuration. It does not turn four live observations into a
+worst-case gas proof. The evidence and links are recorded in
+[`ccip-live-transfers-20260819.json`](evidence/ccip-live-transfers-20260819.json).
+Its SHA-256 digest is
+`b24b1a512c80b0ba45192132fd5bda357b66d3ea7adbe5393b2edc47a1444ce2`.
 
 ## Open owner and evidence gates
 
@@ -55,12 +81,15 @@ send was performed while producing this evidence.
    inbound and outbound rate limiting disabled (`false, 0, 0`), and every
    `rateLimitAdmin` is the zero address. The owner must explicitly select a policy or
    explicitly accept that posture. This repository does not choose or apply one.
-2. **Automatic-execution destination gas.** The historical isolated mock measured
-   `releaseOrMint` at 78,813 gas warm and 95,902 gas cold. The cold pool call alone
-   exceeded the historical 90,000 combined default before real RipeHq work and
-   OffRamp balance checks. Operational readiness requires accepted measurement of the
-   full real-token OffRamp path and confirmation of the configured destination-token
-   gas overhead/margin. The mock numbers are risk evidence, not a production limit.
+2. **Automatic-execution destination gas.** The 2026-08-19 production messages
+   prove successful automatic execution for RIPE and GREEN in both directions.
+   The historical isolated mock measured `releaseOrMint` at 78,813 gas warm and
+   95,902 gas cold, while all four successful messages carried a `90,000` destination
+   token-gas amount. Operational readiness still requires accepted measurement
+   of the worst-case full real-token OffRamp path and confirmation of the
+   configured destination-token gas overhead/margin. The mock numbers are risk
+   evidence, not a production limit, and the live total transaction gas is not
+   the same quantity as the pool subcall allowance.
 3. **Live transaction backend.** `scripts/ccip_send.py` validates exact decimal
    amounts, manifests, profile identity, and RPC chain ID, then supports fork
    simulation only. Live mode fails with `CCIP_LIVE_SIGNER_UNBOUND`; no private-key or
