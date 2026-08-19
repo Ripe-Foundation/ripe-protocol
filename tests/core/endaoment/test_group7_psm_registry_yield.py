@@ -15,6 +15,10 @@ prove WHERE the failure lands and that funds are never at risk, and the
 pair-storage semantics of setUsdcYieldPosition. Deposit composition (B + P)
 is asserted at the code level in the report (EndaomentPSM.vy:565 deposits
 balanceOf(self) — the entire idle balance).
+
+Registry, vault, and Lego contracts are trusted protocol components. Revert
+propagation in this module documents the typed-call trust boundary and atomic
+rollback; it is not an unresolved fail-soft requirement.
 """
 
 import boa
@@ -51,12 +55,12 @@ def _enable(endaoment_psm, switchboard_charlie, mock_price_source, charlie_token
 ################
 
 
-def test_g7_6a_reverting_vault_check_bricks_user_actions(
+def test_g7_6a_trusted_vault_check_revert_propagates_for_that_recipient(
     endaoment_psm, charlie_token, green_token,
     switchboard_charlie, mission_control, switchboard_alpha, mock_undy_v2,
     governance, mock_price_source,
 ):
-    """`isEarnVault` revert on one recipient bricks that user's mint; other EOAs are unchanged."""
+    """A trusted `isEarnVault` revert propagates for that recipient only."""
     victim = boa.env.generate_address()
     other = boa.env.generate_address()
     mock_undy_v2.setAllAddressesAreVaults(False)

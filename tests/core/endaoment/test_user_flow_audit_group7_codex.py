@@ -504,7 +504,7 @@ def test_g7_stale_mint_capacity_then_hq_green_authorization_revocation_reverts_a
         ) == before
 
 
-def test_g7_interval_duration_accepts_first_overflowing_value_and_bricks_both_active_windows(
+def test_g7_checked_interval_subtraction_keeps_both_active_windows_callable(
     endaoment_psm,
     charlie_token,
     green_token,
@@ -560,7 +560,7 @@ def test_g7_interval_duration_accepts_first_overflowing_value_and_bricks_both_ac
     after_psm_tx()
 
 
-def test_g7_constructor_allows_max_interval_duration_then_bricks_after_first_mint_window(
+def test_g7_constructor_rejects_max_interval_duration(
     ripe_hq_deploy,
     charlie_token,
 ):
@@ -585,7 +585,7 @@ def test_g7_constructor_allows_max_interval_duration_then_bricks_after_first_min
             )
 
 
-def test_g7_max_interval_mint_accepts_overflowing_value_while_nearby_safe_value_works(
+def test_g7_max_interval_mint_accepts_exact_safe_bound_and_rejects_next_value(
     endaoment_psm,
     charlie_token,
     switchboard_charlie,
@@ -603,10 +603,49 @@ def test_g7_max_interval_mint_accepts_overflowing_value_while_nearby_safe_value_
         after_psm_tx()
 
         with boa.reverts("invalid max"):
-            endaoment_psm.setMaxIntervalMint(MAX_UINT256 - 1, sender=switchboard_charlie.address)
+            endaoment_psm.setMaxIntervalMint(
+                MAX_SAFE_INTERVAL_MINT + 1,
+                sender=switchboard_charlie.address,
+            )
     finally:
         if endaoment_psm.maxIntervalMint() != 100_000 * ONE_GREEN:
             endaoment_psm.setMaxIntervalMint(100_000 * ONE_GREEN, sender=switchboard_charlie.address)
+
+
+def test_g7_constructor_enforces_exact_max_interval_mint_boundary(
+    ripe_hq_deploy,
+    charlie_token,
+):
+    with boa.env.anchor():
+        psm = boa.load(
+            "contracts/core/EndaomentPSM.vy",
+            ripe_hq_deploy,
+            43_200,
+            0,
+            MAX_SAFE_INTERVAL_MINT,
+            0,
+            100_000 * ONE_GREEN,
+            charlie_token.address,
+            0,
+            ZERO_ADDRESS,
+            name="g7_safe_max_interval_mint_constructor_psm",
+        )
+        assert psm.maxIntervalMint() == MAX_SAFE_INTERVAL_MINT
+
+        with boa.reverts("invalid max"):
+            boa.load(
+                "contracts/core/EndaomentPSM.vy",
+                ripe_hq_deploy,
+                43_200,
+                0,
+                MAX_SAFE_INTERVAL_MINT + 1,
+                0,
+                100_000 * ONE_GREEN,
+                charlie_token.address,
+                0,
+                ZERO_ADDRESS,
+                name="g7_unsafe_max_interval_mint_constructor_psm",
+            )
 
 
 def test_g7_accepted_mint_cap_does_not_overflow_fee_gross_up(

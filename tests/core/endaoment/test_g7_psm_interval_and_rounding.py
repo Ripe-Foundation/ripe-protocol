@@ -157,7 +157,7 @@ def test_g7_shortening_duration_expires_the_live_window_immediately(
     psm.setNumBlocksPerInterval(FIXTURE_BLOCKS, sender=switchboard_charlie.address)
 
 
-def test_g7_max_accepted_interval_duration_bricks_the_window_check(
+def test_g7_max_accepted_interval_duration_keeps_window_check_callable(
     endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source
 ):
     """Previously `max_value - 1` overflowed `start + duration` and bricked the window.
@@ -187,7 +187,7 @@ def test_g7_max_accepted_interval_duration_bricks_the_window_check(
     after_psm_tx()
 
 
-def test_g7_max_interval_mint_near_uint_max_bricks_mint_but_not_redeem(
+def test_g7_unsafe_mint_cap_is_rejected_but_redeem_cap_remains_unbounded(
     endaoment_psm, charlie_token, green_token, switchboard_charlie, governance,
     mock_price_source, credit_engine
 ):

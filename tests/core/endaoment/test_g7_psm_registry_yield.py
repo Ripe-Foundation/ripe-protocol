@@ -6,6 +6,10 @@ combined Underscore hub (registry + LegoBook + Lego + VaultRegistry) in-process
 so the composition can be exercised.  It proves *interface composition only* —
 it is not pinned Underscore behaviour.
 
+Registry, vault, and Lego contracts are trusted protocol components. The
+adversarial mocks below are assumption controls: they document typed-call
+atomicity and out-of-model integration failures, not required remediations.
+
 The vault token is `charlie_token_vault` (`MockErc4626Vault` over the same 6dp
 `charlie_token`).
 """
@@ -274,11 +278,11 @@ def test_g7_launch_yield_position_is_empty_and_deposit_is_a_noop(
 # ------------------------------------------------- 6a malformed registry
 
 
-def test_g7_registry_that_reverts_bricks_every_psm_action(
+def test_g7_trusted_registry_revert_propagates_through_psm_user_actions(
     endaoment_psm, undy_hub, mission_control, switchboard_alpha, switchboard_charlie,
     charlie_token, green_token, governance, mock_price_source, credit_engine
 ):
-    """A reverting registry walk reverts mint and redeem.
+    """A trusted registry revert propagates through mint and redeem atomically.
 
     Empty getAddr(10) is still regular: no vault-registry call is made.
     """
@@ -457,15 +461,16 @@ def test_g7_yield_view_overstates_then_withdrawal_realises_less_late_revert(
     psm.setShouldAutoDeposit(True, sender=switchboard_charlie.address)
 
 
-def test_g7_lego_partial_deposit_leaves_green_under_backed(
+def test_g7_out_of_model_partial_deposit_documents_trusted_lego_assumption(
     endaoment_psm, undy_hub, charlie_token, charlie_token_vault, green_token,
     switchboard_charlie, governance, mock_price_source, wired
 ):
-    """The PSM does not measure receipt; it trusts the Lego's return tuple.
+    """The PSM intentionally trusts the Lego's return tuple.
 
     With a Lego that keeps 10% of the deposit, the mint still succeeds and GREEN
     is still minted 1:1, but redeemable inventory is 10% short. Integration /
-    config-dependent: it needs a hostile or buggy Lego, not user input.
+    config-dependent and outside the threat model: it needs a hostile or buggy
+    Lego, not user input.
     """
     psm = endaoment_psm
     _enable(psm, switchboard_charlie)
@@ -559,7 +564,7 @@ def test_g7_deposit_to_yield_is_composition_not_a_drain(
 # ------------------------------------------------- 6c lifecycle
 
 
-def test_g7_clearing_the_registry_strands_yield_inventory(
+def test_g7_clearing_registry_excludes_yield_inventory_until_restored(
     endaoment_psm, undy_hub, mission_control, switchboard_alpha, switchboard_charlie,
     charlie_token, charlie_token_vault, green_token, governance, mock_price_source,
     credit_engine, wired
@@ -760,11 +765,11 @@ def test_g7_overstated_withdrawal_return_reaches_the_usdc_transfer(
     psm.setShouldAutoDeposit(True, sender=switchboard_charlie.address)
 
 
-def test_g7_a_failing_yield_venue_bricks_minting_entirely(
+def test_g7_trusted_yield_deposit_revert_propagates_atomically(
     endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
     governance, mock_price_source, credit_engine, wired
 ):
-    """A reverting `depositForYield` rolls back an otherwise-valid mint."""
+    """A trusted `depositForYield` revert rolls back the mint atomically."""
     psm = endaoment_psm
     _enable(psm, switchboard_charlie)
 
@@ -787,11 +792,11 @@ def test_g7_a_failing_yield_venue_bricks_minting_entirely(
     undy_hub.setRevertOnDeposit(False)
 
 
-def test_g7_a_reverting_underlying_view_bricks_redeeming_entirely(
+def test_g7_trusted_underlying_view_revert_propagates_to_redeem_and_capacity_views(
     endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
     governance, mock_price_source, credit_engine, wired
 ):
-    """A reverting `getUnderlyingAmountSafe` bricks redeem and capacity views."""
+    """A trusted `getUnderlyingAmountSafe` revert propagates to its callers."""
     psm = endaoment_psm
     _enable(psm, switchboard_charlie)
     psm.setShouldAutoDeposit(False, sender=switchboard_charlie.address)
@@ -1256,7 +1261,7 @@ def test_g7_oversized_yield_receipt_decodes_prefix(
     endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
     governance, mock_price_source, wired,
 ):
-    """Typed ABI ignores the extra byte; the first four words are zeros."""
+    """Out-of-model adapter output documents that typed ABI ignores an extra byte."""
     psm = endaoment_psm
     _enable(psm, switchboard_charlie)
     user = boa.env.generate_address()

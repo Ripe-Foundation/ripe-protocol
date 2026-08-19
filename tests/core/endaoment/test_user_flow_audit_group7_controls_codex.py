@@ -371,7 +371,7 @@ def test_g7_delta_install_and_clear_registry_are_real_timelocked_production_writ
     assert mission_control.underscoreRegistry() == ZERO_ADDRESS
 
 
-def test_g7_delta_accepts_registry_that_bricks_all_psm_user_actions_until_clear(
+def test_g7_delta_installed_registry_revert_propagates_until_clear(
     endaoment_psm,
     charlie_token,
     green_token,
@@ -382,9 +382,11 @@ def test_g7_delta_accepts_registry_that_bricks_all_psm_user_actions_until_clear(
     mock_price_source,
     whale,
 ):
-    """Group 9 lets Delta install a registry that is honest at the empty-address
-    sentinel and reverts on a real vault walk. Typed PSM walks then revert
-    until the registry is cleared.
+    """Characterize the trusted-registry boundary retained by Group 9.
+
+    Delta can install a registry that passes the empty-address sentinel and
+    later reverts on a real vault walk. Typed PSM calls propagate that revert
+    atomically until governance clears the registry.
     """
     broken = boa.loads(BROKEN_UNDERSCORE_REGISTRY_SOURCE, name="g7_broken_underscore_registry")
     install = switchboard_delta.setUnderscoreRegistry(broken.address, sender=governance.address)
@@ -554,7 +556,7 @@ def test_g7_partial_yield_pairs_are_inert_until_both_lego_and_vault_token_are_se
         assert endaoment_psm.getUnderlyingYieldAmount() == 3 * payment
 
 
-def test_g7_wrong_yield_receipt_token_leaves_green_minted_but_the_configured_position_empty(
+def test_g7_out_of_model_wrong_receipt_documents_trusted_lego_assumption(
     endaoment_psm,
     charlie_token,
     green_token,
@@ -564,7 +566,7 @@ def test_g7_wrong_yield_receipt_token_leaves_green_minted_but_the_configured_pos
     mission_control,
     mock_price_source,
 ):
-    """A hostile/misconfigured Lego is an integration failure, not pinned Underscore proof."""
+    """A hostile/misconfigured Lego is outside the trusted integration model."""
     with boa.env.anchor():
         _, expected_receipt, lego = _deploy_yield_stack(
             mission_control, switchboard_alpha, governance, charlie_token

@@ -167,7 +167,7 @@ def test_g7_lower_raise_shorten_lengthen_duration(
     endaoment_psm.setMaxIntervalMint(100_000 * E18, sender=switchboard_charlie.address)
 
 
-def test_g7_max_value_minus_one_duration_overflows_ordinary_interval(
+def test_g7_max_value_minus_one_duration_keeps_ordinary_interval_callable(
     endaoment_psm,
     charlie_token,
     green_token,
@@ -209,7 +209,7 @@ def test_g7_max_value_minus_one_duration_overflows_ordinary_interval(
             endaoment_psm.setNumBlocksPerInterval(ONE_DAY_BLOCKS, sender=switchboard_charlie.address)
 
 
-def test_g7_max_interval_overflow_ordinary_view_reverts_vault_view_does_not(
+def test_g7_unsafe_mint_cap_is_rejected_and_vault_view_stays_unlimited(
     endaoment_psm,
     switchboard_charlie,
     mission_control,
