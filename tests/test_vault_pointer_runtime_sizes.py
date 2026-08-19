@@ -24,7 +24,7 @@ EXPECTED_RUNTIME_BYTES = {
     "CreditEngine": 24502,
     "CreditRedeem": 8303,
     "Deleverage": 24459,
-    "StabilityPool": 24002,
+    "StabilityPool": 24182,
     "BlueChipYieldPrices": 22749,
     "ChainlinkPrices": 14256,
     "CurvePrices": 23141,

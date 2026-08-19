@@ -765,12 +765,8 @@ def test_dust_deactivated_pair_with_residual_balance_remains_claimable(
     # worth $0.03 and must move to the dormant set.
     mock_price_source.setPrice(bravo_token, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=bob)
-    events = filter_logs(stability_pool, "ClaimAssetDeactivated")
-    assert len(events) == 1
-    assert events[0].balance == residual
-    assert events[0].activeCount == 0
-    assert events[0].reason == 2
-    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 0
+    assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 1
     assert stability_pool.claimableBalances(alpha_token, bravo_token) == residual
 
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
@@ -3617,11 +3613,12 @@ def test_stab_vault_claims_auto_deposit_with_delegation(
 
 
 #################################
-# Dust Removal Tests            #
+# Dust residual / live-share    #
 #################################
 
 
 DUST_USD_THRESHOLD = 5 * 10 ** 16  # $0.05 in 18-decimal USD
+CLAIM_ASSET_ACTIVE = 2
 
 
 def test_stab_vault_claims_dust_removal_below_threshold(
@@ -3641,7 +3638,7 @@ def test_stab_vault_claims_dust_removal_below_threshold(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test removal when remaining USD value is below $0.05."""
+    """Live-share partial claim below $0.05 keeps the row on the iterable."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3656,7 +3653,7 @@ def test_stab_vault_claims_dust_removal_below_threshold(
     alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
     stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
 
-    # Add an active $0.30 balance so a partial claim can leave dormant dust.
+    # Add an active $0.30 balance so a partial claim can leave a dust residual.
     claimable_amount = 30 * 10 ** 16
     bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
     stability_pool.swapForLiquidatedCollateral(
@@ -3674,15 +3671,14 @@ def test_stab_vault_claims_dust_removal_below_threshold(
     claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
-    # Bravo should be removed from the iterable list (dust removal)
-    # index == 0 means it's no longer in the list
+    # Shares remain, so remainingUsdValue is forced to 0 and the row stays listed.
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
-    assert bravo_index_after == 0, "Dust should be removed from iterable list"
+    assert bravo_index_after == bravo_index_before
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
-    # BUT the balance should still exist (not zeroed)
     remaining_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
-    assert remaining_balance > 0, "Balance should be preserved, only removed from list"
-    assert remaining_balance < claimable_amount, "Some should have been claimed"
+    assert remaining_balance > 0
+    assert remaining_balance < claimable_amount
 
 
 def test_stab_vault_claims_no_dust_removal_above_threshold(
@@ -3758,7 +3754,7 @@ def test_stab_vault_claims_dust_balance_preserved(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that claimableBalances and totalClaimableBalances remain intact after dust removal from list"""
+    """Claim and total balances stay intact after a live-share dust residual."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3783,13 +3779,13 @@ def test_stab_vault_claims_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.26, leaving $0.04 dormant.
+    # Claim $0.26, leaving a $0.04 residual that stays ACTIVE while shares remain.
     claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
-    # Verify dust removed from list (index == 0 means not in list)
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
-    assert bravo_index_after == 0, "Dust should be removed from list"
+    assert bravo_index_after > 0
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
     # Verify balances are preserved (not zeroed)
     remaining_claimable = stability_pool.claimableBalances(alpha_token, bravo_token)
@@ -3817,7 +3813,7 @@ def test_stab_vault_claims_dust_readdition_after_removal(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that after dust removal, new liquidations re-add the asset to the list"""
+    """A later receipt adds onto a live-share dust residual that stayed listed."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3846,9 +3842,9 @@ def test_stab_vault_claims_dust_readdition_after_removal(
     claim_usd_value = 11 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
-    # Verify removed from list (index == 0)
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
-    assert bravo_index_after == 0, "Dust should be removed from list"
+    assert bravo_index_after > 0
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
     # Store the dust balance
     dust_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
@@ -3862,9 +3858,9 @@ def test_stab_vault_claims_dust_readdition_after_removal(
         alice, green_token, savings_green, sender=auction_house.address
     )
 
-    # Bravo should be back in the list (index > 0)
     bravo_index_readded = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
-    assert bravo_index_readded > 0, "Bravo should be re-added to list"
+    assert bravo_index_readded == bravo_index_after
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
     # Balance should be dust + new amount
     total_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
@@ -3888,7 +3884,7 @@ def test_stab_vault_claims_dust_precision_loss_triggers_removal(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that very small remaining amounts trigger dust removal even when division would round to 0"""
+    """A one-wei residual after a live-share claim stays listed."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3912,15 +3908,14 @@ def test_stab_vault_claims_dust_precision_loss_triggers_removal(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.27, which is 9 out of 10 token wei and leaves 1 wei.
-    # The remaining USD value calculation would be: (1 * claimUsdValue) / claimAmount
-    # which is very small - the precision loss fix should set remainingUsdValue=1 and trigger removal
+    # Claim $0.27, which is 9 of 10 token wei and leaves 1 wei. Live shares
+    # force remainingUsdValue to 0, so the row stays ACTIVE.
     claim_usd_value = 27 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
-    # Should be removed from list due to precision loss handling (index == 0)
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
-    assert bravo_index_after == 0, "Dust should be removed from list"
+    assert bravo_index_after > 0
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
     # But balance should remain
     remaining = stability_pool.claimableBalances(alpha_token, bravo_token)
@@ -3944,7 +3939,7 @@ def test_stab_vault_claims_dust_different_price_levels(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test dust removal with different price levels (expensive asset)"""
+    """A live-share residual below $0.05 stays listed at a high unit price."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3972,9 +3967,9 @@ def test_stab_vault_claims_dust_different_price_levels(
     claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
-    # Should be removed from list (remaining < $0.05).
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
-    assert bravo_index_after == 0, "Dust should be removed from list"
+    assert bravo_index_after > 0
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
     # Balance should remain
     remaining = stability_pool.claimableBalances(alpha_token, bravo_token)

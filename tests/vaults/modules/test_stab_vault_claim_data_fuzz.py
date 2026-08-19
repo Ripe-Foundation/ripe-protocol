@@ -262,7 +262,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                 pair_balance = expected_pairs.get(pair_key, 0)
                 usd_value = pair_balance * price // EIGHTEEN_DECIMALS
                 if (
-                    token_address in active_addresses
+                    stability_pool.totalBalances(alpha_token) == 0
+                    and token_address in active_addresses
                     and usd_value != 0
                     and usd_value < RETENTION_THRESHOLD
                 ):
@@ -286,7 +287,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                 pair_balance = expected_pairs.get(pair_key, 0)
                 usd_value = pair_balance * price // EIGHTEEN_DECIMALS
                 if (
-                    pair_balance != 0
+                    stability_pool.totalBalances(alpha_token) == 0
+                    and pair_balance != 0
                     and token_address not in active_addresses
                     and usd_value >= ACTIVATION_THRESHOLD
                 ):
@@ -367,11 +369,14 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
     mock_price_source,
     green_token,
     savings_green,
+    setGeneralConfig,
+    setAssetConfig,
     fuzz_claim_tokens,
 ):
     candidate_amount, active_increment = case
 
     with boa.env.anchor():
+        setGeneralConfig()
         _seed_stability_asset(
             stability_pool,
             alpha_token,
@@ -470,12 +475,14 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             MAX_ACTIVE_CLAIM_ASSETS
         )
 
-        # Pruning a different active asset frees one slot for the candidate.
-        mock_price_source.setPrice(active_tokens[1], 2 * 10**17)
-        stability_pool.pruneClaimableAssets(
-            alpha_token,
-            [active_tokens[1]],
-            sender=alice,
+        # Claim an occupant to zero to free one slot for the candidate.
+        setAssetConfig(active_tokens[1])
+        stability_pool.claimManyFromStabilityPool(
+            bob,
+            [(alpha_token.address, active_tokens[1].address, MAX_UINT256)],
+            bob,
+            False,
+            sender=teller.address,
         )
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
             MAX_ACTIVE_CLAIM_ASSETS - 1
@@ -622,7 +629,9 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
             )
 
         should_remove = remaining_balance == 0 or (
-            remaining_usd_value != 0 and remaining_usd_value < RETENTION_THRESHOLD
+            stability_pool.totalBalances(alpha_token) == 0
+            and remaining_usd_value != 0
+            and remaining_usd_value < RETENTION_THRESHOLD
         )
         expected_pairs[_claim_pair(alpha_token, claim)] = remaining_balance
         if should_remove:
@@ -800,9 +809,9 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
                 expected_pairs[_claim_pair(stab_asset, claim)] = remaining_claims[
                     stab_address
                 ]
-                if (
-                    remaining_claims[stab_address] == 0
-                    or remaining_claims[stab_address] < RETENTION_THRESHOLD
+                if remaining_claims[stab_address] == 0 or (
+                    stability_pool.totalBalances(stab_asset) == 0
+                    and remaining_claims[stab_address] < RETENTION_THRESHOLD
                 ):
                     active_addresses = [
                         _asset_address(asset) for asset in expected_active[stab_address]

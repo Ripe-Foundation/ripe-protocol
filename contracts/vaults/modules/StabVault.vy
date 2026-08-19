@@ -798,6 +798,8 @@ def _claimFromStabilityPool(
             remainingUsdValue = 1 # very small dust, trigger removal
         else:
             remainingUsdValue = numerator // claimAmount
+    if vaultData.totalBalances[_stabAsset] != 0:
+        remainingUsdValue = 0
     self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset, remainingUsdValue)
 
     # move tokens to recipient
@@ -1044,6 +1046,8 @@ def _redeemFromStabilityPool(
                 remainingUsdValue = 1 # very small dust, trigger removal
             else:
                 remainingUsdValue = numerator // maxClaimableAmount
+        if vaultData.totalBalances[stabAsset] != 0:
+            remainingUsdValue = 0
         self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance, remainingUsdValue)
 
         # move tokens to recipient
@@ -1202,6 +1206,7 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
 @view
 @external
 def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, uint256, uint256):
+    # pause not modeled; execute still asserts isPaused
     greenToken: address = empty(address)
     savingsGreen: address = empty(address)
     priceDesk: address = empty(address)
@@ -1209,7 +1214,11 @@ def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, u
     usdValue: uint256 = 0
     capacityRemaining: uint256 = 0
     usdValue, capacityRemaining = self._getClaimAssetActivationData(_stabAsset, _claimAsset, greenToken, savingsGreen, priceDesk)
-    return (usdValue >= ACTIVATION_USD_THRESHOLD and capacityRemaining != 0), usdValue, capacityRemaining
+    return (
+        vaultData.totalBalances[_stabAsset] == 0
+        and usdValue >= ACTIVATION_USD_THRESHOLD
+        and capacityRemaining != 0
+    ), usdValue, capacityRemaining
 
 
 @view
@@ -1248,6 +1257,10 @@ def _maintainClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address
 
     for claimAsset: address in _claimAssets:
         if _shouldActivate:
+            # live book: fail-soft quote must not seat a pair onto NAV
+            if vaultData.totalBalances[_stabAsset] != 0:
+                continue
+
             pairBalance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
             if pairBalance == 0 or self.indexOfClaimableAsset[_stabAsset][claimAsset] != 0:
                 continue
@@ -1272,6 +1285,14 @@ def _maintainClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address
         balance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
         if balance == 0:
             self._removeClaimableAsset(_stabAsset, claimAsset, DEACTIVATION_ZERO)
+            continue
+
+        # live book: fail-soft dust quote must not hide a nonzero pile
+        if vaultData.totalBalances[_stabAsset] != 0:
+            continue
+
+        custody: uint256 = staticcall IERC20(claimAsset).balanceOf(self)
+        if custody < self.totalClaimableBalances[claimAsset]:
             continue
 
         usdValue: uint256 = self._getUsdValue(claimAsset, balance, greenToken, savingsGreen, priceDesk, False)
@@ -1373,7 +1394,7 @@ def _reduceClaimableBalances(
         self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_ZERO)
         return
 
-    # remove claimable asset if remaining USD value is dust (< $0.10) - only remove from iterable list
+    # remove claimable asset if remaining USD value is dust (RETENTION $0.05) - only remove from iterable list
     if _remainingUsdValue != 0 and _remainingUsdValue < RETENTION_USD_THRESHOLD:
         self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_DUST)
 
