@@ -9,6 +9,12 @@ LEGACY_RIPE_GOV_VAULT_ID = 2
 ASSET_WEIGHT = 100_00
 LOCK_TERMS = (100, 1_000, 200_00, True, 10_00)
 
+# These tests keep the current RipeGov as the VaultMigrator source stand-in.
+# Deployed Base legacy releases on a one-block minLockDuration decrease through
+# its old classifier. Current RipeGov releases on a one-block min increase
+# through the courtesy predicate. Exact legacy-source and fork fidelity is
+# deferred to issue #150.
+
 
 def _register_target(ripe_hq, vault_book, governance):
     target = boa.load("contracts/vaults/RipeGov.vy", ripe_hq, name="legacy_migration_target")
@@ -87,9 +93,15 @@ def _seed_locked_legacy_position(source, asset, funder, user, teller, ledger, am
         )
 
 
-def _one_block_min_wind_down_terms():
+def _current_source_courtesy_min_increase_terms():
+    """Current RipeGov courtesy: minLockDuration 100 → 101.
+
+    Deployed Base legacy released on a one-block min decrease through its old
+    classifier. These tests cover VaultMigrator mechanics with the current
+    source as a stand-in; exact legacy-source and fork fidelity is issue #150.
+    """
     return (
-        LOCK_TERMS[0] - 1,
+        LOCK_TERMS[0] + 1,
         LOCK_TERMS[1],
         LOCK_TERMS[2],
         LOCK_TERMS[3],
@@ -261,7 +273,7 @@ def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
     assert ledger.isParticipatingInVault(bob, target_id)
 
 
-def test_active_legacy_locks_migrate_for_many_users_and_all_assets_after_one_block_min_reduction(
+def test_active_locks_migrate_for_many_users_and_all_assets_after_one_block_min_increase(
     ripe_hq,
     vault_book,
     governance,
@@ -281,9 +293,14 @@ def test_active_legacy_locks_migrate_for_many_users_and_all_assets_after_one_blo
     setAssetConfig,
     setGeneralConfig,
 ):
-    """The admin wind-down changes both supported assets at once. Every live
-    lock remains active in the source snapshot, the one-block min reduction
-    makes legacy withdrawal reachable, and import restores the original record."""
+    """VaultMigrator mechanics with the current RipeGov as source stand-in.
+
+    Every live lock remains active in the source snapshot. A one-block
+    minLockDuration increase triggers current RipeGov courtesy so withdrawal
+    is reachable, and import restores the original record. Deployed Base
+    legacy instead released on a one-block min decrease through its old
+    classifier. Exact legacy-source and fork fidelity is issue #150.
+    """
     boa.env.evm.patch.chain_id = 8453
     source = ripe_gov_vault
     target, target_id = _register_target(ripe_hq, vault_book, governance)
@@ -337,9 +354,12 @@ def test_active_legacy_locks_migrate_for_many_users_and_all_assets_after_one_blo
             assert pending > 0
             expected[(user, asset.address)] = (data, data.govPoints + pending)
 
-    # A one-block reduction of minLockDuration is the specific key-term change
-    # that resets the legacy source's effective unlock during withdrawal.
-    wind_down_terms = _one_block_min_wind_down_terms()
+    # A one-block increase of minLockDuration is the current RipeGov courtesy
+    # trigger. Deployed Base legacy instead released on a one-block min
+    # decrease through its old classifier. These tests cover VaultMigrator
+    # mechanics with the current source as a stand-in; exact legacy-source
+    # and fork fidelity is issue #150.
+    wind_down_terms = _current_source_courtesy_min_increase_terms()
     for asset, _ in assets:
         _set_legacy_asset_config(
             mission_control,
@@ -431,7 +451,7 @@ def test_late_legacy_user_failure_rolls_back_earlier_users_atomically(
         switchboard_alpha,
         ripe_token,
         target_id,
-        _one_block_min_wind_down_terms(),
+        _current_source_courtesy_min_increase_terms(),
     )
     target.pause(True, sender=switchboard_alpha.address)
     _pause_if_needed(teller, switchboard_alpha)
@@ -498,7 +518,7 @@ def test_legacy_migration_rejects_user_touched_in_same_action_block_and_rolls_ba
         switchboard_alpha,
         ripe_token,
         target_id,
-        _one_block_min_wind_down_terms(),
+        _current_source_courtesy_min_increase_terms(),
     )
 
     # Stamp the user's last touch before Teller enters its migration pause.
@@ -572,7 +592,7 @@ def test_legacy_migration_batch_gas_characterization(
         switchboard_alpha,
         ripe_token,
         target_id,
-        _one_block_min_wind_down_terms(),
+        _current_source_courtesy_min_increase_terms(),
     )
     target.pause(True, sender=switchboard_alpha.address)
     _pause_if_needed(teller, switchboard_alpha)
@@ -650,7 +670,7 @@ def test_legacy_dual_asset_twenty_five_user_batch_fits_block_envelope(
             switchboard_alpha,
             asset,
             target_id,
-            _one_block_min_wind_down_terms(),
+            _current_source_courtesy_min_increase_terms(),
         )
     target.pause(True, sender=switchboard_alpha.address)
     _pause_if_needed(teller, switchboard_alpha)
