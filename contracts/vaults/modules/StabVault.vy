@@ -188,6 +188,7 @@ def _depositTokensInVault(
     # calc shares
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     newShares: uint256 = self._valueToShares(newUserValue, vaultData.totalBalances[_asset], prevStabValue + claimableValue, False)
+    assert newShares != 0 # dev: cannot mint 0 shares
 
     # add balance on deposit
     vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)
@@ -1033,8 +1034,17 @@ def _redeemFromStabilityPool(
         if claimableBalance == 0:
             continue
 
-        # reduce claimable balances
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
+
+        redeemNumerator: uint256 = claimAmount * maxRedeemValue
+        redeemAmount: uint256 = redeemNumerator // maxClaimableAmount
+        if redeemNumerator % maxClaimableAmount != 0:
+            redeemAmount += 1
+        redeemAmount = min(redeemAmount, remainingRedeemValue)
+
+        if stabAsset == _a.savingsGreen:
+            if staticcall IERC4626(_a.savingsGreen).previewDeposit(redeemAmount) == 0:
+                continue
 
         # compute remaining USD value using price ratio: maxRedeemValue / maxClaimableAmount
         remainingUsdValue: uint256 = 0
@@ -1049,13 +1059,6 @@ def _redeemFromStabilityPool(
         # move tokens to recipient
         self._handleAssetForUser(_asset, claimAmount, _recipient, _shouldAutoDeposit, _a)
         remainingClaimAmount -= claimAmount
-
-        # finalize redeem amount (round up to favor protocol)
-        numerator: uint256 = claimAmount * maxRedeemValue
-        redeemAmount: uint256 = numerator // maxClaimableAmount
-        if numerator % maxClaimableAmount != 0:
-            redeemAmount += 1
-        redeemAmount = min(redeemAmount, remainingRedeemValue)
 
         # if stab asset is sGREEN, just convert directly, no need to make green claimable in this case
         if stabAsset == _a.savingsGreen:
