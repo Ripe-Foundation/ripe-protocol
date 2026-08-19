@@ -75,6 +75,16 @@ worst-case gas proof. The evidence and links are recorded in
 Its SHA-256 digest is
 `b24b1a512c80b0ba45192132fd5bda357b66d3ea7adbe5393b2edc47a1444ce2`.
 
+The latency variance is intra-lane, not merely directional. Base -> Robinhood
+sequences 1806 and 1807 were sent 96 seconds apart but arrived 384 seconds
+apart; their delivery times differ by 288 seconds (19m58s versus 24m46s).
+Commit-round batching is a plausible explanation—a message just missing a
+round waits for the next—but these four transfers do not prove that mechanism or
+bound its tail. Before any fast-lane refill buffer or stage-B age cap is fixed,
+measure source finality and commit/execution round timing across consecutive
+sequence numbers and multiple rounds. Configure from the observed tail plus an
+explicit margin, not from the maximum or midpoint of this four-message sample.
+
 ## Open owner and evidence gates
 
 1. **Rate limits and rate-limit administration.** All four pools currently have
