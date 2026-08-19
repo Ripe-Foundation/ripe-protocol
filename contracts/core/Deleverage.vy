@@ -706,6 +706,8 @@ def _deleverageUser(
 
     # have cap when not trusted (treat similar to redemption)
     if not isTrusted:
+        if userDebt.inLiquidation or bt.collateralVal == 0:
+            return 0
         if not self._canDeleverageUserDebtPosition(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
             return 0
         # SwitchboardBravo rejects ltv > redemptionThreshold. This ordering is
@@ -1210,7 +1212,7 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
     # to ensure maximum protocol solvency, we will target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
-    # collateral value too low
+    # already at or inside the target LTV, so the untrusted cap is the full debt
     if _debtAmount <= collValueAdjusted:
         return _debtAmount
 

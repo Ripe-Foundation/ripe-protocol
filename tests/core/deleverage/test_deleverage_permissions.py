@@ -1,7 +1,7 @@
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
-from conf_utils import filter_logs, set_full_payoff_params
+from conf_utils import filter_logs, set_full_payoff_params, clear_transient_storage
 
 HUNDRED_PERCENT = 100_00
 SIX_DECIMALS = 10**6
@@ -1385,10 +1385,8 @@ def test_user_in_liquidation_can_be_deleveraged(
     mock_price_source,
 ):
     """
-    Test that user in liquidation can still be deleveraged.
-
-    The contract allows deleveraging even for users marked as in liquidation,
-    as deleverage is a debt reduction mechanism that helps the protocol.
+    Untrusted many-users cannot unwind a book flagged inLiquidation.
+    Trusted specific-assets (self) and trusted many-users (Ripe) still can.
     """
     # Setup user in redemption zone
     initial_price, new_price = setup_redemption_zone(
@@ -1411,9 +1409,32 @@ def test_user_in_liquidation_can_be_deleveraged(
     )
     ledger.setUserDebt(bob, debt_tuple, 0, (0, 0), sender=credit_engine.address)
 
-    # Deleverage should work (helps reduce protocol risk)
-    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
-    assert repaid_amount > 0, "Deleverage should work even for users in liquidation"
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 0, sender=alice)
+    assert ledger.userDebt(bob).inLiquidation is True
+
+    # Trusted specific-assets: ordinary self is trusted on this entry.
+    clear_transient_storage()
+    repaid_specific = teller.deleverageWithSpecificAssets(
+        [(3, alpha_token.address, 20 * EIGHTEEN_DECIMALS)],
+        bob,
+        sender=bob,
+    )
+    assert repaid_specific > 0, "trusted specific-assets should still sell a flagged book"
+
+    # Re-flag remaining debt so trusted many-users is still on a flagged book.
+    clear_transient_storage()
+    user_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0]
+    assert user_debt.amount > 0
+    ledger.setUserDebt(
+        bob,
+        (user_debt.amount, user_debt.principal, user_debt.debtTerms, user_debt.lastTimestamp, True),
+        0,
+        (0, 0),
+        sender=credit_engine.address,
+    )
+    repaid_trusted = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
+    assert repaid_trusted > 0, "trusted many-users (Ripe) should still sell a flagged book"
 
 
 def test_zero_collateral_value_reverts_without_price(
