@@ -99,6 +99,12 @@ def setupRipeGovVaultConfig(
     yield setup_ripe_gov_vault_config
 
 
+@pytest.fixture(autouse=True)
+def _live_ripe_gov_terms_for_contributor_creation(setupRipeGovVaultConfig):
+    """Contributor creation requires live RipeGov terms: 0 < duration <= max."""
+    setupRipeGovVaultConfig()
+
+
 @pytest.fixture(scope="module")
 def deployedContributor(
     human_resources,

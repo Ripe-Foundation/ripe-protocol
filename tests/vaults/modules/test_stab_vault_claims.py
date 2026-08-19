@@ -4623,12 +4623,11 @@ def test_stab_reward_lock_point_contribution_is_exact(
 @pytest.mark.parametrize(
     ("min_lock", "max_lock", "ratio", "expected_lock"),
     (
-        (0, 0, 0, 0),
         (100, 1_100, 0, 100),
         (100, 1_100, 50_00, 500),
         (100, 1_100, 100_00, 1_000),
     ),
-    ids=("zero", "minimum", "ordinary", "maximum"),
+    ids=("minimum", "ordinary", "maximum"),
 )
 def test_stab_reward_lock_configured_duration_boundaries(
     min_lock,
@@ -4651,7 +4650,7 @@ def test_stab_reward_lock_configured_duration_boundaries(
     setAssetConfig,
     setupStabRewardLock,
 ):
-    """Section 15: zero, minimum, ordinary, and maximum configured duration."""
+    """Section 15: minimum, ordinary, and maximum configured duration."""
     setupStabRewardLock(
         _minLockDuration=min_lock,
         _maxLockDuration=max_lock,
@@ -4668,9 +4667,73 @@ def test_stab_reward_lock_configured_duration_boundaries(
     assert ripe_gov_vault.userBalances(bob, ripe_token) > 0
     unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
     assert unlock == boa.env.evm.patch.block_number + expected_lock
-    # A zero derived duration leaves the position immediately withdrawable.
-    if expected_lock == 0:
-        assert unlock <= boa.env.evm.patch.block_number
+
+
+def test_stab_reward_claim_reverts_when_max_lock_duration_is_zero(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """Section 15 zero-state regression.
+
+    Zero maximum lock duration is now rejected by SwitchboardAlpha. Direct
+    MissionControl setup is used only to model an uninitialized or legacy state.
+    """
+    setupStabRewardLock(
+        _minLockDuration=0,
+        _maxLockDuration=0,
+        _autoStakeDurationRatio=0,
+    )
+    setAssetConfig(bravo_token)
+
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+    gov_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    claimable_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert gov_shares_before == 0
+    assert claimable_before > 0
+
+    with pytest.raises(BoaError) as exc_info:
+        claim_from_stability_pool(
+            teller, vault_id, alpha_token, bravo_token, sender=bob
+        )
+    assert_reverted_call(exc_info.value, "no lock terms", teller)
+
+    assert ripe_gov_vault.userBalances(bob, ripe_token) == gov_shares_before
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == claimable_before
 
 
 def test_stab_reward_added_to_an_existing_unlocked_position_creates_a_lock(
