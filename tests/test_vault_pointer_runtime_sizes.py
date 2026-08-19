@@ -23,7 +23,7 @@ EXPECTED_RUNTIME_BYTES = {
     "AuctionHouse": 24568,
     "CreditEngine": 24382,
     "CreditRedeem": 8290,
-    "Deleverage": 24424,
+    "Deleverage": 24459,
     "StabilityPool": 24002,
     "BlueChipYieldPrices": 22749,
     "ChainlinkPrices": 14256,
