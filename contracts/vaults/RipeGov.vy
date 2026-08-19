@@ -1029,7 +1029,7 @@ def _getWeightedLockOnTokenDeposit(
     return block.number + newWeightedDuration
 
 
-# same terms
+# legacy directional terms classifier; not the courtesy predicate
 
 
 @view
@@ -1061,4 +1061,16 @@ def refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.
 @view
 @internal
 def _refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> uint256:
+    # Courtesy zero: canExit lost, fee up while canExit was on, or boost down.
+    # False/0 -> True/fee enables an optional paid exit; that is not a courtesy.
+    # minLock / maxLock changes do not rewrite an existing commitment.
+    # Lazy: only a later touch while the worse config is still live persists
+    # unlock=0. Restoring the old terms first removes the opportunity.
+    # This does not override Teller pause or shouldFreezeWhenBadDebt.
+    if (
+        (_prevTerms.canExit and not _newTerms.canExit)
+        or (_prevTerms.canExit and _newTerms.exitFee > _prevTerms.exitFee)
+        or _newTerms.maxLockBoost < _prevTerms.maxLockBoost
+    ):
+        return 0
     return _prevUnlock

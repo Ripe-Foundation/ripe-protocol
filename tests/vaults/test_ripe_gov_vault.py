@@ -16,6 +16,78 @@ def _add_remaining_holder(vault, token, funder, holder, amount, teller):
     vault.depositTokensInVault(holder, token, amount, sender=teller.address)
 
 
+def _switchboard_lock_terms(min_lock, max_lock, boost, can_exit, exit_fee):
+    """LockTerms that satisfy SwitchboardAlpha canExit/fee pairing."""
+    if can_exit:
+        assert exit_fee > 0
+    else:
+        assert exit_fee == 0
+    return (min_lock, max_lock, boost, can_exit, exit_fee)
+
+
+def _deposit_with_lock(vault, token, funder, user, teller, amount, lock_duration=500):
+    token.transfer(vault, amount, sender=funder)
+    vault.depositTokensWithLockDuration(
+        user, token, amount, lock_duration, sender=teller.address
+    )
+    data = vault.userGovData(user, token)
+    assert data.unlock == boa.env.evm.patch.block_number + lock_duration
+    return data
+
+
+def _gov_position_snapshot(vault, token, user):
+    data = vault.userGovData(user, token)
+    terms = data.lastTerms
+    return (
+        token.balanceOf(user),
+        token.balanceOf(vault),
+        vault.userBalances(user, token),
+        vault.totalBalances(token),
+        vault.getTotalAmountForUser(user, token),
+        data.unlock,
+        data.lastShares,
+        data.govPoints,
+        terms.minLockDuration,
+        terms.maxLockDuration,
+        terms.maxLockBoost,
+        terms.canExit,
+        terms.exitFee,
+        vault.totalUserGovPoints(user),
+        vault.totalGovPoints(),
+    )
+
+
+def _execute_ripe_gov_vault_config(
+    switchboard_alpha,
+    governance,
+    asset,
+    *,
+    asset_weight=100_00,
+    freeze=False,
+    min_lock=100,
+    max_lock=1000,
+    boost=200_00,
+    exit_fee=10_00,
+    can_exit=True,
+):
+    time_lock = switchboard_alpha.actionTimeLock()
+    proposed_block = boa.env.evm.patch.block_number
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        asset,
+        asset_weight,
+        freeze,
+        min_lock,
+        max_lock,
+        boost,
+        exit_fee,
+        can_exit,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=time_lock)
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    return action_id, proposed_block, time_lock
+
+
 @pytest.fixture(scope="module")
 def setupRipeGovVaultConfig(mission_control, setAssetConfig, switchboard_alpha, ripe_token):
     def setupRipeGovVaultConfig(
@@ -942,14 +1014,13 @@ def test_ripe_gov_vault_configuration_updates_after_deposit(
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
     assert userData_before.unlock > boa.env.evm.patch.block_number  # Should have future unlock
     
-    # Update configuration with worse terms. `_refreshUnlock` now keeps the
-    # previous unlock; lastTerms still pick up the live config.
+    # Valid courtesy: True/10% -> False/0%. lastTerms pick up the live config.
     setupRipeGovVaultConfig(
         _assetWeight=150_00,
         _minLockDuration=200,
         _maxLockDuration=2000,
         _maxLockBoost=300_00,
-        _exitFee=20_00,
+        _exitFee=0,
         _canExit=False,
         _shouldFreezeWhenBadDebt=False,
     )
@@ -957,9 +1028,9 @@ def test_ripe_gov_vault_configuration_updates_after_deposit(
     ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
     
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
-    assert userData_after.unlock == userData_before.unlock
+    assert userData_after.unlock == 0
     assert userData_after.lastTerms.canExit is False
-    assert userData_after.lastTerms.exitFee == 20_00
+    assert userData_after.lastTerms.exitFee == 0
     assert userData_after.lastShares > 0
 
 
@@ -1001,7 +1072,7 @@ def test_ripe_gov_vault_release_lock_when_cannot_exit(
 ):
     """Test that release lock fails when canExit is false"""
     # Setup config with exit disabled
-    setupRipeGovVaultConfig(_canExit=False)
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
 
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     
@@ -1639,19 +1710,28 @@ def test_ripe_gov_vault_are_key_terms_same_identical(ripe_gov_vault):
 def test_ripe_gov_vault_are_key_terms_same_can_exit_worse(ripe_gov_vault):
     """Test areKeyTermsSame returns False when canExit goes from True to False"""
     
-    old_terms = (100, 1000, 200_00, True, 10_00)   # canExit = True
-    new_terms = (100, 1000, 200_00, False, 10_00)  # canExit = False
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
     
     assert not ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
-def test_ripe_gov_vault_are_key_terms_same_can_exit_better(ripe_gov_vault):
-    """Test areKeyTermsSame returns True when canExit goes from False to True"""
-    
-    old_terms = (100, 1000, 200_00, False, 10_00)  # canExit = False
-    new_terms = (100, 1000, 200_00, True, 10_00)   # canExit = True
-    
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
+def test_ripe_gov_vault_are_key_terms_same_enabling_exit_is_legacy_not_same(
+    ripe_gov_vault,
+):
+    """Valid False/0 -> True/10% is not 'same' on the public view.
+
+    `areKeyTermsSame` is a legacy same-or-better classifier and is not the
+    courtesy trigger. The fee rising from 0 to 10% makes this False even
+    though `refreshUnlock` keeps the lock. Do not change that view without
+    an explicit owner decision: off-chain callers may still read it, and
+    RipeGov headroom is tight.
+    """
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    prev_unlock = boa.env.evm.patch.block_number + 500
+    assert not ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
+    assert ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms) == prev_unlock
 
 
 def test_ripe_gov_vault_are_key_terms_same_boost_worse(ripe_gov_vault):
@@ -1681,12 +1761,12 @@ def test_ripe_gov_vault_are_key_terms_same_min_lock_increase_allowed(ripe_gov_va
     assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
-def test_ripe_gov_vault_are_key_terms_same_min_lock_decrease_worse(ripe_gov_vault):
-    """Test areKeyTermsSame returns False when minLockDuration decreases (terms get worse)"""
-    
-    old_terms = (150, 1000, 200_00, True, 10_00)  # minLock = 150
-    new_terms = (100, 1000, 200_00, True, 10_00)  # minLock = 100 (looser, worse terms)
-    
+def test_ripe_gov_vault_are_key_terms_same_min_lock_decrease_is_legacy_not_same(
+    ripe_gov_vault,
+):
+    """A lower min lock is user-favorable, but the legacy view is not-same."""
+    old_terms = (150, 1000, 200_00, True, 10_00)
+    new_terms = (100, 1000, 200_00, True, 10_00)
     assert not ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
@@ -1718,27 +1798,40 @@ def test_ripe_gov_vault_are_key_terms_same_max_lock_duration_change(ripe_gov_vau
     assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
+# Courtesy policy gate on rh.
+#
+# Authoritative courtesy-policy regression surface on `rh`: this file's
+# refreshUnlock / courtesy / config-update tests plus
+# tests/test_vault_pointer_runtime_sizes.py.
+# test_g6_* files stay on the isolation audit pin (Finding 1 as first shipped:
+# refresh always keeps unlock) and are intentionally not on rh.
+#
+# Courtesy is lazy: the user must touch while the worse config is still live.
+# Restoring the old terms first removes the opportunity. Zeroing unlock does
+# not override Teller pause or shouldFreezeWhenBadDebt.
+
+
 def test_ripe_gov_vault_refresh_unlock_terms_same(ripe_gov_vault):
     """Test refreshUnlock keeps unlock when terms are the same"""
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 500
-    terms = (100, 1000, 200_00, True, 10_00)
+    terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, terms, terms)
     assert new_unlock == prev_unlock
 
 
 def test_ripe_gov_vault_refresh_unlock_terms_worse(ripe_gov_vault):
-    """Test refreshUnlock keeps unlock when terms get worse"""
+    """Courtesy: taking canExit away zeros the stored unlock."""
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 500
-    old_terms = (100, 1000, 200_00, True, 10_00)  # canExit = True
-    new_terms = (100, 1000, 200_00, False, 10_00) # canExit = False (worse)
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
-    assert new_unlock == prev_unlock
+    assert new_unlock == 0
 
 
 def test_ripe_gov_vault_refresh_unlock_max_duration_decreased(ripe_gov_vault):
@@ -1746,8 +1839,8 @@ def test_ripe_gov_vault_refresh_unlock_max_duration_decreased(ripe_gov_vault):
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 1000  # locked for 1000 blocks
-    old_terms = (100, 1200, 200_00, True, 10_00)  # maxLock = 1200
-    new_terms = (100, 800, 200_00, True, 10_00)   # maxLock = 800 (reduced)
+    old_terms = _switchboard_lock_terms(100, 1200, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(100, 800, 200_00, True, 10_00)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
     assert new_unlock == prev_unlock
@@ -1758,8 +1851,8 @@ def test_ripe_gov_vault_refresh_unlock_max_duration_increased(ripe_gov_vault):
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 800   # locked for 800 blocks
-    old_terms = (100, 1000, 200_00, True, 10_00)  # maxLock = 1000
-    new_terms = (100, 1200, 200_00, True, 10_00)  # maxLock = 1200 (increased)
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(100, 1200, 200_00, True, 10_00)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
     
@@ -1768,15 +1861,597 @@ def test_ripe_gov_vault_refresh_unlock_max_duration_increased(ripe_gov_vault):
 
 
 def test_ripe_gov_vault_refresh_unlock_terms_worse_and_max_changed(ripe_gov_vault):
-    """Test refreshUnlock handles both terms getting worse and maxLockDuration change"""
+    """Courtesy zero from canExit loss, not from the maxLock decrease."""
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 1000
-    old_terms = (100, 1200, 200_00, True, 10_00)   # canExit=True, maxLock=1200
-    new_terms = (100, 800, 200_00, False, 10_00)   # canExit=False, maxLock=800
+    old_terms = _switchboard_lock_terms(100, 1200, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(100, 800, 200_00, False, 0)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
-    assert new_unlock == prev_unlock
+    assert new_unlock == 0
+
+
+def test_ripe_gov_vault_refresh_unlock_fee_increase_is_courtesy_zero(ripe_gov_vault):
+    current_block = boa.env.evm.patch.block_number
+    prev_unlock = current_block + 500
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 20_00)
+    assert ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms) == 0
+
+
+def test_ripe_gov_vault_refresh_unlock_boost_decrease_is_courtesy_zero(ripe_gov_vault):
+    current_block = boa.env.evm.patch.block_number
+    prev_unlock = current_block + 500
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(100, 1000, 150_00, True, 10_00)
+    assert ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms) == 0
+
+
+def test_ripe_gov_vault_refresh_unlock_minlock_decrease_keeps_prev(ripe_gov_vault):
+    current_block = boa.env.evm.patch.block_number
+    prev_unlock = current_block + 500
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    new_terms = _switchboard_lock_terms(50, 1000, 200_00, True, 10_00)
+    assert ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms) == prev_unlock
+
+
+def test_ripe_gov_vault_refresh_unlock_enabling_exit_keeps_prev(ripe_gov_vault):
+    """False/0 -> True/10% adds a paid exit path; it must not free the lock."""
+    current_block = boa.env.evm.patch.block_number
+    prev_unlock = current_block + 500
+    old_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, True, 10_00)
+    assert ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms) == prev_unlock
+
+
+@pytest.mark.parametrize(
+    "new_kwargs",
+    [
+        {"_canExit": False, "_exitFee": 0},
+        {"_exitFee": 20_00},
+        {"_maxLockBoost": 150_00},
+    ],
+    ids=["can_exit_lost", "fee_up", "boost_down"],
+)
+def test_ripe_gov_vault_courtesy_ordinary_withdraw_is_free(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    setupRipeGovVaultConfig,
+    new_kwargs,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    bob_before = ripe_token.balanceOf(bob)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
+    data_before = _deposit_with_lock(
+        ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount
+    )
+    shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    assert data_before.unlock > boa.env.evm.patch.block_number
+
+    setupRipeGovVaultConfig(**new_kwargs)
+
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, deposit_amount, bob, sender=teller.address
+    )
+
+    data_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert withdrawn == deposit_amount
+    assert is_depleted
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_token.balanceOf(bob) - bob_before == deposit_amount
+    assert ripe_token.balanceOf(ripe_gov_vault) == custody_before
+    assert ripe_gov_vault.userBalances(bob, ripe_token) == 0
+    assert ripe_gov_vault.totalBalances(ripe_token) == total_shares_before - shares_before
+    assert data_after.unlock == 0
+    assert data_after.lastShares == 0
+    assert data_after.govPoints == 0
+
+
+@pytest.mark.parametrize(
+    "new_kwargs",
+    [
+        {"_minLockDuration": 50},
+        {"_maxLockDuration": 400},
+        {"_exitFee": 5_00},
+        {"_maxLockBoost": 300_00},
+    ],
+    ids=["min_down", "max_down", "fee_down", "boost_up"],
+)
+def test_ripe_gov_vault_duration_or_favorable_change_stays_locked(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+    new_kwargs,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    data_before = _deposit_with_lock(
+        ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount
+    )
+
+    setupRipeGovVaultConfig(**new_kwargs)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+
+    data_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert data_after.unlock == data_before.unlock
+    assert data_after.unlock > boa.env.evm.patch.block_number
+    with boa.reverts("not reached unlock"):
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob, ripe_token, deposit_amount, bob, sender=teller.address
+        )
+
+
+def test_ripe_gov_vault_enabling_exit_keeps_lock_and_paid_release(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    data_before = _deposit_with_lock(
+        ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount
+    )
+    _add_remaining_holder(ripe_gov_vault, ripe_token, whale, alice, deposit_amount, teller)
+    shares_before = ripe_gov_vault.userGovData(bob, ripe_token).lastShares
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
+
+    setupRipeGovVaultConfig(_canExit=True, _exitFee=10_00)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+
+    data_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert data_after.unlock == data_before.unlock
+    assert data_after.lastTerms.canExit is True
+    assert data_after.lastTerms.exitFee == 10_00
+    with boa.reverts("not reached unlock"):
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob, ripe_token, deposit_amount, bob, sender=teller.address
+        )
+
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
+    released = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert released.unlock == 0
+    assert_exact_exit_claim(
+        shares_before,
+        total_shares_before,
+        custody_before,
+        10_00,
+        released.lastShares,
+        ripe_gov_vault.totalBalances(ripe_token),
+    )
+
+
+def test_ripe_gov_vault_courtesy_restore_before_touch_keeps_lock(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    data_before = _deposit_with_lock(
+        ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount
+    )
+
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    setupRipeGovVaultConfig()
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+
+    data_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert data_after.unlock == data_before.unlock
+    with boa.reverts("not reached unlock"):
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob, ripe_token, deposit_amount, bob, sender=teller.address
+        )
+
+
+def test_ripe_gov_vault_courtesy_top_up_uses_weighted_blend(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    prev_shares = ripe_gov_vault.userGovData(bob, ripe_token).lastShares
+    new_shares = ripe_gov_vault.amountToShares(ripe_token, 1, False)
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
+    expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        new_shares, 100, new_terms, prev_shares, 0
+    )
+    min_lock_unlock = boa.env.evm.patch.block_number + 100
+    assert expected_unlock != min_lock_unlock
+
+    ripe_token.transfer(ripe_gov_vault, 1, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, 1, sender=teller.address)
+
+    relocked = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert relocked.unlock == expected_unlock
+
+
+def test_ripe_gov_vault_courtesy_equal_top_up_relocks_at_weighted_duration(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    prev_shares = ripe_gov_vault.userGovData(bob, ripe_token).lastShares
+    new_shares = ripe_gov_vault.amountToShares(ripe_token, deposit_amount, False)
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
+    expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        new_shares, 100, new_terms, prev_shares, 0
+    )
+    now = boa.env.evm.patch.block_number
+    assert expected_unlock > now
+    assert expected_unlock < now + 100
+
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(
+        bob, ripe_token, deposit_amount, sender=teller.address
+    )
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == expected_unlock
+    with boa.reverts("not reached unlock"):
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob, ripe_token, deposit_amount, bob, sender=teller.address
+        )
+
+
+@pytest.mark.parametrize(
+    "new_kwargs",
+    [
+        {"_canExit": False, "_exitFee": 0, "_maxLockBoost": 300_00},
+        {"_exitFee": 20_00, "_maxLockBoost": 300_00},
+    ],
+    ids=["can_exit_lost_boost_up", "fee_up_boost_up"],
+)
+def test_ripe_gov_vault_courtesy_adverse_dominates_favorable(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    setupRipeGovVaultConfig,
+    new_kwargs,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+
+    setupRipeGovVaultConfig(**new_kwargs)
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, deposit_amount, bob, sender=teller.address
+    )
+    assert withdrawn == deposit_amount
+    assert is_depleted
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+
+def test_ripe_gov_vault_courtesy_checkpoint_then_release_lock_not_needed(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+    with boa.reverts("no release needed"):
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
+
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, deposit_amount, bob, sender=teller.address
+    )
+    assert withdrawn == deposit_amount
+    assert is_depleted
+
+
+def test_ripe_gov_vault_courtesy_checkpoint_keeps_lock_bonus_direct_withdraw_does_not(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, alice, teller, deposit_amount)
+    boa.env.time_travel(blocks=50)
+
+    new_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+
+    bob_before = ripe_gov_vault.userGovData(bob, ripe_token)
+    alice_before = ripe_gov_vault.userGovData(alice, ripe_token)
+    pending_with_lock = ripe_gov_vault.getLatestGovPoints(
+        bob_before.lastShares,
+        bob_before.lastPointsUpdate,
+        bob_before.unlock,
+        new_terms,
+        100_00,
+    )
+    pending_if_zeroed = ripe_gov_vault.getLatestGovPoints(
+        bob_before.lastShares,
+        bob_before.lastPointsUpdate,
+        0,
+        new_terms,
+        100_00,
+    )
+    assert pending_with_lock > pending_if_zeroed
+
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints == pending_with_lock
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+    half = deposit_amount // 2
+    alice_pending_unlocked = ripe_gov_vault.getLatestGovPoints(
+        alice_before.lastShares,
+        alice_before.lastPointsUpdate,
+        0,
+        new_terms,
+        100_00,
+    )
+    withdrawal_shares = ripe_gov_vault.amountToShares(ripe_token, half, True)
+    ripe_gov_vault.withdrawTokensFromVault(
+        alice, ripe_token, half, alice, sender=teller.address
+    )
+    expected_alice = alice_pending_unlocked - (
+        alice_pending_unlocked * withdrawal_shares // alice_before.lastShares
+    )
+    assert ripe_gov_vault.userGovData(alice, ripe_token).govPoints == expected_alice
+
+
+def test_ripe_gov_vault_courtesy_switchboard_then_teller_withdraw(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    governance,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+):
+    """Canonical user route: SwitchboardAlpha timelock + Teller.withdraw."""
+    setGeneralConfig()
+    time_lock = switchboard_alpha.actionTimeLock()
+    max_lock = time_lock + 1_000
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=max_lock)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(bob, deposit_amount, sender=whale)
+    ripe_token.approve(teller, deposit_amount, sender=bob)
+    assert teller.depositIntoGovVault(
+        ripe_token, deposit_amount, max_lock, bob, sender=bob
+    ) == deposit_amount
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock_before > boa.env.evm.patch.block_number
+
+    _, proposed_block, executed_time_lock = _execute_ripe_gov_vault_config(
+        switchboard_alpha,
+        governance,
+        ripe_token,
+        min_lock=100,
+        max_lock=max_lock,
+        exit_fee=0,
+        can_exit=False,
+    )
+    assert time_lock > 0
+    assert executed_time_lock == time_lock
+    assert boa.env.evm.patch.block_number - proposed_block >= time_lock
+    assert unlock_before > boa.env.evm.patch.block_number
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == unlock_before
+    stored = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert stored.lastTerms.canExit is True
+    assert stored.lastTerms.exitFee == 10_00
+
+    bob_before = ripe_token.balanceOf(bob)
+    withdrawn = teller.withdraw(
+        ripe_token, deposit_amount, bob, ripe_gov_vault, 2, sender=bob
+    )
+    assert withdrawn == deposit_amount
+    assert ripe_token.balanceOf(bob) - bob_before == deposit_amount
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+    logs = filter_logs(teller, "TellerWithdrawal")
+    assert len(logs) == 1
+    assert logs[0].amount == deposit_amount
+    assert logs[0].isDepleted
+
+
+def test_ripe_gov_vault_enabling_exit_switchboard_then_teller_release_lock(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    switchboard_alpha,
+    governance,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+):
+    """Canonical control: False/0 -> True/10% stays locked; Teller.releaseLock pays."""
+    setGeneralConfig()
+    time_lock = switchboard_alpha.actionTimeLock()
+    max_lock = time_lock + 1_000
+    setupRipeGovVaultConfig(
+        _minLockDuration=100,
+        _maxLockDuration=max_lock,
+        _canExit=False,
+        _exitFee=0,
+    )
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(bob, deposit_amount, sender=whale)
+    ripe_token.approve(teller, deposit_amount, sender=bob)
+    assert teller.depositIntoGovVault(
+        ripe_token, deposit_amount, max_lock, bob, sender=bob
+    ) == deposit_amount
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    _add_remaining_holder(
+        ripe_gov_vault, ripe_token, whale, alice, deposit_amount, teller
+    )
+    shares_before = ripe_gov_vault.userGovData(bob, ripe_token).lastShares
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
+
+    _, proposed_block, executed_time_lock = _execute_ripe_gov_vault_config(
+        switchboard_alpha,
+        governance,
+        ripe_token,
+        min_lock=100,
+        max_lock=max_lock,
+        exit_fee=10_00,
+        can_exit=True,
+    )
+    assert time_lock > 0
+    assert executed_time_lock == time_lock
+    assert boa.env.evm.patch.block_number - proposed_block >= time_lock
+
+    untouched = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert untouched.unlock == unlock_before
+    assert untouched.unlock > boa.env.evm.patch.block_number
+    assert untouched.lastTerms.canExit is False
+    assert untouched.lastTerms.exitFee == 0
+
+    state_before = _gov_position_snapshot(ripe_gov_vault, ripe_token, bob)
+    with boa.reverts("not reached unlock"):
+        teller.withdraw(
+            ripe_token, deposit_amount, bob, ripe_gov_vault, 2, sender=bob
+        )
+    assert _gov_position_snapshot(ripe_gov_vault, ripe_token, bob) == state_before
+    after_failed_withdraw = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert after_failed_withdraw.lastTerms.canExit is False
+    assert after_failed_withdraw.lastTerms.exitFee == 0
+
+    teller.releaseLock(ripe_token, sender=bob)
+    released = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert released.unlock == 0
+    assert released.lastTerms.canExit is True
+    assert released.lastTerms.exitFee == 10_00
+    assert_exact_exit_claim(
+        shares_before,
+        total_shares_before,
+        custody_before,
+        10_00,
+        released.lastShares,
+        ripe_gov_vault.totalBalances(ripe_token),
+    )
+
+
+def test_ripe_gov_vault_courtesy_does_not_override_bad_debt_freeze(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    ledger,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+):
+    setGeneralConfig()
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(bob, deposit_amount, sender=whale)
+    ripe_token.approve(teller, deposit_amount, sender=bob)
+    teller.depositIntoGovVault(ripe_token, deposit_amount, 500, bob, sender=bob)
+
+    setupRipeGovVaultConfig(
+        _canExit=False, _exitFee=0, _shouldFreezeWhenBadDebt=True
+    )
+    ledger.setBadDebt(50 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    state_before = _gov_position_snapshot(ripe_gov_vault, ripe_token, bob)
+    with boa.reverts("cannot withdraw when bad debt"):
+        teller.withdraw(
+            ripe_token, deposit_amount, bob, ripe_gov_vault, 2, sender=bob
+        )
+    assert _gov_position_snapshot(ripe_gov_vault, ripe_token, bob) == state_before
+
+    ledger.setBadDebt(0, sender=switchboard_alpha.address)
+    withdrawn = teller.withdraw(
+        ripe_token, deposit_amount, bob, ripe_gov_vault, 2, sender=bob
+    )
+    assert withdrawn == deposit_amount
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+
+def test_ripe_gov_vault_courtesy_does_not_override_teller_pause(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+):
+    setGeneralConfig()
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(bob, deposit_amount, sender=whale)
+    ripe_token.approve(teller, deposit_amount, sender=bob)
+    teller.depositIntoGovVault(ripe_token, deposit_amount, 500, bob, sender=bob)
+
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    teller.pause(True, sender=switchboard_alpha.address)
+    state_before = _gov_position_snapshot(ripe_gov_vault, ripe_token, bob)
+    with boa.reverts("contract paused"):
+        teller.withdraw(
+            ripe_token, deposit_amount, bob, ripe_gov_vault, 2, sender=bob
+        )
+    assert _gov_position_snapshot(ripe_gov_vault, ripe_token, bob) == state_before
+
+    teller.pause(False, sender=switchboard_alpha.address)
+    withdrawn = teller.withdraw(
+        ripe_token, deposit_amount, bob, ripe_gov_vault, 2, sender=bob
+    )
+    assert withdrawn == deposit_amount
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
 
 
 ###########################################
