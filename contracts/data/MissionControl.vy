@@ -37,6 +37,94 @@ interface Vault:
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
 
+interface Lootbox:
+    def checkpointRipeRewardsBeforeConfigChange(): nonpayable
+
+interface LootboxAccrual:
+    def armedMissionControl() -> address: view
+    def activationBlock() -> uint256: view
+
+interface PriorMissionControl:
+    def userDelegation(_user: address, _delegate: address) -> cs.ActionDelegation: view
+    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
+    def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def userConfig(_user: address) -> cs.UserConfig: view
+    def canPerformLiteAction(_signer: address) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
+    def liteSigners(_index: uint256) -> address: view
+    def indexOfAsset(_asset: address) -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
+    def preferredStabVaultId() -> uint256: view
+    def assets(_index: uint256) -> address: view
+    def numLiteSigners() -> uint256: view
+    def numAssets() -> uint256: view
+
+flag ImportCategory:
+    USER_CONFIGS
+    USER_DELEGATIONS
+    STAB_VAULT_IDS
+    RIPE_GOV_VAULT_IDS
+    VAULT_POINTERS
+    LITE_SIGNERS
+    ASSETS
+    RIPE_GOV_VAULT_CONFIGS
+
+# owner-bound import manifest: expected unique key counts for the categories that cannot be
+# enumerated on the prior MissionControl (the enumerable ones are reconciled by readback)
+struct ImportManifest:
+    userConfigs: uint256
+    userDelegations: uint256
+    stabVaultIds: uint256
+    ripeGovVaultIds: uint256
+    ripeGovVaultConfigs: uint256
+
+struct AssetIndex:
+    stakerIndex: uint256
+    voterIndex: uint256
+    enabledBlocks: uint256
+    gen: uint256
+
+struct EnabledClockBundle:
+    activationBlock: uint256
+    arePointsEnabled: bool
+    enabledBlocks: uint256
+    enabledClockBlock: uint256
+
+struct PointsIndexBundle:
+    activationBlock: uint256
+    arePointsEnabled: bool
+    enabledBlocks: uint256
+    enabledClockBlock: uint256
+    globalStakerIndex: uint256
+    globalVoterIndex: uint256
+    globalIndexEnabledBlocks: uint256
+    stakersPointsAllocTotal: uint256
+    voterPointsAllocTotal: uint256
+    assetStakerIndex: uint256
+    assetVoterIndex: uint256
+    assetIndexEnabledBlocks: uint256
+    stakersPointsAlloc: uint256
+    voterPointsAlloc: uint256
+
+event MissionControlArmed:
+    activationBlock: uint256
+    clockGen: uint256
+
+event MissionControlImportBatch:
+    category: ImportCategory
+    numKeys: uint256
+
+event MissionControlImportFinalized:
+    priorMissionControl: indexed(address)
+    userConfigs: uint256
+    userDelegations: uint256
+    stabVaultIds: uint256
+    ripeGovVaultIds: uint256
+    ripeGovVaultConfigs: uint256
+    priorAssets: uint256
+    priorLiteSigners: uint256
+
 struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
     voterPointsAllocTotal: uint256
@@ -212,6 +300,38 @@ trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 
+# lootbox point indexes (armed accounting)
+activationBlock: public(uint256)
+clockGen: public(uint256)
+enabledBlocks: public(uint256)
+enabledClockBlock: public(uint256)
+globalStakerIndex: public(uint256)
+globalVoterIndex: public(uint256)
+globalIndexEnabledBlocks: public(uint256)
+assetIndexes: public(HashMap[address, AssetIndex]) # asset -> index row
+
+# import from prior mission control
+importedCategories: ImportCategory
+isImportFinalized: public(bool)
+importedUserConfigs: public(uint256)
+importedUserDelegations: public(uint256)
+importedStabVaultIds: public(uint256)
+importedRipeGovVaultIds: public(uint256)
+importedRipeGovVaultConfigs: public(uint256)
+didImportUserConfig: HashMap[address, bool]
+didImportUserDelegation: HashMap[address, HashMap[address, bool]]
+didImportStabVaultId: HashMap[uint256, bool]
+didImportRipeGovVaultId: HashMap[uint256, bool]
+didImportRipeGovVaultConfig: HashMap[address, bool]
+didImportAsset: HashMap[address, bool]
+
+LOOTBOX_ACCRUAL: public(immutable(address))
+PRIOR_MISSION_CONTROL: public(immutable(address))
+
+MAX_IMPORT_BATCH: constant(uint256) = 50
+# an asset copy rewrites ~25 storage slots (cs.AssetConfig) per key: keep one batch well inside an L2 tx budget
+MAX_ASSET_IMPORT_BATCH: constant(uint256) = 10
+MAX_IMPORT_WALK: constant(uint256) = 100 # prior asset / lite signer readback at finalize
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
@@ -219,9 +339,14 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
 
 @deploy
-def __init__(_ripeHq: address, _defaults: address):
+def __init__(_ripeHq: address, _defaults: address, _lootboxAccrual: address, _priorMissionControl: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
+
+    assert _lootboxAccrual != empty(address) # dev: invalid lootbox accrual
+    LOOTBOX_ACCRUAL = _lootboxAccrual
+    PRIOR_MISSION_CONTROL = _priorMissionControl # bound once; empty skips the import step
+    self.enabledClockBlock = block.number
 
     self.numAssets = 1 # not using 0 index
     self.numLiteSigners = 1 # not using 0 index, 0 means "not in list"
@@ -306,6 +431,14 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 
 @internal
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
+    # armed: settle the point indexes at the old rates before the new allocs become visible
+    if self.activationBlock != 0:
+        prevStakersPointsAlloc: uint256 = self.assetConfig[_asset].stakersPointsAlloc
+        prevVoterPointsAlloc: uint256 = self.assetConfig[_asset].voterPointsAlloc
+        if prevStakersPointsAlloc != _config.stakersPointsAlloc or prevVoterPointsAlloc != _config.voterPointsAlloc:
+            self._settleGlobalIndexes()
+            self._settleAssetIndexes(_asset, prevStakersPointsAlloc, prevVoterPointsAlloc)
+
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
@@ -382,6 +515,21 @@ def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDele
 @external
 def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+
+    # armed: 1) checkpoint rewards at the old rate / allocs, 2) advance the enabled clock, 3) write
+    if self.activationBlock != 0:
+        prev: cs.RipeRewardsConfig = self.rewardsConfig
+        if (
+            prev.ripePerBlock != _config.ripePerBlock or
+            prev.borrowersAlloc != _config.borrowersAlloc or
+            prev.stakersAlloc != _config.stakersAlloc or
+            prev.votersAlloc != _config.votersAlloc or
+            prev.genDepositorsAlloc != _config.genDepositorsAlloc
+        ):
+            extcall Lootbox(addys._getLootboxAddr()).checkpointRipeRewardsBeforeConfigChange()
+        if prev.arePointsEnabled != _config.arePointsEnabled:
+            self._advanceEnabledClock(prev.arePointsEnabled)
+
     self.rewardsConfig = _config
 
 
@@ -401,6 +549,369 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
     totalPointsAllocs.stakersPointsAllocTotal += _newStakersPointsAlloc
     totalPointsAllocs.voterPointsAllocTotal += _newVoterPointsAlloc
     self.totalPointsAllocs = totalPointsAllocs
+
+
+#################
+# Point Indexes #
+#################
+
+
+# enabled-block clock
+
+
+@view
+@internal
+def _peekEnabledBlocks() -> uint256:
+    if self.rewardsConfig.arePointsEnabled:
+        return self.enabledBlocks + (block.number - self.enabledClockBlock)
+    return self.enabledBlocks
+
+
+@internal
+def _advanceEnabledClock(_wasEnabled: bool):
+    if _wasEnabled:
+        self.enabledBlocks += block.number - self.enabledClockBlock
+    self.enabledClockBlock = block.number
+
+
+# settle indexes (before a rate change)
+
+
+@internal
+def _settleGlobalIndexes():
+    enabled: uint256 = self._peekEnabledBlocks()
+    indexEnabled: uint256 = self.globalIndexEnabledBlocks
+    if enabled != indexEnabled:
+        totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs
+        self.globalStakerIndex += totalPointsAllocs.stakersPointsAllocTotal * (enabled - indexEnabled)
+        self.globalVoterIndex += totalPointsAllocs.voterPointsAllocTotal * (enabled - indexEnabled)
+        self.globalIndexEnabledBlocks = enabled
+
+
+@internal
+def _settleAssetIndexes(_asset: address, _prevStakersAlloc: uint256, _prevVoterAlloc: uint256):
+    enabled: uint256 = self._peekEnabledBlocks()
+    row: AssetIndex = self.assetIndexes[_asset]
+    if row.gen != self.clockGen:
+        # rows from before this activation are inert: restart from zero at activation
+        row = AssetIndex(stakerIndex=0, voterIndex=0, enabledBlocks=0, gen=self.clockGen)
+    row.stakerIndex += _prevStakersAlloc * (enabled - row.enabledBlocks)
+    row.voterIndex += _prevVoterAlloc * (enabled - row.enabledBlocks)
+    row.enabledBlocks = enabled
+    self.assetIndexes[_asset] = row
+
+
+# arm
+
+
+@external
+def arm():
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self.activationBlock == 0 # dev: already armed
+    if PRIOR_MISSION_CONTROL != empty(address):
+        # the import must have been finalized (sealed and reconciled against the prior), and the
+        # prior must still be the live MissionControl this one replaces
+        assert self.isImportFinalized # dev: import not finalized
+        assert PRIOR_MISSION_CONTROL == addys._getMissionControlAddr() # dev: prior not live
+
+    # the accrual must have been armed against this MissionControl in this same block
+    assert staticcall LootboxAccrual(LOOTBOX_ACCRUAL).armedMissionControl() == self # dev: accrual not bound
+    assert staticcall LootboxAccrual(LOOTBOX_ACCRUAL).activationBlock() == block.number # dev: accrual not armed
+
+    clockGen: uint256 = self.clockGen + 1
+    self.clockGen = clockGen
+    self.globalStakerIndex = 0
+    self.globalVoterIndex = 0
+    self.globalIndexEnabledBlocks = 0
+    self.enabledBlocks = 0
+    self.enabledClockBlock = block.number
+    self.activationBlock = block.number
+    log MissionControlArmed(activationBlock=block.number, clockGen=clockGen)
+
+
+# peeks
+
+
+@view
+@external
+def peekEnabledBlocks() -> uint256:
+    return self._peekEnabledBlocks()
+
+
+@view
+@external
+def peekGlobalIndexes() -> (uint256, uint256):
+    enabled: uint256 = self._peekEnabledBlocks() - self.globalIndexEnabledBlocks
+    totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs
+    return (
+        self.globalStakerIndex + totalPointsAllocs.stakersPointsAllocTotal * enabled,
+        self.globalVoterIndex + totalPointsAllocs.voterPointsAllocTotal * enabled,
+    )
+
+
+@view
+@external
+def peekAssetIndexes(_asset: address) -> (uint256, uint256):
+    row: AssetIndex = self._getLiveAssetIndex(_asset)
+    enabled: uint256 = self._peekEnabledBlocks() - row.enabledBlocks
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    return (
+        row.stakerIndex + assetConfig.stakersPointsAlloc * enabled,
+        row.voterIndex + assetConfig.voterPointsAlloc * enabled,
+    )
+
+
+@view
+@internal
+def _getLiveAssetIndex(_asset: address) -> AssetIndex:
+    row: AssetIndex = self.assetIndexes[_asset]
+    if row.gen != self.clockGen:
+        return empty(AssetIndex)
+    return row
+
+
+@view
+@external
+def getEnabledClockBundle() -> EnabledClockBundle:
+    return EnabledClockBundle(
+        activationBlock=self.activationBlock,
+        arePointsEnabled=self.rewardsConfig.arePointsEnabled,
+        enabledBlocks=self.enabledBlocks,
+        enabledClockBlock=self.enabledClockBlock,
+    )
+
+
+@view
+@external
+def getPointsIndexBundle(_asset: address) -> PointsIndexBundle:
+    totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    row: AssetIndex = self._getLiveAssetIndex(_asset)
+    return PointsIndexBundle(
+        activationBlock=self.activationBlock,
+        arePointsEnabled=self.rewardsConfig.arePointsEnabled,
+        enabledBlocks=self.enabledBlocks,
+        enabledClockBlock=self.enabledClockBlock,
+        globalStakerIndex=self.globalStakerIndex,
+        globalVoterIndex=self.globalVoterIndex,
+        globalIndexEnabledBlocks=self.globalIndexEnabledBlocks,
+        stakersPointsAllocTotal=totalPointsAllocs.stakersPointsAllocTotal,
+        voterPointsAllocTotal=totalPointsAllocs.voterPointsAllocTotal,
+        assetStakerIndex=row.stakerIndex,
+        assetVoterIndex=row.voterIndex,
+        assetIndexEnabledBlocks=row.enabledBlocks,
+        stakersPointsAlloc=assetConfig.stakersPointsAlloc,
+        voterPointsAlloc=assetConfig.voterPointsAlloc,
+    )
+
+
+##########
+# Import #
+##########
+
+
+@view
+@external
+def priorMC() -> address:
+    return PRIOR_MISSION_CONTROL
+
+
+@view
+@external
+def lootboxAccrual() -> address:
+    return LOOTBOX_ACCRUAL
+
+
+# Replacement flow (Switchboard-gated, reads the immutable prior only):
+#   importFromPrior(category, keys...) in batches of <= 50, any number of times, until finalize
+#   finalizeImport(manifest): one-time seal -- category flags complete + manifest counts +
+#     symmetric readback reconciliation (prior assets / lite signers / pointers == candidate's,
+#     both membership AND counts). After it, no further import can touch this contract.
+#   arm(): requires the sealed finalize when a prior is bound, and the prior must still be the
+#     live MissionControl at RipeHq id 5
+
+
+@external
+def importFromPrior(
+    _category: ImportCategory,
+    _addressKeys: DynArray[address, MAX_IMPORT_BATCH],
+    _vaultIds: DynArray[uint256, MAX_IMPORT_BATCH],
+    _delegates: DynArray[address, MAX_IMPORT_BATCH],
+):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert PRIOR_MISSION_CONTROL != empty(address) # dev: no prior mission control
+    assert not self.isImportFinalized # dev: import finalized
+    assert self.activationBlock == 0 # dev: already armed
+    prior: PriorMissionControl = PriorMissionControl(PRIOR_MISSION_CONTROL)
+
+    numKeys: uint256 = 0
+    if _category == ImportCategory.USER_CONFIGS:
+        numKeys = len(_addressKeys)
+        for user: address in _addressKeys:
+            self.userConfig[user] = staticcall prior.userConfig(user)
+            if not self.didImportUserConfig[user]:
+                self.didImportUserConfig[user] = True
+                self.importedUserConfigs += 1
+
+    elif _category == ImportCategory.USER_DELEGATIONS:
+        numKeys = len(_addressKeys)
+        assert len(_delegates) == numKeys # dev: delegation pairs
+        for i: uint256 in range(MAX_IMPORT_BATCH):
+            if i >= numKeys:
+                break
+            user: address = _addressKeys[i]
+            delegate: address = _delegates[i]
+            self.userDelegation[user][delegate] = staticcall prior.userDelegation(user, delegate)
+            if not self.didImportUserDelegation[user][delegate]:
+                self.didImportUserDelegation[user][delegate] = True
+                self.importedUserDelegations += 1
+
+    elif _category == ImportCategory.STAB_VAULT_IDS:
+        numKeys = len(_vaultIds)
+        for vaultId: uint256 in _vaultIds:
+            # monotonic: retired pools stay stab ids; only ids the prior confirms count
+            if staticcall prior.isStabVaultId(vaultId):
+                self.isStabVaultId[vaultId] = True
+                if not self.didImportStabVaultId[vaultId]:
+                    self.didImportStabVaultId[vaultId] = True
+                    self.importedStabVaultIds += 1
+
+    elif _category == ImportCategory.RIPE_GOV_VAULT_IDS:
+        numKeys = len(_vaultIds)
+        for vaultId: uint256 in _vaultIds:
+            if staticcall prior.isRipeGovVaultId(vaultId):
+                self.isRipeGovVaultId[vaultId] = True
+                if not self.didImportRipeGovVaultId[vaultId]:
+                    self.didImportRipeGovVaultId[vaultId] = True
+                    self.importedRipeGovVaultIds += 1
+
+    elif _category == ImportCategory.VAULT_POINTERS:
+        coreRipeGovVaultId: uint256 = staticcall prior.coreRipeGovVaultId()
+        if coreRipeGovVaultId != 0:
+            self.coreRipeGovVaultId = coreRipeGovVaultId
+            self.isRipeGovVaultId[coreRipeGovVaultId] = True
+        preferredStabVaultId: uint256 = staticcall prior.preferredStabVaultId()
+        if preferredStabVaultId != 0:
+            self.preferredStabVaultId = preferredStabVaultId
+            self.isStabVaultId[preferredStabVaultId] = True
+
+    elif _category == ImportCategory.LITE_SIGNERS:
+        numKeys = len(_addressKeys)
+        for signer: address in _addressKeys:
+            # mirrors the prior both ways so a revocation on the prior can be replayed
+            if staticcall prior.canPerformLiteAction(signer):
+                self._addLiteSigner(signer)
+            else:
+                self._removeLiteSigner(signer)
+
+    elif _category == ImportCategory.ASSETS:
+        numKeys = len(_addressKeys)
+        assert numKeys <= MAX_ASSET_IMPORT_BATCH # dev: asset batch too large
+        for asset: address in _addressKeys:
+            assert staticcall prior.indexOfAsset(asset) != 0 # dev: asset not on prior
+            # the prior (live) config always wins; registers the asset when Defaults missed it
+            self._setAssetConfig(asset, staticcall prior.assetConfig(asset))
+            self.didImportAsset[asset] = True
+
+    elif _category == ImportCategory.RIPE_GOV_VAULT_CONFIGS:
+        numKeys = len(_addressKeys)
+        for asset: address in _addressKeys:
+            self.ripeGovVaultConfig[asset] = staticcall prior.ripeGovVaultConfig(asset)
+            if not self.didImportRipeGovVaultConfig[asset]:
+                self.didImportRipeGovVaultConfig[asset] = True
+                self.importedRipeGovVaultConfigs += 1
+
+    else:
+        raise "invalid category"
+
+    self.importedCategories |= _category
+    log MissionControlImportBatch(category=_category, numKeys=numKeys)
+
+
+@external
+def finalizeImport(_manifest: ImportManifest):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert PRIOR_MISSION_CONTROL != empty(address) # dev: no prior mission control
+    assert not self.isImportFinalized # dev: import finalized
+    prior: PriorMissionControl = PriorMissionControl(PRIOR_MISSION_CONTROL)
+
+    # every category touched or explicitly marked empty
+    allCategories: ImportCategory = (
+        ImportCategory.USER_CONFIGS | ImportCategory.USER_DELEGATIONS |
+        ImportCategory.STAB_VAULT_IDS | ImportCategory.RIPE_GOV_VAULT_IDS |
+        ImportCategory.VAULT_POINTERS | ImportCategory.LITE_SIGNERS |
+        ImportCategory.ASSETS | ImportCategory.RIPE_GOV_VAULT_CONFIGS
+    )
+    assert self.importedCategories == allCategories # dev: import incomplete
+
+    # owner-bound manifest for the categories that cannot be enumerated on the prior
+    assert self.importedUserConfigs == _manifest.userConfigs # dev: user configs manifest
+    assert self.importedUserDelegations == _manifest.userDelegations # dev: user delegations manifest
+    assert self.importedStabVaultIds == _manifest.stabVaultIds # dev: stab vault ids manifest
+    assert self.importedRipeGovVaultIds == _manifest.ripeGovVaultIds # dev: ripe gov vault ids manifest
+    assert self.importedRipeGovVaultConfigs == _manifest.ripeGovVaultConfigs # dev: ripe gov vault configs manifest
+
+    # readback reconciliation of everything the prior can enumerate (both directions)
+    assert self.coreRipeGovVaultId == staticcall prior.coreRipeGovVaultId() # dev: core vault id drift
+    assert self.preferredStabVaultId == staticcall prior.preferredStabVaultId() # dev: preferred stab id drift
+
+    priorNumAssets: uint256 = staticcall prior.numAssets()
+    assert priorNumAssets <= MAX_IMPORT_WALK + 1 # dev: too many prior assets
+    priorAssets: uint256 = 0
+    if priorNumAssets > 1:
+        for i: uint256 in range(1, priorNumAssets, bound=MAX_IMPORT_WALK + 1):
+            asset: address = staticcall prior.assets(i)
+            if asset == empty(address):
+                continue
+            assert self.didImportAsset[asset] # dev: asset not imported
+            priorAssets += 1
+
+    # nothing registered here that the prior does not have (stale Defaults extras), and the
+    # registries are the same size: membership both ways + equal counts = set equality
+    numAssets: uint256 = self.numAssets
+    assert numAssets <= MAX_IMPORT_WALK + 1 # dev: too many assets
+    candidateAssets: uint256 = 0
+    if numAssets > 1:
+        for i: uint256 in range(1, numAssets, bound=MAX_IMPORT_WALK + 1):
+            asset: address = self.assets[i]
+            if asset != empty(address):
+                assert staticcall prior.indexOfAsset(asset) != 0 # dev: asset not on prior
+                candidateAssets += 1
+    assert candidateAssets == priorAssets # dev: asset count drift
+
+    priorNumLiteSigners: uint256 = staticcall prior.numLiteSigners()
+    assert priorNumLiteSigners <= MAX_IMPORT_WALK + 1 # dev: too many prior lite signers
+    priorLiteSigners: uint256 = 0
+    if priorNumLiteSigners > 1:
+        for i: uint256 in range(1, priorNumLiteSigners, bound=MAX_IMPORT_WALK + 1):
+            signer: address = staticcall prior.liteSigners(i)
+            if signer == empty(address):
+                continue
+            assert self.indexOfLiteSigner[signer] != 0 # dev: lite signer not imported
+            priorLiteSigners += 1
+
+    numLiteSigners: uint256 = self.numLiteSigners
+    assert numLiteSigners <= MAX_IMPORT_WALK + 1 # dev: too many lite signers
+    candidateLiteSigners: uint256 = 0
+    if numLiteSigners > 1:
+        for i: uint256 in range(1, numLiteSigners, bound=MAX_IMPORT_WALK + 1):
+            signer: address = self.liteSigners[i]
+            if signer != empty(address):
+                assert staticcall prior.canPerformLiteAction(signer) # dev: lite signer not on prior
+                candidateLiteSigners += 1
+    assert candidateLiteSigners == priorLiteSigners # dev: lite signer count drift
+
+    self.isImportFinalized = True
+    log MissionControlImportFinalized(
+        priorMissionControl=PRIOR_MISSION_CONTROL,
+        userConfigs=_manifest.userConfigs,
+        userDelegations=_manifest.userDelegations,
+        stabVaultIds=_manifest.stabVaultIds,
+        ripeGovVaultIds=_manifest.ripeGovVaultIds,
+        ripeGovVaultConfigs=_manifest.ripeGovVaultConfigs,
+        priorAssets=priorAssets,
+        priorLiteSigners=priorLiteSigners,
+    )
 
 
 ################

@@ -68,6 +68,36 @@ interface VaultMigrator:
     def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
     def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
 
+interface MissionControlMigration:
+    def importFromPrior(_category: ImportCategory, _addressKeys: DynArray[address, MAX_IMPORT_BATCH], _vaultIds: DynArray[uint256, MAX_IMPORT_BATCH], _delegates: DynArray[address, MAX_IMPORT_BATCH]): nonpayable
+    def finalizeImport(_manifest: ImportManifest): nonpayable
+    def arm(): nonpayable
+
+interface LootboxAccrual:
+    def arm(_mc: address): nonpayable
+    def assertActivated(_mc: address, _lootbox: address) -> bool: view
+
+interface RewardAccountingReader:
+    def lootboxAccrual() -> address: view
+
+# mirrors MissionControl.ImportCategory (same member order -> same bits)
+flag ImportCategory:
+    USER_CONFIGS
+    USER_DELEGATIONS
+    STAB_VAULT_IDS
+    RIPE_GOV_VAULT_IDS
+    VAULT_POINTERS
+    LITE_SIGNERS
+    ASSETS
+    RIPE_GOV_VAULT_CONFIGS
+
+struct ImportManifest:
+    userConfigs: uint256
+    userDelegations: uint256
+    stabVaultIds: uint256
+    ripeGovVaultIds: uint256
+    ripeGovVaultConfigs: uint256
+
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
@@ -482,8 +512,10 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
 MAX_MIGRATION_USERS: constant(uint256) = 25
+MAX_IMPORT_BATCH: constant(uint256) = 50
 
 MISSION_CONTROL_ID: constant(uint256) = 5
+LOOTBOX_ID: constant(uint256) = 16
 VAULT_BOOK_ID: constant(uint256) = 8
 ENDAOMENT_ID: constant(uint256) = 14
 ENDAOMENT_PSM_ID: constant(uint256) = 22
@@ -586,6 +618,58 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_users) != 0 # dev: no migrations
     return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users)
+
+
+#################################
+# MissionControl Replacement    #
+#################################
+
+
+# A replacement MissionControl imports its predecessor in bounded batches, finalizes against an
+# owner-bound manifest, then arms together with its LootboxAccrual in ONE transaction (both one-time
+# arm() calls must land on the same block). HQ ids 5 and 16 are confirmed by governance afterwards.
+
+
+@external
+def importMissionControl(
+    _missionControl: address,
+    _category: ImportCategory,
+    _addressKeys: DynArray[address, MAX_IMPORT_BATCH],
+    _vaultIds: DynArray[uint256, MAX_IMPORT_BATCH],
+    _delegates: DynArray[address, MAX_IMPORT_BATCH],
+):
+    assert gov._canGovern(msg.sender) # dev: no perms
+    extcall MissionControlMigration(_missionControl).importFromPrior(_category, _addressKeys, _vaultIds, _delegates)
+
+
+@external
+def finalizeMissionControlImport(_missionControl: address, _manifest: ImportManifest):
+    assert gov._canGovern(msg.sender) # dev: no perms
+    extcall MissionControlMigration(_missionControl).finalizeImport(_manifest)
+
+
+@external
+def armRewardAccounting(_lootboxAccrual: address, _missionControl: address):
+    assert gov._canGovern(msg.sender) # dev: no perms
+    extcall LootboxAccrual(_lootboxAccrual).arm(_missionControl)
+    extcall MissionControlMigration(_missionControl).arm()
+
+
+@view
+@external
+def assertRewardAccountingActivated(_missionControl: address, _lootbox: address) -> bool:
+    # The LAST call of the activation Safe batch. RipeHq confirms return False instead of
+    # reverting when a pending update went stale (MultiSend reads that as success); this reverts
+    # unless the whole three-way binding actually went live, rolling the entire batch back.
+    # Echo proves the registry half; the accrual (read off the supplied MissionControl) proves
+    # the arming half: armed with exactly this MissionControl, same nonzero activation block,
+    # MissionControl and Lootbox both bound to it.
+    hq: address = gov._getRipeHqFromGov()
+    assert staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID) == _missionControl # dev: mission control not live
+    assert staticcall RipeHq(hq).getAddr(LOOTBOX_ID) == _lootbox # dev: lootbox not live
+    accrual: address = staticcall RewardAccountingReader(_missionControl).lootboxAccrual()
+    assert staticcall LootboxAccrual(accrual).assertActivated(_missionControl, _lootbox) # dev: not armed
+    return True
 
 
 ##################################
