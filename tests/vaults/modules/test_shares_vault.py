@@ -1658,3 +1658,117 @@ def test_shares_vault_zero_balance_scenarios(
     asset, has_balance = rebase_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, 1)
     assert asset == alpha_token.address
     assert has_balance  # Should be true because shares exist
+
+
+def test_shares_vault_full_precision_muldiv_vectors(
+    rebase_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    alice,
+    teller,
+):
+    """Overflow-safe conversion: ordinary identity, remainder ceil, fitting overflow, fail-closed."""
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(rebase_erc20_vault, deposit_amount, sender=alpha_token_whale)
+    rebase_erc20_vault.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+
+    total_shares = rebase_erc20_vault.totalBalances(alpha_token)
+    total_balance = alpha_token.balanceOf(rebase_erc20_vault)
+    denom = total_balance + 1
+    shares_plus = total_shares + DECIMAL_OFFSET
+
+    for amount in (1, 50 * EIGHTEEN_DECIMALS, deposit_amount, 123456789):
+        product = amount * shares_plus
+        assert product <= MAX_UINT256
+        expected_floor = product // denom
+        rem = product % denom
+        assert rebase_erc20_vault.amountToShares(alpha_token, amount, False) == expected_floor
+        assert rebase_erc20_vault.amountToShares(alpha_token, amount, True) == (
+            expected_floor + (1 if rem else 0)
+        )
+
+    alpha_token.transfer(rebase_erc20_vault, 1, sender=alpha_token_whale)
+    denom = alpha_token.balanceOf(rebase_erc20_vault) + 1
+    shares_plus = rebase_erc20_vault.totalBalances(alpha_token) + DECIMAL_OFFSET
+    odd = next(i for i in range(1, 10_000) if (i * shares_plus) % denom != 0)
+    assert rebase_erc20_vault.amountToShares(alpha_token, odd, True) == (
+        rebase_erc20_vault.amountToShares(alpha_token, odd, False) + 1
+    )
+
+    user_shares = rebase_erc20_vault.userBalances(bob, alpha_token)
+    for shares in (1, user_shares // 2, user_shares):
+        product = shares * denom
+        expected_floor = product // shares_plus
+        rem = product % shares_plus
+        assert rebase_erc20_vault.sharesToAmount(alpha_token, shares, False) == expected_floor
+        assert rebase_erc20_vault.sharesToAmount(alpha_token, shares, True) == (
+            expected_floor + (1 if rem else 0)
+        )
+
+    cycle = 184_467_440_737_095_516
+    alpha_token.transfer(
+        alpha_token_whale,
+        alpha_token.balanceOf(rebase_erc20_vault),
+        sender=rebase_erc20_vault.address,
+    )
+    assert alpha_token.balanceOf(rebase_erc20_vault) == 0
+
+    alpha_token.transfer(rebase_erc20_vault, cycle, sender=alpha_token_whale)
+    rebase_erc20_vault.depositTokensInVault(sally, alpha_token, cycle, sender=teller.address)
+    alpha_token.transfer(
+        alpha_token_whale,
+        alpha_token.balanceOf(rebase_erc20_vault),
+        sender=rebase_erc20_vault.address,
+    )
+
+    alpha_token.transfer(rebase_erc20_vault, cycle, sender=alpha_token_whale)
+    rebase_erc20_vault.depositTokensInVault(alice, alpha_token, cycle, sender=teller.address)
+
+    alice_shares = rebase_erc20_vault.userBalances(alice, alpha_token)
+    custody = alpha_token.balanceOf(rebase_erc20_vault)
+    assert alice_shares * (custody + 1) > MAX_UINT256
+    quoted = rebase_erc20_vault.sharesToAmount(alpha_token, alice_shares, False)
+    assert quoted <= cycle
+    assert cycle - quoted <= 1
+
+    total_shares = rebase_erc20_vault.totalBalances(alpha_token)
+    total_balance = alpha_token.balanceOf(rebase_erc20_vault)
+    overflow_amount = 10 ** 15
+    assert overflow_amount * (total_shares + DECIMAL_OFFSET) > MAX_UINT256
+    expected = (
+        overflow_amount * (total_shares + DECIMAL_OFFSET) // (total_balance + 1)
+    )
+    assert rebase_erc20_vault.amountToShares(alpha_token, overflow_amount, False) == expected
+
+    alpha_token.transfer(rebase_erc20_vault, 1, sender=alpha_token_whale)
+    total_balance = alpha_token.balanceOf(rebase_erc20_vault)
+    overflow_odd = next(
+        i
+        for i in range(overflow_amount, overflow_amount + 10_000)
+        if i * (total_shares + DECIMAL_OFFSET) > MAX_UINT256
+        and i * (total_shares + DECIMAL_OFFSET) % (total_balance + 1) != 0
+    )
+    overflow_floor = rebase_erc20_vault.amountToShares(alpha_token, overflow_odd, False)
+    assert rebase_erc20_vault.amountToShares(alpha_token, overflow_odd, True) == overflow_floor + 1
+
+    try:
+        rebase_erc20_vault.amountToShares(alpha_token, MAX_UINT256, False)
+    except BoaError as error:
+        assert_reverted_call(error, "result overflows", rebase_erc20_vault)
+    else:
+        raise AssertionError("quotient-too-large must revert result overflows")
+
+    shares_plus = total_shares + DECIMAL_OFFSET
+    denom = total_balance + 1
+    amt = (MAX_UINT256 * denom + shares_plus - 1) // shares_plus
+    if amt * shares_plus // denom == MAX_UINT256 and amt * shares_plus % denom != 0:
+        try:
+            rebase_erc20_vault.amountToShares(alpha_token, amt, True)
+        except BoaError:
+            pass
+        else:
+            raise AssertionError("round-up past max_uint must revert")
