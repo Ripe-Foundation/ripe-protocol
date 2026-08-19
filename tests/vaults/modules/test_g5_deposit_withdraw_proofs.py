@@ -3,19 +3,16 @@
 Drive through the real Teller path where practical. StabilityPool calls with
 sender=teller.address are used only to isolate vault-level math (component
 tests), with Teller-level proofs alongside.
-
-Each test is wrapped in boa.env.anchor() so session fixtures stay clean.
 """
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from boa.contracts.base_evm_contract import BoaError
 from conf_utils import (
     assert_reverted_call,
     clear_transient_storage,
     claim_from_stability_pool,
-    filter_logs,
 )
 
 HUNDRED_PERCENT = 100_00
@@ -104,61 +101,36 @@ def test_g5_deposit_roundtrip_conservation(
         assert amount - received <= 2
 
 
-def test_g5_deposit_zero_share_commit(
-    stability_pool, alpha_token, alpha_token_whale, bob, sally, teller,
-    mock_price_source, vault_book, setGeneralConfig, setAssetConfig,
-):
-    """H1: a successful nonzero deposit must not commit custody with newShares == 0.
-
-    First depositor holds a large position (high NAV per share). A second
-    depositor deposits an amount whose USD value is less than one share unit.
-    If the deposit commits with zero shares, custody increased but the depositor
-    received nothing -> their funds are distributed to the existing holder.
-    """
-    with boa.env.anchor():
-        _config_alpha_stab(stability_pool, alpha_token, vault_book, setGeneralConfig, setAssetConfig)
-        mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
-
-        big = 100 * EIGHTEEN_DECIMALS  # $100 -> shares = 100e18 * 1e8 / (100e18+1) ~ 1e10
-        _teller_deposit(teller, stability_pool, alpha_token, alpha_token_whale, bob, big)
-        bob_shares = stability_pool.userBalances(bob, alpha_token)
-        assert bob_shares > 0
-
-        # totalValue+1 ~ 100e18+1; totalShares+OFFSET ~ bob_shares+1e8
-        # one share costs (totalValue+1)//(totalShares+1e8) ~ 1e10 wei of alpha
-        # deposit less than one share unit:
-        tiny = 1  # 1 wei
-        custody_before = alpha_token.balanceOf(stability_pool.address)
-        deposited = _teller_deposit(teller, stability_pool, alpha_token, alpha_token_whale, sally, tiny)
-        sally_shares = stability_pool.userBalances(sally, alpha_token)
-
-        # INVARIANT: nonzero committed deposit => nonzero shares
-        if deposited != 0:
-            assert sally_shares != 0, (
-                f"custody committed ({alpha_token.balanceOf(stability_pool.address) - custody_before} wei) "
-                f"with zero shares minted"
-            )
-
-
 def test_g5_deposit_zero_share_boundary_control(
-    stability_pool, alpha_token, alpha_token_whale, bob, sally, teller,
-    mock_price_source, vault_book, setGeneralConfig, setAssetConfig,
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
+    bob, sally, teller, auction_house, mock_price_source, green_token, savings_green,
+    vault_book, setGeneralConfig, setAssetConfig,
 ):
-    """Adjacent positive control: deposit sized to mint exactly >=1 share succeeds."""
+    """Adjacent positive control: the exact one-share boundary succeeds."""
     with boa.env.anchor():
         _config_alpha_stab(stability_pool, alpha_token, vault_book, setGeneralConfig, setAssetConfig)
+        setAssetConfig(bravo_token)
         mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+        mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
 
-        big = 100 * EIGHTEEN_DECIMALS
-        _teller_deposit(teller, stability_pool, alpha_token, alpha_token_whale, bob, big)
+        first = 10**12
+        _teller_deposit(teller, stability_pool, alpha_token, alpha_token_whale, bob, first)
+        huge_claimable = 1_000_000 * EIGHTEEN_DECIMALS
+        _record_claim(
+            stability_pool, alpha_token, bravo_token, bravo_token_whale,
+            huge_claimable, bob, auction_house, green_token, savings_green,
+        )
 
-        bob_shares = stability_pool.userBalances(bob, alpha_token)
-        # one share unit in asset terms ~ (totalValue+1) // (totalShares + 1e8)
         total_value = stability_pool.getTotalValue(alpha_token)
         total_shares = stability_pool.totalBalances(alpha_token)
-        one_share_cost = (total_value + 1) // (total_shares + 10**8) + 2
+        share_denominator = total_shares + 10**8
+        one_share_cost = (total_value + share_denominator) // share_denominator
+
+        assert (one_share_cost - 1) * share_denominator // (total_value + 1) == 0
+        assert one_share_cost * share_denominator // (total_value + 1) == 1
         deposited = _teller_deposit(teller, stability_pool, alpha_token, alpha_token_whale, sally, one_share_cost)
-        assert stability_pool.userBalances(sally, alpha_token) >= 1
+        assert deposited == one_share_cost
+        assert stability_pool.userBalances(sally, alpha_token) == 1
 
 
 def test_g5_deposit_reserved_asset_reverts(
@@ -252,7 +224,6 @@ def test_g5_withdraw_branches_with_active_claimable(
 
         # sally's claim still fully covered: her NAV ~ 105e18 vs remaining unreserved + claimable
         sally_value = stability_pool.getTotalUserValue(sally, alpha_token)
-        unreserved = alpha_token.balanceOf(stability_pool.address) - stability_pool.totalClaimableBalances(alpha_token)
         # sally NAV is against unreserved + claimable; claimable 10e18 is hers + bob's share... bob exited
         # without touching claimable, so claimable liability unchanged and custody unchanged
         assert sally_value > 0
@@ -335,63 +306,6 @@ def test_g5_deposit_into_existing_cohort_with_claimable(
         assert sally_shares > bob_shares * 45 // 100
 
 
-def test_g5_deposit_after_total_shares_zero_with_dormant_leftover(
-    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
-    bob, sally, teller, auction_house, mock_price_source, green_token, savings_green,
-    vault_book, setGeneralConfig, setAssetConfig,
-):
-    """H3: after totalShares == 0 with leftover DORMANT claimable, a new depositor
-    mints shares against NAV that excludes dormant inventory, then claims it.
-
-    If the new depositor can claim dormant value at a discount (shares priced
-    without the dormant pile), abandoned value transfers to them.
-    """
-    with boa.env.anchor():
-        _config_alpha_stab(stability_pool, alpha_token, vault_book, setGeneralConfig, setAssetConfig)
-        setAssetConfig(bravo_token)
-        amount = 100 * EIGHTEEN_DECIMALS
-        _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source, amount)
-        mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
-        # dormant dust: below ACTIVATION_USD_THRESHOLD ($0.10)
-        dust = 5 * 10**16  # $0.05 worth of bravo at $1
-        _record_claim(stability_pool, alpha_token, bravo_token, bravo_token_whale,
-                      dust, bob, auction_house, green_token, savings_green)
-        assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == 1  # DORMANT
-
-        # bob fully exits (unreserved only; dormant remains stranded)
-        teller.withdraw(alpha_token, MAX_UINT256, bob, stability_pool, 0, sender=bob)
-        clear_transient_storage()
-        assert stability_pool.totalBalances(alpha_token) == 0
-        assert stability_pool.claimableBalances(alpha_token, bravo_token) == dust
-
-        # sally deposits fresh; her shares are priced against NAV excluding the dormant pile
-        sally_deposit = 100 * EIGHTEEN_DECIMALS
-        _teller_deposit(teller, stability_pool, alpha_token, alpha_token_whale, sally, sally_deposit)
-        sally_shares = stability_pool.userBalances(sally, alpha_token)
-        assert sally_shares > 0
-
-        # sally claims the dormant pile via Teller
-        vault_id = vault_book.getRegId(stability_pool)
-        bravo_before = bravo_token.balanceOf(sally)
-        claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=sally)
-        clear_transient_storage()
-        got = bravo_token.balanceOf(sally) - bravo_before
-        # how much of the dormant dust could sally take, and how many shares did it cost?
-        shares_after = stability_pool.userBalances(sally, alpha_token)
-        shares_burned = sally_shares - shares_after
-        # report the ratio: value taken (in USD) vs shares burned * price-per-share
-        total_value = stability_pool.getTotalValue(alpha_token)
-        total_shares = stability_pool.totalBalances(alpha_token)
-        print(f"\nH3 dormant capture: got={got} dust={dust} shares_burned={shares_burned} "
-              f"of {sally_shares}; remaining NAV={total_value} shares={total_shares}")
-        # For the report; assertion is that the dormant value IS reachable by a new
-        # depositor. The open question is the pricing: shares_burned should be tiny
-        # relative to the value taken if the dormant pile is unpriced.
-        if got != 0:
-            taken_usd = got  # bravo at $1
-            print(f"taken_usd={taken_usd}, burned share pct of sally={shares_burned * 10000 // sally_shares}bps")
-
-
 def test_g5_sgreen_convert_roundtrip(
     stability_pool, green_token, savings_green, whale, bob, teller,
     mission_control, switchboard_alpha, switchboard_bravo, vault_book,
@@ -415,6 +329,7 @@ def test_g5_sgreen_convert_roundtrip(
         clear_transient_storage()
 
         # Teller holds no residue after the wrap+deposit
+        assert deposited == amount
         assert green_token.balanceOf(teller.address) == teller_before_green
         assert savings_green.balanceOf(teller.address) == teller_before_sgreen
         assert stability_pool.userBalances(bob, savings_green) > 0

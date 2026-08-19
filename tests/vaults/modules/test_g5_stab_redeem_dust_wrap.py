@@ -91,6 +91,9 @@ def test_committed_redeem_row_survives_a_dust_remainder_on_a_later_row(
 
     # Safety property: a row the contract cannot satisfy must soft-skip; it must
     # not destroy a sibling row that already committed. One wei less of budget.
+    pair_before = stability_pool.claimableBalances(
+        savings_green.address, bravo_token.address)
+    sally_bravo_before = bravo_token.balanceOf(sally)
     sally_green_before = green_token.balanceOf(sally)
     sally_sgreen_before = savings_green.balanceOf(sally)
     spent = teller.redeemManyFromStabilityPool(
@@ -99,7 +102,8 @@ def test_committed_redeem_row_survives_a_dust_remainder_on_a_later_row(
     clear_transient_storage()
     assert spent == 10 * EIGHTEEN_DECIMALS
     assert stability_pool.claimableBalances(
-        savings_green.address, bravo_token.address) == PILE - 10 * EIGHTEEN_DECIMALS
+        savings_green.address, bravo_token.address) == pair_before - 10 * EIGHTEEN_DECIMALS
+    assert bravo_token.balanceOf(sally) - sally_bravo_before == 10 * EIGHTEEN_DECIMALS
     assert sally_green_before - green_token.balanceOf(sally) == 10 * EIGHTEEN_DECIMALS
     assert savings_green.balanceOf(sally) == sally_sgreen_before
     assert green_token.balanceOf(stability_pool.address) == 0
@@ -187,37 +191,6 @@ def test_same_sequences_are_safe_while_sgreen_is_at_parity(
         vault_id, [(bravo_token.address, MAX_UINT256)], 100 * EIGHTEEN_DECIMALS,
         sally, False, False, True, sender=sally) == 1
     clear_transient_storage()
-
-
-def test_g5_dust_wrap_revert_rolls_back_committed_row(
-    stab_cohort, stability_pool, green_token, savings_green, whale, sally, teller,
-    bravo_token,
-):
-    """Dust row skips; sibling stays committed (same balances as the first test)."""
-    vault_id = stab_cohort
-    _accrue_sgreen_yield(green_token, savings_green, whale, 100 * EIGHTEEN_DECIMALS)
-    _fund(green_token, teller, whale, sally, 500 * EIGHTEEN_DECIMALS)
-    rows = [(bravo_token.address, 10 * EIGHTEEN_DECIMALS),
-            (bravo_token.address, MAX_UINT256)]
-
-    pair_before = stability_pool.claimableBalances(
-        savings_green.address, bravo_token.address)
-    sally_bravo_before = bravo_token.balanceOf(sally)
-    sally_green_before = green_token.balanceOf(sally)
-    sally_sgreen_before = savings_green.balanceOf(sally)
-
-    spent = teller.redeemManyFromStabilityPool(
-        vault_id, rows, 10 * EIGHTEEN_DECIMALS + 1, sally, False, False, True,
-        sender=sally)
-    clear_transient_storage()
-
-    assert spent == 10 * EIGHTEEN_DECIMALS
-    assert stability_pool.claimableBalances(
-        savings_green.address, bravo_token.address) == pair_before - 10 * EIGHTEEN_DECIMALS
-    assert bravo_token.balanceOf(sally) - sally_bravo_before == 10 * EIGHTEEN_DECIMALS
-    assert sally_green_before - green_token.balanceOf(sally) == 10 * EIGHTEEN_DECIMALS
-    assert savings_green.balanceOf(sally) == sally_sgreen_before
-    assert green_token.balanceOf(stability_pool.address) == 0
 
 
 def test_g5_one_wei_residue_is_cleared_by_shareholder_claim(

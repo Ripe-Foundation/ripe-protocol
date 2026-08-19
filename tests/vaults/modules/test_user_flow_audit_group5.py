@@ -559,7 +559,6 @@ def test_group5_claim_auto_deposit_to_second_pool_must_not_commit_zero_shares(
         == source_unreserved
     )
     assert bravo_token.balanceOf(alternate_stability_pool) == target_custody
-    assert alternate_stability_pool.userBalances(alice, bravo_token) == 0
     assert alternate_stability_pool.userBalances(alice, bravo_token) == target_shares
     assert bravo_token.balanceOf(alice) == alice_bravo
     assert bravo_token.balanceOf(bob) == bob_bravo

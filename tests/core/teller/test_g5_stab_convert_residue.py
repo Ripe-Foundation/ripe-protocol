@@ -10,7 +10,7 @@ exceed remaining headroom reverts in full and rolls back. Generic
 """
 
 import boa
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, VAULT_MIGRATOR_HQ_ID
+from constants import EIGHTEEN_DECIMALS, VAULT_MIGRATOR_HQ_ID
 from conf_utils import clear_transient_storage, filter_logs
 
 
@@ -64,7 +64,7 @@ def _convert_rollback_state(stability_pool, green_token, savings_green, teller, 
     )
 
 
-def test_convert_partial_clamp_strands_sgreen_in_teller(
+def test_convert_over_global_limit_reverts_without_teller_residue(
     stability_pool, green_token, savings_green, whale, bob, teller,
     setGeneralConfig, setAssetConfig,
 ):
