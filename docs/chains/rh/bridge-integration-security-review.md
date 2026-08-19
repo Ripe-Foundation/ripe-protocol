@@ -671,6 +671,53 @@ pause without clearing exposure; `known-failed` is not writable payout state.
 Otherwise a failure ages silently until it presents as a threshold breach with
 no indication of cause.
 
+**Third — the fix relocates the harm, it does not remove it, and the two ends
+are not equivalent.** A rejected fill strands a user who has already deposited:
+Depository deposits are permissionless and there is no permissionless timeout
+refund, so the origin leg is irreversible before the destination leg is
+attempted. Gating `fill` on `mintEnabled` therefore adds a *new trigger* for
+that pre-existing condition — a protocol-wide incident with no bridge component
+now rejects fills for users whose deposit cannot be undone.
+
+The fix is still right, because a fully drained float during an incident is the
+worse outcome. But the relocation should be recorded as a chosen position, and
+the two sides differ in three ways that "the harm moves" understates:
+
+- **Consent and bound.** Ripe's float loss is bounded by caps the protocol
+  chose and can absorb — that is precisely what the caps are for. The stranded
+  user consented to nothing, is bounded by no cap they can observe, and recovers
+  only through Relay's allocator signature, which carries no timeout and no
+  obligation to them.
+- **Visibility at the moment of decision.** Governance disabling minting during
+  an oracle fault is not thinking about the bridge, and nothing on-chain tells
+  them how many irreversible deposits are currently in flight. The decision is
+  made blind unless the runbook makes it otherwise.
+- **What the caps actually bound.** The spec's conclusion that the caps are the
+  security boundary is true *for Ripe's float*. This channel is not bounded by
+  them at all. The qualifier belongs in the sentence, or the conclusion reads as
+  covering an exposure it does not touch.
+
+**Sequencing narrows the residual, and costs nothing.** Ripe cannot stop the
+origin deposit — it is permissionless — but Ripe controls admission upstream of
+it, because the API/UI quote gate is what puts users on the path. The incident
+sequence should therefore be: **close the quote gate, wait out the deposit→fill
+window, then disable minting** — the same ordering H-5 requires for the
+replenishment leg, and for the same reason. With that sequencing the residual is
+not "everyone in flight," it is "users who deposited inside the drain window,
+plus users who bypassed quoting entirely." That is a smaller and more honestly
+stated number than an unsequenced acceptance, and it is the number the owner
+should be asked to accept.
+
+The corresponding runbook obligation is one line: **before `setMintingEnabled(false)`,
+read outstanding in-flight deposit notional and count; if nonzero, either wait
+out the window or record the accepted stranding.** Without it this finding is
+discovered during an incident rather than decided before one.
+
+Note that a quote-side admission threshold narrows this residual but cannot
+close it: a quote does not reserve destination capacity, so concurrent quotes
+can consume the same headroom, and `mintEnabled` and `lanePaused` are step
+functions with no headroom to reserve against in the first place.
+
 ### M-4 — The age cap is the one control that can brick the contract enforcing it
 
 **Severity: Medium (liveness, self-inflicted). Implementation trap in the
@@ -800,6 +847,13 @@ Whatever design lands, these must be red-before-green:
 18. The data-bearing CCIP rebalancer pins out-of-order execution on every refill.
     A proof-order race may make one callback fail pending manual re-execution;
     that failed message cannot head-of-line block later independent refills.
+19. Incident-sequencing rehearsal, not a contract test (H-6): from a state with
+    open quotes and deposits inside the deposit-to-fill window, the runbook's
+    ordering — close the quote gate, drain the window, then disable minting —
+    is executed end to end, and the count of users stranded is recorded. The
+    same rehearsal run in the reverse order establishes the delta the owner is
+    accepting. A runbook whose stranded count has never been measured is an
+    assumption, not a control.
 
 ## Sign-off
 
@@ -815,6 +869,13 @@ the fact is float. It also demonstrates why the two lanes cannot be reviewed
 separately: the fill path and the refill path were each assessed correctly in
 isolation, and the defect is only visible when a single governance action is
 applied to both at once.
+
+Its fix is not free, and the cost lands on someone who did not choose it: gating
+`fill` on `mintEnabled` converts a float drain into stranded user deposits that
+no cap bounds. That trade is the right one, but it is an owner acceptance rather
+than a resolved finding, and it is only correctly sized once the quote-gate-first
+sequencing above is the assumed procedure. Sign-off on H-6 means accepting a
+measured stranded-user count, not accepting that the code change is sufficient.
 
 H-5 applies to the lane the owner is already using, which makes it the only
 finding here that is not contingent on a future decision. It does not block the
