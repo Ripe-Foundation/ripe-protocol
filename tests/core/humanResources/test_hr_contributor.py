@@ -496,6 +496,44 @@ def test_contributor_final_transfer_honors_its_separate_deposit_lock_term(
     assert not ripe_gov_vault.doesUserHaveBalance(contributor, ripe_token)
 
 
+def test_contributor_final_transfer_honors_duration_after_later_max_reduction(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    ripe_token,
+    alice,
+    bob,
+):
+    general_min_lock = 100
+    stored_duration = 500
+    setupRipeGovVaultConfig(
+        _minLockDuration=general_min_lock,
+        _maxLockDuration=1_000,
+    )
+    terms = dict(valid_contributor_terms)
+    terms["owner"] = alice
+    terms["manager"] = bob
+    terms["depositLockDuration"] = stored_duration
+    contributor = Contributor.at(deployedContributor(terms))
+
+    boa.env.time_travel(seconds=terms["startDelay"] + terms["unlockLength"] + 1)
+    contributor.initiateRipeTransfer(sender=alice)
+    contributor_data = ripe_gov_vault.userGovData(contributor, ripe_token)
+    # 500 is inside live [100, 1000], so the ordinary paycheck path keeps it.
+    assert contributor_data.unlock == boa.env.evm.patch.block_number + stored_duration
+
+    setupRipeGovVaultConfig(
+        _minLockDuration=general_min_lock,
+        _maxLockDuration=100,
+    )
+    boa.env.time_travel(blocks=contributor.keyActionDelay())
+    contributor.confirmRipeTransfer(False, sender=alice)
+    owner_data = ripe_gov_vault.userGovData(alice, ripe_token)
+    assert owner_data.unlock == boa.env.evm.patch.block_number + stored_duration
+    assert stored_duration > 100
+
+
 def test_contributor_confirm_ripe_transfer_too_early(
     contributor_contract,
     setupRipeGovVaultConfig,

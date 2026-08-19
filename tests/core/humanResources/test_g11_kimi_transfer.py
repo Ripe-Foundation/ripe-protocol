@@ -392,14 +392,20 @@ def test_g11_lock_matrix(
     valid_contributor_terms, setupRipeGovVaultConfig,
     ripe_gov_vault, ripe_token, ledger, teller, whale, owner_address, manager_address,
 ):
-    """Thin lock matrix over depositLockDuration in {0, below min, exact min,
-    exact max, max+1, overflow-sized} x owner prevShares {< PRECISION, >= PRECISION}.
+    """Thin lock matrix over depositLockDuration in {below min, exact min,
+    exact max} x owner prevShares {< PRECISION, >= PRECISION}.
 
     Cash (clone) is clamped to [minLock, maxLock]; confirm (owner) is raw in the
     fresh branch and weighted (new leg floored at 1) in the seeded branch.
+    Zero and above-max D are rejected at create.
     """
-    durations = [0, FIXTURE_MIN_LOCK - 1, FIXTURE_MIN_LOCK,
-                 FIXTURE_MAX_LOCK, FIXTURE_MAX_LOCK + 1]
+    for dur in (0, FIXTURE_MAX_LOCK + 1, MAX_UINT256):
+        with boa.reverts("invalid terms"):
+            _deploy(
+                human_resources, setupHrConfig, setupLedgerBalance, governance,
+                valid_contributor_terms, depositLockDuration=dur,
+            )
+    durations = [FIXTURE_MIN_LOCK - 1, FIXTURE_MIN_LOCK, FIXTURE_MAX_LOCK]
     for dur in durations:
         c = _deploy(
             human_resources, setupHrConfig, setupLedgerBalance, governance,
@@ -454,11 +460,11 @@ def test_g11_lock_matrix(
         # After the first iteration the owner has >= PRECISION shares, so the
         # loop below covers the seeded branch from iteration 2 onward.
 
-    # --- explicit seeded branch with a measured weighted blend (dur = 0 case
-    # floors the new leg to 1, dragging the blended unlock DOWN vs a min lock)
+    # --- explicit seeded branch with a measured weighted blend (below-min
+    # duration of 1 pulls the blended unlock DOWN vs a min lock)
     c = _deploy(
         human_resources, setupHrConfig, setupLedgerBalance, governance,
-        valid_contributor_terms, depositLockDuration=0,
+        valid_contributor_terms, depositLockDuration=1,
     )
     setupRipeGovVaultConfig()
     _travel_to_ts(c.startTime() + 30 * 24 * 3600)

@@ -986,3 +986,164 @@ def test_hr_are_valid_contributor_terms_vesting_above_maximum(
     )
     
     assert not result
+
+
+def _are_valid_terms(human_resources, terms, deposit_lock_duration=None):
+    return human_resources.areValidContributorTerms(
+        terms["owner"],
+        terms["manager"],
+        terms["compensation"],
+        terms["startDelay"],
+        terms["vestingLength"],
+        terms["cliffLength"],
+        terms["unlockLength"],
+        terms["depositLockDuration"] if deposit_lock_duration is None else deposit_lock_duration,
+    )
+
+
+def test_hr_are_valid_contributor_terms_no_ripe_gov_lock_terms(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=0, _maxLockDuration=0)
+
+    assert not _are_valid_terms(human_resources, valid_terms)
+
+
+def test_hr_are_valid_contributor_terms_zero_deposit_lock_duration(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+
+    assert not _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=0)
+
+
+def test_hr_initiate_new_contributor_zero_deposit_lock_duration_reverts(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    valid_terms,
+    governance,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+
+    with boa.reverts("invalid terms"):
+        human_resources.initiateNewContributor(
+            valid_terms["owner"],
+            valid_terms["manager"],
+            valid_terms["compensation"],
+            valid_terms["startDelay"],
+            valid_terms["vestingLength"],
+            valid_terms["cliffLength"],
+            valid_terms["unlockLength"],
+            0,
+            sender=governance.address,
+        )
+
+
+def test_hr_are_valid_contributor_terms_duration_above_live_max_is_invalid(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+    governance,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    assert not _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=1001)
+    with boa.reverts("invalid terms"):
+        human_resources.initiateNewContributor(
+            valid_terms["owner"],
+            valid_terms["manager"],
+            valid_terms["compensation"],
+            valid_terms["startDelay"],
+            valid_terms["vestingLength"],
+            valid_terms["cliffLength"],
+            valid_terms["unlockLength"],
+            1001,
+            sender=governance.address,
+        )
+
+
+def test_hr_are_valid_contributor_terms_duration_equal_to_live_max_is_valid(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    assert _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=1000)
+
+
+def test_hr_are_valid_contributor_terms_duration_below_live_min_is_valid(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    assert _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=1)
+
+
+def test_hr_confirm_new_contributor_cancels_when_live_max_falls_below_duration(
+    human_resources,
+    ledger,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+    governance,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    action_id = human_resources.initiateNewContributor(
+        valid_terms["owner"],
+        valid_terms["manager"],
+        valid_terms["compensation"],
+        valid_terms["startDelay"],
+        valid_terms["vestingLength"],
+        valid_terms["cliffLength"],
+        valid_terms["unlockLength"],
+        500,
+        sender=governance.address,
+    )
+    assert human_resources.pendingContributor(action_id).owner == valid_terms["owner"]
+    num_contributors_before = ledger.numContributors()
+    ripe_avail_before = ledger.ripeAvailForHr()
+
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=400)
+    boa.env.time_travel(blocks=human_resources.actionTimeLock())
+
+    result = human_resources.confirmNewContributor(action_id, sender=governance.address)
+    assert result is False
+    pending = human_resources.pendingContributor(action_id)
+    assert pending.owner == ZERO_ADDRESS
+    assert pending.depositLockDuration == 0
+    assert filter_logs(human_resources, "NewContributorConfirmed") == []
+    assert ledger.numContributors() == num_contributors_before
+    assert ledger.ripeAvailForHr() == ripe_avail_before
+    with boa.reverts("no pending contributor"):
+        human_resources.confirmNewContributor(action_id, sender=governance.address)

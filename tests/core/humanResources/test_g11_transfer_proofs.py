@@ -413,7 +413,7 @@ def test_g11_lock_matrix_cash_clamped_transfer_raw(
     terms["depositLockDuration"] = duration
     setupHrConfig()
     setupLedgerBalance(terms["compensation"])
-    if duration == MAX_UINT256:
+    if duration in (0, 1001, MAX_UINT256):
         with boa.reverts("invalid terms"):
             human_resources.initiateNewContributor(
                 terms["owner"],

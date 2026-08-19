@@ -139,7 +139,8 @@ def deployedContributor(
     ledger,
     governance,
     alice,
-    bob
+    bob,
+    setupRipeGovVaultConfig,
 ):
     """Deploy a contributor contract for testing"""
     def _deployedContributor(_owner=alice, _manager=bob, _compensation=1000 * EIGHTEEN_DECIMALS):
@@ -160,7 +161,8 @@ def deployedContributor(
         
         # Set available RIPE for HR
         ledger.setRipeAvailForHr(10000 * EIGHTEEN_DECIMALS, sender=switchboard_delta.address)
-        
+        setupRipeGovVaultConfig()
+
         # Initiate new contributor
         aid = human_resources.initiateNewContributor(
             owner,             # _owner
@@ -694,13 +696,14 @@ def test_switchboard_delta_execute_pending_manager_change(
 
 
 def test_switchboard_delta_execute_pending_cancel_paycheck(
-    switchboard_delta, governance, human_resources, setupHrConfig, setupLedgerBalance, alice, bob
+    switchboard_delta, governance, human_resources, setupHrConfig, setupLedgerBalance, setupRipeGovVaultConfig, alice, bob
 ):
     """Test executing pending paycheck cancellation succeeds when switchboard is properly registered"""
     # Set up HR config and ledger balance
     setupHrConfig()
     setupLedgerBalance(1000 * EIGHTEEN_DECIMALS)
-    
+    setupRipeGovVaultConfig()
+
     # Create contributor with long but valid vesting period to allow cancellation
     aid = human_resources.initiateNewContributor(
         alice,                      # _owner
@@ -806,13 +809,14 @@ def test_switchboard_delta_complete_hr_config_workflow(
 
 def test_switchboard_delta_complete_contributor_management_workflow(
     switchboard_delta, mission_control, governance, human_resources, setupHrConfig, setupLedgerBalance,
-    alice, bob
+    setupRipeGovVaultConfig, alice, bob
 ):
     """Test complete workflow for contributor management - SwitchboardDelta has proper permissions"""
     # Set up HR config and ledger balance
     setupHrConfig()
     setupLedgerBalance(1000 * EIGHTEEN_DECIMALS)
-    
+    setupRipeGovVaultConfig()
+
     # Create contributor with long but valid vesting period to allow paycheck cancellation
     aid = human_resources.initiateNewContributor(
         alice,                      # _owner

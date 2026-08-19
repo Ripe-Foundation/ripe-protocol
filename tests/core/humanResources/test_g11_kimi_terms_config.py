@@ -68,11 +68,11 @@ def test_g11_lock_duration_acceptance_set(
     human_resources, setupHrConfig, setupLedgerBalance, governance,
     valid_contributor_terms, owner_address, manager_address,
 ):
-    """In-band depositLockDuration values validate and initiate; overflow-sized D is rejected."""
+    """In-band and below-min D validate; zero, above live max, and overflow D are rejected."""
     setupHrConfig()
     setupLedgerBalance(10 * valid_contributor_terms["compensation"])
     t = valid_contributor_terms
-    for dur in [0, 99, 100, 1000, 1001]:
+    for dur in [1, 99, 100, 1000]:
         assert human_resources.areValidContributorTerms(
             t["owner"], t["manager"], t["compensation"], t["startDelay"],
             t["vestingLength"], t["cliffLength"], t["unlockLength"], dur,
@@ -84,16 +84,17 @@ def test_g11_lock_duration_acceptance_set(
         )
         assert aid != 0
         human_resources.cancelNewContributor(aid, sender=governance.address)
-    assert not human_resources.areValidContributorTerms(
-        t["owner"], t["manager"], t["compensation"], t["startDelay"],
-        t["vestingLength"], t["cliffLength"], t["unlockLength"], MAX_UINT256,
-    )
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
+    for dur in [0, 1001, MAX_UINT256]:
+        assert not human_resources.areValidContributorTerms(
             t["owner"], t["manager"], t["compensation"], t["startDelay"],
-            t["vestingLength"], t["cliffLength"], t["unlockLength"], MAX_UINT256,
-            sender=governance.address,
+            t["vestingLength"], t["cliffLength"], t["unlockLength"], dur,
         )
+        with boa.reverts("invalid terms"):
+            human_resources.initiateNewContributor(
+                t["owner"], t["manager"], t["compensation"], t["startDelay"],
+                t["vestingLength"], t["cliffLength"], t["unlockLength"], dur,
+                sender=governance.address,
+            )
 
 
 def test_g11_terms_rejections_and_overlapping_pendings(

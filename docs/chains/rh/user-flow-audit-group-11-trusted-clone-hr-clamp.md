@@ -38,6 +38,11 @@ Approved 2026-08-19:
 7. `RipePaycheckCancelled.forfeitedAmount` reports the full
    forfeiture, not the credited amount.
 8. Do not add storage, signatures, return values, or events.
+9. Create-time `depositLockDuration` follows the #188 live-max band:
+   `0 < D <= live RipeGov max`, live max must be configured, `D`
+   below the live min remains allowed, and confirmed terms are not
+   rewritten after later min/max changes. Keep the static
+   `D <= MAX_UINT256 - 2**64` overflow ceiling.
 
 This reverses draft 6’s previous no-saturation direction for
 Hunk 4. Draft 6 kept ordinary `budget += forfeitedAmount` and
@@ -67,9 +72,17 @@ Hunk 2’s seven representability bounds reject a create when:
 6. `cliffLength > MAX_UINT256 - startTime`
 7. `unlockLength > MAX_UINT256 - startTime`
 
-Those are static overflow checks. They do not read live
-`ripeGovVaultConfig` and do not reject a lock merely for sitting
-below the live minimum or above the live maximum.
+Those are static overflow checks. Creation and confirmation also
+require a live RipeGov lock band:
+
+- `depositLockDuration != 0`
+- live `maxLockDuration != 0`
+- `depositLockDuration <= live maxLockDuration`
+
+A duration below the live general minimum is still allowed. Later
+min/max changes do not rewrite a confirmed term. If the live
+maximum falls below a pending duration before confirmation, the
+pending action is cancelled and no clone is deployed.
 
 Hunk 4 is only this Human Resources boundary:
 

@@ -71,7 +71,7 @@ def test_g11_deposit_lock_duration_acceptance_set(
     setupHrConfig()
     setupLedgerBalance(valid_contributor_terms["compensation"])
     t = valid_contributor_terms
-    for duration in (0, 50, 100, 1000, 1001):
+    for duration in (1, 50, 100, 1000):
         terms = _valid(t, depositLockDuration=duration)
         setupLedgerBalance(terms["compensation"])
         assert human_resources.areValidContributorTerms(*terms_tuple(terms))
@@ -82,13 +82,14 @@ def test_g11_deposit_lock_duration_acceptance_set(
         assert human_resources.confirmNewContributor(aid, sender=governance.address)
         c = Contributor.at(filter_logs(human_resources, "NewContributorConfirmed")[0].contributorAddr)
         assert c.depositLockDuration() == duration
-    terms_max = _valid(t, depositLockDuration=MAX_UINT256)
-    setupLedgerBalance(terms_max["compensation"])
-    assert human_resources.areValidContributorTerms(*terms_tuple(terms_max)) is False
-    with boa.reverts("invalid terms"):
-        human_resources.initiateNewContributor(
-            *terms_tuple(terms_max), sender=governance.address
-        )
+    for duration in (0, 1001, MAX_UINT256):
+        terms = _valid(t, depositLockDuration=duration)
+        setupLedgerBalance(terms["compensation"])
+        assert human_resources.areValidContributorTerms(*terms_tuple(terms)) is False
+        with boa.reverts("invalid terms"):
+            human_resources.initiateNewContributor(
+                *terms_tuple(terms), sender=governance.address
+            )
 
 
 def test_g11_two_overlapping_pendings_second_confirm_false_no_extra_clone(
@@ -555,6 +556,7 @@ def test_g11_are_valid_accepts_and_rejects_overflow_bounds(
     human_resources,
     setupHrConfig,
     setupLedgerBalance,
+    setupRipeGovVaultConfig,
     valid_contributor_terms,
     governance,
 ):
@@ -582,6 +584,7 @@ def test_g11_are_valid_accepts_and_rejects_overflow_bounds(
         *terms_tuple(_valid(t, vestingLength=2**128 + 1, unlockLength=2**128 + 1))
     )
     d_ok = MAX_UINT256 - 2**64
+    setupRipeGovVaultConfig(_minLockDuration=1, _maxLockDuration=MAX_UINT256)
     assert human_resources.areValidContributorTerms(
         *terms_tuple(_valid(t, depositLockDuration=d_ok))
     )

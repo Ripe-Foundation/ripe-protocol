@@ -62,6 +62,7 @@ interface RipeToken:
 interface MissionControl:
     def coreRipeGovVaultId() -> uint256: view
     def hrConfig() -> cs.HrConfig: view
+    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
 
 interface HrContributor:
     def totalClaimed() -> uint256: view
@@ -172,7 +173,7 @@ def initiateNewContributor(
         depositLockDuration=_depositLockDuration,
     )
     hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
-    assert self._areValidContributorTerms(terms, hrConfig, a.ledger) # dev: invalid terms
+    assert self._areValidContributorTerms(terms, hrConfig, a.ledger, a.missionControl, a.ripeToken) # dev: invalid terms
 
     aid: uint256 = timeLock._initiateAction()
     self.pendingContributor[aid] = terms
@@ -205,7 +206,7 @@ def confirmNewContributor(_aid: uint256) -> bool:
     assert terms.owner != empty(address) # dev: no pending contributor
 
     hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
-    if not self._areValidContributorTerms(terms, hrConfig, a.ledger):
+    if not self._areValidContributorTerms(terms, hrConfig, a.ledger, a.missionControl, a.ripeToken):
         self._cancelNewPendingContributor(_aid)
         return False
 
@@ -312,12 +313,18 @@ def areValidContributorTerms(
         depositLockDuration=_depositLockDuration,
     )
     hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
-    return self._areValidContributorTerms(terms, hrConfig, a.ledger)
+    return self._areValidContributorTerms(terms, hrConfig, a.ledger, a.missionControl, a.ripeToken)
 
 
 @view
 @internal
-def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, _ledger: address) -> bool:
+def _areValidContributorTerms(
+    _terms: ContributorTerms,
+    _hrConfig: cs.HrConfig,
+    _ledger: address,
+    _missionControl: address,
+    _ripeToken: address,
+) -> bool:
 
     # must have a template
     if _hrConfig.contribTemplate == empty(address):
@@ -363,6 +370,17 @@ def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, 
         return False
 
     if empty(address) in [_terms.owner, _terms.manager]:
+        return False
+
+    # Distinct Contributor agreement: 0 < duration <= live RipeGov max.
+    # Being below the live general minimum is allowed. Later min/max changes
+    # do not amend a confirmed term; this check is creation/confirmation only.
+    if _terms.depositLockDuration == 0:
+        return False
+    ripeGovConfig: cs.RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_ripeToken)
+    if ripeGovConfig.lockTerms.maxLockDuration == 0:
+        return False
+    if _terms.depositLockDuration > ripeGovConfig.lockTerms.maxLockDuration:
         return False
 
     if _terms.compensation > max_value(uint256) // 2:

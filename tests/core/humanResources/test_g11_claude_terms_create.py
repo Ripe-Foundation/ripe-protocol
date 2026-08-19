@@ -71,28 +71,29 @@ def test_g11c_terms_validation_rejects_documented_zeros_and_orderings(
     assert _valid(human_resources, terms(**{**base, "manager": alice}))
 
 
-def test_g11c_deposit_lock_duration_acceptance_set_is_completely_unchecked(
+def test_g11c_deposit_lock_duration_acceptance_set(
     human_resources, mission_control, switchboard_delta, contributor_template,
     ledger, governance, alice, bob,
 ):
-    """{0, below min, exact min, exact max, max+1} validate and construct.
-    Overflow-sized D is rejected at initiate."""
+    """Below-min through live max validate and construct. Zero, above-max,
+    and overflow-sized D are rejected at initiate."""
     set_hr_config(mission_control, switchboard_delta, contributor_template)
     base = terms(owner=alice, manager=bob)
     set_budget(ledger, switchboard_delta, base["compensation"])
-    for d in (0, 50, 100, 1_000, 1_001):
+    for d in (1, 50, 100, 1_000):
         assert _valid(human_resources, terms(**{**base, "depositLockDuration": d})), d
-    assert not _valid(human_resources, terms(**{**base, "depositLockDuration": MAX_UINT256}))
+    for d in (0, 1_001, MAX_UINT256):
+        assert not _valid(human_resources, terms(**{**base, "depositLockDuration": d})), d
 
     c = make_contributor(
         human_resources, mission_control, switchboard_delta, contributor_template,
-        ledger, governance, terms(**{**base, "depositLockDuration": 0}),
+        ledger, governance, terms(**{**base, "depositLockDuration": 50}),
     )
-    assert c.depositLockDuration() == 0
+    assert c.depositLockDuration() == 50
     assert not hasattr(c, "setDepositLockDuration")
     with boa.reverts("invalid terms"):
         human_resources.initiateNewContributor(
-            *term_args(terms(**{**base, "depositLockDuration": MAX_UINT256})),
+            *term_args(terms(**{**base, "depositLockDuration": 0})),
             sender=governance.address,
         )
 

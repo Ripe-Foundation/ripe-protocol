@@ -2670,6 +2670,13 @@ def test_actual_hr_contributor_position_migrates_with_points_and_lock(
         sender=switchboard_delta.address,
     )
     ledger.setRipeAvailForHr(compensation, sender=switchboard_delta.address)
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID, target_id],
+    )
     action_id = human_resources.initiateNewContributor(
         alice,
         bob,

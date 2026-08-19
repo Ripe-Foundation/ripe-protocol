@@ -1,15 +1,15 @@
 """Group 11 (Claude) never-skip #2 -- the cash-clamps / transfer-raw lock matrix.
 
-`depositLockDuration` is chosen once at `initiateNewContributor`, is never read by
-`_areValidContributorTerms` or `Contributor.__init__`, and has no setter. This file
-measures what the two legs actually do with it.
+`depositLockDuration` is chosen once at create/confirm: 0 < D <= live RipeGov
+max. Below-min D is allowed. This file measures what cash and final transfer
+do with a stored term.
 """
 
 import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import MAX_UINT256, ZERO_ADDRESS
 from conf_utils import assert_reverted_call, filter_logs
 
 from g11_claude_helpers import (
@@ -25,7 +25,6 @@ from g11_claude_helpers import (
 
 VAULT_MIN = 100
 VAULT_MAX = 1_000
-SEED = 10 * EIGHTEEN_DECIMALS
 
 
 def _clamped(duration):
@@ -50,8 +49,8 @@ def _cash_and_initiate(c, ripe_gov_vault, ripe_token, owner):
 
 @pytest.mark.parametrize(
     "duration",
-    [0, 50, VAULT_MIN, VAULT_MAX, VAULT_MAX + 1],
-    ids=["zero", "below_min", "exact_min", "exact_max", "max_plus_one"],
+    [50, VAULT_MIN, VAULT_MAX],
+    ids=["below_min", "exact_min", "exact_max"],
 )
 def test_g11c_lock_matrix_fresh_owner_prevshares_below_precision(
     duration,
@@ -89,12 +88,8 @@ def test_g11c_lock_matrix_fresh_owner_prevshares_below_precision(
     assert position(ripe_gov_vault, alice, ripe_token) == cashed
     assert position(ripe_gov_vault, c, ripe_token) == 0
 
-    if duration == 0:
-        # the owner lands fully unlocked at the confirm block, under the vault minimum
-        assert unlock_block(ripe_gov_vault, alice, ripe_token) == bn
+    if duration < VAULT_MIN:
         assert unlock_block(ripe_gov_vault, alice, ripe_token) < bn + VAULT_MIN
-    if duration > VAULT_MAX:
-        assert unlock_block(ripe_gov_vault, alice, ripe_token) > bn + VAULT_MAX
 
 
 def test_g11c_lock_matrix_seeded_owner_prevshares_at_or_above_precision(
@@ -105,41 +100,16 @@ def test_g11c_lock_matrix_seeded_owner_prevshares_at_or_above_precision(
     ledger,
     governance,
     setupRipeGovVaultConfig,
-    ripe_gov_vault,
-    ripe_token,
-    teller,
-    whale,
     alice,
 ):
-    """prevShares >= PRECISION: the weighted blend's NEW leg is not capped at
-    maxLockDuration, so an over-max HR term extends the owner's whole position."""
+    """Create-time policy rejects D above the live RipeGov maximum."""
     setupRipeGovVaultConfig(_minLockDuration=VAULT_MIN, _maxLockDuration=VAULT_MAX)
     over_max = 50 * VAULT_MAX
-    c = _build(
-        human_resources, mission_control, switchboard_delta, contributor_template,
-        ledger, governance, alice, over_max,
-    )
-
-    # ordinary owner route: alice stakes her own RIPE into the gov vault
-    ripe_token.transfer(alice, SEED, sender=whale)
-    ripe_token.approve(teller, SEED, sender=alice)
-    teller.depositIntoGovVault(ripe_token, SEED, 0, sender=alice)
-    prev_shares = ripe_gov_vault.userBalances(alice, ripe_token)
-    assert prev_shares >= 10**18  # >= PRECISION -> weighted branch
-    assert unlock_block(ripe_gov_vault, alice, ripe_token) == (
-        boa.env.evm.patch.block_number + VAULT_MIN
-    )
-
-    cashed, _ = _cash_and_initiate(c, ripe_gov_vault, ripe_token, alice)
-    boa.env.time_travel(blocks=c.keyActionDelay())
-    c.confirmRipeTransfer(False, sender=alice)
-    bn = boa.env.evm.patch.block_number
-
-    owner_unlock = unlock_block(ripe_gov_vault, alice, ripe_token)
-    # the blend is dominated by the uncapped new leg
-    assert owner_unlock > bn + VAULT_MAX
-    assert position(ripe_gov_vault, alice, ripe_token) == SEED + cashed
-    assert position(ripe_gov_vault, c, ripe_token) == 0
+    t = terms(owner=alice, depositLockDuration=over_max)
+    set_hr_config(mission_control, switchboard_delta, contributor_template)
+    set_budget(ledger, switchboard_delta, t["compensation"])
+    with boa.reverts("invalid terms"):
+        human_resources.initiateNewContributor(*term_args(t), sender=governance.address)
 
 
 def test_g11c_lock_matrix_overflow_sized_term_permanently_strands_the_position(

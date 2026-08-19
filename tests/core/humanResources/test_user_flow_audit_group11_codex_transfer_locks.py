@@ -48,11 +48,11 @@ def test_g11_cash_clamp_and_final_transfer_raw_duration_matrix(
     teller,
     owner_address,
 ):
-    """In-band durations create; overflow-sized D is rejected at initiate."""
+    """Below-min through live max create; zero, above-max, and overflow D are rejected."""
     setupRipeGovVaultConfig(_minLockDuration=MIN_LOCK, _maxLockDuration=MAX_LOCK)
     terms = dict(valid_contributor_terms)
     terms["depositLockDuration"] = duration
-    if duration == UINT256_MAX:
+    if duration in (0, MAX_LOCK + 1, UINT256_MAX):
         setupHrConfig()
         setupLedgerBalance(terms["compensation"])
         with boa.reverts("invalid terms"):
