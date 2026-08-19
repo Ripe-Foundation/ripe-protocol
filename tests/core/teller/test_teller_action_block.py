@@ -263,8 +263,39 @@ def _replace_hq_address(ripe_hq, governance, registry_id, replacement):
     assert ripe_hq.getAddr(registry_id) == replacement.address
 
 
+@pytest.fixture(scope="module")
+def route_matrix_contracts():
+    """Deploy the route-matrix mock graph once per module.
+
+    Only deployments belong here. Every registry rewrite, asset/user config
+    and permission grant stays function-scoped in teller_route_matrix_env, so
+    each test still begins from unmodified protocol wiring -- the tests in
+    this module that never request that fixture must not observe a replaced
+    HQ address.
+
+    These contract objects are shared by every test in the module. Boa
+    reverts their EVM storage between tests but not their Python-side
+    state, so do not read filter_logs, get_logs or _computation from them.
+    """
+    green = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_green")
+    savings = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_savings")
+    savings.configure_underlying(green)
+    return {
+        "asset": boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_asset"),
+        "green": green,
+        "savings": savings,
+        "vault": _route_sink("route_matrix_vault"),
+        "credit_engine": _route_sink("route_matrix_credit_engine"),
+        "auction_house": _route_sink("route_matrix_auction_house"),
+        "bond_room": _route_sink("route_matrix_bond_room"),
+        "lootbox": _route_sink("route_matrix_lootbox"),
+        "credit_redeem": _route_sink("route_matrix_credit_redeem"),
+    }
+
+
 @pytest.fixture
 def teller_route_matrix_env(
+    route_matrix_contracts,
     ripe_hq,
     governance,
     teller,
@@ -285,17 +316,16 @@ def teller_route_matrix_env(
     # module is collected without the repository's autouse Boa anchor plugin.
     with boa.env.anchor():
         setGeneralConfig()
-        asset = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_asset")
-        green = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_green")
-        savings = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_savings")
-        savings.configure_underlying(green)
+        asset = route_matrix_contracts["asset"]
+        green = route_matrix_contracts["green"]
+        savings = route_matrix_contracts["savings"]
 
-        vault = _route_sink("route_matrix_vault")
-        credit_engine = _route_sink("route_matrix_credit_engine")
-        auction_house = _route_sink("route_matrix_auction_house")
-        bond_room = _route_sink("route_matrix_bond_room")
-        lootbox = _route_sink("route_matrix_lootbox")
-        credit_redeem = _route_sink("route_matrix_credit_redeem")
+        vault = route_matrix_contracts["vault"]
+        credit_engine = route_matrix_contracts["credit_engine"]
+        auction_house = route_matrix_contracts["auction_house"]
+        bond_room = route_matrix_contracts["bond_room"]
+        lootbox = route_matrix_contracts["lootbox"]
+        credit_redeem = route_matrix_contracts["credit_redeem"]
         vault_id = registerVault(vault, "Teller route matrix vault")
 
         mission_control.setCoreRipeGovVaultId(

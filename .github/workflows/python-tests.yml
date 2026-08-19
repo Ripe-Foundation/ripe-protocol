@@ -10,13 +10,26 @@ on:
       - rh
       - rh-audit-remediation
   push:
-    # Also runs on the integration branches, and not only for signal: a cache
-    # written during a pull_request run is scoped to that pull request, so PRs
-    # can never share one. Only a run on the base branch itself writes a cache
-    # that later PRs targeting it can restore. Without this the Titanoboa
-    # compiler cache never hits, every job recompiles every contract, and the
-    # lean lane pays roughly 1.7x (measured: 138s warm vs 235s cold on the
-    # vaults-gov shard).
+    # Push runs the full job set -- the same jobs as pull_request and
+    # merge_group, not a reduced one.
+    #
+    # master, rh, and rh-audit-remediation are not push-protected today, and
+    # master is not listed on pull_request or merge_group. Push is therefore
+    # the only automatic Python validation covering direct integration-branch
+    # updates and anything reaching master; PRs targeting master still get no
+    # pre-merge merge-ref run.
+    #
+    # Do not gate the validation jobs off of push again unless both are true:
+    # (1) all three branches reject direct pushes, and (2) master is listed on
+    # pull_request and merge_group. A unit test cannot see live branch
+    # protection -- the YAML routing here is the source of truth.
+    #
+    # A run on one of these branches is also what makes the Titanoboa cache
+    # usable at all: a cache written during a pull_request run is scoped to
+    # that pull request, so PRs can never share one. Only a run on the base
+    # branch itself writes caches that later PRs targeting it can restore.
+    # Restoring a relevant cache measurably beats a cold one (measured on one
+    # shard, one input hash: 138s vs 235s).
     branches:
       - master
       - rh
@@ -124,10 +137,12 @@ jobs:
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-          # Eight shards, balanced by measured serial runtime rather than test
+          # Shards are balanced by measured serial runtime rather than test
           # count: tests/core averages ~0.75s per test, tests/vaults ~1.29s, and
           # everything else ~0.65s. Wall clock is the slowest shard, so the
-          # heavy directories are split and the light ones are pooled.
+          # heavy directories are split and the light ones are pooled. The
+          # matrix-vs-case scheduling equality test in
+          # test_lean_shard_coverage.py keeps the shard count honest.
           # loadfile everywhere, no exceptions. It keeps every test in a file on
           # one worker and preserves intra-file ordering.
           #
