@@ -13,6 +13,7 @@ The vault token is `charlie_token_vault` (`MockErc4626Vault` over the same 6dp
 import boa
 import pytest
 
+from boa.contracts.base_evm_contract import BoaError
 from boa.util.abi import abi_encode
 from eth_utils import keccak
 
@@ -277,9 +278,9 @@ def test_g7_registry_that_reverts_bricks_every_psm_action(
     endaoment_psm, undy_hub, mission_control, switchboard_alpha, switchboard_charlie,
     charlie_token, green_token, governance, mock_price_source, credit_engine
 ):
-    """Previously a reverting/malformed registry bricked every PSM user action.
+    """A reverting registry walk reverts mint and redeem.
 
-    This test now proves those walks fail closed to the regular path.
+    Empty getAddr(10) is still regular: no vault-registry call is made.
     """
     psm = endaoment_psm
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
@@ -299,29 +300,25 @@ def test_g7_registry_that_reverts_bricks_every_psm_action(
 
     psm.setMintFee(500, sender=switchboard_charlie.address)
     undy_hub.setRevertOnGetAddr(True)
-    minted = psm.mintGreen(100 * SIX_DECIMALS, user, False, sender=user)
+    with boa.reverts():
+        psm.mintGreen(100 * SIX_DECIMALS, user, False, sender=user)
     after_psm_tx()
-    assert minted == 95 * EIGHTEEN_DECIMALS
-    assert psm.redeemGreen(100 * EIGHTEEN_DECIMALS, user, False, sender=user) == 100 * SIX_DECIMALS
+    with boa.reverts():
+        psm.redeemGreen(100 * EIGHTEEN_DECIMALS, user, False, sender=user)
     after_psm_tx()
     undy_hub.setRevertOnGetAddr(False)
 
     undy_hub.setRevertOnIsEarnVault(True)
-    minted = psm.mintGreen(100 * SIX_DECIMALS, user, False, sender=user)
+    with boa.reverts():
+        psm.mintGreen(100 * SIX_DECIMALS, user, False, sender=user)
     after_psm_tx()
-    assert minted == 95 * EIGHTEEN_DECIMALS
-    assert psm.redeemGreen(100 * EIGHTEEN_DECIMALS, user, False, sender=user) == 100 * SIX_DECIMALS
+    with boa.reverts():
+        psm.redeemGreen(100 * EIGHTEEN_DECIMALS, user, False, sender=user)
     after_psm_tx()
     undy_hub.setRevertOnIsEarnVault(False)
-
-    undy_hub.setMalformedGetAddr(True)
-    minted = psm.mintGreen(100 * SIX_DECIMALS, user, False, sender=user)
-    after_psm_tx()
-    assert minted == 95 * EIGHTEEN_DECIMALS
-    undy_hub.setMalformedGetAddr(False)
     psm.setMintFee(0, sender=switchboard_charlie.address)
 
-    # (d) *absent* id 10 is the fail-closed case: regular treatment, no revert
+    # absent id 10: vault registry is empty, so the walk stops before isEarnVault
     undy_hub.setMissingRegId(10)
     assert psm.mintGreen(100 * SIX_DECIMALS, user, False, sender=user) > 0
     after_psm_tx()
@@ -482,7 +479,7 @@ def test_g7_lego_partial_deposit_leaves_green_under_backed(
     log = filter_logs(psm, "EndaomentPSMYieldDeposit")[0]
     after_psm_tx()
     assert minted == 1_000 * EIGHTEEN_DECIMALS
-    assert log.amount == 1_000 * SIX_DECIMALS
+    assert log.amount == 900 * SIX_DECIMALS
     assert psm.getAvailableUsdc() == 900 * SIX_DECIMALS
 
     undy_hub.setOverstateDepositReturn(True)
@@ -767,11 +764,7 @@ def test_g7_a_failing_yield_venue_bricks_minting_entirely(
     endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
     governance, mock_price_source, credit_engine, wired
 ):
-    """Previously a reverting `depositForYield` rolled back an otherwise-valid mint.
-
-    This test now proves the mint fail-softs to idle USDC, revokes the Lego
-    allowance, and emits no deposit event.
-    """
+    """A reverting `depositForYield` rolls back an otherwise-valid mint."""
     psm = endaoment_psm
     _enable(psm, switchboard_charlie)
 
@@ -784,13 +777,12 @@ def test_g7_a_failing_yield_venue_bricks_minting_entirely(
 
     undy_hub.setRevertOnDeposit(True)
     pre_supply = green_token.totalSupply()
-    minted = psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
+    pre_user = charlie_token.balanceOf(user)
+    with boa.reverts():
+        psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
     after_psm_tx()
-    assert minted == 1_000 * EIGHTEEN_DECIMALS
-    assert green_token.totalSupply() - pre_supply == minted
-    assert charlie_token.allowance(psm.address, undy_hub.address) == 0
-    assert charlie_token.balanceOf(psm.address) == 1_000 * SIX_DECIMALS
-    assert filter_logs(psm, "EndaomentPSMYieldDeposit") == []
+    assert green_token.totalSupply() == pre_supply
+    assert charlie_token.balanceOf(user) == pre_user
 
     undy_hub.setRevertOnDeposit(False)
 
@@ -799,17 +791,16 @@ def test_g7_a_reverting_underlying_view_bricks_redeeming_entirely(
     endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
     governance, mock_price_source, credit_engine, wired
 ):
-    """Previously a reverting `getUnderlyingAmountSafe` bricked redeem and capacity views.
-
-    This test now proves those views fail-soft to idle USDC and idle redeem succeeds.
-    """
+    """A reverting `getUnderlyingAmountSafe` bricks redeem and capacity views."""
     psm = endaoment_psm
     _enable(psm, switchboard_charlie)
     psm.setShouldAutoDeposit(False, sender=switchboard_charlie.address)
 
     charlie_token.mint(psm.address, 10_000 * SIX_DECIMALS, sender=governance.address)
-    psm.depositToYield(sender=switchboard_charlie.address)
+    deposited = psm.depositToYield(sender=switchboard_charlie.address)
     after_psm_tx()
+    assert deposited == 10_000 * SIX_DECIMALS
+    assert psm.getAvailableUsdc() == 10_000 * SIX_DECIMALS
     charlie_token.mint(psm.address, 2_000 * SIX_DECIMALS, sender=governance.address)  # idle
 
     user = boa.env.generate_address()
@@ -819,12 +810,12 @@ def test_g7_a_reverting_underlying_view_bricks_redeeming_entirely(
     after_psm_tx()
 
     undy_hub.setRevertOnUnderlyingView(True)
-    idle = charlie_token.balanceOf(psm.address)
-    assert idle > 0
-    assert psm.getAvailableUsdc() == idle
-    assert psm.getMaxRedeemableGreenAmount(user, False) == idle * ONE_GREEN // ONE_USDC
-    assert psm.getMaxUsdcAmountForMint() > 0
-    assert psm.redeemGreen(500 * EIGHTEEN_DECIMALS, user, False, sender=user) == 500 * SIX_DECIMALS
+    with pytest.raises(BoaError):
+        assert psm.getAvailableUsdc() > 0
+    with pytest.raises(BoaError):
+        assert psm.getMaxRedeemableGreenAmount(user, False) > 0
+    with boa.reverts():
+        psm.redeemGreen(500 * EIGHTEEN_DECIMALS, user, False, sender=user)
     after_psm_tx()
 
     undy_hub.setRevertOnUnderlyingView(False)
@@ -1016,6 +1007,16 @@ def _depositForYield_len(target, asset, amount, vault, recipient):
     )
 
 
+def _reverting_mint_on_registry(psm, mission_control, switchboard_alpha, switchboard_charlie, registry, user):
+    mission_control.setUnderscoreRegistry(registry, sender=switchboard_alpha.address)
+    psm.setMintFee(500, sender=switchboard_charlie.address)
+    with boa.reverts():
+        psm.mintGreen(100 * SIX_DECIMALS, user, False, sender=user)
+    after_psm_tx()
+    psm.setMintFee(0, sender=switchboard_charlie.address)
+    mission_control.setUnderscoreRegistry(ZERO_ADDRESS, sender=switchboard_alpha.address)
+
+
 def _regular_mint_on_registry(psm, mission_control, switchboard_alpha, switchboard_charlie, registry, user):
     mission_control.setUnderscoreRegistry(registry, sender=switchboard_alpha.address)
     psm.setMintFee(500, sender=switchboard_charlie.address)
@@ -1040,11 +1041,10 @@ def _prep_regular_user(psm, switchboard_charlie, mock_price_source, charlie_toke
     [
         (HIGH_ADDR_REG, (), 32),
         (SHORT_ADDR_REG, (), 16),
-        (OVERSIZE_ADDR_REG, (), 33),
     ],
-    ids=["getAddr-high-word", "getAddr-short", "getAddr-oversized"],
+    ids=["getAddr-high-word", "getAddr-short"],
 )
-def test_g7_untrusted_getAddr_fail_closed_to_regular(
+def test_g7_malformed_getAddr_reverts_mint(
     endaoment_psm, mission_control, switchboard_alpha, switchboard_charlie,
     charlie_token, governance, mock_price_source, src, ctor_args, expected_len,
 ):
@@ -1052,6 +1052,21 @@ def test_g7_untrusted_getAddr_fail_closed_to_regular(
     user = _prep_regular_user(psm, switchboard_charlie, mock_price_source, charlie_token, governance)
     reg = boa.loads(src, *ctor_args, name="g7_getAddr_case")
     assert _getAddr_len(reg.address) == expected_len
+    _reverting_mint_on_registry(
+        psm, mission_control, switchboard_alpha, switchboard_charlie,
+        reg.address, user,
+    )
+
+
+def test_g7_oversized_getAddr_decodes_prefix_and_is_regular(
+    endaoment_psm, mission_control, switchboard_alpha, switchboard_charlie,
+    charlie_token, governance, mock_price_source,
+):
+    """Typed ABI ignores extra bytes; 33-byte getAddr decodes as empty → regular."""
+    psm = endaoment_psm
+    user = _prep_regular_user(psm, switchboard_charlie, mock_price_source, charlie_token, governance)
+    reg = boa.loads(OVERSIZE_ADDR_REG, name="g7_getAddr_oversized")
+    assert _getAddr_len(reg.address) == 33
     _regular_mint_on_registry(
         psm, mission_control, switchboard_alpha, switchboard_charlie,
         reg.address, user,
@@ -1063,11 +1078,10 @@ def test_g7_untrusted_getAddr_fail_closed_to_regular(
     [
         (NONCANONICAL_VAULT_REG, (2,), 32),
         (SHORT_VAULT_REG, (), 16),
-        (OVERSIZE_VAULT_REG, (), 33),
     ],
-    ids=["isEarnVault-noncanonical", "isEarnVault-short", "isEarnVault-oversized"],
+    ids=["isEarnVault-noncanonical", "isEarnVault-short"],
 )
-def test_g7_untrusted_isEarnVault_fail_closed_to_regular(
+def test_g7_malformed_isEarnVault_reverts_mint(
     endaoment_psm, mission_control, switchboard_alpha, switchboard_charlie,
     charlie_token, governance, mock_price_source, src, ctor_args, expected_len,
 ):
@@ -1075,13 +1089,28 @@ def test_g7_untrusted_isEarnVault_fail_closed_to_regular(
     user = _prep_regular_user(psm, switchboard_charlie, mock_price_source, charlie_token, governance)
     reg = boa.loads(src, *ctor_args, name="g7_isEarnVault_case")
     assert _isEarnVault_len(reg.address, user) == expected_len
+    _reverting_mint_on_registry(
+        psm, mission_control, switchboard_alpha, switchboard_charlie,
+        reg.address, user,
+    )
+
+
+def test_g7_oversized_isEarnVault_decodes_prefix_and_is_regular(
+    endaoment_psm, mission_control, switchboard_alpha, switchboard_charlie,
+    charlie_token, governance, mock_price_source,
+):
+    """Typed ABI ignores extra bytes; 33-byte isEarnVault decodes as False → regular."""
+    psm = endaoment_psm
+    user = _prep_regular_user(psm, switchboard_charlie, mock_price_source, charlie_token, governance)
+    reg = boa.loads(OVERSIZE_VAULT_REG, name="g7_isEarnVault_oversized")
+    assert _isEarnVault_len(reg.address, user) == 33
     _regular_mint_on_registry(
         psm, mission_control, switchboard_alpha, switchboard_charlie,
         reg.address, user,
     )
 
 
-def test_g7_untrusted_codeless_id10_fail_closed_to_regular(
+def test_g7_codeless_id10_reverts_mint(
     endaoment_psm, mission_control, switchboard_alpha, switchboard_charlie,
     charlie_token, governance, mock_price_source,
 ):
@@ -1091,13 +1120,13 @@ def test_g7_untrusted_codeless_id10_fail_closed_to_regular(
     reg = boa.loads(CODELESS_ID10_REG, empty_addr, name="g7_codeless_id10")
     assert _getAddr_len(reg.address) == 32
     assert _isEarnVault_len(empty_addr, user) == 0
-    _regular_mint_on_registry(
+    _reverting_mint_on_registry(
         psm, mission_control, switchboard_alpha, switchboard_charlie,
         reg.address, user,
     )
 
 
-def test_g7_yield_configured_reverting_registry_still_completes_idle_paths(
+def test_g7_yield_configured_reverting_registry_reverts_user_paths(
     endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
     governance, mock_price_source, credit_engine, wired,
 ):
@@ -1107,18 +1136,20 @@ def test_g7_yield_configured_reverting_registry_still_completes_idle_paths(
     user = boa.env.generate_address()
     charlie_token.mint(user, 1_000 * SIX_DECIMALS, sender=governance.address)
     charlie_token.approve(psm.address, MAX_UINT256, sender=user)
-    minted = psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
+    pre_user = charlie_token.balanceOf(user)
+    with boa.reverts():
+        psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
     after_psm_tx()
-    assert minted == 1_000 * EIGHTEEN_DECIMALS
-    assert charlie_token.balanceOf(psm.address) == 1_000 * SIX_DECIMALS
-    assert filter_logs(psm, "EndaomentPSMYieldDeposit") == []
+    assert charlie_token.balanceOf(user) == pre_user
+    _give_green(green_token, credit_engine, user, 1_000 * EIGHTEEN_DECIMALS)
     green_token.approve(psm.address, MAX_UINT256, sender=user)
-    assert psm.redeemGreen(1_000 * EIGHTEEN_DECIMALS, user, False, sender=user) == 1_000 * SIX_DECIMALS
+    with boa.reverts():
+        psm.redeemGreen(1_000 * EIGHTEEN_DECIMALS, user, False, sender=user)
     after_psm_tx()
     undy_hub.setRevertOnGetAddr(False)
 
 
-def test_g7_honest_yield_deposit_returns_measured_psm_outflow(
+def test_g7_honest_yield_deposit_returns_lego_asset_amount(
     endaoment_psm, undy_hub, charlie_token, charlie_token_vault, switchboard_charlie,
     governance, mock_price_source, wired,
 ):
@@ -1137,7 +1168,7 @@ def test_g7_honest_yield_deposit_returns_measured_psm_outflow(
     psm.setShouldAutoDeposit(True, sender=switchboard_charlie.address)
 
 
-def test_g7_deposit_to_yield_return_is_psm_outflow_not_lego_assets(
+def test_g7_deposit_to_yield_return_is_lego_asset_amount(
     endaoment_psm, undy_hub, charlie_token, switchboard_charlie,
     governance, mock_price_source, wired,
 ):
@@ -1148,8 +1179,8 @@ def test_g7_deposit_to_yield_return_is_psm_outflow_not_lego_assets(
     charlie_token.mint(psm.address, 1_000 * SIX_DECIMALS, sender=governance.address)
     returned = psm.depositToYield(sender=switchboard_charlie.address)
     ev = filter_logs(psm, "EndaomentPSMYieldDeposit")[0]
-    assert returned == 1_000 * SIX_DECIMALS
-    assert ev.amount == 1_000 * SIX_DECIMALS
+    assert returned == 900 * SIX_DECIMALS
+    assert ev.amount == 900 * SIX_DECIMALS
     assert psm.getAvailableUsdc() == 900 * SIX_DECIMALS
     undy_hub.setDepositShortfallBps(0)
     psm.setShouldAutoDeposit(True, sender=switchboard_charlie.address)
@@ -1179,14 +1210,14 @@ def test_g7_five_arg_only_lego_still_deposits(
     [
         (SHORT_LEGO, 32),
         (MALFORMED_LEGO, 128),
-        (OVERSIZE_LEGO, 129),
     ],
-    ids=["receipt-short", "receipt-malformed-address", "receipt-oversized"],
+    ids=["receipt-short", "receipt-malformed-address"],
 )
-def test_g7_yield_receipt_classes_revert_on_silent_take_and_fail_soft_without_drop(
+def test_g7_malformed_yield_receipt_reverts_mint(
     endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
     governance, mock_price_source, wired, src, expected_len,
 ):
+    """Typed `depositForYield` decode reverts; a take inside the Lego rolls back."""
     psm = endaoment_psm
     _enable(psm, switchboard_charlie)
     user = boa.env.generate_address()
@@ -1203,7 +1234,7 @@ def test_g7_yield_receipt_classes_revert_on_silent_take_and_fail_soft_without_dr
     pre_user = charlie_token.balanceOf(user)
     pre_psm = charlie_token.balanceOf(psm.address)
     pre_supply = green_token.totalSupply()
-    with boa.reverts("unconfirmed yield take"):
+    with boa.reverts():
         psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
     after_psm_tx()
     assert charlie_token.balanceOf(user) == pre_user
@@ -1212,11 +1243,48 @@ def test_g7_yield_receipt_classes_revert_on_silent_take_and_fail_soft_without_dr
     assert charlie_token.allowance(psm.address, taker.address) == 0
 
     undy_hub.setLegoAddrOverride(noop.address)
-    minted = psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
-    assert minted == 1_000 * EIGHTEEN_DECIMALS
-    assert filter_logs(psm, "EndaomentPSMYieldDeposit") == []
+    with boa.reverts():
+        psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
     after_psm_tx()
+    assert charlie_token.balanceOf(user) == pre_user
+    assert green_token.totalSupply() == pre_supply
     assert charlie_token.allowance(psm.address, noop.address) == 0
+    undy_hub.setLegoAddrOverride(ZERO_ADDRESS)
+
+
+def test_g7_oversized_yield_receipt_decodes_prefix(
+    endaoment_psm, undy_hub, charlie_token, green_token, switchboard_charlie,
+    governance, mock_price_source, wired,
+):
+    """Typed ABI ignores the extra byte; the first four words are zeros."""
+    psm = endaoment_psm
+    _enable(psm, switchboard_charlie)
+    user = boa.env.generate_address()
+    charlie_token.mint(user, 10_000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(psm.address, MAX_UINT256, sender=user)
+
+    noop = boa.loads(OVERSIZE_LEGO, False, name="g7_oversize_noop")
+    assert _depositForYield_len(
+        noop.address, charlie_token.address, 0, ZERO_ADDRESS, psm.address
+    ) == 129
+
+    taker = boa.loads(OVERSIZE_LEGO, True, name="g7_oversize_take")
+    undy_hub.setLegoAddrOverride(taker.address)
+    minted = psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
+    ev = filter_logs(psm, "EndaomentPSMYieldDeposit")[0]
+    after_psm_tx()
+    assert minted == 1_000 * EIGHTEEN_DECIMALS
+    assert ev.amount == 0
+    assert charlie_token.balanceOf(psm.address) == 0
+    assert charlie_token.balanceOf(taker.address) == 1_000 * SIX_DECIMALS
+
+    undy_hub.setLegoAddrOverride(noop.address)
+    minted = psm.mintGreen(1_000 * SIX_DECIMALS, user, False, sender=user)
+    ev = filter_logs(psm, "EndaomentPSMYieldDeposit")[0]
+    after_psm_tx()
+    assert minted == 1_000 * EIGHTEEN_DECIMALS
+    assert ev.amount == 0
+    assert charlie_token.balanceOf(psm.address) == 1_000 * SIX_DECIMALS
     undy_hub.setLegoAddrOverride(ZERO_ADDRESS)
 
 

@@ -56,11 +56,7 @@ def test_g7_6a_reverting_vault_check_bricks_user_actions(
     switchboard_charlie, mission_control, switchboard_alpha, mock_undy_v2,
     governance, mock_price_source,
 ):
-    """Previously `isEarnVault` revert on one recipient bricked that user's mint/redeem.
-
-    This test now proves the victim is treated as regular (fee binds) and other
-    EOAs are unchanged.
-    """
+    """`isEarnVault` revert on one recipient bricks that user's mint; other EOAs are unchanged."""
     victim = boa.env.generate_address()
     other = boa.env.generate_address()
     mock_undy_v2.setAllAddressesAreVaults(False)
@@ -75,15 +71,16 @@ def test_g7_6a_reverting_vault_check_bricks_user_actions(
     charlie_token.approve(endaoment_psm.address, usdc_amount, sender=other)
 
     endaoment_psm.setMintFee(500, sender=switchboard_charlie.address)
-    endaoment_psm.mintGreen(usdc_amount, victim, False, sender=victim)
-    ev = g7.last_mint_event(endaoment_psm)
+    with boa.reverts():
+        endaoment_psm.mintGreen(usdc_amount, victim, False, sender=victim)
     g7.after_psm_tx()
-    assert green_token.balanceOf(victim) == 95 * E18
-    assert ev.usdcFee == usdc_amount * 500 // 10_000
+    assert green_token.balanceOf(victim) == 0
 
     endaoment_psm.mintGreen(usdc_amount, other, False, sender=other)
+    ev = g7.last_mint_event(endaoment_psm)
     g7.after_psm_tx()
     assert green_token.balanceOf(other) == 95 * E18
+    assert ev.usdcFee == usdc_amount * 500 // 10_000
 
 
 def test_g7_6a_missing_vault_registry_id_fails_closed(

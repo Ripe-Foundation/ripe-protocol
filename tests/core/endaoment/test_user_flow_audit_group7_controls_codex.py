@@ -14,7 +14,7 @@ BROKEN_UNDERSCORE_REGISTRY_SOURCE = """
 # @version 0.4.3
 
 # Passes Group 9's Delta empty-address sentinel, then reverts on a real
-# isEarnVault walk. The PSM must fail closed to the regular path.
+# isEarnVault walk. Typed PSM walks then revert mint and redeem.
 
 @view
 @external
@@ -382,11 +382,9 @@ def test_g7_delta_accepts_registry_that_bricks_all_psm_user_actions_until_clear(
     mock_price_source,
     whale,
 ):
-    """Previously a reverting registry installed via Delta bricked every PSM user action.
-
-    Group 9 still lets Delta install a registry that is honest at the
-    empty-address sentinel and reverts on a real vault walk. This test
-    proves mint and redeem then fail closed to the regular path.
+    """Group 9 lets Delta install a registry that is honest at the empty-address
+    sentinel and reverts on a real vault walk. Typed PSM walks then revert
+    until the registry is cleared.
     """
     broken = boa.loads(BROKEN_UNDERSCORE_REGISTRY_SOURCE, name="g7_broken_underscore_registry")
     install = switchboard_delta.setUnderscoreRegistry(broken.address, sender=governance.address)
@@ -405,16 +403,23 @@ def test_g7_delta_accepts_registry_that_bricks_all_psm_user_actions_until_clear(
     charlie_token.mint(endaoment_psm.address, mint_payment, sender=governance.address)
 
     endaoment_psm.setMintFee(500, sender=switchboard_charlie.address)
-    minted = endaoment_psm.mintGreen(mint_payment, user, False, sender=user)
+    with boa.reverts():
+        endaoment_psm.mintGreen(mint_payment, user, False, sender=user)
     after_psm_tx()
-    fee = mint_payment * 500 // 10_000
-    assert minted == (mint_payment - fee) * ONE_GREEN // ONE_USDC
-    assert endaoment_psm.globalMintInterval().amount == minted
-    assert endaoment_psm.redeemGreen(green_amount, user, False, sender=user) == ONE_USDC
+    with boa.reverts():
+        endaoment_psm.redeemGreen(green_amount, user, False, sender=user)
     after_psm_tx()
 
     clear = switchboard_delta.setUnderscoreRegistry(ZERO_ADDRESS, sender=governance.address)
     _execute_delta(switchboard_delta, clear, governance)
+    assert mission_control.underscoreRegistry() == ZERO_ADDRESS
+
+    minted = endaoment_psm.mintGreen(mint_payment, user, False, sender=user)
+    after_psm_tx()
+    fee = mint_payment * 500 // 10_000
+    assert minted == (mint_payment - fee) * ONE_GREEN // ONE_USDC
+    assert endaoment_psm.redeemGreen(green_amount, user, False, sender=user) == ONE_USDC
+    after_psm_tx()
 
 
 def test_g7_immediate_governor_reserve_sweep_turns_visible_redeem_capacity_into_zero(
@@ -621,14 +626,19 @@ def test_g7_yield_deposit_and_underrealized_withdraw_fail_atomically_after_user_
         charlie_token.approve(endaoment_psm.address, payment, sender=user)
 
         lego.setShouldRevertDeposit(True)
-        assert endaoment_psm.mintGreen(payment, user, False, sender=user) == 100 * ONE_GREEN
+        pre_user = charlie_token.balanceOf(user)
+        pre_supply = green_token.totalSupply()
+        with boa.reverts():
+            endaoment_psm.mintGreen(payment, user, False, sender=user)
         after_psm_tx()
-        assert charlie_token.balanceOf(endaoment_psm.address) == payment
+        assert charlie_token.balanceOf(user) == pre_user
+        assert green_token.totalSupply() == pre_supply
         assert charlie_token.allowance(endaoment_psm.address, lego.address) == 0
-        assert filter_logs(endaoment_psm, "EndaomentPSMYieldDeposit") == []
 
         lego.setShouldRevertDeposit(False)
-        assert endaoment_psm.depositToYield(sender=switchboard_charlie.address) == payment
+        assert endaoment_psm.mintGreen(payment, user, False, sender=user) == 100 * ONE_GREEN
+        after_psm_tx()
+        assert endaoment_psm.depositToYield(sender=switchboard_charlie.address) == 0
         after_psm_tx()
         green_token.approve(endaoment_psm.address, 100 * ONE_GREEN, sender=user)
         lego.setWithdrawBps(9_000)

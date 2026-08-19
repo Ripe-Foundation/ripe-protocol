@@ -46,6 +46,13 @@ interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256) -> bool: nonpayable
 
+interface Registry:
+    def isValidAddr(_addr: address) -> bool: view
+    def getAddr(_id: uint256) -> address: view
+
+interface VaultRegistry:
+    def isEarnVault(_addr: address) -> bool: view
+
 interface MissionControl:
     def underscoreRegistry() -> address: view
 
@@ -154,9 +161,6 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_USDC: constant(uint256) = 10 ** 6
 ONE_GREEN: constant(uint256) = 10 ** 18
 MAX_SAFE_INTERVAL_MINT: constant(uint256) = max_value(uint256) // (ONE_USDC * HUNDRED_PERCENT)
-MAX_ADDRESS: constant(uint256) = 2 ** 160 - 1
-UNTRUSTED_VIEW_GAS: constant(uint256) = 250_000
-UNTRUSTED_DEPOSIT_GAS: constant(uint256) = 1_000_000
 
 USDC: public(immutable(address))
 
@@ -585,53 +589,15 @@ def _depositToYield(_usdc: address, _missionControl: address) -> uint256:
 
     # deposit into yield position
     assert extcall IERC20(_usdc).approve(legoAddr, usdcBalance, default_return_value=True)
-    success: bool = False
-    response: Bytes[129] = b""
-    success, response = raw_call(
-        legoAddr,
-        abi_encode(
-            _usdc,
-            usdcBalance,
-            usdcYieldPosition.vaultToken,
-            empty(bytes32),
-            self,
-            method_id=method_id("depositForYield(address,uint256,address,bytes32,address)"),
-        ),
-        max_outsize=129,
-        gas=UNTRUSTED_DEPOSIT_GAS,
-        revert_on_failure=False,
-    )
+    assetAmount: uint256 = 0
+    vaultToken: address = empty(address)
+    vaultTokenAmountReceived: uint256 = 0
+    txUsdValue: uint256 = 0
+    assetAmount, vaultToken, vaultTokenAmountReceived, txUsdValue = extcall UndyLego(legoAddr).depositForYield(_usdc, usdcBalance, usdcYieldPosition.vaultToken, empty(bytes32), self)
     assert extcall IERC20(_usdc).approve(legoAddr, 0, default_return_value=True)
 
-    post: uint256 = staticcall IERC20(_usdc).balanceOf(self)
-    drop: uint256 = 0
-    if post <= usdcBalance:
-        drop = usdcBalance - post
-
-    wellFormed: bool = False
-    vaultToken: address = empty(address)
-    vaultTokenReceived: uint256 = 0
-    usdValue: uint256 = 0
-    if success and len(response) == 128:
-        w0: uint256 = 0
-        w1: uint256 = 0
-        w2: uint256 = 0
-        w3: uint256 = 0
-        w0, w1, w2, w3 = abi_decode(response, (uint256, uint256, uint256, uint256))
-        if w1 <= MAX_ADDRESS:
-            wellFormed = True
-            vaultToken = convert(w1, address)
-            vaultTokenReceived = w2
-            usdValue = w3
-
-    if not success or not wellFormed:
-        assert drop == 0 # dev: unconfirmed yield take
-        return 0
-    if drop == 0:
-        return 0
-
-    log EndaomentPSMYieldDeposit(amount=drop, vaultToken=vaultToken, vaultTokenReceived=vaultTokenReceived, usdValue=usdValue)
-    return drop
+    log EndaomentPSMYieldDeposit(amount=assetAmount, vaultToken=vaultToken, vaultTokenReceived=vaultTokenAmountReceived, usdValue=txUsdValue)
+    return assetAmount
 
 
 # withdraw from yield
@@ -714,15 +680,7 @@ def _getUnderlyingYieldAmount(_legoId: uint256, _vaultToken: address, _missionCo
     legoAddr: address = self._getLegoAddr(_legoId, _missionControl)
     if legoAddr == empty(address):
         return 0
-    ok: bool = False
-    word: uint256 = 0
-    ok, word = self._untrustedStaticWord(
-        legoAddr,
-        abi_encode(_vaultToken, vaultTokenBalance, method_id=method_id("getUnderlyingAmountSafe(address,uint256)")),
-    )
-    if not ok:
-        return 0
-    return word
+    return staticcall UndyLego(legoAddr).getUnderlyingAmountSafe(_vaultToken, vaultTokenBalance)
 
 
 ######################
@@ -762,43 +720,15 @@ def _transferUsdcToEndaomentFunds(_amount: uint256, _usdc: address) -> uint256:
 
 @view
 @internal
-def _untrustedStaticWord(_target: address, _data: Bytes[68]) -> (bool, uint256):
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        _target,
-        _data,
-        max_outsize=33,
-        gas=UNTRUSTED_VIEW_GAS,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return False, 0
-    return True, abi_decode(response, uint256)
-
-
-@view
-@internal
-def _safeGetAddr(_target: address, _id: uint256) -> address:
-    ok: bool = False
-    word: uint256 = 0
-    ok, word = self._untrustedStaticWord(_target, abi_encode(_id, method_id=method_id("getAddr(uint256)")))
-    if not ok or word > MAX_ADDRESS:
-        return empty(address)
-    return convert(word, address)
-
-
-@view
-@internal
 def _getLegoAddr(_legoId: uint256, _missionControl: address) -> address:
     underscoreRegistry: address = staticcall MissionControl(_missionControl).underscoreRegistry()
     if underscoreRegistry == empty(address):
         return empty(address)
-    legoBook: address = self._safeGetAddr(underscoreRegistry, UNDERSCORE_LEGOBOOK_ID)
+    legoBook: address = staticcall Registry(underscoreRegistry).getAddr(UNDERSCORE_LEGOBOOK_ID)
     if legoBook == empty(address):
         return empty(address)
-    return self._safeGetAddr(legoBook, _legoId)
+    legoAddr: address = staticcall Registry(legoBook).getAddr(_legoId)
+    return legoAddr
 
 
 # is underscore vault
@@ -811,14 +741,11 @@ def _isUnderscoreVault(_addr: address, _missionControl: address) -> bool:
     if underscore == empty(address):
         return False
 
-    vaultRegistry: address = self._safeGetAddr(underscore, UNDERSCORE_VAULT_REGISTRY_ID)
+    vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
     if vaultRegistry == empty(address):
         return False
 
-    ok: bool = False
-    word: uint256 = 0
-    ok, word = self._untrustedStaticWord(vaultRegistry, abi_encode(_addr, method_id=method_id("isEarnVault(address)")))
-    return ok and word == 1
+    return staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr)
 
 
 # max usdc available

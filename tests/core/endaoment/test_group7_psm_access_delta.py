@@ -279,8 +279,7 @@ def test_g7_delta_probe_accepts_registry_psm_cannot_consume(
 ):
     """Group 9's Delta sentinel accepts MockUndyV2. A registry whose vault
     id (10) resolves but whose isEarnVault is False for every address still
-    gives no vault privileges — benign divergence. (Never-skip #6a previously
-    reverted; this now proves fail-closed regular-path treatment.)"""
+    gives no vault privileges — typed False is regular treatment."""
     # mock_undy_v2 already: getAddr(id) -> self, isUserWallet(empty) -> False
     # set ALL vault checks False so isEarnVault always False
     mock_undy_v2.setAllAddressesAreVaults(False)
