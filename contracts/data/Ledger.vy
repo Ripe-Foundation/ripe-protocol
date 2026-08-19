@@ -170,6 +170,8 @@ numFungLiqUsers: public(uint256) # num liq users
 
 # hr contributors
 ripeAvailForHr: public(uint256)
+hrReservedCompensation: public(uint256)
+hrCancelCreditLiability: public(uint256)
 contributors: public(HashMap[uint256, address]) # index -> contributor addr
 indexOfContributor: public(HashMap[address, uint256]) # contributor -> index
 numContributors: public(uint256) # num contributors
@@ -823,20 +825,46 @@ def addHrContributor(_contributor: address, _compensation: uint256):
 
     # update ripe avail for hr
     self.ripeAvailForHr -= _compensation
+    assert self.hrReservedCompensation <= max_value(uint256) - _compensation  # dev: hr reserve overflow
+    assert self.hrCancelCreditLiability <= max_value(uint256) - _compensation  # dev: hr cancel liability overflow
+    self.hrReservedCompensation += _compensation
+    self.hrCancelCreditLiability += _compensation
+    assert self.hrCancelCreditLiability >= self.hrReservedCompensation
+    assert self.ripeAvailForHr <= max_value(uint256) - self.hrCancelCreditLiability
 
 
 @external
 def setRipeAvailForHr(_amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
+    assert _amount <= max_value(uint256) - self.hrCancelCreditLiability  # dev: exceeds hr budget headroom
     self.ripeAvailForHr = _amount
+    assert self.ripeAvailForHr <= max_value(uint256) - self.hrCancelCreditLiability
 
 
 @external
-def refundRipeAfterCancelPaycheck(_amount: uint256):
+def consumeHrContributorCash(_mintableReduction: uint256, _liabilityReduction: uint256):
     assert msg.sender == addys._getHumanResourcesAddr() # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
-    self.ripeAvailForHr += _amount
+    assert _mintableReduction <= self.hrReservedCompensation  # dev: hr reserve underflow
+    assert _liabilityReduction <= self.hrCancelCreditLiability  # dev: hr cancel liability underflow
+    self.hrReservedCompensation -= _mintableReduction
+    self.hrCancelCreditLiability -= _liabilityReduction
+    assert self.hrCancelCreditLiability >= self.hrReservedCompensation
+
+
+@external
+def applyHrContributorSettlement(_budgetCredit: uint256, _mintableRelease: uint256, _liabilityRelease: uint256):
+    assert msg.sender == addys._getHumanResourcesAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    assert _mintableRelease <= self.hrReservedCompensation  # dev: hr reserve underflow
+    assert _liabilityRelease <= self.hrCancelCreditLiability  # dev: hr cancel liability underflow
+    assert _budgetCredit <= _liabilityRelease  # dev: hr settlement credit exceeds liability
+    self.hrReservedCompensation -= _mintableRelease
+    self.hrCancelCreditLiability -= _liabilityRelease
+    self.ripeAvailForHr += _budgetCredit
+    assert self.hrCancelCreditLiability >= self.hrReservedCompensation
+    assert self.ripeAvailForHr <= max_value(uint256) - self.hrCancelCreditLiability
 
 
 #########

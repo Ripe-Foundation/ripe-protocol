@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
+from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, MAX_UINT256
 
 
 ############
@@ -836,10 +836,31 @@ def test_ledger_auction_unauthorized_calls(ledger, alice, bob, sample_fungible_a
 # Human Resources Tests #
 #########################
 
+def _hr_globals(ledger):
+    return (
+        ledger.ripeAvailForHr(),
+        ledger.hrReservedCompensation(),
+        ledger.hrCancelCreditLiability(),
+    )
+
+
+def _clear_hr_globals(ledger, human_resources):
+    reserved = ledger.hrReservedCompensation()
+    liability = ledger.hrCancelCreditLiability()
+    if reserved or liability:
+        ledger.applyHrContributorSettlement(
+            0, reserved, liability, sender=human_resources.address
+        )
+    assert ledger.hrReservedCompensation() == 0
+    assert ledger.hrCancelCreditLiability() == 0
+
+
 def test_ledger_add_hr_contributor(ledger, alice, human_resources):
-    """Test adding HR contributor."""
+    """Create bumps both HR globals by C and preserves invariants."""
     compensation = 1000 * EIGHTEEN_DECIMALS
     initial_avail = ledger.ripeAvailForHr()
+    initial_reserved = ledger.hrReservedCompensation()
+    initial_liability = ledger.hrCancelCreditLiability()
     
     # Initially not a contributor
     assert not ledger.isHrContributor(alice)
@@ -857,6 +878,10 @@ def test_ledger_add_hr_contributor(ledger, alice, human_resources):
     # Check compensation was deducted
     expected_avail = initial_avail - compensation
     assert ledger.ripeAvailForHr() == expected_avail
+    assert ledger.hrReservedCompensation() == initial_reserved + compensation
+    assert ledger.hrCancelCreditLiability() == initial_liability + compensation
+    assert ledger.hrCancelCreditLiability() >= ledger.hrReservedCompensation()
+    assert ledger.ripeAvailForHr() <= MAX_UINT256 - ledger.hrCancelCreditLiability()
 
 def test_ledger_add_hr_contributor_duplicate(ledger, alice, human_resources):
     """Test adding duplicate HR contributor fails gracefully."""
@@ -865,14 +890,14 @@ def test_ledger_add_hr_contributor_duplicate(ledger, alice, human_resources):
     # Add contributor first time
     ledger.addHrContributor(alice, compensation, sender=human_resources.address)
     initial_count = ledger.numContributors()
-    initial_avail = ledger.ripeAvailForHr()
+    before = _hr_globals(ledger)
     
     # Try to add again
     ledger.addHrContributor(alice, compensation, sender=human_resources.address)
     
     # Should not change anything
     assert ledger.numContributors() == initial_count
-    assert ledger.ripeAvailForHr() == initial_avail
+    assert _hr_globals(ledger) == before
 
 def test_ledger_add_hr_contributor_unauthorized(ledger, alice, bob):
     """Test that only HumanResources can add contributors."""
@@ -881,18 +906,118 @@ def test_ledger_add_hr_contributor_unauthorized(ledger, alice, bob):
     with boa.reverts("only hr allowed"):
         ledger.addHrContributor(alice, compensation, sender=bob)
 
-def test_ledger_set_ripe_avail_for_hr(ledger, switchboard_alpha, human_resources):
-    """Test setting RIPE available for HR."""
+def test_ledger_set_ripe_avail_for_hr(ledger, switchboard_alpha, human_resources, alice):
+    """Setter headroom is cancel-credit liability, not mintable."""
+    _clear_hr_globals(ledger, human_resources)
     new_amount = 5000 * EIGHTEEN_DECIMALS
     
     # Test via Switchboard
     ledger.setRipeAvailForHr(new_amount, sender=switchboard_alpha.address)
     assert ledger.ripeAvailForHr() == new_amount
     
-    # Test via HumanResources
-    refund_amount = 3000 * EIGHTEEN_DECIMALS
-    ledger.refundRipeAfterCancelPaycheck(refund_amount, sender=human_resources.address)
-    assert ledger.ripeAvailForHr() == new_amount + refund_amount
+    compensation = 4000 * EIGHTEEN_DECIMALS
+    p = 1000 * EIGHTEEN_DECIMALS
+    unique = "0x" + "a1" * 20
+    ledger.addHrContributor(unique, compensation, sender=human_resources.address)
+    assert ledger.hrReservedCompensation() == compensation
+    assert ledger.hrCancelCreditLiability() == compensation
+    assert ledger.ripeAvailForHr() == new_amount - compensation
+
+    ledger.consumeHrContributorCash(p, 0, sender=human_resources.address)
+    assert ledger.hrReservedCompensation() == compensation - p
+    assert ledger.hrCancelCreditLiability() == compensation
+    with boa.reverts("exceeds hr budget headroom"):
+        ledger.setRipeAvailForHr(MAX_UINT256, sender=switchboard_alpha.address)
+    with boa.reverts("exceeds hr budget headroom"):
+        ledger.setRipeAvailForHr(MAX_UINT256 - (compensation - p), sender=switchboard_alpha.address)
+    ledger.setRipeAvailForHr(MAX_UINT256 - compensation, sender=switchboard_alpha.address)
+    assert ledger.ripeAvailForHr() == MAX_UINT256 - compensation
+    with boa.reverts("exceeds hr budget headroom"):
+        ledger.setRipeAvailForHr(MAX_UINT256 - compensation + 1, sender=switchboard_alpha.address)
+
+    ledger.applyHrContributorSettlement(compensation, compensation - p, compensation, sender=human_resources.address)
+    assert ledger.hrReservedCompensation() == 0
+    assert ledger.hrCancelCreditLiability() == 0
+    assert ledger.ripeAvailForHr() == MAX_UINT256
+
+
+def test_ledger_apply_hr_contributor_settlement_happy_paths(ledger, switchboard_alpha, human_resources):
+    _clear_hr_globals(ledger, human_resources)
+    compensation = 100 * EIGHTEEN_DECIMALS
+    p = 10 * EIGHTEEN_DECIMALS
+    unique = "0x" + "a3" * 20
+    ledger.setRipeAvailForHr(compensation, sender=switchboard_alpha.address)
+    ledger.addHrContributor(unique, compensation, sender=human_resources.address)
+    ledger.consumeHrContributorCash(p, 0, sender=human_resources.address)
+    budget = ledger.ripeAvailForHr()
+    ledger.applyHrContributorSettlement(compensation, compensation - p, compensation, sender=human_resources.address)
+    assert ledger.ripeAvailForHr() == budget + compensation
+    assert ledger.hrReservedCompensation() == 0
+    assert ledger.hrCancelCreditLiability() == 0
+
+    unique_f = "0x" + "a4" * 20
+    ledger.setRipeAvailForHr(compensation, sender=switchboard_alpha.address)
+    ledger.addHrContributor(unique_f, compensation, sender=human_resources.address)
+    ledger.consumeHrContributorCash(p, 0, sender=human_resources.address)
+    budget = ledger.ripeAvailForHr()
+    ledger.applyHrContributorSettlement(compensation - p, compensation - p, compensation, sender=human_resources.address)
+    assert ledger.ripeAvailForHr() == budget + (compensation - p)
+    assert ledger.hrReservedCompensation() == 0
+    assert ledger.hrCancelCreditLiability() == 0
+
+
+def test_ledger_apply_hr_contributor_settlement_negatives_leave_state(
+    ledger, switchboard_alpha, human_resources,
+):
+    _clear_hr_globals(ledger, human_resources)
+    compensation = 100 * EIGHTEEN_DECIMALS
+    p = 10 * EIGHTEEN_DECIMALS
+    unique = "0x" + "a5" * 20
+    ledger.setRipeAvailForHr(compensation, sender=switchboard_alpha.address)
+    ledger.addHrContributor(unique, compensation, sender=human_resources.address)
+    ledger.consumeHrContributorCash(p, 0, sender=human_resources.address)
+    before = _hr_globals(ledger)
+
+    with boa.reverts("hr reserve underflow"):
+        ledger.applyHrContributorSettlement(0, before[1] + 1, 0, sender=human_resources.address)
+    with boa.reverts("hr cancel liability underflow"):
+        ledger.applyHrContributorSettlement(0, 0, before[2] + 1, sender=human_resources.address)
+    with boa.reverts("hr settlement credit exceeds liability"):
+        ledger.applyHrContributorSettlement(p + 1, 0, p, sender=human_resources.address)
+    with boa.reverts():
+        ledger.applyHrContributorSettlement(0, 0, compensation, sender=human_resources.address)
+    assert _hr_globals(ledger) == before
+
+
+def test_ledger_consume_hr_contributor_cash_direct_proofs(ledger, switchboard_alpha, human_resources):
+    _clear_hr_globals(ledger, human_resources)
+    compensation = 100 * EIGHTEEN_DECIMALS
+    p = 10 * EIGHTEEN_DECIMALS
+    unique = "0x" + "a6" * 20
+    ledger.setRipeAvailForHr(compensation, sender=switchboard_alpha.address)
+    ledger.addHrContributor(unique, compensation, sender=human_resources.address)
+    ledger.consumeHrContributorCash(p, 0, sender=human_resources.address)
+    assert ledger.hrReservedCompensation() == compensation - p
+    assert ledger.hrCancelCreditLiability() == compensation
+    budget = ledger.ripeAvailForHr()
+
+    ledger.consumeHrContributorCash(compensation - p, compensation, sender=human_resources.address)
+    assert ledger.hrReservedCompensation() == 0
+    assert ledger.hrCancelCreditLiability() == 0
+    assert ledger.ripeAvailForHr() == budget
+
+    unique2 = "0x" + "a7" * 20
+    ledger.setRipeAvailForHr(compensation, sender=switchboard_alpha.address)
+    ledger.addHrContributor(unique2, compensation, sender=human_resources.address)
+    ledger.consumeHrContributorCash(p, 0, sender=human_resources.address)
+    before = _hr_globals(ledger)
+    with boa.reverts("hr reserve underflow"):
+        ledger.consumeHrContributorCash(before[1] + 1, 0, sender=human_resources.address)
+    with boa.reverts("hr cancel liability underflow"):
+        ledger.consumeHrContributorCash(0, before[2] + 1, sender=human_resources.address)
+    with boa.reverts():
+        ledger.consumeHrContributorCash(0, compensation, sender=human_resources.address)
+    assert _hr_globals(ledger) == before
 
 def test_ledger_set_ripe_avail_for_hr_unauthorized(ledger, alice):
     """Test that only authorized contracts can set HR RIPE."""
@@ -1286,6 +1411,12 @@ def test_ledger_all_functions_paused(ledger, switchboard_alpha, alice, teller, l
     
     with boa.reverts("not activated"):
         ledger.setRipeAvailForHr(5000, sender=switchboard_alpha.address)
+
+    with boa.reverts("not activated"):
+        ledger.consumeHrContributorCash(1, 0, sender=human_resources.address)
+
+    with boa.reverts("not activated"):
+        ledger.applyHrContributorSettlement(1, 1, 1, sender=human_resources.address)
     
     # Bonds
     with boa.reverts("not activated"):
@@ -1358,12 +1489,16 @@ def test_ledger_hr_contributor_compensation_exceeds_available(ledger, human_reso
     # Try to add contributor with higher compensation - should revert due to safesub
     high_compensation = 200 * EIGHTEEN_DECIMALS
     
+    reserved_before = ledger.hrReservedCompensation()
+    liability_before = ledger.hrCancelCreditLiability()
     with boa.reverts():  # safesub will cause revert
         ledger.addHrContributor(alice, high_compensation, sender=human_resources.address)
     
     # Contributor should not be added and available RIPE unchanged
     assert not ledger.isHrContributor(alice)
     assert ledger.ripeAvailForHr() == low_avail
+    assert ledger.hrReservedCompensation() == reserved_before
+    assert ledger.hrCancelCreditLiability() == liability_before
 
 ####################
 # Boundary Testing #

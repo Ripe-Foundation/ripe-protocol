@@ -45,7 +45,8 @@ from ethereum.ercs import IERC20
 interface Ledger:
     def addHrContributor(_contributor: address, _compensation: uint256): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
-    def refundRipeAfterCancelPaycheck(_amount: uint256): nonpayable
+    def consumeHrContributorCash(_mintableReduction: uint256, _liabilityReduction: uint256): nonpayable
+    def applyHrContributorSettlement(_budgetCredit: uint256, _mintableRelease: uint256, _liabilityRelease: uint256): nonpayable
     def isHrContributor(_contributor: address) -> bool: view
     def contributors(i: uint256) -> address: view
     def numContributors() -> uint256: view
@@ -86,6 +87,14 @@ struct ContributorTerms:
     unlockLength: uint256
     depositLockDuration: uint256
 
+struct HrGrant:
+    initialized: bool
+    remainingMintable: uint256
+    cancelCreditLiability: uint256
+    mintedPaycheck: uint256
+    cliffTime: uint256
+    settled: bool
+
 event NewContributorInitiated:
     owner: indexed(address)
     manager: indexed(address)
@@ -124,6 +133,9 @@ event NewContributorCancelled:
 
 # pending
 pendingContributor: public(HashMap[uint256, ContributorTerms]) # aid -> terms
+# Fresh HR/Ledger deploy only. Pre-existing Ledger contributors have
+# initialized=False and cannot cash or refund until a separate migration.
+hrGrant: public(HashMap[address, HrGrant])
 
 
 @deploy
@@ -231,6 +243,15 @@ def confirmNewContributor(_aid: uint256) -> bool:
 
     # update ledger
     extcall Ledger(a.ledger).addHrContributor(contributorAddr, terms.compensation)
+
+    self.hrGrant[contributorAddr] = HrGrant(
+        initialized=True,
+        remainingMintable=terms.compensation,
+        cancelCreditLiability=terms.compensation,
+        mintedPaycheck=0,
+        cliffTime=block.timestamp + terms.startDelay + terms.cliffLength,
+        settled=False,
+    )
 
     self.pendingContributor[_aid] = empty(ContributorTerms)
     log NewContributorConfirmed(
@@ -365,6 +386,22 @@ def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, 
     if empty(address) in [_terms.owner, _terms.manager]:
         return False
 
+    if _terms.compensation > max_value(uint256) // 2:
+        return False
+    if _terms.vestingLength > 2 ** 128:
+        return False
+    if _terms.depositLockDuration > max_value(uint256) - 2 ** 64:
+        return False
+    if _terms.startDelay > max_value(uint256) - block.timestamp:
+        return False
+    startTime: uint256 = block.timestamp + _terms.startDelay
+    if _terms.vestingLength > max_value(uint256) - startTime:
+        return False
+    if _terms.cliffLength > max_value(uint256) - startTime:
+        return False
+    if _terms.unlockLength > max_value(uint256) - startTime:
+        return False
+
     return True
 
 
@@ -420,6 +457,22 @@ def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
     a: addys.Addys = addys._getAddys()
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
+    g: HrGrant = self.hrGrant[msg.sender]
+    assert g.initialized # dev: hr grant not initialized
+    assert not g.settled # dev: hr grant settled
+    assert _amount <= g.remainingMintable # dev: hr reserve underflow
+    g.remainingMintable -= _amount
+    g.mintedPaycheck += _amount
+    liabilityReduce: uint256 = 0
+    if block.timestamp >= g.cliffTime:
+        if g.cancelCreditLiability > g.remainingMintable:
+            liabilityReduce = g.cancelCreditLiability - g.remainingMintable
+            g.cancelCreditLiability = g.remainingMintable
+    if g.remainingMintable == 0 and g.cancelCreditLiability == 0:
+        g.settled = True
+    self.hrGrant[msg.sender] = g
+    extcall Ledger(a.ledger).consumeHrContributorCash(_amount, liabilityReduce)
+
     # mint ripe tokens here
     extcall RipeToken(a.ripeToken).mint(self, _amount)
 
@@ -440,20 +493,44 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     a: addys.Addys = addys._getAddys()
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
-    # refund ledger 
-    extcall Ledger(a.ledger).refundRipeAfterCancelPaycheck(_amount)
+    g: HrGrant = self.hrGrant[msg.sender]
+    assert g.initialized # dev: hr grant not initialized
+    assert not g.settled # dev: hr grant settled
 
-    if not _shouldBurnPosition:
-        return
+    actualBurned: uint256 = 0
+    if _shouldBurnPosition:
+        vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+        ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
+        withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
+        extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
+        burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
+        if burnAmount != 0:
+            assert extcall RipeToken(a.ripeToken).burn(burnAmount) # dev: ripe burn failed
+            actualBurned = burnAmount
 
-    # withdraw and burn position
-    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
-    withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
-    extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
-    burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
-    if burnAmount != 0:
-        extcall RipeToken(a.ripeToken).burn(burnAmount)
+    mintableRelease: uint256 = min(_amount, g.remainingMintable)
+    extraWanted: uint256 = _amount - mintableRelease
+    maxExtra: uint256 = min(g.mintedPaycheck, actualBurned)
+    assert extraWanted <= maxExtra # dev: hr reserve underflow
+    budgetCredit: uint256 = _amount
+
+    g.remainingMintable -= mintableRelease
+    liabilityRelease: uint256 = 0
+    if g.remainingMintable == 0:
+        liabilityRelease = g.cancelCreditLiability
+        g.cancelCreditLiability = 0
+        g.settled = True
+    else:
+        liabilityRelease = mintableRelease
+        assert g.cancelCreditLiability >= liabilityRelease
+        g.cancelCreditLiability -= liabilityRelease
+
+    self.hrGrant[msg.sender] = g
+    extcall Ledger(a.ledger).applyHrContributorSettlement(
+        budgetCredit,
+        mintableRelease,
+        liabilityRelease,
+    )
 
 
 #########
@@ -483,7 +560,10 @@ def getTotalClaimed() -> uint256:
         contributorAddr: address = staticcall Ledger(ledger).contributors(i)
         if contributorAddr == empty(address):
             continue
-        totalClaimed += staticcall HrContributor(contributorAddr).totalClaimed()
+        claimed: uint256 = staticcall HrContributor(contributorAddr).totalClaimed()
+        if totalClaimed > max_value(uint256) - claimed:
+            return max_value(uint256)
+        totalClaimed += claimed
 
     return totalClaimed
 
@@ -502,6 +582,9 @@ def getTotalCompensation() -> uint256:
         contributorAddr: address = staticcall Ledger(ledger).contributors(i)
         if contributorAddr == empty(address):
             continue
-        totalCompensation += staticcall HrContributor(contributorAddr).compensation()
+        compensation: uint256 = staticcall HrContributor(contributorAddr).compensation()
+        if totalCompensation > max_value(uint256) - compensation:
+            return max_value(uint256)
+        totalCompensation += compensation
 
     return totalCompensation
