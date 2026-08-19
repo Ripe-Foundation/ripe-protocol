@@ -942,26 +942,25 @@ def test_ripe_gov_vault_configuration_updates_after_deposit(
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
     assert userData_before.unlock > boa.env.evm.patch.block_number  # Should have future unlock
     
-    # Update configuration with WORSE terms (this should reset unlock to 0)
+    # Update configuration with worse terms. `_refreshUnlock` now keeps the
+    # previous unlock; lastTerms still pick up the live config.
     setupRipeGovVaultConfig(
-        _assetWeight=150_00,  # increased (doesn't affect unlock reset)
-        _minLockDuration=200,  # increased (doesn't affect unlock reset)
-        _maxLockDuration=2000,  # increased (doesn't affect unlock reset)
-        _maxLockBoost=300_00,  # increased (doesn't affect unlock reset)
-        _exitFee=20_00,  # INCREASED from 10_00 - makes terms worse
-        _canExit=False,  # DISABLED from True - makes terms worse
-        _shouldFreezeWhenBadDebt=False,  # Added new parameter
+        _assetWeight=150_00,
+        _minLockDuration=200,
+        _maxLockDuration=2000,
+        _maxLockBoost=300_00,
+        _exitFee=20_00,
+        _canExit=False,
+        _shouldFreezeWhenBadDebt=False,
     )
     
-    # Update user points (should refresh terms and reset unlock)
     ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
     
-    # User data should reflect that unlock was reset due to worse terms
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
-    
-    # When terms get worse (exit disabled AND exit fees increased), unlock MUST be reset to 0
-    assert userData_after.unlock == 0  # Should be exactly 0 when terms get worse
-    assert userData_after.lastShares > 0  # Should still have shares
+    assert userData_after.unlock == userData_before.unlock
+    assert userData_after.lastTerms.canExit is False
+    assert userData_after.lastTerms.exitFee == 20_00
+    assert userData_after.lastShares > 0
 
 
 def test_ripe_gov_vault_lock_terms_enforcement(
@@ -1731,7 +1730,7 @@ def test_ripe_gov_vault_refresh_unlock_terms_same(ripe_gov_vault):
 
 
 def test_ripe_gov_vault_refresh_unlock_terms_worse(ripe_gov_vault):
-    """Test refreshUnlock resets to 0 when terms get worse"""
+    """Test refreshUnlock keeps unlock when terms get worse"""
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 500
@@ -1739,11 +1738,11 @@ def test_ripe_gov_vault_refresh_unlock_terms_worse(ripe_gov_vault):
     new_terms = (100, 1000, 200_00, False, 10_00) # canExit = False (worse)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
-    assert new_unlock == 0
+    assert new_unlock == prev_unlock
 
 
 def test_ripe_gov_vault_refresh_unlock_max_duration_decreased(ripe_gov_vault):
-    """Test refreshUnlock caps at new maxLockDuration when it's reduced"""
+    """Test refreshUnlock keeps the previous unlock when maxLockDuration is reduced"""
     
     current_block = boa.env.evm.patch.block_number
     prev_unlock = current_block + 1000  # locked for 1000 blocks
@@ -1751,10 +1750,7 @@ def test_ripe_gov_vault_refresh_unlock_max_duration_decreased(ripe_gov_vault):
     new_terms = (100, 800, 200_00, True, 10_00)   # maxLock = 800 (reduced)
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
-    
-    # Should be capped at current_block + 800 (new max)
-    expected_unlock = current_block + 800
-    assert new_unlock == expected_unlock
+    assert new_unlock == prev_unlock
 
 
 def test_ripe_gov_vault_refresh_unlock_max_duration_increased(ripe_gov_vault):
@@ -1780,10 +1776,7 @@ def test_ripe_gov_vault_refresh_unlock_terms_worse_and_max_changed(ripe_gov_vaul
     new_terms = (100, 800, 200_00, False, 10_00)   # canExit=False, maxLock=800
     
     new_unlock = ripe_gov_vault.refreshUnlock(prev_unlock, new_terms, old_terms)
-    
-    # Terms got worse (canExit False), so should reset to 0
-    # Even though maxLock changed, the reset to 0 takes precedence
-    assert new_unlock == 0
+    assert new_unlock == prev_unlock
 
 
 ###########################################
@@ -2231,7 +2224,7 @@ def test_ripe_gov_vault_transfer_contributor_ripe_tokens_multiple_transfers(
 def test_ripe_gov_vault_transfer_contributor_ripe_tokens_lock_duration_enforcement(
     ripe_gov_vault, ripe_token, whale, bob, alice, teller, human_resources, setupRipeGovVaultConfig
 ):
-    """Test transferContributorRipeTokens uses weighted lock calculation"""
+    """Test transferContributorRipeTokens clamps duration before the weighted lock."""
     # Setup with specific lock duration limits
     setupRipeGovVaultConfig(_minLockDuration=200, _maxLockDuration=800)
 
@@ -2246,9 +2239,9 @@ def test_ripe_gov_vault_transfer_contributor_ripe_tokens_lock_duration_enforceme
     current_block_before = boa.env.evm.patch.block_number
     assert bob_userData_initial.unlock == current_block_before + 200  # Bob has min lock
     
-    # Transfer with lock duration - uses weighted lock calculation, not min/max enforcement
+    # Transfer duration 50 is clamped to minLock 200, then blended.
     ripe_gov_vault.transferContributorRipeTokens(
-        bob, alice, 50, sender=human_resources.address  # Uses weighted lock calculation
+        bob, alice, 50, sender=human_resources.address
     )
     
     # Alice gets a weighted lock based on bob's remaining lock and the requested duration

@@ -204,13 +204,15 @@ def _depositTokensInRipeGovVault(
     assert not self.positionMigratedOut[_user][_asset] # dev: position migrated
     a: addys.Addys = addys._getAddys(_a)
 
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, a.missionControl)
+    assert config.lockTerms.maxLockDuration != 0 # dev: no lock terms
+
     # deposit tokens (using shares module)
     depositAmount: uint256 = 0
     newShares: uint256 = 0
     depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)
 
     # handle gov data/points
-    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, a.missionControl)
     lockDuration: uint256 = max(config.lockTerms.minLockDuration, _lockDuration)
     lockDuration = min(lockDuration, config.lockTerms.maxLockDuration)
     self._handleGovDataOnDeposit(_user, _asset, newShares, lockDuration, 0, config)
@@ -452,6 +454,9 @@ def transferContributorRipeTokens(
 
     # config
     config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(a.ripeToken, a.missionControl)
+    assert config.lockTerms.maxLockDuration != 0 # dev: no lock terms
+    lockDuration: uint256 = max(config.lockTerms.minLockDuration, _lockDuration)
+    lockDuration = min(lockDuration, config.lockTerms.maxLockDuration)
 
     # transfer tokens (using shares module)
     ripeAmount: uint256 = 0
@@ -460,7 +465,7 @@ def transferContributorRipeTokens(
     ripeAmount, transferShares, na = sharesVault._transferBalanceWithinVault(a.ripeToken, _contributor, _toUser, max_value(uint256))
 
     # handle gov data/points
-    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
+    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
     return ripeAmount
@@ -484,6 +489,15 @@ def disableGovPointAccrualForUser(_user: address):
     assert _user != empty(address) # dev: invalid user
     assert self.govPointAccrualDisabledBlock == 0 # dev: globally disabled
     assert self.userGovPointAccrualDisabledBlock[_user] == 0 # dev: already disabled
+
+    a: addys.Addys = addys._getAddys()
+    numUserAssets: uint256 = vaultData.numUserAssets[_user]
+    if numUserAssets != 0:
+        for i: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
+            asset: address = vaultData.userAssets[_user][i]
+            if asset == empty(address):
+                continue
+            self._updateGovPointsForUserAsset(_user, asset, a.missionControl, False)
 
     self.userGovPointAccrualDisabledBlock[_user] = block.number
     log GovPointAccrualDisabledForUser(user=_user, disabledBlock=block.number, caller=msg.sender)
@@ -789,9 +803,6 @@ def adjustLock(
     assert userData.lastTerms.maxLockDuration != 0 # dev: no lock terms
     assert userData.lastShares != 0 # dev: no position
 
-    # update lootbox points
-    self._updateDepositPoints(_user, _asset, a)
-
     # update lock duration
     lockDuration: uint256 = max(_newLockDuration, userData.lastTerms.minLockDuration)
     lockDuration = min(lockDuration, userData.lastTerms.maxLockDuration)
@@ -799,6 +810,9 @@ def adjustLock(
     assert newUnlockBlock > userData.unlock # dev: new lock cannot be earlier
     userData.unlock = newUnlockBlock
     self.userGovData[_user][_asset] = userData
+
+    # checkpoint lootbox after the new unlock is committed
+    self._updateDepositPoints(_user, _asset, a)
 
     log LockModified(user=_user, asset=_asset, newLockDuration=lockDuration)
 
@@ -1001,8 +1015,8 @@ def _getWeightedLockOnTokenDeposit(
 
     # previous lock duration
     prevDuration: uint256 = 1
-    if _prevUnlock > block.number and _lockTerms.maxLockDuration != 0:
-        prevDuration = min(_prevUnlock - block.number, _lockTerms.maxLockDuration)
+    if _prevUnlock > block.number:
+        prevDuration = _prevUnlock - block.number
 
     # not allowing zero on `newNormalized` or `newLockDuration` -- or else new deposit won't get any weight
     newNormalized: uint256 = 1
@@ -1047,8 +1061,4 @@ def refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.
 @view
 @internal
 def _refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> uint256:
-    return (
-        min(_prevUnlock, block.number + _newTerms.maxLockDuration)
-        if self._areKeyTermsSame(_newTerms, _prevTerms)
-        else 0
-    )
+    return _prevUnlock

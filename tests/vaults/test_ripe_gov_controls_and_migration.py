@@ -16,6 +16,10 @@ ASSET_WEIGHT = 100_00
 LOCK_TERMS = (100, 1_000, 200_00, True, 10_00)
 
 
+def _clamp_lock_duration(duration, terms=LOCK_TERMS):
+    return min(max(duration, terms[0]), terms[1])
+
+
 def _configure_ripe_gov_asset(
     mission_control,
     setAssetConfig,
@@ -1504,8 +1508,16 @@ def test_direct_import_rejects_partially_nonempty_target_position(
     teller,
     switchboard_alpha,
     mission_control,
+    setAssetConfig,
 ):
     target, target_id = target_ripe_gov_vault
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID, target_id],
+    )
     _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     existing = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, existing, teller)
@@ -1540,8 +1552,16 @@ def test_direct_import_rejects_position_already_migrated_out(
     teller,
     switchboard_alpha,
     mission_control,
+    setAssetConfig,
 ):
     target, target_id = target_ripe_gov_vault
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID, target_id],
+    )
     _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     amount = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, amount, teller)
@@ -3463,7 +3483,7 @@ def test_gov_transfer_to_a_different_user_still_moves_shares(
 
 
 # --------------------------------------------------------------------------
-# Contributor transfers retain their separately governed lock term
+# Contributor transfers clamp duration to the vault [minLock, maxLock] range
 # --------------------------------------------------------------------------
 
 
@@ -3482,7 +3502,7 @@ CONTRIBUTOR_DURATIONS = (
 @pytest.mark.parametrize(
     "duration", [d for _label, d in CONTRIBUTOR_DURATIONS], ids=[l for l, _d in CONTRIBUTOR_DURATIONS]
 )
-def test_contributor_transfer_honors_configured_duration_on_fresh_recipient(
+def test_contributor_transfer_clamps_configured_duration_on_fresh_recipient(
     duration,
     ripe_gov_vault,
     ripe_token,
@@ -3495,7 +3515,10 @@ def test_contributor_transfer_honors_configured_duration_on_fresh_recipient(
     setAssetConfig,
     switchboard_alpha,
 ):
-    """The contributor's block-based term is distinct from general deposit bounds."""
+    """HR duration is clamped to the vault [minLock, maxLock] range before install.
+
+    Formerly `test_contributor_transfer_honors_configured_duration_on_fresh_recipient`.
+    """
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3513,11 +3536,11 @@ def test_contributor_transfer_honors_configured_duration_on_fresh_recipient(
     )
 
     assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == (
-        boa.env.evm.patch.block_number + duration
+        boa.env.evm.patch.block_number + _clamp_lock_duration(duration)
     )
 
 
-def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock(
+def test_contributor_transfer_uses_clamped_duration_in_weighted_recipient_lock(
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -3530,7 +3553,10 @@ def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_loc
     switchboard_alpha,
     switchboard_bravo,
 ):
-    """An existing recipient lock is blended, not substituted for the HR term."""
+    """An existing recipient lock is blended with the clamped HR term.
+
+    Formerly `test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock`.
+    """
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3565,7 +3591,7 @@ def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_loc
     unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
     expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
         contributor_shares,
-        contributor_duration,
+        _clamp_lock_duration(contributor_duration),
         LOCK_TERMS,
         recipient_shares,
         unlock_before,
