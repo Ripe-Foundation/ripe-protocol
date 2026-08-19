@@ -133,10 +133,13 @@ general RipeGov asset bounds.
 is initiated or confirmed, the duration must be greater than zero and less than
 or equal to the then-live RIPE RipeGov `maxLockDuration`. Live terms must exist
 (`maxLockDuration != 0`). The duration may be below the live general
-`minLockDuration`; that is intentional. If the live maximum falls below the
-pending duration before confirmation, the pending action is cancelled with no
-Contributor deployed. This does not authorize transfer-time clamping; that
-approach remains rejected.
+`minLockDuration`; that is intentional. Creation also keeps the static
+representability ceiling `depositLockDuration <= MAX_UINT256 - 2**64`.
+If the live maximum falls below the pending duration before confirmation,
+the pending action is cancelled with no Contributor deployed. This does
+not authorize transfer-time clamping; that approach remains rejected.
+This live-band rule is now base `rh` behavior after #188; #195 does not
+ask #188 to rebase.
 
 **Enforced behavior.** During vesting, `cashRipeCheck` deposits RIPE into the
 Contributor's RipeGov position through Teller, so that ordinary deposit is still
@@ -320,7 +323,7 @@ free.
 | 1 (rebase / burn) | `test_stab_vault_hardening.py::test_active_claim_custody_deficit_fails_closed_for_value_extracting_actions`, `::test_claim_reserve_cannot_be_reclassified_as_stability_backing` | passing enforcement regression |
 | 1 (outbound fee) | `::test_outbound_fee_on_transfer_short_delivery_reverts_atomically`, `::test_outbound_fee_on_transfer_stability_asset_does_not_burn_shares` | passing enforcement regression for the named paths |
 | 1 (callbacks) | `test_teller_deposit.py::test_predeployment_undecorated_route_reentrancy_cross_product`, `::test_receipt_window_blocks_every_custody_changing_nested_route`, `::test_after_credit_callback_cannot_corrupt_the_measured_receipt` | passing central-guard regressions |
-| 2 | `test_hr_contributor.py::test_contributor_final_transfer_honors_its_separate_deposit_lock_term`, `::test_contributor_final_transfer_honors_duration_after_later_max_reduction`, `test_hr_add_contributor.py` duration validation tests, `test_ripe_gov_controls_and_migration.py::test_contributor_transfer_honors_configured_duration_on_fresh_recipient`, `::test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock` | passing contributor-policy regressions |
+| 2 | `test_hr_contributor.py::test_contributor_final_transfer_honors_its_separate_deposit_lock_term`, `::test_contributor_final_transfer_honors_duration_after_later_max_reduction`, `test_hr_add_contributor.py` duration validation tests, `test_ripe_gov_controls_and_migration.py::test_contributor_transfer_honors_configured_duration_on_fresh_recipient`, `::test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock`, `::test_contributor_transfer_uses_above_max_duration_in_weighted_recipient_lock` | passing contributor-policy regressions |
 | 3 | `test_ripe_gov_vault.py::test_zero_asset_weight_means_zero_points`, `::test_nonzero_asset_weight_boundaries_are_exact` | passing policy regression |
 | 4 | `test_ripe_gov_controls_and_migration.py::test_ripe_gov_pause_matrix_while_paused` | passing enforcement regression |
 | 5 | `test_stab_vault_hardening.py::test_reverting_price_source_takes_down_every_nav_dependent_action` | passing enforcement regression |

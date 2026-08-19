@@ -164,8 +164,8 @@ The controlled sequence is:
 3. wait for the required action-block boundary;
 4. call `migrateLegacyRipeGovPositions(users)` in gas-qualified multi-user
    batches; and
-5. restore or advance configuration exactly as the approved migration plan
-   specifies.
+5. restore the exact pre-wind-down configuration before target unpause; any
+   later term change is a separate governance action.
 
 Changing the configuration does not authorize loss of the user's stored lock.
 The target import must restore that original lock and terms.

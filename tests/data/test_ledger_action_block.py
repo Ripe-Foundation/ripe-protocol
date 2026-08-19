@@ -808,20 +808,3 @@ def test_l3a_monotonic_mutant_fails_equality_only_regression_case(
             sender=teller.address,
         )
     assert mutant.lastTouch(alice) == 1_500
-
-
-@pytest.fixture(autouse=True)
-def isolate_boa_storage_diagnostics():
-    """Avoid Boa repr crashes from stale address/type trace metadata."""
-
-    # Keep this below all tests: earlier placement moves cadence-sensitive line
-    # numbers pinned by test_block_clock_inventory.py. A shared root fixture
-    # would be preferable but tests/conftest.py is outside this candidate's
-    # explicit authorization.
-    assert isinstance(boa.env.sstore_trace, dict)
-    assert isinstance(boa.env.sha3_trace, dict)
-    boa.env.sstore_trace.clear()
-    boa.env.sha3_trace.clear()
-    yield
-    boa.env.sstore_trace.clear()
-    boa.env.sha3_trace.clear()

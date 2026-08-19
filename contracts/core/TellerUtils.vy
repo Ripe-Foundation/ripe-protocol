@@ -164,6 +164,9 @@ def validateOnDeposit(
     assert availGlobalDeposit != 0 # dev: cannot deposit, reached global limit
     amount = min(amount, availGlobalDeposit)
 
+    if _areFundsHereAlready:
+        assert amount == _amount # dev: cannot partially deposit held funds
+
     # min balance
     assert amount + vd.userBalance >= config.minDepositBalance # dev: too small a balance
 

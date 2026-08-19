@@ -2472,6 +2472,69 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         )
 
 
+def test_ripe_gov_vault_config_rejects_zero_max_lock_duration(
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    setAssetConfig,
+    mission_control,
+):
+    """Zero max lock duration is invalid; min zero with a positive max is not."""
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            False,
+            0,
+            0,
+            200_00,
+            0,
+            False,
+            sender=governance.address,
+        )
+
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        0,
+        1_000,
+        200_00,
+        0,
+        False,
+        sender=governance.address,
+    )
+    assert action_id > 0
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    live = mission_control.ripeGovVaultConfig(alpha_token.address)
+    assert live.lockTerms.minLockDuration == 0
+    assert live.lockTerms.maxLockDuration == 1_000
+    assert live.assetWeight == 100_00
+
+    next_action = switchboard_alpha.actionId()
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            150_00,
+            True,
+            0,
+            0,
+            200_00,
+            0,
+            False,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.actionId() == next_action
+    live_after = mission_control.ripeGovVaultConfig(alpha_token.address)
+    assert live_after.lockTerms.minLockDuration == 0
+    assert live_after.lockTerms.maxLockDuration == 1_000
+    assert live_after.assetWeight == 100_00
+    assert not live_after.shouldFreezeWhenBadDebt
+
+
 def test_ripe_gov_vault_config_rejects_unset_target_core_pointer(
     switchboard_alpha,
     switchboard_bravo,

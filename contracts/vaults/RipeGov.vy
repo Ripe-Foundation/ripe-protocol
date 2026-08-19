@@ -204,13 +204,15 @@ def _depositTokensInRipeGovVault(
     assert not self.positionMigratedOut[_user][_asset] # dev: position migrated
     a: addys.Addys = addys._getAddys(_a)
 
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, a.missionControl)
+    assert config.lockTerms.maxLockDuration != 0 # dev: no lock terms
+
     # deposit tokens (using shares module)
     depositAmount: uint256 = 0
     newShares: uint256 = 0
     depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)
 
     # handle gov data/points
-    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, a.missionControl)
     lockDuration: uint256 = max(config.lockTerms.minLockDuration, _lockDuration)
     lockDuration = min(lockDuration, config.lockTerms.maxLockDuration)
     self._handleGovDataOnDeposit(_user, _asset, newShares, lockDuration, 0, config)
@@ -319,6 +321,12 @@ def _handleGovDataOnWithdrawal(
     _ledger: address,
 ) -> uint256:
     userData: GovData = self.userGovData[_user][_asset]
+    shouldUpdatePoints: bool = not self._isGovPointAccrualDisabled(_user)
+    newPoints: uint256 = 0
+    if shouldUpdatePoints:
+        # Courtesy may zero unlock on this touch. Accrue through this block with
+        # the pre-release unlock and the live terms/weight first.
+        newPoints = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
 
     # refresh unlock / terms
     userData.unlock = self._refreshUnlock(userData.unlock, _config.lockTerms, userData.lastTerms)
@@ -331,7 +339,7 @@ def _handleGovDataOnWithdrawal(
     # Disabled users forfeit no stored points on a partial exit. A complete
     # per-asset exit clears only the frozen points already recorded for that
     # asset; unsafe pending accrual is intentionally never calculated.
-    if self._isGovPointAccrualDisabled(_user):
+    if not shouldUpdatePoints:
         userData.lastShares = vaultData.userBalances[_user][_asset]
         userData.lastPointsUpdate = block.number
         if userData.lastShares == 0:
@@ -344,7 +352,6 @@ def _handleGovDataOnWithdrawal(
         self.userGovData[_user][_asset] = userData
         return 0
 
-    newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
     prevSavedPoints: uint256 = userData.govPoints
 
     # handle points penalty for withdrawal
@@ -386,6 +393,10 @@ def transferBalanceWithinVault(
 ) -> (uint256, bool):
     assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     a: addys.Addys = addys._getAddys(_a)
+
+    # Intentionally not gated on lock terms: AuctionHouse/CreditEngine forced
+    # transfers must stay live for liquidation and redemption. The recipient
+    # leg uses minLockDuration; a valid row may have minLockDuration == 0.
 
     # transfer tokens (using shares module)
     transferAmount: uint256 = 0
@@ -452,6 +463,7 @@ def transferContributorRipeTokens(
 
     # config
     config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(a.ripeToken, a.missionControl)
+    assert config.lockTerms.maxLockDuration != 0 # dev: no lock terms
 
     # transfer tokens (using shares module)
     ripeAmount: uint256 = 0
@@ -459,7 +471,8 @@ def transferContributorRipeTokens(
     na: bool = False
     ripeAmount, transferShares, na = sharesVault._transferBalanceWithinVault(a.ripeToken, _contributor, _toUser, max_value(uint256))
 
-    # handle gov data/points
+    # Confirmed Contributor duration is forwarded exactly. Do not clamp to the
+    # live min/max; a later maximum reduction must not rewrite the agreement.
     self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
@@ -789,9 +802,6 @@ def adjustLock(
     assert userData.lastTerms.maxLockDuration != 0 # dev: no lock terms
     assert userData.lastShares != 0 # dev: no position
 
-    # update lootbox points
-    self._updateDepositPoints(_user, _asset, a)
-
     # update lock duration
     lockDuration: uint256 = max(_newLockDuration, userData.lastTerms.minLockDuration)
     lockDuration = min(lockDuration, userData.lastTerms.maxLockDuration)
@@ -799,6 +809,9 @@ def adjustLock(
     assert newUnlockBlock > userData.unlock # dev: new lock cannot be earlier
     userData.unlock = newUnlockBlock
     self.userGovData[_user][_asset] = userData
+
+    # checkpoint lootbox after the new unlock is committed
+    self._updateDepositPoints(_user, _asset, a)
 
     log LockModified(user=_user, asset=_asset, newLockDuration=lockDuration)
 
@@ -1001,8 +1014,8 @@ def _getWeightedLockOnTokenDeposit(
 
     # previous lock duration
     prevDuration: uint256 = 1
-    if _prevUnlock > block.number and _lockTerms.maxLockDuration != 0:
-        prevDuration = min(_prevUnlock - block.number, _lockTerms.maxLockDuration)
+    if _prevUnlock > block.number:
+        prevDuration = _prevUnlock - block.number
 
     # not allowing zero on `newNormalized` or `newLockDuration` -- or else new deposit won't get any weight
     newNormalized: uint256 = 1
@@ -1013,26 +1026,6 @@ def _getWeightedLockOnTokenDeposit(
     # take weighted average, blending the unlock durations
     newWeightedDuration: uint256 = ((prevNormalized * prevDuration) + (newNormalized * newLockDuration)) // (prevNormalized + newNormalized)
     return block.number + newWeightedDuration
-
-
-# same terms
-
-
-@view
-@external
-def areKeyTermsSame(_newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> bool:
-    return self._areKeyTermsSame(_newTerms, _prevTerms)
-
-
-@view
-@internal
-def _areKeyTermsSame(_newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> bool:
-    return (
-        (not _prevTerms.canExit or _newTerms.canExit)
-        and _newTerms.maxLockBoost >= _prevTerms.maxLockBoost
-        and _newTerms.minLockDuration >= _prevTerms.minLockDuration
-        and _newTerms.exitFee <= _prevTerms.exitFee
-    )
 
 
 # refresh unlock
@@ -1047,8 +1040,21 @@ def refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.
 @view
 @internal
 def _refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> uint256:
-    return (
-        min(_prevUnlock, block.number + _newTerms.maxLockDuration)
-        if self._areKeyTermsSame(_newTerms, _prevTerms)
-        else 0
-    )
+    # Courtesy zero when any live term is worse: canExit lost, fee up while
+    # exit was already on, boost down, minLockDuration up, or maxLockDuration
+    # up. Any adverse change wins even if another term improves.
+    # False/0 -> True/fee enables an optional paid exit; that is not a courtesy.
+    # Lazy: only a later touch while the worse config is still live persists
+    # unlock=0. Restoring the old terms first removes the opportunity.
+    # Once recorded, restoring the previous config does not restore the lock.
+    # A later lock-forming action may establish a new lock.
+    # This does not override Teller pause or shouldFreezeWhenBadDebt.
+    if (
+        (_prevTerms.canExit and not _newTerms.canExit)
+        or (_prevTerms.canExit and _newTerms.exitFee > _prevTerms.exitFee)
+        or _newTerms.maxLockBoost < _prevTerms.maxLockBoost
+        or _newTerms.minLockDuration > _prevTerms.minLockDuration
+        or _newTerms.maxLockDuration > _prevTerms.maxLockDuration
+    ):
+        return 0
+    return _prevUnlock

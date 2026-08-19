@@ -237,6 +237,38 @@ def _with_boardroom(vault, recorder):
     return vault.getAddys()._replace(boardroom=recorder.address)
 
 
+def _lock_terms_tuple(terms):
+    return (
+        terms.minLockDuration,
+        terms.maxLockDuration,
+        terms.maxLockBoost,
+        terms.canExit,
+        terms.exitFee,
+    )
+
+
+def _gov_asset_state(vault, user, asset):
+    data = vault.userGovData(user, asset)
+    return (
+        data.govPoints,
+        data.lastShares,
+        data.lastPointsUpdate,
+        data.unlock,
+        _lock_terms_tuple(data.lastTerms),
+    )
+
+
+def _pending_gov_points(vault, user, asset, weight=ASSET_WEIGHT):
+    data = vault.userGovData(user, asset)
+    return vault.getLatestGovPoints(
+        data.lastShares,
+        data.lastPointsUpdate,
+        data.unlock,
+        _lock_terms_tuple(data.lastTerms),
+        weight,
+    )
+
+
 def _assert_contributor_transfer_case(
     *,
     ripe_gov_vault,
@@ -722,6 +754,208 @@ def test_global_point_freeze_stops_updates_for_every_user_without_zeroing(
     assert ripe_gov_vault.totalGovPoints() == total_points
     assert ripe_gov_vault.userGovData(bob, ripe_token).lastPointsUpdate == boa.env.evm.patch.block_number
     assert ripe_gov_vault.userGovData(alice, ripe_token).lastPointsUpdate == boa.env.evm.patch.block_number
+
+
+def test_user_disable_is_no_update_cutoff_across_two_assets(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+):
+    for asset in (ripe_token, alpha_token):
+        _configure_ripe_gov_asset(
+            mission_control,
+            setAssetConfig,
+            switchboard_alpha,
+            asset,
+            [SOURCE_VAULT_ID],
+        )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        80 * EIGHTEEN_DECIMALS,
+        teller,
+        400,
+        switchboard_alpha,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        40 * EIGHTEEN_DECIMALS,
+        teller,
+        400,
+        switchboard_alpha,
+    )
+    boa.env.time_travel(blocks=20)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints > 0
+    assert ripe_gov_vault.userGovData(bob, alpha_token).govPoints > 0
+
+    boa.env.time_travel(blocks=15)
+    before = {
+        asset: _gov_asset_state(ripe_gov_vault, bob, asset)
+        for asset in (ripe_token, alpha_token)
+    }
+    pending = {
+        asset: _pending_gov_points(ripe_gov_vault, bob, asset)
+        for asset in (ripe_token, alpha_token)
+    }
+    assert pending[ripe_token] > 0
+    assert pending[alpha_token] > 0
+    user_total = ripe_gov_vault.totalUserGovPoints(bob)
+    global_total = ripe_gov_vault.totalGovPoints()
+
+    ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
+    logs = filter_logs(ripe_gov_vault, "GovPointAccrualDisabledForUser")
+    disabled_block = ripe_gov_vault.userGovPointAccrualDisabledBlock(bob)
+    assert disabled_block == boa.env.evm.patch.block_number
+    assert len(logs) == 1
+    assert logs[0].user == bob
+    assert logs[0].disabledBlock == disabled_block
+    assert logs[0].caller == switchboard_echo.address
+
+    for asset in (ripe_token, alpha_token):
+        assert _gov_asset_state(ripe_gov_vault, bob, asset) == before[asset]
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == global_total
+
+    boa.env.time_travel(blocks=30)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    for asset in (ripe_token, alpha_token):
+        after = _gov_asset_state(ripe_gov_vault, bob, asset)
+        assert after[0] == before[asset][0]
+        assert after[1] == before[asset][1]
+        assert after[3] == before[asset][3]
+        assert after[4] == before[asset][4]
+        assert after[2] == boa.env.evm.patch.block_number
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == global_total
+
+
+def test_user_disable_succeeds_when_aggregate_point_totals_are_saturated(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+):
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        teller,
+        500,
+        switchboard_alpha,
+    )
+    boa.env.time_travel(blocks=25)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    stored = _gov_asset_state(ripe_gov_vault, bob, ripe_token)
+    assert stored[0] > 0
+    user_total = ripe_gov_vault.totalUserGovPoints(bob)
+
+    boa.env.time_travel(blocks=10)
+    assert _pending_gov_points(ripe_gov_vault, bob, ripe_token) > 0
+    before = _gov_asset_state(ripe_gov_vault, bob, ripe_token)
+    ripe_gov_vault.eval(f"self.totalGovPoints = {MAX_UINT256}")
+    assert ripe_gov_vault.totalGovPoints() == MAX_UINT256
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+
+    with boa.reverts():
+        ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == MAX_UINT256
+
+    ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
+    logs = filter_logs(ripe_gov_vault, "GovPointAccrualDisabledForUser")
+    assert ripe_gov_vault.userGovPointAccrualDisabledBlock(bob) == boa.env.evm.patch.block_number
+    assert len(logs) == 1
+    assert logs[0].user == bob
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == MAX_UINT256
+
+
+def test_echo_user_disable_is_no_update_cutoff_with_pending_accrual(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    governance,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+):
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        75 * EIGHTEEN_DECIMALS,
+        teller,
+        400,
+        switchboard_alpha,
+    )
+    boa.env.time_travel(blocks=20)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints > 0
+
+    action_id = switchboard_echo.disableRipeGovPointAccrualForUser(
+        SOURCE_VAULT_ID,
+        bob,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_echo.actionTimeLock())
+    assert _pending_gov_points(ripe_gov_vault, bob, ripe_token) > 0
+    before = _gov_asset_state(ripe_gov_vault, bob, ripe_token)
+    user_total = ripe_gov_vault.totalUserGovPoints(bob)
+    global_total = ripe_gov_vault.totalGovPoints()
+
+    assert switchboard_echo.executePendingAction(action_id, sender=governance.address)
+    echo_logs = filter_logs(switchboard_echo, "RipeGovPointAccrualUserDisableExecuted")
+    disabled_block = ripe_gov_vault.userGovPointAccrualDisabledBlock(bob)
+    assert disabled_block == boa.env.evm.patch.block_number
+    assert len(echo_logs) == 1
+    assert echo_logs[0].user == bob
+    assert echo_logs[0].vaultId == SOURCE_VAULT_ID
+    assert echo_logs[0].vaultAddr == ripe_gov_vault.address
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == global_total
 
 
 def test_disabled_partial_withdrawal_preserves_points_and_full_exit_clears_them(
@@ -1504,8 +1738,16 @@ def test_direct_import_rejects_partially_nonempty_target_position(
     teller,
     switchboard_alpha,
     mission_control,
+    setAssetConfig,
 ):
     target, target_id = target_ripe_gov_vault
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID, target_id],
+    )
     _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     existing = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, existing, teller)
@@ -1540,8 +1782,16 @@ def test_direct_import_rejects_position_already_migrated_out(
     teller,
     switchboard_alpha,
     mission_control,
+    setAssetConfig,
 ):
     target, target_id = target_ripe_gov_vault
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID, target_id],
+    )
     _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     amount = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, amount, teller)
@@ -3469,13 +3719,84 @@ def test_gov_transfer_to_a_different_user_still_moves_shares(
     assert ripe_gov_vault.userBalances(bob, ripe_token) < bob_shares_before
 
 
+@pytest.mark.parametrize(
+    "caller_name",
+    ("auction_house", "credit_engine"),
+    ids=("auction_house", "credit_engine"),
+)
+def test_forced_transfer_remains_live_without_lock_terms(
+    caller_name,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    credit_engine,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """F11 / M-12: forced transfers stay live with no lock-terms guard.
+
+    Direct MissionControl `(0, 0)` setup is test-only legacy-state modeling.
+    F10 rejects zero maximum duration through the canonical SwitchboardAlpha route.
+    """
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    _direct_deposit(ripe_gov_vault, ripe_token, whale, bob, amount, teller)
+    assert ripe_gov_vault.userBalances(alice, ripe_token) == 0
+
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        ASSET_WEIGHT,
+        False,
+        (0, 0, 0, False, 0),
+        sender=switchboard_alpha.address,
+    )
+
+    sender_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    recipient_shares_before = ripe_gov_vault.userBalances(alice, ripe_token)
+    total_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
+    transfer_amount = amount // 2
+    caller = auction_house if caller_name == "auction_house" else credit_engine
+
+    transferred, depleted = ripe_gov_vault.transferBalanceWithinVault(
+        ripe_token,
+        bob,
+        alice,
+        transfer_amount,
+        sender=caller.address,
+    )
+    assert transferred == transfer_amount
+    assert not depleted
+
+    sender_shares_after = ripe_gov_vault.userBalances(bob, ripe_token)
+    recipient_shares_after = ripe_gov_vault.userBalances(alice, ripe_token)
+    sender_delta = sender_shares_after - sender_shares_before
+    recipient_delta = recipient_shares_after - recipient_shares_before
+    assert sender_delta == -recipient_delta
+    assert recipient_delta > 0
+    assert ripe_gov_vault.totalBalances(ripe_token) == total_before
+    assert ripe_token.balanceOf(ripe_gov_vault) == custody_before
+    assert ripe_gov_vault.userGovData(alice, ripe_token).unlock == boa.env.evm.patch.block_number
+    assert ripe_gov_vault.userGovData(alice, ripe_token).lastTerms.maxLockDuration == 0
+
+
 # --------------------------------------------------------------------------
-# Contributor transfers retain their separately governed lock term
+# Contributor transfers honor the stored duration exactly while terms exist
 # --------------------------------------------------------------------------
 
 
 CONTRIBUTOR_DURATIONS = (
-    ("zero", 0),
     ("one", 1),
     ("below_general_min", LOCK_TERMS[0] - 1),
     ("at_min", LOCK_TERMS[0]),
@@ -3502,7 +3823,7 @@ def test_contributor_transfer_honors_configured_duration_on_fresh_recipient(
     setAssetConfig,
     switchboard_alpha,
 ):
-    """The contributor's block-based term is distinct from general deposit bounds."""
+    """HR duration is installed exactly, including below min and above live max."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3537,7 +3858,7 @@ def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_loc
     switchboard_alpha,
     switchboard_bravo,
 ):
-    """An existing recipient lock is blended, not substituted for the HR term."""
+    """An existing recipient lock is blended with the raw HR term, not a clamp."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3577,6 +3898,14 @@ def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_loc
         recipient_shares,
         unlock_before,
     )
+    clamped_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        LOCK_TERMS[0],
+        LOCK_TERMS,
+        recipient_shares,
+        unlock_before,
+    )
+    assert expected_unlock != clamped_unlock
 
     ripe_gov_vault.transferContributorRipeTokens(
         sally, bob, contributor_duration, sender=human_resources.address
@@ -3585,6 +3914,109 @@ def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_loc
     assert unlock_after == expected_unlock
     assert unlock_after < unlock_before
     assert ripe_gov_vault.userBalances(sally, ripe_token) == 0
+
+
+def test_contributor_transfer_uses_above_max_duration_in_weighted_recipient_lock(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+    switchboard_bravo,
+):
+    """A later live-max reduction is modeled by forwarding a duration above max."""
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+
+    contributor_duration = LOCK_TERMS[1] * 10
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        10 * EIGHTEEN_DECIMALS,
+        teller,
+        lock_duration=LOCK_TERMS[1],
+        switchboard=switchboard_bravo,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        sally,
+        1_000 * EIGHTEEN_DECIMALS,
+        teller,
+    )
+
+    recipient_shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    contributor_shares = ripe_gov_vault.userBalances(sally, ripe_token)
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        contributor_duration,
+        LOCK_TERMS,
+        recipient_shares,
+        unlock_before,
+    )
+    clamped_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        LOCK_TERMS[1],
+        LOCK_TERMS,
+        recipient_shares,
+        unlock_before,
+    )
+    assert expected_unlock != clamped_unlock
+
+    ripe_gov_vault.transferContributorRipeTokens(
+        sally, bob, contributor_duration, sender=human_resources.address
+    )
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == expected_unlock
+
+
+def test_contributor_transfer_reverts_without_lock_terms(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    _direct_deposit(
+        ripe_gov_vault, ripe_token, whale, sally, 100 * EIGHTEEN_DECIMALS, teller
+    )
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+        lock_terms=(0, 0, 0, False, 0),
+    )
+    with boa.reverts("no lock terms"):
+        ripe_gov_vault.transferContributorRipeTokens(
+            sally, bob, 50, sender=human_resources.address
+        )
 
 
 # --------------------------------------------------------------------------

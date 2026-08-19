@@ -1464,7 +1464,7 @@ def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: 
     if _assetWeight > 500_00: # max 500%
         return False
 
-    if _lockTerms.minLockDuration > _lockTerms.maxLockDuration:
+    if _lockTerms.maxLockDuration == 0 or _lockTerms.minLockDuration > _lockTerms.maxLockDuration:
         return False
 
     if _lockTerms.maxLockBoost > 1000_00: # max 1000%

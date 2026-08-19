@@ -21,6 +21,12 @@ It also does not, by itself, authorize production-contract edits. The owner’s 
 > confirmation delay—must honor that stored term and the normal weighted-lock
 > calculation. Sections 8.2, 9.3, and the completion criteria below incorporate this
 > controlling decision; older expected-red/evidence descriptions are historical.
+>
+> **Owner refinement — 2026-08-19 (F-07).** Transfer-time clamping remains
+> rejected. Initiation and confirmation now require
+> `0 < depositLockDuration <= live RipeGov maxLockDuration`. Below-minimum
+> durations are allowed. After confirmation, later min/max changes do not
+> amend the stored term.
 
 ## 2. Bound baseline and startup gate
 
@@ -546,6 +552,12 @@ When contributor shares move into the owner's RipeGov position:
   transfer confirmation gates; and
 - keep ordinary paycheck deposits through Teller subject to normal RipeGov deposit
   bounds while the position remains owned by the Contributor contract.
+
+**Creation rule (2026-08-19).** `HumanResources` initiation and confirmation
+require `0 < depositLockDuration <= live RipeGov maxLockDuration`. The duration
+may be below the live general minimum. A pending Contributor whose duration
+exceeds a later-reduced live maximum is cancelled at confirmation. Confirmed
+terms are not rewritten by later min/max changes.
 
 ### 9.4 Pause semantics
 
