@@ -611,14 +611,19 @@ def test_erc4626_governance_blacklist_burn_bypasses_exit_controls(
 
     savings_green.pause(True, sender=governance.address)
     remaining = savings_green.balanceOf(bob)
-    assert savings_green.burnBlacklistTokens(
-        bob,
-        remaining + 1,
-        sender=governance.address,
-    )
-    assert savings_green.balanceOf(bob) == 0
-    assert savings_green.totalSupply() == 0
+    with boa.reverts("cannot strand vault assets"):
+        savings_green.burnBlacklistTokens(
+            bob,
+            remaining + 1,
+            sender=governance.address,
+        )
+    assert savings_green.balanceOf(bob) == remaining
+    assert savings_green.totalSupply() == remaining
     assert savings_green.totalAssets() == deposit_amount
+
+    savings_green.pause(False, sender=governance.address)
+    savings_green.setBlacklist(bob, False, sender=switchboard.address)
+    assert savings_green.redeem(remaining, bob, bob, sender=bob) == deposit_amount
 
 
 def test_erc4626_max_views_report_pause_blacklist_and_conversion_limits(

@@ -282,9 +282,8 @@ def test_green_token_pause_functionality(green_token, whale, bob, governance):
     
     with boa.reverts("token paused"):
         green_token.increaseAllowance(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
-    
-    with boa.reverts("token paused"):
-        green_token.decreaseAllowance(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
+
+    assert green_token.decreaseAllowance(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
     
     with boa.reverts("token paused"):
         green_token.burn(100 * EIGHTEEN_DECIMALS, sender=whale)
