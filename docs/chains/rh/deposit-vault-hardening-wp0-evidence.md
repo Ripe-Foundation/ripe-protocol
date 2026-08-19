@@ -428,6 +428,9 @@ The reduction is not free, and the owner must weigh it:
 - **This was one candidate reduction, not an exhaustive search.** Other
   non-ABI-breaking reductions may exist and were not looked for.
 
+**Disposition (2026-08-19):** `areKeyTermsSame` was removed by owner decision as
+an intentional ABI change; other wrapper decisions are unchanged.
+
 **E-3 — any production edit also breaks frozen-artifact gates the plan does not
 list.** `config/contract-artifact-expectations.json` freezes source SHA-256,
 canonical ABI hash, storage layout, runtime-template size/hash, and creation

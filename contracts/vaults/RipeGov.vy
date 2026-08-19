@@ -1028,26 +1028,6 @@ def _getWeightedLockOnTokenDeposit(
     return block.number + newWeightedDuration
 
 
-# legacy directional terms classifier; not the courtesy predicate
-
-
-@view
-@external
-def areKeyTermsSame(_newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> bool:
-    return self._areKeyTermsSame(_newTerms, _prevTerms)
-
-
-@view
-@internal
-def _areKeyTermsSame(_newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> bool:
-    return (
-        (not _prevTerms.canExit or _newTerms.canExit)
-        and _newTerms.maxLockBoost >= _prevTerms.maxLockBoost
-        and _newTerms.minLockDuration >= _prevTerms.minLockDuration
-        and _newTerms.exitFee <= _prevTerms.exitFee
-    )
-
-
 # refresh unlock
 
 
