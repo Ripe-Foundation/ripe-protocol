@@ -6,7 +6,8 @@ Revised: 2026-08-18 (rev 2 — rescoped, H-2 corrected, invariant corrected;
 rev 3 — added H-3, post-deposit authority fields;
 rev 4 — added H-4 custody exposure;
 rev 5 — H-3 Relay resolution retracted, H-4 ceiling corrected to receivable;
-rev 6 — bound effective Relay attribution, added live cross-layer privilege graph)
+rev 6 — bound effective Relay attribution, added live cross-layer privilege graph;
+rev 7 — added M-3, token-level denylist for the Across GREEN/RIPE footgun)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -195,6 +196,77 @@ Relay must therefore be integrated **strictly as a liquidity/inventory lane
 with zero RipeHq authorization**. No new `hqConfig` entry, no new
 `canMintGreen`/`canMintRipe` department. Any proposal that routes the fast lane
 through `GreenToken.mint` should be rejected on this basis alone.
+
+### M-3 — Rejecting GREEN/RIPE at Ripe's boundary does not prevent the deposit
+
+**Severity: Medium (user funds, no attacker profit). Mitigation available and
+unilateral; not yet specified anywhere. Added rev 7.**
+
+`across-settlement-evaluation.md` establishes that `SpokePool._depositV3`
+performs no input-token allowlist check, that route enablement is dead code
+(`SpokePool.sol:92`), and that `deposit(GREEN, ...)` therefore **succeeds
+on-chain** and is then unrecoverable absent Across admin action. The synthesis
+answers this with fail-closed allowlists at the API and client boundaries.
+
+Those controls are correct and necessary, but they are **path-scoped**: they
+govern transactions Ripe's own frontend constructs. They do not govern Across's
+own app, third-party aggregators, or a direct `eth_sendTransaction` to the
+SpokePool. Those paths are live today and reach the same footgun.
+
+The reason this matters more than its likelihood suggests is that the failure is
+**indistinguishable from a correct transaction at signing time**: a genuine,
+verified Across SpokePool, a real function, the user's own address as recipient.
+Every heuristic a careful user applies returns "safe". User vigilance is
+therefore not an available control, which makes a phishing page presenting
+itself as a Ripe fast lane an unusually well-disguised griefing vector — the
+attacker does not extract the funds, but GREEN is what looks broken.
+
+**Ripe already owns a control that covers every path.** GREEN and RIPE both
+initialize `Erc20Token` (`contracts/tokens/GreenToken.vy:38`,
+`contracts/tokens/RipeToken.vy:38`), which carries a recipient-side denylist:
+
+- `_transfer` asserts `not self.blacklisted[_recipient]`
+  (`contracts/tokens/modules/Erc20Token.vy:208`);
+- `transferFrom` additionally asserts `not self.blacklisted[msg.sender]`
+  (`:195`), and the SpokePool *is* `msg.sender` for its own
+  `safeTransferFrom` pull.
+
+Blacklisting the SpokePool address therefore makes `deposit(GREEN, ...)` revert
+at the token, converting a silent stranding into a clean on-chain failure —
+with no Across governance dependency and no change to any Ripe contract.
+
+**Blacklisting the terminal sink is sufficient; peripheries need not be
+enumerated.** Every deposit path, however many hops precede it, must ultimately
+land GREEN in the SpokePool. A periphery contract's own inbound leg succeeds and
+its onward transfer to the SpokePool trips the recipient check, so the composite
+call still reverts. This is the property that makes the control tractable.
+
+Three constraints govern how it should be used:
+
+1. **It is a denylist and fails open.** An Across SpokePool on a chain nobody
+   listed is not covered. This is a complement to the client-side allowlist,
+   which is fail-closed by construction, not a replacement for it. The reason to
+   hold both is that they cover disjoint paths, not that either is redundant.
+2. **It blocks the exit as well as the entrance** (`:207`, sender side). Applied
+   *before* any GREEN reaches the SpokePool it is purely preventive. Applied
+   *after*, it converts "stranded pending Across DAO action" into "stranded
+   permanently", recoverable only by governance burn and re-mint. Ordering is
+   the whole difference; this should be a launch-time action, not an incident
+   response.
+3. **It confers a new governance power over a third party's balance.**
+   `burnBlacklistTokens` (`:415`) is gated on `msg.sender == governance()` — a
+   stricter gate than `setBlacklist`'s delegated `canSetTokenBlacklist` (`:405`),
+   so the blacklist-setter cannot burn and the privilege split is sound. But any
+   GREEN already at a blacklisted SpokePool becomes governance-burnable. For
+   stranded funds that is arguably the desired remedy; it should still be an
+   explicit decision rather than a side effect.
+
+**Recommendation.** Blacklist the Across SpokePool address on every chain where
+GREEN or RIPE is deployed, as a pre-launch action, and add newly onboarded
+chains to the same list. Do not blacklist the CCIP token pool — that is the one
+approved route, and an operational error here breaks it. Record the denylist as
+a standing obligation with an owner, since its fail-open direction means it
+decays silently as Across deploys new chains.
 
 ### H-3 — Provider deposit authority must resolve to the connected wallet
 
