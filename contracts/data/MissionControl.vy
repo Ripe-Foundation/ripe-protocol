@@ -37,10 +37,6 @@ interface Vault:
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
 
-interface PriceDesk:
-    def isValidRegId(_regId: uint256) -> bool: view
-    def getAddr(_regId: uint256) -> address: view
-
 struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
     voterPointsAllocTotal: uint256
@@ -558,23 +554,7 @@ def setUnderscoreRegistry(_underscoreRegistry: address):
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.priorityPriceSourceIds = self._sanitizePriorityPriceSourceIds(_priorityIds)
-
-
-@internal
-def _sanitizePriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
-    sanitizedIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
-    priceDesk: address = addys._getPriceDeskAddr()
-    for pid: uint256 in _priorityIds:
-        if not staticcall PriceDesk(priceDesk).isValidRegId(pid):
-            continue
-        if staticcall PriceDesk(priceDesk).getAddr(pid) == empty(address):
-            continue
-        if pid in sanitizedIds:
-            continue
-        sanitizedIds.append(pid)
-    assert len(sanitizedIds) != 0 # dev: invalid priority price source ids
-    return sanitizedIds
+    self.priorityPriceSourceIds = _priorityIds
 
 
 # should check last touch

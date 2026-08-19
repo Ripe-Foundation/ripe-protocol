@@ -1,6 +1,7 @@
 import boa
 
 from config.BluePrint import PARAMS
+from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
@@ -83,18 +84,47 @@ def test_defaults_base_id9_does_not_win_ahead_of_id4(
 def test_mission_control_sanitizes_duplicates_and_invalid_ids(
     mission_control,
     switchboard_alpha,
+    alice,
 ):
     with boa.env.anchor():
+        raw_ids = [1, 1, 2, 99, 2]
         mission_control.setPriorityPriceSourceIds(
-            [1, 1, 2, 99, 2],
+            raw_ids,
             sender=switchboard_alpha.address,
         )
-        assert list(mission_control.getPriorityPriceSourceIds()) == [1, 2]
-        with boa.reverts("invalid priority price source ids"):
+        assert list(mission_control.getPriorityPriceSourceIds()) == raw_ids
+
+        mission_control.setPriorityPriceSourceIds(
+            [],
+            sender=switchboard_alpha.address,
+        )
+        assert list(mission_control.getPriorityPriceSourceIds()) == []
+
+        with boa.reverts("no perms"):
             mission_control.setPriorityPriceSourceIds(
-                [99, 98],
-                sender=switchboard_alpha.address,
+                [1],
+                sender=alice,
             )
+
+
+def test_switchboard_writes_valid_priority_list(
+    switchboard_alpha,
+    mission_control,
+    governance,
+):
+    with boa.env.anchor():
+        valid_ids = [1, 8, 2, 4, 5]
+        action_id = switchboard_alpha.setPriorityPriceSourceIds(
+            valid_ids,
+            sender=governance.address,
+        )
+        pending = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert pending[0].numPriorityPriceSourceIds == 5
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+        assert list(mission_control.getPriorityPriceSourceIds()) == valid_ids
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 5
 
 
 def test_switchboard_write_then_id_disabled_after_propose(
@@ -104,10 +134,15 @@ def test_switchboard_write_then_id_disabled_after_propose(
     governance,
 ):
     with boa.env.anchor():
-        action_id = switchboard_alpha.setPriorityPriceSourceIds(
+        mixed_action = switchboard_alpha.setPriorityPriceSourceIds(
             [1, 6],
             sender=governance.address,
         )
+        only_disabled = switchboard_alpha.setPriorityPriceSourceIds(
+            [6],
+            sender=governance.address,
+        )
+
         assert price_desk.startAddressDisableInRegistry(6, sender=governance.address)
         boa.env.time_travel(
             blocks=max(
@@ -118,16 +153,24 @@ def test_switchboard_write_then_id_disabled_after_propose(
         )
         assert price_desk.confirmAddressDisableInRegistry(6, sender=governance.address)
         assert price_desk.getAddr(6) == boa.eval("empty(address)")
-        assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
-        assert list(mission_control.getPriorityPriceSourceIds()) == [1]
 
-        only_disabled = switchboard_alpha.setPriorityPriceSourceIds(
-            [6],
+        assert switchboard_alpha.executePendingAction(
+            mixed_action,
             sender=governance.address,
         )
-        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert list(mission_control.getPriorityPriceSourceIds()) == [1]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert len(modified) == 1
+        assert modified[0].numIds == 1
+
+        after_mixed = list(mission_control.getPriorityPriceSourceIds())
         with boa.reverts("invalid priority price source ids"):
-            switchboard_alpha.executePendingAction(only_disabled, sender=governance.address)
+            switchboard_alpha.executePendingAction(
+                only_disabled,
+                sender=governance.address,
+            )
+        assert switchboard_alpha.hasPendingAction(only_disabled)
+        assert list(mission_control.getPriorityPriceSourceIds()) == after_mixed
 
 
 MOCK_HQ = """
@@ -157,6 +200,7 @@ def test_replacement_mission_control_uses_own_price_desk(
     defaults,
     switchboard,
     switchboard_alpha,
+    mission_control,
     price_desk,
     governance,
     fork,
@@ -191,13 +235,47 @@ def test_replacement_mission_control_uses_own_price_desk(
         defaults,
         name="replacement_mc_priority",
     )
-    replacement.setPriorityPriceSourceIds(
-        [1, 1, 2, 99],
-        sender=switchboard_alpha.address,
-    )
-    assert list(replacement.getPriorityPriceSourceIds()) == [1]
-    with boa.reverts("invalid priority price source ids"):
-        replacement.setPriorityPriceSourceIds(
-            [2, 99],
-            sender=switchboard_alpha.address,
+    assert replacement.getRipeHq() == mock_hq.address
+    assert price_desk.isValidRegId(1)
+    default_ids = list(mission_control.getPriorityPriceSourceIds())
+
+    with boa.env.anchor():
+        write_action = switchboard_alpha.setPriorityPriceSourceIds(
+            [1, 1, 2, 99],
+            replacement.address,
+            sender=governance.address,
         )
+        pending = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert pending[0].numPriorityPriceSourceIds == 4
+
+        revalidate_action = switchboard_alpha.setPriorityPriceSourceIds(
+            [1],
+            replacement.address,
+            sender=governance.address,
+        )
+
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(
+            write_action,
+            sender=governance.address,
+        )
+        assert list(replacement.getPriorityPriceSourceIds()) == [1]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 1
+        assert list(mission_control.getPriorityPriceSourceIds()) == default_ids
+
+        assert own_desk.startAddressDisableInRegistry(1, sender=governance.address)
+        if own_desk.registryChangeTimeLock() != 0:
+            boa.env.time_travel(blocks=own_desk.registryChangeTimeLock() + 1)
+        assert own_desk.confirmAddressDisableInRegistry(1, sender=governance.address)
+        assert own_desk.getAddr(1) == boa.eval("empty(address)")
+        assert price_desk.getAddr(1) != boa.eval("empty(address)")
+
+        before_fail = list(replacement.getPriorityPriceSourceIds())
+        with boa.reverts("invalid priority price source ids"):
+            switchboard_alpha.executePendingAction(
+                revalidate_action,
+                sender=governance.address,
+            )
+        assert switchboard_alpha.hasPendingAction(revalidate_action)
+        assert list(replacement.getPriorityPriceSourceIds()) == before_fail

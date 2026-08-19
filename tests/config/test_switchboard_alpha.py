@@ -994,28 +994,38 @@ def test_invalid_priority_vaults(switchboard_alpha, governance):
         switchboard_alpha.setPriorityLiqAssetVaults(invalid_vaults, sender=governance.address)
 
 
-def test_priority_price_source_ids_filtered(switchboard_alpha, governance):
-    # Test with invalid price source IDs (will be filtered)
-    ids = [999, 998, 997]  # Use obviously invalid IDs that should be filtered out
-    # This should revert since all IDs will be filtered out, resulting in empty list
-    with boa.reverts("invalid priority sources"):
-        switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
-    
-    # Test with duplicate invalid IDs
-    duplicate_ids = [999, 999, 998, 998, 997, 997]
-    with boa.reverts("invalid priority sources"):
-        switchboard_alpha.setPriorityPriceSourceIds(duplicate_ids, sender=governance.address)
-    
-    # Test with mix of valid and invalid IDs (1 and 2 are valid in test env)
-    mixed_ids = [1, 2, 999, 998, 1, 2]  # Contains duplicates
-    # This should succeed because it has valid IDs (1 and 2)
-    action_id = switchboard_alpha.setPriorityPriceSourceIds(mixed_ids, sender=governance.address)
-    assert action_id > 0
-    
-    # Check that only valid, deduplicated IDs were stored
-    logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
-    assert len(logs) == 1
-    assert logs[0].numPriorityPriceSourceIds == 2  # Only IDs 1 and 2 should be valid
+def test_priority_price_source_ids_filtered(switchboard_alpha, mission_control, governance):
+    # EIP-170 fallback: nonempty proposals are stored raw; sanitation is at execution.
+    with boa.env.anchor():
+        ids = [999, 998, 997]
+        invalid_action = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
+        assert invalid_action > 0
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 3
+
+        duplicate_ids = [999, 999, 998, 998, 997, 997]
+        action_id = switchboard_alpha.setPriorityPriceSourceIds(duplicate_ids, sender=governance.address)
+        assert action_id > 0
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert logs[0].numPriorityPriceSourceIds == 6
+
+        mixed_ids = [1, 2, 999, 998, 1, 2]
+        mixed_action = switchboard_alpha.setPriorityPriceSourceIds(mixed_ids, sender=governance.address)
+        assert mixed_action > 0
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 6
+
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(mixed_action, sender=governance.address)
+        assert list(mission_control.getPriorityPriceSourceIds()) == [1, 2]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 2
+
+        with boa.reverts("invalid priority price source ids"):
+            switchboard_alpha.executePendingAction(invalid_action, sender=governance.address)
+        assert switchboard_alpha.hasPendingAction(invalid_action)
 
 
 def test_invalid_priority_sources(switchboard_alpha, governance):
@@ -1275,20 +1285,25 @@ def test_validate_priority_vaults_deduplication(switchboard_alpha, governance, a
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 
 
-def test_sanitize_priority_sources_deduplication(switchboard_alpha, governance):
+def test_sanitize_priority_sources_deduplication(switchboard_alpha, mission_control, governance):
     """Test the deduplication logic in _sanitizePrioritySources"""
     
     # Test with duplicate price source IDs (1 and 2 are valid)
     ids = [1, 1, 2, 2, 1, 99]  # Contains duplicates, 99 is invalid
     
-    # This should succeed with valid IDs 1 and 2 (deduplicated)
-    action_id = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
-    assert action_id > 0
-    
-    # Check deduplication worked
-    logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
-    assert len(logs) == 1
-    assert logs[0].numPriorityPriceSourceIds == 2  # Only unique valid IDs 1 and 2
+    with boa.env.anchor():
+        action_id = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
+        assert action_id > 0
+
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 6
+
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+        assert list(mission_control.getPriorityPriceSourceIds()) == [1, 2]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 2
 
 
 def test_auction_params_boundary_conditions(switchboard_alpha, mission_control, governance):
@@ -1698,20 +1713,25 @@ def test_priority_vault_deduplication_complex(switchboard_alpha, governance, alp
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 
 
-def test_priority_price_sources_maximum_array(switchboard_alpha, governance):
+def test_priority_price_sources_maximum_array(switchboard_alpha, mission_control, governance):
     """Test priority price sources with maximum allowed array size"""
     # MAX_PRIORITY_PRICE_SOURCES is 10
     # Mix of valid (1, 2) and invalid IDs
     max_sources = [1, 2] + list(range(100, 108))
     
-    # This should succeed with the valid IDs
-    action_id = switchboard_alpha.setPriorityPriceSourceIds(max_sources, sender=governance.address)
-    assert action_id > 0
-    
-    # Should only have the valid IDs
-    logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
-    assert len(logs) == 1
-    assert logs[0].numPriorityPriceSourceIds == 2  # Only IDs 1 and 2 are valid
+    with boa.env.anchor():
+        action_id = switchboard_alpha.setPriorityPriceSourceIds(max_sources, sender=governance.address)
+        assert action_id > 0
+
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 10
+
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+        assert list(mission_control.getPriorityPriceSourceIds()) == [1, 2]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 2
 
 
 def test_action_expiration_boundary_conditions(switchboard_alpha, governance):

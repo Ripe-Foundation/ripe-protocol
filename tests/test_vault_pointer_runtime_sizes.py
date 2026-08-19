@@ -12,8 +12,8 @@ EIP170_LIMIT = 24_576
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16682,
-    "SwitchboardAlpha": 24521,
+    "MissionControl": 16143,
+    "SwitchboardAlpha": 24556,
     "SwitchboardBravo": 24364,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23192,
