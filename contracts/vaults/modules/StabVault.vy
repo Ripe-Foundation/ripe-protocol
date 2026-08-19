@@ -1036,9 +1036,9 @@ def _redeemFromStabilityPool(
 
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
 
-        redeem_numerator: uint256 = claimAmount * maxRedeemValue
-        redeemAmount: uint256 = redeem_numerator // maxClaimableAmount
-        if redeem_numerator % maxClaimableAmount != 0:
+        redeemNumerator: uint256 = claimAmount * maxRedeemValue
+        redeemAmount: uint256 = redeemNumerator // maxClaimableAmount
+        if redeemNumerator % maxClaimableAmount != 0:
             redeemAmount += 1
         redeemAmount = min(redeemAmount, remainingRedeemValue)
 
