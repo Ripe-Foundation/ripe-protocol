@@ -81,9 +81,6 @@ interface VaultRegistry:
 interface AddressRegistry:
     def getAddr(_regId: uint256) -> address: view
 
-interface TokenBlacklist:
-    def blacklisted(_addr: address) -> bool: view
-
 interface RipeHq:
     def governance() -> address: view
 
@@ -1229,7 +1226,6 @@ def _handleGreenForUser(
 
         sgreenRecipient: address = _recipient
         if _shouldEnterStabPool:
-            assert not staticcall TokenBlacklist(_a.savingsGreen).blacklisted(_recipient) # dev: blacklisted
             sgreenRecipient = self
 
         # put GREEN into sGREEN

@@ -1,10 +1,10 @@
-"""Group 3 fixes 1 and 2: post-accrual global cap and sGREEN stab blacklist."""
+"""Group 3 fix 1: post-accrual global cap. Stab-enter sGREEN blacklist is not in CreditEngine."""
 
 import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ONE_YEAR
-from conf_utils import clear_transient_storage, filter_logs, has_dev_reason
+from conf_utils import clear_transient_storage, has_dev_reason
 
 
 WRAP_CUTOFF = 10**9
@@ -12,34 +12,6 @@ WRAP_CUTOFF = 10**9
 
 def _interest(amount, rate, elapsed):
     return (amount * rate * elapsed) // (HUNDRED_PERCENT * ONE_YEAR)
-
-
-def _snapshot(ledger, green_token, savings_green, credit_engine, teller, stability_pool, *users):
-    state = {
-        "total_debt": ledger.totalDebt(),
-        "unrealized": ledger.unrealizedYield(),
-        "green_supply": green_token.totalSupply(),
-        "sg_supply": savings_green.totalSupply(),
-        "green_ce": green_token.balanceOf(credit_engine.address),
-        "sg_ce": savings_green.balanceOf(credit_engine.address),
-        "green_sg_vault": green_token.balanceOf(savings_green.address),
-        "green_teller": green_token.balanceOf(teller.address),
-        "sg_teller": savings_green.balanceOf(teller.address),
-        "allow_green_sg": green_token.allowance(credit_engine.address, savings_green.address),
-        "allow_sg_teller": savings_green.allowance(credit_engine.address, teller.address),
-        "stab_custody": savings_green.balanceOf(stability_pool.address),
-    }
-    for i, user in enumerate(users):
-        prefix = f"u{i}_"
-        state[prefix + "debt"] = tuple(ledger.userDebt(user))
-        state[prefix + "interval"] = tuple(ledger.borrowIntervals(user))
-        state[prefix + "last_touch"] = ledger.lastTouch(user)
-        state[prefix + "is_borrower"] = ledger.isBorrower(user)
-        state[prefix + "points"] = tuple(ledger.userBorrowPoints(user))
-        state[prefix + "green"] = green_token.balanceOf(user)
-        state[prefix + "sg"] = savings_green.balanceOf(user)
-        state[prefix + "stab"] = stability_pool.getTotalAmountForUser(user, savings_green.address)
-    return state
 
 
 def _open_rate_position(
@@ -318,106 +290,6 @@ def test_stab_enter_credits_green_only_blacklisted_target(
     assert stability_pool.getTotalAmountForUser(bob, savings_green.address) == amount
     assert green_token.balanceOf(bob) == 0
     assert savings_green.balanceOf(bob) == 0
-
-
-def test_stab_enter_reverts_for_sgreen_blacklisted_target(
-    alpha_token,
-    alpha_token_whale,
-    bob,
-    setGeneralConfig,
-    setAssetConfig,
-    setGeneralDebtConfig,
-    createDebtTerms,
-    performDeposit,
-    mock_price_source,
-    teller,
-    green_token,
-    savings_green,
-    stability_pool,
-    switchboard,
-    credit_engine,
-    ledger,
-):
-    _setup_stab_borrow(
-        user=bob,
-        alpha_token=alpha_token,
-        alpha_token_whale=alpha_token_whale,
-        setGeneralConfig=setGeneralConfig,
-        setAssetConfig=setAssetConfig,
-        setGeneralDebtConfig=setGeneralDebtConfig,
-        createDebtTerms=createDebtTerms,
-        performDeposit=performDeposit,
-        mock_price_source=mock_price_source,
-        savings_green=savings_green,
-    )
-    savings_green.setBlacklist(bob, True, sender=switchboard.address)
-
-    with pytest.raises(boa.BoaError) as exc_info:
-        teller.borrow(50 * EIGHTEEN_DECIMALS, bob, True, False, sender=bob)
-    assert has_dev_reason(exc_info.value, "blacklisted")
-
-    before = _snapshot(
-        ledger, green_token, savings_green, credit_engine, teller, stability_pool, bob,
-    )
-    with pytest.raises(boa.BoaError) as exc_info:
-        teller.borrow(50 * EIGHTEEN_DECIMALS, bob, True, True, sender=bob)
-    assert has_dev_reason(exc_info.value, "blacklisted")
-    after = _snapshot(
-        ledger, green_token, savings_green, credit_engine, teller, stability_pool, bob,
-    )
-    assert after == before, {k: (before[k], after[k]) for k in before if before[k] != after[k]}
-    assert filter_logs(teller, "NewBorrow") == []
-
-
-def test_stab_enter_reverts_for_sgreen_blacklisted_target_via_delegate(
-    alpha_token,
-    alpha_token_whale,
-    bob,
-    sally,
-    setGeneralConfig,
-    setAssetConfig,
-    setGeneralDebtConfig,
-    createDebtTerms,
-    performDeposit,
-    mock_price_source,
-    teller,
-    green_token,
-    savings_green,
-    stability_pool,
-    switchboard,
-    credit_engine,
-    ledger,
-    setUserDelegation,
-):
-    _setup_stab_borrow(
-        user=bob,
-        alpha_token=alpha_token,
-        alpha_token_whale=alpha_token_whale,
-        setGeneralConfig=setGeneralConfig,
-        setAssetConfig=setAssetConfig,
-        setGeneralDebtConfig=setGeneralDebtConfig,
-        createDebtTerms=createDebtTerms,
-        performDeposit=performDeposit,
-        mock_price_source=mock_price_source,
-        savings_green=savings_green,
-    )
-    setUserDelegation(bob, sally, _canBorrow=True)
-    savings_green.setBlacklist(bob, True, sender=switchboard.address)
-    assert not savings_green.blacklisted(sally)
-
-    before = _snapshot(
-        ledger, green_token, savings_green, credit_engine, teller, stability_pool, bob, sally,
-    )
-    with pytest.raises(boa.BoaError) as exc_info:
-        teller.borrow(50 * EIGHTEEN_DECIMALS, bob, True, True, sender=sally)
-    assert has_dev_reason(exc_info.value, "blacklisted")
-    after = _snapshot(
-        ledger, green_token, savings_green, credit_engine, teller, stability_pool, bob, sally,
-    )
-    assert after == before, {k: (before[k], after[k]) for k in before if before[k] != after[k]}
-    assert filter_logs(teller, "NewBorrow") == []
-    assert ledger.userDebt(sally).amount == 0
-    assert stability_pool.getTotalAmountForUser(sally, savings_green.address) == 0
 
 
 def test_stab_flag_below_cutoff_delivers_green_to_sgreen_blacklisted_target(
