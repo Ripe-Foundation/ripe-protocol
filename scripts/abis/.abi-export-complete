@@ -29,8 +29,8 @@
     "LocalGov.json": "f9d1c28c1d13c19a602706a3e7626e573120776129c13892a261727110c202db",
     "Lootbox.json": "33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c",
     "MissionControl.json": "d7dfb5c4d03537fb38dba533196787622cf59b608615fc90d629b6804aa3c277",
-    "PriceDesk.json": "8d13b75be224ea83720773549eab757fd6574371c8f0363cd8f0f00e0db3fece",
-    "PythPrices.json": "761857c58dca1202e7e1bdc42e61af4ddfa5658938ed6cbdd366aa5bf2d6d7b9",
+    "PriceDesk.json": "fa28c2031167711a91f8cc93eda4ed9cdd9cdebd19105cdb1cee7c85b9ed37cf",
+    "PythPrices.json": "8e18ea04f61f8391d7fdf87df8b5b4b0be1b2040891df4325155807b97bfa9df",
     "RebaseErc20.json": "7cab842f3b1345e1bdf8d5f05bb96ee9160a49cc0dce4df59fa12b5acdf113c6",
     "RedStone.json": "66ee6de4d9f52bba4e6eacc6ab64a8e525a18b3b2b0880680a16aecce79fca2e",
     "RipeGov.json": "a6a509cad62d3ccdff2aff6257fd78ec76f37b249377fa6ec1f62d87d52eace8",
@@ -39,7 +39,7 @@
     "SavingsGreen.json": "9593466f4a1d5d07038dddecdb201a2b651447e45518802aee6a29cb725a6d15",
     "SimpleErc20.json": "be44f9050d4467c3cb22787a691979f7c670b43c474cfe0aeb93b26568f96d3c",
     "StabilityPool.json": "18e25406c85ea9c981efb5e39c1c971106b3e7cc6866b00a62607cb938415af1",
-    "StorkPrices.json": "fc096105bf0e98a9d91cae24ff410b65872908416f6f27b33b90874e0e1a4836",
+    "StorkPrices.json": "689f30905478c5d97344f7f08ff1c3604d1cac0ad6794f1ce881d96ae2091f1d",
     "Switchboard.json": "41d1b888bbe553d7990487b6bbe0a532551ac2f89d3b83af5684f973e2fad47e",
     "SwitchboardAlpha.json": "e5e33b9fd69ca649b3a7035f6f9f9afb3da88b80b57724907af388dce6edc747",
     "SwitchboardBravo.json": "3f655e6d966fcffacb58b506fa0cee984e35c4b5b7296f3d3f6b5309bd7b90b4",
@@ -53,7 +53,7 @@
     "UniswapV2Prices.json": "a261e469c5b7118a6e3c44ef371b4815af9c7380fb46a13326a444c0b52fe0c3",
     "VaultBook.json": "a8850130074fb9ab75effaf5ae74d6d49c1ce7da74c3164d401372d0831cda22",
     "VaultMigrator.json": "34b3d57e75d465d6e310fe0b7d47a9a10c1938c23e437e424223658493f848c3",
-    "wsuperOETHbPrices.json": "9fa66465471bfe016db2baec84a7caab1b7b4e49ab59e7aece531319d1956147"
+    "wsuperOETHbPrices.json": "154e353c87778735cc32176288499393910bdb12a32e6f46d065187b5fb1c906"
   },
   "schema_version": 1,
   "status": "complete"

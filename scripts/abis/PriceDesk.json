@@ -1520,6 +1520,31 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "getPrice",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "getEthUsdValue",
     "inputs": [
       {

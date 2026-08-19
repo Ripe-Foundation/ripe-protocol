@@ -52,21 +52,21 @@ def test_stork_local_update_prices(
         998888888000000000,
         publish_time,
     )
-    exp_fee = len(payload)
+    exp_fee = 1
 
     # insufficient payment
     with boa.reverts("payment required"):
-        stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=0)
+        stork_prices.updateStorkPrice([payload], sender=authorized_caller, value=0)
 
     # success - caller provides payment
     assert boa.env.get_balance(mock_stork.address) == 0
     boa.env.set_balance(authorized_caller, EIGHTEEN_DECIMALS)
     pre_switchboard_bal = boa.env.get_balance(authorized_caller)
 
-    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert stork_prices.updateStorkPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     log = filter_logs(stork_prices, 'StorkPriceUpdated')[0]
-    assert log.payload == payload
+    assert list(log.payload) == [payload]
     assert log.feeAmount == exp_fee
     assert log.caller == authorized_caller
 
@@ -153,7 +153,7 @@ def test_stork_get_price(
 
     # update price - caller provides payment
     boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
-    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert stork_prices.updateStorkPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # test price
     assert stork_prices.getPrice(alpha_token) == expected_price
@@ -206,7 +206,7 @@ def test_stork_get_price_stale(
     boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
 
     # success update price
-    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert stork_prices.updateStorkPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # price should be 0 due to staleness
     assert stork_prices.getPrice(alpha_token, 3600) == 0
@@ -390,7 +390,7 @@ def test_stork_add_price_feed_validation_during_confirm(
     # Setup the feed first so validation passes during add
     payload = mock_stork.createPriceFeedUpdateData(invalid_feed_id, 998000000000000000, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(payload, value=len(payload))
+    mock_stork.updateTemporalNumericValuesV1([payload], value=1)
     
     assert stork_prices.addNewPriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
     
@@ -401,7 +401,7 @@ def test_stork_add_price_feed_validation_during_confirm(
     # In Stork, validation checks timestampNs != 0, so we set it to 0
     invalid_payload = mock_stork.createPriceFeedUpdateData(invalid_feed_id, 0, 0)  # timestamp 0
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(invalid_payload, value=len(invalid_payload))
+    mock_stork.updateTemporalNumericValuesV1([invalid_payload], value=1)
 
     # Confirm should fail and auto-cancel due to invalid timestamp (0)
     assert not stork_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
@@ -430,7 +430,7 @@ def test_stork_update_price_feed(
     # Setup the second feed in MockStork
     payload_2 = mock_stork.createPriceFeedUpdateData(data_feed_id_2, 970000000000000000, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(payload_2, value=len(payload_2))
+    mock_stork.updateTemporalNumericValuesV1([payload_2], value=1)
 
     # Add initial feed
     addStorkFeed(alpha_token, data_feed_id_1)
@@ -502,7 +502,7 @@ def test_stork_update_price_feed_cancel(
     # Setup the second feed in MockStork
     payload_2 = mock_stork.createPriceFeedUpdateData(data_feed_id_2, 970000000000000000, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(payload_2, value=len(payload_2))
+    mock_stork.updateTemporalNumericValuesV1([payload_2], value=1)
 
     # Add initial feed
     addStorkFeed(alpha_token, data_feed_id_1)
@@ -549,7 +549,7 @@ def test_stork_update_feed_validation_functions(
     # Setup the second feed in MockStork
     payload_2 = mock_stork.createPriceFeedUpdateData(data_feed_id_2, 970000000000000000, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(payload_2, value=len(payload_2))
+    mock_stork.updateTemporalNumericValuesV1([payload_2], value=1)
     invalid_feed_id = bytes.fromhex("f" * 64)
 
     # Add initial feed
@@ -693,7 +693,7 @@ def test_stork_price_stale_edge_cases(
     # Test price exactly at stale time boundary
     publish_time = boa.env.evm.patch.timestamp
     payload = mock_stork.createPriceFeedUpdateData(data_feed_id, 998000000000000000, publish_time)
-    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert stork_prices.updateStorkPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # Test price just at stale boundary (should still be valid)
     assert stork_prices.getPrice(alpha_token, 0) != 0
@@ -706,7 +706,7 @@ def test_stork_price_stale_edge_cases(
 
     # Test with maximum uint256 stale time
     payload = mock_stork.createPriceFeedUpdateData(data_feed_id, 998000000000000000, boa.env.evm.patch.timestamp)
-    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert stork_prices.updateStorkPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert stork_prices.getPrice(alpha_token, 2**256 - 1) != 0
 
     # Test with zero stale time (never stale)
@@ -723,14 +723,14 @@ def test_stork_time_lock_edge_cases(
 ):
     data_feed_id_1 = bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
     data_feed_id_2 = bytes.fromhex("8416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290d")
-    
-    # Setup the second feed in MockStork
+
+    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)
+    payload_1 = mock_stork.createPriceFeedUpdateData(data_feed_id_1, 998000000000000000, boa.env.evm.patch.timestamp)
     payload_2 = mock_stork.createPriceFeedUpdateData(data_feed_id_2, 970000000000000000, boa.env.evm.patch.timestamp)
-    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(payload_2, value=len(payload_2))
+    mock_stork.updateTemporalNumericValuesV1([payload_1, payload_2], value=2)
 
     # Test confirming just before time lock boundary
-    assert stork_prices.addNewPriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+    assert stork_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     boa.env.time_travel(blocks=stork_prices.actionTimeLock() - 1)
     with boa.reverts("time lock not reached"):
         stork_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
@@ -768,7 +768,7 @@ def test_stork_governance_edge_cases(
     # Setup the second feed in MockStork
     payload_2 = mock_stork.createPriceFeedUpdateData(data_feed_id_2, 970000000000000000, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(payload_2, value=len(payload_2))
+    mock_stork.updateTemporalNumericValuesV1([payload_2], value=1)
 
     # Test multiple governance actions in sequence
     assert stork_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
@@ -813,7 +813,7 @@ def test_stork_feed_validation_edge_cases(
     # Create a feed with zero timestamp (invalid)
     zero_payload = mock_stork.createPriceFeedUpdateData(zero_timestamp_feed_id, 998000000000000000, 0)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(zero_payload, value=len(zero_payload))
+    mock_stork.updateTemporalNumericValuesV1([zero_payload], value=1)
 
     # Should fail validation due to zero timestampNs
     with boa.reverts("invalid feed"):
@@ -822,7 +822,7 @@ def test_stork_feed_validation_edge_cases(
     # Fix the timestamp and it should work
     fresh_payload = mock_stork.createPriceFeedUpdateData(zero_timestamp_feed_id, 998000000000000000, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(fresh_payload, value=len(fresh_payload))
+    mock_stork.updateTemporalNumericValuesV1([fresh_payload], value=1)
     assert stork_prices.addNewPriceFeed(alpha_token, zero_timestamp_feed_id, 0, sender=governance.address)
 
 
@@ -853,7 +853,7 @@ def _set_sc20_stork_price(mock_stork, publish_time):
         publish_time,
     )
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)
-    mock_stork.updateTemporalNumericValuesV1(payload, value=len(payload))
+    mock_stork.updateTemporalNumericValuesV1([payload], value=1)
 
 
 def _add_sc20_stork_feed(

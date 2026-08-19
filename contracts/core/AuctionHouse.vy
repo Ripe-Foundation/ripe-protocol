@@ -743,7 +743,7 @@ def _swapAssetsWithStabPool(
     shouldGoToNextAsset: bool = False
     poolBalanceBefore: uint256 = staticcall IERC20(_liqAsset).balanceOf(_stabPool.vaultAddr)
     collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _stabPool.vaultAddr, _liqVaultId, _liqVaultAddr, _liqAsset, False, maxCollateralUsdValue, _a)
-    if collateralUsdValueSent == 0 or collateralAmountSent == 0:
+    if collateralUsdValueSent == 0:
         return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
     assert staticcall IERC20(_liqAsset).balanceOf(_stabPool.vaultAddr) == poolBalanceBefore + collateralAmountSent
 
@@ -1198,7 +1198,7 @@ def _buyFungibleAuction(
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
     collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _recipient, _liqVaultId, liqVaultAddr, _liqAsset, _shouldTransferBalance, maxCollateralUsdValue, _a)
-    if collateralUsdValueSent == 0 or collateralAmountSent == 0:
+    if collateralUsdValueSent == 0:
         return 0
 
     # pay green amount, pay back debt
@@ -1287,10 +1287,12 @@ def _transferCollateral(
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _fromUser, _toUser, maxAssetAmount, _a)
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
+    usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
     # Post-mutation: sender first so lastBalance writes the live share
     # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
     if amountSent != 0:
+        assert usdValue != 0 # dev: amounts do not match up
         for i: uint256 in range(2):
             user: address = _fromUser
             if i != 0:
@@ -1300,7 +1302,6 @@ def _transferCollateral(
                 user = _toUser
             extcall LootBox(_a.lootbox).updateDepositPoints(user, _vaultId, _vaultAddr, _asset, _a)
 
-    usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted
 
 

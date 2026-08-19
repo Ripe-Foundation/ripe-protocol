@@ -246,9 +246,13 @@ def _redeemCollateral(
     # withdraw or transfer balance to redeemer
     amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(_shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)
     assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
+    if amountSent == 0:
+        return 0
 
-    # repay debt
+    # repay debt. amountSent is known only after the vault caps; a floored-to-zero
+    # payment after a nonzero transfer must revert the whole transaction.
     repayValue: uint256 = min(amountSent * maxRedeemValue // maxAssetAmount, userDebt.amount)
+    assert repayValue != 0 # dev: could not burn green
     assert extcall GreenToken(_a.greenToken).burn(repayValue) # dev: could not burn green
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, repayValue, newInterest, d.numUserVaults, _a)
 

@@ -143,7 +143,7 @@ def test_reverting_non_priority_source_falls_through_to_healthy_source(
     failed = _raw_source(price_mode=1)
     healthy = _raw_source(3 * EIGHTEEN_DECIMALS, True)
     desk = _isolated_price_desk(ripe_hq, deploy3r, [failed, healthy])
-    _set_priorities(mission_control, switchboard_alpha, [])
+    _set_priorities(mission_control, switchboard_alpha, [6])
 
     assert desk.getPrice(alpha_token, True) == 3 * EIGHTEEN_DECIMALS
 
@@ -334,7 +334,7 @@ def test_gas_burning_non_priority_source_falls_through_to_healthy_source(
     )
     healthy = _raw_source(10 * EIGHTEEN_DECIMALS, True)
     desk = _isolated_price_desk(ripe_hq, deploy3r, [burner, healthy])
-    _set_priorities(mission_control, switchboard_alpha, [])
+    _set_priorities(mission_control, switchboard_alpha, [6])
 
     assert desk.getPrice(alpha_token, True, gas=1_000_000) == 10 * EIGHTEEN_DECIMALS
 

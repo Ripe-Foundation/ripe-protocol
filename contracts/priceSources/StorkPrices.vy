@@ -22,17 +22,29 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 
-interface StorkNetwork:
-    def getTemporalNumericValueUnsafeV1(_feedId: bytes32) -> TemporalNumericValue: view
-    def updateTemporalNumericValuesV1(_payload: Bytes[2048]): payable
-    def getUpdateFeeV1(_payload: Bytes[2048]) -> uint256: view
-
-interface MissionControl:
-    def canPerformLiteAction(_user: address) -> bool: view
+MAX_PRICE_UPDATES: constant(uint256) = 20
 
 struct TemporalNumericValue:
     timestampNs: uint64
-    quantizedValue: uint256
+    quantizedValue: int192
+
+struct TemporalNumericValueInput:
+    temporalNumericValue: TemporalNumericValue
+    id: bytes32
+    publisherMerkleRoot: bytes32
+    valueComputeAlgHash: bytes32
+    r: bytes32
+    s: bytes32
+    v: uint8
+
+interface StorkNetwork:
+    def getTemporalNumericValueUnsafeV1(_feedId: bytes32) -> TemporalNumericValue: view
+    def updateTemporalNumericValuesV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]): payable
+    def getUpdateFeeV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> uint256: view
+
+interface MissionControl:
+    def canPerformLiteAction(_user: address) -> bool: view
+    def getPriceStaleTime() -> uint256: view
 
 struct StorkFeedConfig:
     feedId: bytes32
@@ -92,7 +104,7 @@ event DisableStorkFeedCancelled:
     feedId: bytes32
 
 event StorkPriceUpdated:
-    payload: Bytes[2048]
+    payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]
     feeAmount: uint256
     caller: indexed(address)
 
@@ -105,8 +117,6 @@ feedConfig: public(HashMap[address, StorkFeedConfig]) # asset -> feed
 pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
 STORK: public(immutable(address))
-
-MAX_PRICE_UPDATES: constant(uint256) = 20
 
 
 @pure
@@ -169,8 +179,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
 
-    # no price
-    if data.quantizedValue == 0:
+    # official 1e18 as-is; reject non-positive int192 (CAND-PS-011)
+    if data.quantizedValue <= 0:
         return 0
 
     # price is too stale
@@ -181,7 +191,7 @@ def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
     if _staleTime != 0 and block.timestamp - publishTime > _staleTime:
         return 0
 
-    return data.quantizedValue
+    return convert(data.quantizedValue, uint256)
 
 
 # utilities
@@ -396,7 +406,21 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
         return False
 
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
-    return data.timestampNs != 0
+    if data.quantizedValue <= 0:
+        return False
+    publishTime: uint256 = convert(data.timestampNs, uint256) // 1_000_000_000
+    if publishTime == 0 or publishTime > block.timestamp:
+        return False
+
+    globalStaleTime: uint256 = 0
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl != empty(address):
+        globalStaleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
+
+    staleTime: uint256 = self._resolveStaleTime(globalStaleTime, _staleTime)
+    if staleTime != 0 and block.timestamp - publishTime > staleTime:
+        return False
+    return True
 
 
 ################
@@ -498,20 +522,20 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 
 @payable
 @external
-def updateStorkPrice(_payload: Bytes[2048]) -> bool:
+def updateStorkPrice(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     assert msg.value != 0 # dev: payment required
     return self._updateStorkPrice(_payload, STORK, msg.value, True)
 
 
 @external
-def updateStorkPriceNoPay(_payload: Bytes[2048]) -> bool:
+def updateStorkPriceNoPay(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     return self._updateStorkPrice(_payload, STORK, self.balance, False)
 
 
 @internal
-def _updateStorkPrice(_payload: Bytes[2048], _stork: address, _payment: uint256, _shouldRefund: bool) -> bool:
+def _updateStorkPrice(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES], _stork: address, _payment: uint256, _shouldRefund: bool) -> bool:
     feeAmount: uint256 = staticcall StorkNetwork(_stork).getUpdateFeeV1(_payload)
     assert _payment >= feeAmount # dev: insufficient payment
 

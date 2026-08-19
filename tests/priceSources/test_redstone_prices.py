@@ -214,3 +214,57 @@ def test_sc20_redstone_eth_composition_preserved(
     )
     expected_price = 500 * 2_500 * EIGHTEEN_DECIMALS
     assert redstone.getPrice(alpha_token, 10, price_desk) == expected_price
+
+
+def test_redstone_eth_leg_uses_resolved_stale_on_pricedesk(
+    redstone,
+    chainlink,
+    price_desk,
+    alpha_token,
+    mock_redstone_alpha,
+    mock_redstone_eth,
+    governance,
+    switchboard_alpha,
+    mission_control,
+):
+    with boa.env.anchor():
+        _set_redstone_global_bound(
+            switchboard_alpha,
+            governance,
+            mission_control,
+            stale_time=7_200,
+        )
+        eth = redstone.ETH()
+        _set_redstone_feed(mock_redstone_eth, 2_500 * CHAINLINK_DECIMALS)
+        assert chainlink.addNewPriceFeed(
+            eth,
+            mock_redstone_eth,
+            0,
+            False,
+            False,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+        _set_redstone_feed(mock_redstone_eth, 2_500 * CHAINLINK_DECIMALS)
+        assert chainlink.confirmNewPriceFeed(eth, sender=governance.address)
+
+        _add_redstone_feed(
+            redstone,
+            alpha_token,
+            mock_redstone_alpha,
+            governance,
+            10,
+            needs_eth=True,
+            refresh_feeds=((mock_redstone_eth, 2_500 * CHAINLINK_DECIMALS),),
+        )
+
+        _set_redstone_feed(mock_redstone_eth, 2_500 * CHAINLINK_DECIMALS, age=50)
+        _set_redstone_feed(mock_redstone_alpha, 500 * CHAINLINK_DECIMALS)
+
+        assert price_desk.getPrice(eth) == 2_500 * EIGHTEEN_DECIMALS
+        assert price_desk.getPrice(eth, False) == 2_500 * EIGHTEEN_DECIMALS
+        assert price_desk.getPrice(eth, False, 10) == 0
+        with boa.reverts():
+            redstone.getPrice(alpha_token, 0, price_desk)
+        with boa.reverts():
+            redstone.getPrice(alpha_token, 10, price_desk)

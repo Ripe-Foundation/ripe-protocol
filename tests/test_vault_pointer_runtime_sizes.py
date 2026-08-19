@@ -32,13 +32,13 @@ EXPECTED_RUNTIME_BYTES = {
     "Deleverage": 24459,
     "StabilityPool": 24269,
     "BlueChipYieldPrices": 22749,
-    "ChainlinkPrices": 14256,
-    "CurvePrices": 23141,
-    "PythPrices": 14282,
-    "RedStone": 13633,
-    "StorkPrices": 13162,
-    "UndyVaultPrices": 17612,
-    "wsuperOETHbPrices": 8763,
+    "ChainlinkPrices": 14481,
+    "CurvePrices": 24013,
+    "PythPrices": 14811,
+    "RedStone": 13864,
+    "StorkPrices": 13832,
+    "UndyVaultPrices": 18806,
+    "wsuperOETHbPrices": 8336,
 }
 
 

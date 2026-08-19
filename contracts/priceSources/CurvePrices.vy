@@ -314,6 +314,8 @@ def _getPriceAndHasFeed(_asset: address, _staleTime: uint256, _priceDesk: addres
     config: CurvePriceConfig = self.curveConfig[asset]
     if config.pool == empty(address):
         return 0, False
+    if config.numUnderlying > 4:
+        return 0, True
 
     # get price, adjust if savings green
     assetPrice: uint256 = self._getCurvePrice(asset, config, _priceDesk)
@@ -353,6 +355,27 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 @view
 @internal
+def _canonicalGreen(_asset: address) -> address:
+    if _asset == SGREEN:
+        return GREEN
+    return _asset
+
+
+@view
+@internal
+def _lpUnderlyingCanonicalEquals(_asset: address, _config: CurvePriceConfig) -> bool:
+    canonicalAsset: address = self._canonicalGreen(_asset)
+    for i: uint256 in range(4):
+        u: address = _config.underlying[i]
+        if u == empty(address):
+            break
+        if self._canonicalGreen(u) == canonicalAsset:
+            return True
+    return False
+
+
+@view
+@internal
 def _getCurvePrice(_asset: address, _config: CurvePriceConfig, _priceDesk: address) -> uint256:
     price: uint256 = 0
 
@@ -362,6 +385,9 @@ def _getCurvePrice(_asset: address, _config: CurvePriceConfig, _priceDesk: addre
 
     # lp tokens
     if _asset == _config.lpToken:
+        # residual/legacy storage fail-closed; admission also rejects this
+        if self._lpUnderlyingCanonicalEquals(_asset, _config):
+            return 0
 
         # stable lp tokens
         if _config.poolType == PoolType.STABLESWAP_NG or _config.poolType == PoolType.METAPOOL:
@@ -531,10 +557,11 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again
+    # validate again against a live reconstruct; store only if trust fields match
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending new feed
-    if not self._isValidNewFeed(_asset, d.config):
+    live: CurvePriceConfig = self._getCurvePoolConfig(d.config.pool)
+    if not self._isValidNewFeed(_asset, live) or not self._trustSensitiveConfigMatches(d.config, live):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -542,7 +569,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
     # save new feed config
-    self.curveConfig[_asset] = d.config
+    self.curveConfig[_asset] = live
     self.pendingUpdates[_asset] = empty(PendingCurvePrice)
     priceData._addPricedAsset(_asset)
 
@@ -624,11 +651,12 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again
+    # validate again against a live reconstruct; store only if trust fields match
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending update feed
     prevPool: address = self.curveConfig[_asset].pool
-    if not self._isValidUpdateFeed(_asset, d.config, prevPool):
+    live: CurvePriceConfig = self._getCurvePoolConfig(d.config.pool)
+    if not self._isValidUpdateFeed(_asset, live, prevPool) or not self._trustSensitiveConfigMatches(d.config, live):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -636,7 +664,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
     # save new feed config
-    self.curveConfig[_asset] = d.config
+    self.curveConfig[_asset] = live
     self.pendingUpdates[_asset] = empty(PendingCurvePrice)
 
     log CurvePriceConfigUpdated(asset=_asset, pool=d.config.pool, prevPool=prevPool)
@@ -689,14 +717,54 @@ def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
     if empty(address) in [_asset, _config.pool, _config.lpToken]:
         return False
 
+    if _config.numUnderlying > 4:
+        return False
+
     if _asset not in _config.underlying and _asset != _config.lpToken:
         return False
+
+    canonicalAsset: address = self._canonicalGreen(_asset)
+
+    # LP route: reject if a PriceDesk-queried underlying canonicalizes to this asset
+    if _asset == _config.lpToken:
+        if self._lpUnderlyingCanonicalEquals(_asset, _config):
+            return False
+
+    # same-pool nested alt (CAND-PS-HYP-001); both admission orders
+    elif _config.numUnderlying == 2:
+        alt: address = _config.underlying[0]
+        if alt == _asset:
+            alt = _config.underlying[1]
+        canonAlt: address = self._canonicalGreen(alt)
+        if canonAlt == canonicalAsset:
+            return False
+        if alt != empty(address) and (self.curveConfig[alt].pool == _config.pool or self.curveConfig[canonAlt].pool == _config.pool):
+            return False
 
     # for initial ripe/green lp deployment, need to skip checking price -- when totalSupply is zero, the `get_virtual_price()` will fail
     if _config.hasEcoToken and _asset == _config.pool and staticcall CurvePool(_config.pool).totalSupply() == 0:
         return True
 
     return self._getCurvePrice(_asset, _config, empty(address)) != 0
+
+
+@pure
+@internal
+def _trustSensitiveConfigMatches(_pending: CurvePriceConfig, _live: CurvePriceConfig) -> bool:
+    if _pending.pool != _live.pool:
+        return False
+    if _pending.lpToken != _live.lpToken:
+        return False
+    if _pending.numUnderlying != _live.numUnderlying:
+        return False
+    if _pending.poolType != _live.poolType:
+        return False
+    if _pending.hasEcoToken != _live.hasEcoToken:
+        return False
+    for i: uint256 in range(4):
+        if _pending.underlying[i] != _live.underlying[i]:
+            return False
+    return True
 
 
 ################
