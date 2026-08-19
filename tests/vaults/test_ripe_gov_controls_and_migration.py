@@ -3719,6 +3719,78 @@ def test_gov_transfer_to_a_different_user_still_moves_shares(
     assert ripe_gov_vault.userBalances(bob, ripe_token) < bob_shares_before
 
 
+@pytest.mark.parametrize(
+    "caller_name",
+    ("auction_house", "credit_engine"),
+    ids=("auction_house", "credit_engine"),
+)
+def test_forced_transfer_remains_live_without_lock_terms(
+    caller_name,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    credit_engine,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """F11 / M-12: forced transfers stay live with no lock-terms guard.
+
+    Direct MissionControl `(0, 0)` setup is test-only legacy-state modeling.
+    F10 rejects zero maximum duration through the canonical SwitchboardAlpha route.
+    """
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    _direct_deposit(ripe_gov_vault, ripe_token, whale, bob, amount, teller)
+    assert ripe_gov_vault.userBalances(alice, ripe_token) == 0
+
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        ASSET_WEIGHT,
+        False,
+        (0, 0, 0, False, 0),
+        sender=switchboard_alpha.address,
+    )
+
+    sender_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    recipient_shares_before = ripe_gov_vault.userBalances(alice, ripe_token)
+    total_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
+    transfer_amount = amount // 2
+    caller = auction_house if caller_name == "auction_house" else credit_engine
+
+    transferred, depleted = ripe_gov_vault.transferBalanceWithinVault(
+        ripe_token,
+        bob,
+        alice,
+        transfer_amount,
+        sender=caller.address,
+    )
+    assert transferred == transfer_amount
+    assert not depleted
+
+    sender_shares_after = ripe_gov_vault.userBalances(bob, ripe_token)
+    recipient_shares_after = ripe_gov_vault.userBalances(alice, ripe_token)
+    sender_delta = sender_shares_after - sender_shares_before
+    recipient_delta = recipient_shares_after - recipient_shares_before
+    assert sender_delta == -recipient_delta
+    assert recipient_delta > 0
+    assert ripe_gov_vault.totalBalances(ripe_token) == total_before
+    assert ripe_token.balanceOf(ripe_gov_vault) == custody_before
+    assert ripe_gov_vault.userGovData(alice, ripe_token).unlock == boa.env.evm.patch.block_number
+    assert ripe_gov_vault.userGovData(alice, ripe_token).lastTerms.maxLockDuration == 0
+
+
 # --------------------------------------------------------------------------
 # Contributor transfers honor the stored duration exactly while terms exist
 # --------------------------------------------------------------------------

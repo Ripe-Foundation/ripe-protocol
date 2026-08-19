@@ -394,6 +394,10 @@ def transferBalanceWithinVault(
     assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     a: addys.Addys = addys._getAddys(_a)
 
+    # Intentionally not gated on lock terms: AuctionHouse/CreditEngine forced
+    # transfers must stay live for liquidation and redemption. The recipient
+    # leg uses minLockDuration; a valid row may have minLockDuration == 0.
+
     # transfer tokens (using shares module)
     transferAmount: uint256 = 0
     transferShares: uint256 = 0
