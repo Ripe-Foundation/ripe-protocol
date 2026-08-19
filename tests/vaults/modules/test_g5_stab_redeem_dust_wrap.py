@@ -3,7 +3,7 @@ documented soft-skip row and roll back committed siblings.
 
 `StabVault._redeemFromStabilityPool` is annotated fail-soft and returns 0
 for every other unsatisfiable condition. The sGREEN wrap used to call
-`sGREEN.deposit` with no dust guard, so `convertToShares(redeemAmount) == 0`
+`sGREEN.deposit` with no dust guard, so `previewDeposit(redeemAmount) == 0`
 reverted the whole batch. The wrap is now skipped in that case; sibling
 rows still settle, and an all-dust batch reverts `no redemptions occurred`.
 The refund-side `> 10 ** 9` cutoff at `_handleGreenForUser` is unchanged.
@@ -75,7 +75,7 @@ def test_committed_redeem_row_survives_a_dust_remainder_on_a_later_row(
     vault_id = stab_cohort
     _accrue_sgreen_yield(green_token, savings_green, whale, 100 * EIGHTEEN_DECIMALS)
     assert savings_green.convertToAssets(EIGHTEEN_DECIMALS) > EIGHTEEN_DECIMALS
-    assert savings_green.convertToShares(1) == 0  # the trigger condition
+    assert savings_green.previewDeposit(1) == 0  # the trigger condition
 
     _fund(green_token, teller, whale, sally, 500 * EIGHTEEN_DECIMALS)
     rows = [(bravo_token.address, 10 * EIGHTEEN_DECIMALS),
@@ -138,7 +138,7 @@ def test_one_wei_claim_residue_does_not_brick_sibling_redemption_rows(
     # Safety property: an unsatisfiable bravo row must soft-skip, leaving the
     # charlie row in the same batch to settle normally.
     leftover_assets = 70 * EIGHTEEN_DECIMALS
-    expected_sgreen = savings_green.convertToShares(leftover_assets)
+    expected_sgreen = savings_green.previewDeposit(leftover_assets)
     sally_sgreen_before = savings_green.balanceOf(sally)
     spent = teller.redeemManyFromStabilityPool(
         vault_id,
@@ -160,7 +160,7 @@ def test_same_sequences_are_safe_while_sgreen_is_at_parity(
 ):
     """Adjacent positive control: at rate == 1.0 both sequences succeed.
 
-    This isolates the defect to `convertToShares(redeemAmount) == 0`, not to
+    This isolates the defect to `previewDeposit(redeemAmount) == 0`, not to
     the batch shape or the residue itself.
     """
     vault_id = stab_cohort
@@ -251,7 +251,7 @@ def test_g5_weth_priced_one_wei_residue_settles_at_ordinary_sgreen_rate(
 ):
     """1-wei residue of a ~$2k 18-dec asset + large GREEN budget does not wrap-revert
     at an ordinary post-yield sGREEN rate. `_getAssetAmount` is nonzero; redeemAmount
-    is ~2000 GREEN wei; convertToShares(2000) != 0. Launch-WETH DoS is rate-dependent,
+    is ~2000 GREEN wei; previewDeposit(2000) != 0. Launch-WETH DoS is rate-dependent,
     not a blanket `_getAssetAmount == 0` skip.
     """
     vault_id = stab_cohort
@@ -265,7 +265,7 @@ def test_g5_weth_priced_one_wei_residue_settles_at_ordinary_sgreen_rate(
     assert stability_pool.claimableBalances(sg, bravo_token.address) == 1
 
     mock_price_source.setPrice(bravo_token, 2000 * EIGHTEEN_DECIMALS)
-    assert savings_green.convertToShares(2000) != 0
+    assert savings_green.previewDeposit(2000) != 0
 
     spent = teller.redeemManyFromStabilityPool(
         vault_id, [(bravo_token.address, MAX_UINT256)],
@@ -282,7 +282,7 @@ def test_g5_single_dust_only_redemption_reverts_no_redemptions_occurred(
     vault_id = stab_cohort
     sg = savings_green.address
     _accrue_sgreen_yield(green_token, savings_green, whale, 100 * EIGHTEEN_DECIMALS)
-    assert savings_green.convertToShares(1) == 0
+    assert savings_green.previewDeposit(1) == 0
     _fund(green_token, teller, whale, sally, 500 * EIGHTEEN_DECIMALS)
 
     pair_before = stability_pool.claimableBalances(sg, bravo_token.address)
@@ -304,7 +304,7 @@ def test_g5_same_claim_asset_second_stab_slice_still_settles_when_sgreen_wrap_is
     vault_id = stab_cohort
     sg = savings_green.address
     _accrue_sgreen_yield(green_token, savings_green, whale, 100 * EIGHTEEN_DECIMALS)
-    assert savings_green.convertToShares(1) == 0
+    assert savings_green.previewDeposit(1) == 0
     _fund(green_token, teller, whale, sally, 500 * EIGHTEEN_DECIMALS)
 
     teller.redeemManyFromStabilityPool(

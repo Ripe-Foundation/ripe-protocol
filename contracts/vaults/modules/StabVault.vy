@@ -1043,7 +1043,7 @@ def _redeemFromStabilityPool(
         redeemAmount = min(redeemAmount, remainingRedeemValue)
 
         if stabAsset == _a.savingsGreen:
-            if staticcall IERC4626(_a.savingsGreen).convertToShares(redeemAmount) == 0:
+            if staticcall IERC4626(_a.savingsGreen).previewDeposit(redeemAmount) == 0:
                 continue
 
         # compute remaining USD value using price ratio: maxRedeemValue / maxClaimableAmount
