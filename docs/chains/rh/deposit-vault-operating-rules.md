@@ -133,10 +133,13 @@ general RipeGov asset bounds.
 is initiated or confirmed, the duration must be greater than zero and less than
 or equal to the then-live RIPE RipeGov `maxLockDuration`. Live terms must exist
 (`maxLockDuration != 0`). The duration may be below the live general
-`minLockDuration`; that is intentional. If the live maximum falls below the
-pending duration before confirmation, the pending action is cancelled with no
-Contributor deployed. This does not authorize transfer-time clamping; that
-approach remains rejected.
+`minLockDuration`; that is intentional. Creation also keeps the static
+representability ceiling `depositLockDuration <= MAX_UINT256 - 2**64`.
+If the live maximum falls below the pending duration before confirmation,
+the pending action is cancelled with no Contributor deployed. This does
+not authorize transfer-time clamping; that approach remains rejected.
+This live-band rule is now base `rh` behavior after #188; #195 does not
+ask #188 to rebase.
 
 **Enforced behavior.** During vesting, `cashRipeCheck` deposits RIPE into the
 Contributor's RipeGov position through Teller, so that ordinary deposit is still
