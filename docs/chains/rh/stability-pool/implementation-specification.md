@@ -104,7 +104,70 @@ The final owner decisions and security corrections are:
     cap-`12` prescriptive text below remains historical design context and is
     superseded by this as-built decision.
 
-Final bytecode and ABI evidence is:
+## Current normative membership (2026-08-19)
+
+These are the live StabVault constants and residual rules. Older
+prescriptive passages below that still say cap `12` or `$0.10`/`$0.25`
+are pre-existing drift in the historical design record; they are not
+caused by this residual-policy change.
+
+| Item | Current rule |
+| --- | --- |
+| Active cap | `MAX_ACTIVE_CLAIM_ASSETS = 20` |
+| Maintenance batch | `MAX_CLAIM_ASSET_MAINTENANCE = 15` |
+| Activation threshold | `$0.10` (`10 * 10**16`) |
+| Retention threshold | `$0.05` (`5 * 10**16`) |
+| Live nonzero prune | no-op for every nonzero row |
+| Empty-cohort custody deficit | skip (`continue`), do not quote |
+| Activation | empty-cohort only (`totalBalances == 0`); `canActivateClaimAsset` returns early when the book is live |
+| Zero residual | `DEACTIVATION_ZERO`; unlist only |
+| Empty-cohort dust | priced leftover below `$0.05` → `DEACTIVATION_DUST` |
+| Live microscopic dust | leftover below `$0.05` and `R <= P // 10**10` (inclusive) → `DEACTIVATION_DUST` |
+| Live meaningful leftover | below `$0.05` but `R > P // 10**10` → remain active |
+| Unavailable/zero USD | never classified as dust |
+| Surviving residual | unlist does not erase pair balance, aggregate liability, or custody; a later receipt may accumulate and reactivate |
+
+`LIVE_RESIDUAL_DIVISOR = 10**10` bounds live residual delisting to
+`R <= P // 10**10`. That caps omitted membership to one ten-billionth of
+the prior per-cohort pair. A correctly priced `$100M` pair implies at
+most approximately `$0.01` of omitted residual. For a 6-decimal asset,
+one base unit can qualify only when `P >= 10**10` raw units, i.e.
+10,000 whole tokens.
+
+Owner decision 2026-08-19: residual membership is centralized in
+`_reduceClaimableBalances` and applies to claim, redeem, and
+`swapWithClaimableGreen`. That supersedes the earlier call-site-only
+`remainingUsdValue = 0` placement and the GREEN exclusion. It supersedes
+20-cap stickiness only for microscopic residuals. Meaningful live
+residuals stay sticky. Live prune and empty-only activation are
+unchanged.
+
+**Recovery:** consume a meaningful dormant balance through configured
+redemption after the oracle price is correct. Do not redeem while the
+oracle remains wrong-low. Before removing a former claim asset’s price
+feed, verify `totalClaimableBalances[asset] == 0` and that no active
+row depends on it.
+
+**Recovery composition:**
+
+- redemption consumes dormant liability without manually re-seating the
+  dormant row;
+- sGREEN cohorts receive sGREEN custody through GREEN
+  conversion/deposit;
+- other cohorts receive claimable GREEN.
+
+This-branch deployed StabilityPool runtime is pinned at `24,269` bytes
+(`307` bytes EIP-170 headroom vs `24,576`) in
+`tests/test_vault_pointer_runtime_sizes.py`. That pin is the composed
+#192 measurement on `origin/rh` after PR #191 merged.
+
+The following bytecode and ABI evidence is **historical**. It is the
+2026-08-06 as-built record bound to source/test commit
+`3c7b1ff66e9167914cac4cff2da126e7d9964773`. Hashes and the `24,239` /
+`337` deployed-runtime row were not regenerated for the 2026-08-19
+residual policy and must not be read as the current pin.
+
+Historical bytecode and ABI evidence:
 
 | Measurement | Result |
 | --- | ---: |
@@ -613,6 +676,11 @@ Requirements:
 The function must not change custody, pair balances, aggregate liabilities, or
 user shares.
 
+The `$0.10` prune thresholds in this section are historical specification
+text. See **Current normative membership (2026-08-19)** for the live
+rules: retention is `$0.05`, live nonzero prune is a no-op, and
+empty-cohort dust uses `$0.05`.
+
 ### 8.7 Permissionless activation
 
 Add:
@@ -638,6 +706,11 @@ Requirements:
 - when capacity is full, leave dormant without emitting another dormant event;
 - duplicates remain safe; and
 - activation never changes custody, liabilities, or shares.
+
+The `$0.25` activation floor in this section is historical specification
+text. See **Current normative membership (2026-08-19)** for the live
+rule: activation threshold is `$0.10`, and activation remains
+empty-cohort only.
 
 This pause requirement applies only to the explicit maintenance entry point.
 An eligible later liquidation receipt may still register a cumulative dormant
