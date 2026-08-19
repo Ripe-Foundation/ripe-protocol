@@ -9,7 +9,7 @@ EIP170_LIMIT = 24_576
 # this pin before merge.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
-    "SwitchboardAlpha": 24506,
+    "SwitchboardAlpha": 24521,
     "SwitchboardBravo": 24364,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23192,
