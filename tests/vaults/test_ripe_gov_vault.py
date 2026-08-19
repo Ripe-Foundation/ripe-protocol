@@ -767,6 +767,41 @@ def test_ripe_gov_vault_adjust_lock_extend_duration(
     assert userData_after.lastShares == userData_before.lastShares  # Shares unchanged
 
 
+def test_ripe_gov_vault_adjust_lock_checkpoints_lootbox_after_new_unlock(
+    ripe_gov_vault,
+    vault_book,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    ledger,
+    setupRipeGovVaultConfig,
+):
+    """adjustLock must persist the new unlock before the Lootbox checkpoint."""
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+
+    share_before = ripe_gov_vault.getUserLootBoxShare(bob, ripe_token)
+    assert share_before > 0
+
+    ripe_gov_vault.adjustLock(bob, ripe_token, 800, sender=teller.address)
+
+    expected_unlock = boa.env.evm.patch.block_number + 800
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == expected_unlock
+
+    share_after = ripe_gov_vault.getUserLootBoxShare(bob, ripe_token)
+    assert share_after > share_before
+    assert share_after != share_before
+
+    vault_id = vault_book.getRegId(ripe_gov_vault)
+    last_balance = ledger.userDepositPoints(bob, vault_id, ripe_token).lastBalance
+    assert last_balance == share_after
+    assert last_balance != share_before
+
+
 def test_ripe_gov_vault_adjust_lock_cannot_reduce_duration(
     ripe_gov_vault, ripe_token, whale, bob, teller, switchboard_alpha, setupRipeGovVaultConfig  
 ):
@@ -1735,6 +1770,25 @@ def test_ripe_gov_vault_get_weighted_lock_already_unlocked(ripe_gov_vault):
     # Weighted average: (2000*1 + 1000*500) / (2000+1000) = 502000/3000 ≈ 167
     expected_unlock = current_block + 167
     assert unlock == expected_unlock
+
+
+def test_ripe_gov_vault_weighted_lock_uses_uncapped_previous_remaining(ripe_gov_vault):
+    """Previous remaining duration is not capped to live maxLockDuration."""
+    current_block = boa.env.evm.patch.block_number
+    precision = 10**18
+    terms = (100, 1000, 200_00, True, 10_00)
+    equal_shares = 1000 * precision
+
+    unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        equal_shares,
+        500,
+        terms,
+        equal_shares,
+        current_block + 2000,
+    )
+
+    assert unlock == current_block + 1250
+    assert unlock != current_block + 750
 
 
 # Courtesy policy gate on rh.
