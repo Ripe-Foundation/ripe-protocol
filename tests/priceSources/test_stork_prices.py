@@ -6,6 +6,7 @@ from conf_utils import filter_logs
 from config.BluePrint import CORE_TOKENS
 
 MONTH_IN_SECONDS = 30 * 24 * 60 * 60
+NOT_FOUND_REVERT = "Revert(b'\\xc5r;Q')"
 
 
 @pytest.fixture(scope="module")
@@ -266,8 +267,9 @@ def test_stork_is_valid_feed(
     # valid feed (exists in MockStork)
     assert stork_prices.isValidNewFeed(alpha_token, data_feed_id, 0)
 
-    # invalid feed id (doesn't exist in MockStork)
-    assert not stork_prices.isValidNewFeed(alpha_token, invalid_feed_id, 0)
+    # unknown feed id: production Stork reverts NotFound(); MockStork matches
+    with boa.reverts(NOT_FOUND_REVERT):
+        stork_prices.isValidNewFeed(alpha_token, invalid_feed_id, 0)
 
     # invalid asset
     assert not stork_prices.isValidNewFeed(ZERO_ADDRESS, data_feed_id, 0)
@@ -290,10 +292,12 @@ def test_stork_add_price_feed(
     with boa.reverts("no perms"):
         stork_prices.addNewPriceFeed(alpha_token, data_feed_id, sender=bob)
 
-    # Test adding invalid feed (non-existent feed)
+    # Test adding unset feed (production Stork NotFound)
     invalid_feed_id = bytes.fromhex("f" * 64)
-    with boa.reverts("invalid feed"):
+    with boa.reverts(NOT_FOUND_REVERT):
         stork_prices.addNewPriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
+    assert not stork_prices.hasPendingPriceFeedUpdate(alpha_token)
+    assert not stork_prices.hasPriceFeed(alpha_token)
 
     # Test adding feed with zero address asset
     with boa.reverts("invalid feed"):
@@ -397,13 +401,17 @@ def test_stork_add_price_feed_validation_during_confirm(
     # Travel past time lock
     boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
 
-    # Now update the feed with zero timestampNs to make validation fail
-    # In Stork, validation checks timestampNs != 0, so we set it to 0
-    invalid_payload = mock_stork.createPriceFeedUpdateData(invalid_feed_id, 0, 0)  # timestamp 0
+    # Invalidate with a negative quantized value. Ordinary validation
+    # failures returned normally still auto-cancel during confirmation.
+    # Timestamp-zero / NotFound is not an ordinary validation failure:
+    # it bubbles and leaves the pending action intact (covered separately).
+    invalid_payload = mock_stork.createPriceFeedUpdateData(
+        invalid_feed_id, -1, boa.env.evm.patch.timestamp
+    )
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
     mock_stork.updateTemporalNumericValuesV1([invalid_payload], value=1)
 
-    # Confirm should fail and auto-cancel due to invalid timestamp (0)
+    # Confirm should fail and auto-cancel due to the negative value
     assert not stork_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
     
     # Verify feed was cancelled
@@ -447,10 +455,12 @@ def test_stork_update_price_feed(
     with boa.reverts("invalid feed"):
         stork_prices.updatePriceFeed(ZERO_ADDRESS, data_feed_id_2, 0, sender=governance.address)
 
-    # Test updating with invalid feed
+    # Test updating with an unset feed (production Stork NotFound)
     invalid_feed_id = bytes.fromhex("f" * 64)
-    with boa.reverts("invalid feed"):
+    with boa.reverts(NOT_FOUND_REVERT):
         stork_prices.updatePriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
+    assert stork_prices.feedConfig(alpha_token).feedId == data_feed_id_1
+    assert not stork_prices.hasPendingPriceFeedUpdate(alpha_token)
 
     # Test successful update
     assert stork_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
@@ -559,7 +569,8 @@ def test_stork_update_feed_validation_functions(
     assert stork_prices.isValidUpdateFeed(alpha_token, data_feed_id_2, 0)  # Valid update
     assert not stork_prices.isValidUpdateFeed(alpha_token, data_feed_id_1, 0)  # Same feed
     assert not stork_prices.isValidUpdateFeed(bravo_token, data_feed_id_2, 0)  # No existing feed
-    assert not stork_prices.isValidUpdateFeed(alpha_token, invalid_feed_id, 0)  # Invalid feed
+    with boa.reverts(NOT_FOUND_REVERT):
+        stork_prices.isValidUpdateFeed(alpha_token, invalid_feed_id, 0)
 
 
 ######################
@@ -807,16 +818,16 @@ def test_stork_feed_validation_edge_cases(
 ):
     bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
 
-    # Test feed validation with zero timestampNs (invalid)
+    # Production Stork reverts with NotFound() when timestampNs is zero.
+    # MockStork matches that; StorkPrices does not treat timestamp zero
+    # as an ordinary invalid result.
     zero_timestamp_feed_id = bytes.fromhex("9416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290e")
     
-    # Create a feed with zero timestamp (invalid)
     zero_payload = mock_stork.createPriceFeedUpdateData(zero_timestamp_feed_id, 998000000000000000, 0)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
     mock_stork.updateTemporalNumericValuesV1([zero_payload], value=1)
 
-    # Should fail validation due to zero timestampNs
-    with boa.reverts("invalid feed"):
+    with boa.reverts(NOT_FOUND_REVERT):
         stork_prices.addNewPriceFeed(alpha_token, zero_timestamp_feed_id, 0, sender=governance.address)
 
     # Fix the timestamp and it should work

@@ -33,7 +33,10 @@ def __init__():
 @view
 @external
 def getTemporalNumericValueUnsafeV1(_priceFeedId: bytes32) -> TemporalNumericValue:
-    return  self.priceFeeds[_priceFeedId]
+    value: TemporalNumericValue = self.priceFeeds[_priceFeedId]
+    if value.timestampNs == 0:
+        raw_revert(method_id("NotFound()"))
+    return value
 
 
 @view
