@@ -490,14 +490,14 @@ def disableGovPointAccrualForUser(_user: address):
     assert self.govPointAccrualDisabledBlock == 0 # dev: globally disabled
     assert self.userGovPointAccrualDisabledBlock[_user] == 0 # dev: already disabled
 
-    a: addys.Addys = addys._getAddys()
+    missionControl: address = addys._getMissionControlAddr()
     numUserAssets: uint256 = vaultData.numUserAssets[_user]
     if numUserAssets != 0:
         for i: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = vaultData.userAssets[_user][i]
             if asset == empty(address):
                 continue
-            self._updateGovPointsForUserAsset(_user, asset, a.missionControl, False)
+            self._updateGovPointsForUserAsset(_user, asset, missionControl, False)
 
     self.userGovPointAccrualDisabledBlock[_user] = block.number
     log GovPointAccrualDisabledForUser(user=_user, disabledBlock=block.number, caller=msg.sender)

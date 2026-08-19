@@ -18,7 +18,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Ledger": 13306,
     "Lootbox": 24444,
     "RebaseErc20": 11411,
-    "RipeGov": 24051,
+    "RipeGov": 24131,
     "HumanResources": 12542,
     "AuctionHouse": 24528,
     "CreditEngine": 24502,
