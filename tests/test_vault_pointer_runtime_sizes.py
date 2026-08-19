@@ -13,7 +13,7 @@ EXPECTED_RUNTIME_BYTES = {
     "SwitchboardEcho": 23192,
     "VaultMigrator": 12464,
     "Teller": 24556,
-    "TellerUtils": 9129,
+    "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
     "Lootbox": 24444,
