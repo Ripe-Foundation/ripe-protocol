@@ -7,7 +7,8 @@ rev 3 — added H-3, post-deposit authority fields;
 rev 4 — added H-4 custody exposure;
 rev 5 — H-3 Relay resolution retracted, H-4 ceiling corrected to receivable;
 rev 6 — bound effective Relay attribution, added live cross-layer privilege graph;
-rev 7 — added M-3, token-level denylist for the Across GREEN/RIPE footgun)
+rev 7 — added M-3, token-level denylist for the Across GREEN/RIPE footgun;
+rev 8 — added H-5, destination-side stranding on the live CCIP burn/mint path)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -456,6 +457,94 @@ Depository. Separately approve the Ripe solver EOA's HSM/MPC policy and
 receiver-redirection risk. If no accepted full-loss amount is large enough to
 make the lane useful, the lane does not ship.
 
+### H-5 — The live CCIP burn/mint path fails unsafely on the destination side
+
+**Severity: High (user funds, live path today). Scope extension: this is the
+CCIP RIPE/GREEN lane that is already deployed and proven by four owner
+transactions, not a proposed lane. Added rev 8.**
+
+The origin burn is final before any destination condition is evaluated. Traced
+through the vendored pool:
+
+- `BurnMintTokenPoolAbstract.lockOrBurn` runs `_validateLockOrBurn` **then**
+  `_burn` (`solidity/src/v0.8/ccip/pools/BurnMintTokenPoolAbstract.sol:22-24`).
+- `releaseOrMint` runs `_validateReleaseOrMint` **then**
+  `IBurnMintERC20.mint(receiver, localAmount)` (`:39-46`), which enters
+  `RipeToken.mint` (`contracts/tokens/RipeToken.vy:63`) and then
+  `Erc20Token._mint` (`contracts/tokens/modules/Erc20Token.vy:293`).
+
+So the two sides are asymmetric, and the asymmetry is the finding.
+
+**Origin-side conditions all fail before the burn — the user keeps their
+tokens:** token `isPaused`, `blacklisted[sender]` or `blacklisted[pool]` on the
+inbound `_transfer` (`:207-208`), and the outbound rate limit, which is consumed
+inside `_validateLockOrBurn` (`TokenPool.sol:214`) ahead of `_burn`. All safe.
+
+**Destination-side conditions all fail after the burn.** Six of them, each
+reverting `releaseOrMint` on RIPE that no longer exists on the origin:
+
+1. **RMN curse** on the destination lane (`TokenPool.sol:230`) — Chainlink's
+   control, not Ripe's.
+2. **Inbound rate limit** exceeded (`TokenPool.sol:238`).
+3. **`RipeHq.mintEnabled == False`** on the destination — `canMintRipe` returns
+   `False` at `contracts/registries/RipeHq.vy:392` before it reads any config.
+4. **Destination token `isPaused`** — `_mint` asserts it (`Erc20Token.vy:296`).
+5. **`blacklisted[recipient]`** on the destination — `_mint` asserts it (`:295`).
+6. **Pool loses `canMintRipe`** in the destination `hqConfig` (`RipeHq.vy:397`).
+
+None of the six is visible to the origin chain. `mintEnabled` is chain-local —
+the two RipeHq deployments hold independent state — so Base keeps burning and
+dispatching while Robinhood is closed.
+
+**The trigger is a routine action, not an attack.** `setMintingEnabled(false)`
+is the protocol's standard incident lever; it is what governance reaches for
+during bad debt, an oracle fault, or a depeg, none of which are about bridging.
+Pulling it strands every in-flight bridge message, and it does so precisely when
+the protocol can least absorb a second problem. Condition 5 is worse in one
+respect: `setBlacklist` is gated on the **delegated** `canSetTokenBlacklist`
+(`Erc20Token.vy:405`), not on `governance()` — so unlike pause (`:589`) and
+`setMintingEnabled` (`RipeHq.vy:420`), a non-governance role can strand
+in-flight supply.
+
+**Condition 2 is currently latent and the standing recommendation creates it.**
+All four pools have rate limiting disabled (`false, 0, 0`) with a zero
+`rateLimitAdmin` (`ccip-live-state.md:53`), and this repository's advice is to
+set a policy. Note what that does: **an inbound bucket is a stranding trigger,
+an outbound bucket is free safety.** Outbound consumes before the burn and
+reverts the origin transaction cleanly; inbound consumes after it and reverts
+the mint on tokens already destroyed.
+
+Recovery in all six cases requires clearing the destination condition *and* a
+manual re-execution of the failed CCIP message. That runbook does not exist and
+nobody owns it. Meanwhile global supply is deflated: `_burn` decremented the
+origin `totalSupply` (`Erc20Token.vy:316`) and `_mint` never ran, so for a
+governance token the holder's weight is gone for the duration.
+
+**Recommendation — the general rule first.** On a burn/mint bridge, every
+admission check belongs on the **send** side; the receive side should be as
+close to unconditional as the design allows. A destination-side check is not a
+safety control, it is a stranding trigger, because the value it would protect
+has already been destroyed elsewhere. Concretely:
+
+1. **Size each lane's inbound bucket strictly above its outbound bucket**, so
+   anything that can leave can always arrive. This keeps the entire safety
+   benefit of rate limiting and removes condition 2. Do not set symmetric
+   buckets.
+2. **Give `setMintingEnabled(false)` a documented bridge interaction.** The
+   cheap fix is operational: disable the origin lane first, let the in-flight
+   window drain, then disable minting. The alternative — a mint path for the
+   registered CCIP pool that bypasses `mintEnabled` — is a contract change that
+   deliberately removes the circuit breaker from the bridge, and should not be
+   taken without its own review. Prefer the runbook.
+3. **Check for in-flight messages before blacklisting a recipient**, and treat
+   that as a required step of the delegated procedure, since the authority is
+   weaker than governance.
+4. **Write the manual-execution runbook and name its owner** before the first
+   sized transfer, not after the first stranded one.
+
+Items 1 and 4 are prerequisites to sizing any RIPE transfer beyond the owner's
+existing canaries.
+
 ## Test obligations
 
 Whatever design lands, these must be red-before-green:
@@ -507,6 +596,17 @@ Whatever design lands, these must be red-before-green:
     is the only one the client allowlist cannot reach (M-3). A companion test
     proves the CCIP token pool is *not* blacklisted, so the approved route still
     mints and burns.
+13. On a fork, with a RIPE CCIP transfer already burned on the origin, each of
+    the six destination conditions is asserted to revert `releaseOrMint`
+    individually: RMN curse, inbound rate limit, `mintEnabled == False`,
+    destination `isPaused`, blacklisted recipient, and a pool `hqConfig` entry
+    without `canMintRipe` (H-5). Each case asserts origin `totalSupply` already
+    decreased, proving the burn is unrecoverable by revert.
+14. For every configured lane, inbound bucket capacity and rate are strictly
+    greater than the same lane's outbound bucket, asserted against live pool
+    config rather than intended config (H-5). This is the invariant that keeps a
+    rate-limit policy from becoming a stranding trigger, and it silently breaks
+    whenever either side is retuned alone.
 
 ## Sign-off
 
@@ -515,6 +615,13 @@ rev-4 rationale was wrong and is retracted; the required answer is now the
 effective-depositor and complete-order admission rule above, but H-3 remains an
 implementation/admission blocker until the exact GREEN route is enumerated and
 tested. No implementation or live GREEN-route conformance evidence exists yet.
+
+H-5 applies to the lane the owner is already using, which makes it the only
+finding here that is not contingent on a future decision. It does not block the
+canaries already performed, but obligations 13 and 14 plus the manual-execution
+runbook should land before any sized RIPE transfer, and the inbound/outbound
+asymmetry should be settled in the same governance action that sets rate limits
+at all — otherwise the fix for one gap installs the other.
 
 M-3 is the cheapest item on this list and the only one that closes a live
 exposure rather than gating a future one: the Across GREEN/RIPE footgun is
