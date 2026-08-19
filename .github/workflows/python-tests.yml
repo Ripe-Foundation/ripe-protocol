@@ -10,23 +10,26 @@ on:
       - rh
       - rh-audit-remediation
   push:
-    # Also runs on the integration branches, and not only for signal: a cache
-    # written during a pull_request run is scoped to that pull request, so PRs
-    # can never share one. Only a run on the base branch itself writes a cache
-    # that later PRs targeting it can restore -- warm-boa-cache below writes
-    # the shard-agnostic fallback that a per-shard save can't. Restoring a
-    # relevant cache measurably beats a cold one (measured on one shard,
-    # one input hash: 138s vs 235s); how much of that a given shard's own
-    # restore realizes depends on how much of its compile the fallback key
-    # actually covers, which we haven't separately measured.
+    # Push runs the full job set -- the same jobs as pull_request and
+    # merge_group, not a reduced one.
     #
-    # A push to master/rh/rh-audit-remediation runs the full job set, same as
-    # pull_request/merge_group: a direct push to a protected branch still
-    # needs full validation, not just a cache warm. If those branches are
-    # ever made push-protected (PR-only), the full set could gate on
-    # pull_request/merge_group again and push could go back to running only
-    # warm-boa-cache -- do not make that change without confirming the
-    # protection is actually in place first.
+    # master, rh, and rh-audit-remediation are not push-protected today, and
+    # master is not listed on pull_request or merge_group. Push is therefore
+    # the only automatic Python validation covering direct integration-branch
+    # updates and anything reaching master; PRs targeting master still get no
+    # pre-merge merge-ref run.
+    #
+    # Do not gate the validation jobs off of push again unless both are true:
+    # (1) all three branches reject direct pushes, and (2) master is listed on
+    # pull_request and merge_group. A unit test cannot see live branch
+    # protection -- the YAML routing here is the source of truth.
+    #
+    # A run on one of these branches is also what makes the Titanoboa cache
+    # usable at all: a cache written during a pull_request run is scoped to
+    # that pull request, so PRs can never share one. Only a run on the base
+    # branch itself writes caches that later PRs targeting it can restore.
+    # Restoring a relevant cache measurably beats a cold one (measured on one
+    # shard, one input hash: 138s vs 235s).
     branches:
       - master
       - rh
@@ -134,10 +137,12 @@ jobs:
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-          # Eight shards, balanced by measured serial runtime rather than test
+          # Shards are balanced by measured serial runtime rather than test
           # count: tests/core averages ~0.75s per test, tests/vaults ~1.29s, and
           # everything else ~0.65s. Wall clock is the slowest shard, so the
-          # heavy directories are split and the light ones are pooled.
+          # heavy directories are split and the light ones are pooled. The
+          # matrix-vs-case scheduling equality test in
+          # test_lean_shard_coverage.py keeps the shard count honest.
           # loadfile everywhere, no exceptions. It keeps every test in a file on
           # one worker and preserves intra-file ordering.
           #
@@ -250,94 +255,6 @@ jobs:
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
             --durations=50
-
-      - name: Save Titanoboa compiler artifacts
-        if: ${{ always() && steps.boa-cache.outcome == 'success' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/.ci/boa
-          key: ${{ steps.boa-cache.outputs.cache-primary-key }}
-
-  # Runs alongside the full job set above on push, not instead of it -- a
-  # push to a protected branch still gets full validation. What this job adds
-  # is a cache write the per-shard test jobs can't produce on their own:
-  # their save key (L~105) is scoped to one shard, so a shard that has never
-  # run on this branch has nothing of its own to restore. This job writes a
-  # shard-agnostic key that every lean shard's restore-keys falls back to
-  # (see below), so the first PR to touch a given shard after a push still
-  # gets a warm-ish cache instead of a fully cold one. One shard is enough
-  # for that: ripe_hq is an autouse session fixture (see
-  # tests/conf_core.py), so any test, in any shard, compiles the same ~63
-  # baseline protocol contracts that dominate the cache.
-  #
-  # The key omits matrix.shard entirely (there is no matrix here) so it
-  # lands one level up the restore-keys chain from a normal shard job:
-  # boa-<os>-py312-lean-<hash>-. Every lean shard's restore-keys includes
-  # that exact prefix as its second fallback, so this is the cache all of
-  # them land on when their own shard-specific key has never been written
-  # (a fresh PR branch) or is stale.
-  warm-boa-cache:
-    name: Warm Titanoboa compiler cache
-    if: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      ETHERSCAN_API_KEY: local-placeholder
-      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
-      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
-      PYTHONHASHSEED: "0"
-      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
-      TMPDIR: ${{ github.workspace }}/.ci/tmp
-      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Use Python 3.12.0
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12.0"
-          cache: pip
-          cache-dependency-path: requirements.txt
-
-      - name: Restore Titanoboa compiler artifacts
-        id: boa-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/.ci/boa
-          key: boa-${{ runner.os }}-py312-lean-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-warm-${{ github.run_id }}
-          restore-keys: |
-            boa-${{ runner.os }}-py312-lean-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-
-            boa-${{ runner.os }}-py312-lean-
-            boa-${{ runner.os }}-py312-
-
-      - name: Create private runtime directories
-        run: |
-          mkdir -p \
-            "$HYPOTHESIS_STORAGE_DIRECTORY" \
-            "$PYTHONPYCACHEPREFIX" \
-            "$RIPE_BOA_CACHE_DIR" \
-            "$TMPDIR" \
-            "$XDG_CACHE_HOME" \
-            "$RUNNER_TEMP/pytest-cache" \
-            "$RUNNER_TEMP/pytest-basetemp"
-
-      - name: Install pinned requirements
-        run: |
-          python -m pip install -r requirements.txt
-          python -m pip check
-
-      - name: Warm compiler cache
-        run: |
-          unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
-          unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-          # A single node ID triggers the same autouse ripe_hq session
-          # bootstrap as the whole file or directory would, at a fraction of
-          # the cost -- this job only needs the compile, not the coverage.
-          python -m pytest \
-            -o cache_dir="$RUNNER_TEMP/pytest-cache" \
-            --basetemp="$RUNNER_TEMP/pytest-basetemp" \
-            tests/config/test_bond_booster.py::test_bond_booster_add_new_units_used_permissions
 
       - name: Save Titanoboa compiler artifacts
         if: ${{ always() && steps.boa-cache.outcome == 'success' }}
