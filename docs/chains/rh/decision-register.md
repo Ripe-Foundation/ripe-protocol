@@ -1410,8 +1410,9 @@ Clock decision and separate activation checklist:
 `tests/priceSources/curve/test_green_ref_pool.py`.
 
 **18 August 2026 — price-source Curve edit reopens qualification.** The owner
-accepted `CurvePrices.vy` changes for 4-of-8 confirm, same-pool recursion, and
-GREEN/sGREEN canonicalization. Those edits change the reviewed source, so
+accepted `CurvePrices.vy` changes for 4-of-8 confirm, same-pool recursion,
+GREEN/sGREEN canonicalization, and direct-sGREEN admission guard. Those edits
+change the reviewed source, so
 RH-D043 qualification is reopened. The owner did **not** close RH-D043, did
 not change the clock domain (`block.number` / ancestor semantics), did not
 move `staleBlocks=7,200` or the 720-write cadence into the constructor

@@ -716,6 +716,9 @@ def _isValidUpdateFeed(_asset: address, _config: CurvePriceConfig, _prevPool: ad
 def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
     if empty(address) in [_asset, _config.pool, _config.lpToken]:
         return False
+    # sGREEN prices through GREEN; curveConfig[SGREEN] is never used for pricing
+    if _asset == SGREEN:
+        return False
 
     if _config.numUnderlying > 4:
         return False

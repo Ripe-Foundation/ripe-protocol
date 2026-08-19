@@ -248,3 +248,156 @@ def test_curve_self_recursive_green_lp_fail_closes_on_pricedesk(
         assert curve.getStableLpPrice(pool, coins) != 0
         assert curve.getPrice(green_token) == 0
         assert price_desk.getPrice(green_token) == 0
+
+
+def test_curve_rejects_direct_sgreen_new_feed(
+    ripe_hq,
+    governance,
+    green_token,
+    savings_green,
+    mock_price_source,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
+    fork,
+):
+    with boa.env.anchor():
+        coins8 = [savings_green.address, alpha_token.address] + [ZERO_ADDRESS] * 6
+        mr, ap, pool, lp, extra = _setup_system(
+            alpha_token,
+            bravo_token,
+            charlie_token,
+            delta_token,
+            2,
+            coins8=coins8,
+        )
+        curve = _load_curve(ripe_hq, green_token, savings_green, fork, ap)
+        mock_price_source.setPrice(savings_green, EIGHTEEN_DECIMALS)
+        mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+        cfg = curve.getCurvePoolConfig(pool)
+        assert cfg.pool == pool.address
+        assert cfg.numUnderlying == 2
+        assert savings_green.address in cfg.underlying
+        assert alpha_token.address in cfg.underlying
+        assert cfg.lpToken == lp
+        assert cfg.lpToken not in (green_token.address, savings_green.address)
+        assert mock_price_source.getPrice(alpha_token) != 0
+        # Same reconstructed pool is admissible for the non-sGREEN member.
+        assert curve.isValidNewFeed(alpha_token, pool)
+
+        assert not curve.isValidNewFeed(savings_green, pool)
+        with boa.reverts("invalid pool"):
+            curve.addNewPriceFeed(savings_green, pool, sender=governance.address)
+        assert not curve.hasPendingPriceFeedUpdate(savings_green)
+        assert curve.pendingUpdates(savings_green).actionId == 0
+        assert curve.curveConfig(savings_green).pool == ZERO_ADDRESS
+        assert curve.indexOfAsset(savings_green) == 0
+
+
+def test_curve_rejects_legacy_direct_sgreen_update_but_allows_disable(
+    ripe_hq,
+    governance,
+    green_token,
+    savings_green,
+    mock_price_source,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
+    fork,
+):
+    with boa.env.anchor():
+        coins8 = [savings_green.address, alpha_token.address] + [ZERO_ADDRESS] * 6
+        mr, ap, pool, lp, extra = _setup_system(
+            alpha_token,
+            bravo_token,
+            charlie_token,
+            delta_token,
+            2,
+            coins8=coins8,
+        )
+        curve = _load_curve(ripe_hq, green_token, savings_green, fork, ap)
+        mock_price_source.setPrice(savings_green, EIGHTEEN_DECIMALS)
+        mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+        legacy_pool = boa.env.generate_address("legacy_sgreen_pool")
+        legacy_lp = boa.env.generate_address("legacy_sgreen_lp")
+        assert legacy_pool != pool.address
+        curve.eval(
+            f"self.curveConfig[{savings_green.address}] = CurvePriceConfig("
+            f"pool={legacy_pool}, "
+            f"lpToken={legacy_lp}, "
+            f"numUnderlying=2, "
+            f"underlying=[{savings_green.address}, {alpha_token.address}, empty(address), empty(address)], "
+            f"poolType=PoolType.STABLESWAP_NG, "
+            f"hasEcoToken=True)"
+        )
+        curve.eval(f"priceData._addPricedAsset({savings_green.address})")
+
+        assert curve.indexOfAsset(savings_green) != 0
+        assert curve.curveConfig(savings_green).pool == legacy_pool
+        replacement = curve.getCurvePoolConfig(pool)
+        assert replacement.pool == pool.address
+        assert replacement.pool != legacy_pool
+        assert savings_green.address in replacement.underlying
+        assert alpha_token.address in replacement.underlying
+        assert replacement.lpToken not in (green_token.address, savings_green.address)
+        assert mock_price_source.getPrice(alpha_token) != 0
+        assert curve.isValidNewFeed(alpha_token, pool)
+
+        assert not curve.isValidUpdateFeed(savings_green, pool)
+        with boa.reverts("invalid feed"):
+            curve.updatePriceFeed(savings_green, pool, sender=governance.address)
+        assert not curve.hasPendingPriceFeedUpdate(savings_green)
+        assert curve.curveConfig(savings_green).pool == legacy_pool
+
+        assert curve.isValidDisablePriceFeed(savings_green)
+        assert curve.disablePriceFeed(savings_green, sender=governance.address)
+        boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+        assert curve.confirmDisablePriceFeed(savings_green, sender=governance.address)
+        assert curve.curveConfig(savings_green).pool == ZERO_ADDRESS
+        assert curve.indexOfAsset(savings_green) == 0
+
+
+def test_sgreen_price_derives_through_green_config(
+    ripe_hq,
+    governance,
+    green_token,
+    savings_green,
+    mock_price_source,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
+    fork,
+):
+    with boa.env.anchor():
+        coins8 = [green_token.address, alpha_token.address] + [ZERO_ADDRESS] * 6
+        mr, ap, pool, lp, extra = _setup_system(
+            alpha_token,
+            bravo_token,
+            charlie_token,
+            delta_token,
+            2,
+            coins8=coins8,
+        )
+        curve = _load_curve(ripe_hq, green_token, savings_green, fork, ap)
+        mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+        assert curve.isValidNewFeed(green_token, pool)
+        assert curve.addNewPriceFeed(green_token, pool, sender=governance.address)
+        boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+        mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+        assert curve.confirmNewPriceFeed(green_token, sender=governance.address)
+
+        green_price = curve.getPrice(green_token)
+        sgreen_price = curve.getPrice(savings_green)
+        assert green_price != 0
+        assert sgreen_price != 0
+        assert sgreen_price == green_price
+        assert curve.hasPriceFeed(green_token)
+        assert curve.hasPriceFeed(savings_green)
+        assert curve.curveConfig(green_token).pool == pool.address
+        assert curve.curveConfig(savings_green).pool == ZERO_ADDRESS

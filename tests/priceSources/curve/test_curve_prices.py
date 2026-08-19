@@ -952,13 +952,20 @@ def test_savings_green_price(
     addSeedGreenLiq() # need to add liquidity to pool
 
     # setup green price
+    assert curve_prices.isValidNewFeed(green_token, deployed_green_pool)
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
+    assert curve_prices.hasPriceFeed(green_token)
+    assert curve_prices.hasPriceFeed(savings_green)
+    assert curve_prices.curveConfig(green_token).pool != ZERO_ADDRESS
+    assert curve_prices.curveConfig(savings_green).pool == ZERO_ADDRESS
     
     # initial prices
     green_price = curve_prices.getPrice(green_token)
     initial_sgreen_price = curve_prices.getPrice(savings_green)
+    assert green_price != 0
+    assert initial_sgreen_price != 0
     _test(initial_sgreen_price, green_price)
 
     # deposit into savings green
