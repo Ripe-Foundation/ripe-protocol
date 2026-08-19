@@ -15,6 +15,11 @@ PYTEST_INI_PATH = ROOT / "pytest.ini"
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
 }
+BOA_CACHE_PREFIX = "boa-${{ runner.os }}-py312-${{ matrix.lane }}"
+BOA_INPUT_HASH = (
+    "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
+    "'interfaces/**/*.vyi') }}"
+)
 
 
 @pytest.fixture(scope="session")
@@ -84,6 +89,26 @@ def _unset_tokens(script):
     return tokens
 
 
+def _pytest_args(command):
+    """Exclude launcher flags such as the `-m` in `python -m pytest`."""
+    tokens = shlex.split(command.replace("\\\n", " "), comments=True)
+    try:
+        pytest_index = tokens.index("pytest")
+    except ValueError as error:
+        raise AssertionError("Workflow command must invoke pytest") from error
+    return tokens[pytest_index + 1 :]
+
+
+def _flag_values(arguments, flag):
+    indices = [
+        index for index, argument in enumerate(arguments) if argument == flag
+    ]
+    assert all(index + 1 < len(arguments) for index in indices), (
+        f"Workflow flag has no value: {flag}"
+    )
+    return [arguments[index + 1] for index in indices]
+
+
 def _partition_shard_arguments(arguments):
     targets = []
     ignores = []
@@ -144,6 +169,20 @@ def _uses_serial_pytest_marker(path):
     return False
 
 
+def test_pytest_arg_parser_handles_shell_syntax_without_false_flags():
+    command = (
+        "python -m pytest \\\n"
+        "  -m \\\n"
+        "  gas \\\n"
+        "  tests/example.py\n"
+        "# -m not-gas\n"
+    )
+    arguments = _pytest_args(command)
+
+    assert _flag_values(arguments, "-m") == ["gas"]
+    assert arguments[-1] == "tests/example.py"
+
+
 def test_python_workflow_routes_validation_jobs_on_automatic_events():
     workflow = _workflow()
     assert set(workflow["on"]) == {
@@ -177,13 +216,27 @@ def test_python_workflow_routes_validation_jobs_on_automatic_events():
             f"{job_name} must validate direct integration-branch pushes"
         )
 
-    assert jobs["warm-boa-cache"]["if"] == (
-        "${{ github.event_name == 'push' }}"
-    )
     assert jobs["rh-pr-gate"]["if"] == (
         "${{ always() && (github.event_name == 'pull_request' || "
         "github.event_name == 'merge_group') }}"
     )
+
+
+def test_python_workflow_uses_read_only_repository_permissions():
+    assert _workflow()["permissions"] == {"contents": "read"}
+
+
+def test_python_workflow_dispatches_only_supported_test_lanes():
+    lane = _workflow()["on"]["workflow_dispatch"]["inputs"]["lane"]
+    assert lane["required"] == "true"
+    assert lane["default"] == "lean"
+    assert lane["type"] == "choice"
+    assert lane["options"] == ["lean", "comprehensive"]
+
+
+def test_python_workflow_keeps_running_sibling_shards_after_a_failure():
+    strategy = _workflow()["jobs"]["test"]["strategy"]
+    assert strategy["fail-fast"] == "false"
 
 
 def test_python_workflow_schedules_every_lean_case_arm_once():
@@ -202,6 +255,11 @@ def test_python_workflow_schedules_every_lean_case_arm_once():
     )
 
 
+def test_python_workflow_lean_step_is_not_event_gated():
+    step = _step(_workflow()["jobs"]["test"], "Run lean default lane")
+    assert step["if"] == "matrix.lane == 'lean'"
+
+
 def test_python_workflow_lean_shards_use_loadfile_distribution():
     command = _step(_workflow()["jobs"]["test"], "Run lean default lane")[
         "run"
@@ -213,6 +271,17 @@ def test_python_workflow_lean_shards_use_loadfile_distribution():
     )
     assert assignments == ["loadfile"]
     assert command.count('--dist "$dist_mode"') == 1
+
+
+def test_python_workflow_unknown_lean_shards_fail_closed():
+    command = _step(_workflow()["jobs"]["test"], "Run lean default lane")[
+        "run"
+    ]
+    fallback = (
+        '  *)\n    echo "Unknown lean test shard: $TEST_SHARD"\n'
+        "    exit 2\n    ;;\nesac"
+    )
+    assert fallback in command
 
 
 def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
@@ -291,7 +360,6 @@ def test_python_workflow_pins_every_external_action_to_a_commit():
         for step in job.get("steps", [])
         if "uses" in step and not step["uses"].startswith("./")
     ]
-    assert any(job_name == "warm-boa-cache" for job_name, _, _ in action_steps)
 
     unpinned = {
         f"{job_name}/{step_name}": action
@@ -301,31 +369,62 @@ def test_python_workflow_pins_every_external_action_to_a_commit():
     assert unpinned == {}, f"External actions must use commit SHAs: {unpinned}"
 
 
-def test_python_workflow_warm_cache_matches_lean_restore_prefix():
-    jobs = _workflow()["jobs"]
-    test_restore = _step(
-        jobs["test"], "Restore Titanoboa compiler artifacts"
+def test_python_workflow_primary_cache_key_is_shard_scoped():
+    restore = _step(
+        _workflow()["jobs"]["test"],
+        "Restore Titanoboa compiler artifacts",
     )
-    warm_restore = _step(
-        jobs["warm-boa-cache"], "Restore Titanoboa compiler artifacts"
+    assert restore["with"]["key"] == (
+        f"{BOA_CACHE_PREFIX}-{BOA_INPUT_HASH}-"
+        "${{ matrix.shard }}-${{ github.run_id }}"
     )
 
-    warm_key = warm_restore["with"]["key"]
-    suffix = "warm-${{ github.run_id }}"
-    assert warm_key.endswith(suffix)
-    warm_prefix = warm_key.removesuffix(suffix)
-    lean_restore_prefixes = [
-        prefix.replace("${{ matrix.lane }}", "lean")
-        for prefix in test_restore["with"]["restore-keys"].splitlines()
+
+def test_python_workflow_cache_restore_fallbacks_are_ordered():
+    restore = _step(
+        _workflow()["jobs"]["test"],
+        "Restore Titanoboa compiler artifacts",
+    )
+    assert restore["with"]["restore-keys"].splitlines() == [
+        f"{BOA_CACHE_PREFIX}-{BOA_INPUT_HASH}-${{{{ matrix.shard }}}}-",
+        f"{BOA_CACHE_PREFIX}-{BOA_INPUT_HASH}-",
+        f"{BOA_CACHE_PREFIX}-",
+        "boa-${{ runner.os }}-py312-",
     ]
-    assert warm_prefix in lean_restore_prefixes
 
-    warm_save = _step(
-        jobs["warm-boa-cache"], "Save Titanoboa compiler artifacts"
+
+def test_python_workflow_uses_full_history_for_python_tests():
+    checkout = _step(_workflow()["jobs"]["test"], "Check out source")
+    assert checkout["with"]["fetch-depth"] == "0"
+
+
+def test_python_workflow_bounds_every_job_runtime():
+    jobs = _workflow()["jobs"]
+    expected = {
+        "solidity": "20",
+        "test": "${{ matrix.lane == 'comprehensive' && 180 || 120 }}",
+        "deployment-controls": "60",
+        "snapshot-gas": "30",
+        "rh-pr-gate": "5",
+    }
+    assert all("timeout-minutes" in job for job in jobs.values())
+    for job_name, timeout in expected.items():
+        assert jobs[job_name]["timeout-minutes"] == timeout
+
+
+def test_python_workflow_groups_superseded_branch_or_pr_runs():
+    concurrency = _workflow()["concurrency"]
+    assert concurrency["group"] == (
+        "python-tests-${{ github.workflow }}-"
+        "${{ github.event.pull_request.number || github.ref }}-"
+        "${{ github.event_name == 'workflow_dispatch' "
+        "&& inputs.lane || 'automatic' }}"
     )
-    assert warm_save["with"]["key"] == (
-        "${{ steps.boa-cache.outputs.cache-primary-key }}"
-    )
+
+
+def test_python_workflow_cancels_superseded_branch_or_pr_runs():
+    concurrency = _workflow()["concurrency"]
+    assert concurrency["cancel-in-progress"] == "true"
 
 
 def test_python_workflow_exposes_stable_rh_pr_gate():
@@ -366,11 +465,23 @@ def test_python_workflow_runs_deployment_controls_without_credentials():
         "WEB3_ALCHEMY_API_KEY",
     }
     missing = required - _unset_tokens(command)
+    arguments = _pytest_args(command)
 
     assert not missing, f"Credentials not explicitly unset: {sorted(missing)}"
-    assert "-o addopts=''" in command
-    assert "tests/deployment" in shlex.split(command)
+    assert "addopts=" in _flag_values(arguments, "-o")
+    assert "tests/deployment" in arguments
     assert "tests/deployment" in PYTEST_IGNORED_DIRECTORIES
+
+
+def test_python_workflow_deployment_controls_keep_lean_marker_exclusions():
+    command = _step(
+        _workflow()["jobs"]["deployment-controls"],
+        "Run deployment control suites",
+    )["run"]
+    assert _flag_values(_pytest_args(command), "-m") == [
+        "not release and not artifact and not fuzz and not gas "
+        "and not fork_qualification"
+    ]
 
 
 def test_unset_parser_rejects_credentials_that_are_only_mentioned():
@@ -386,6 +497,17 @@ def test_unset_parser_rejects_credentials_that_are_only_mentioned():
         assert required - _unset_tokens(script) == {dropped}, dropped
 
 
+def test_python_workflow_snapshot_gas_uses_gas_marker_only():
+    command = _step(
+        _workflow()["jobs"]["snapshot-gas"],
+        "Enforce snapshot gas budgets",
+    )["run"]
+    arguments = _pytest_args(command)
+
+    assert _flag_values(arguments, "-m") == ["gas"]
+    assert "addopts=" in _flag_values(arguments, "-o")
+
+
 def test_python_workflow_enforces_all_snapshot_gas_suites():
     command = _step(
         _workflow()["jobs"]["snapshot-gas"],
@@ -396,9 +518,7 @@ def test_python_workflow_enforces_all_snapshot_gas_suites():
         "tests/priceSources/curve/test_robinhood_launch_route.py",
         "tests/core/test_sc24_gas_matrix.py",
     }
-    command_tokens = shlex.split(command)
+    arguments = _pytest_args(command)
 
-    assert "-m" in command_tokens
-    assert "gas" in command_tokens
     for test_file in expected_test_files:
-        assert command_tokens.count(test_file) == 1
+        assert arguments.count(test_file) == 1
