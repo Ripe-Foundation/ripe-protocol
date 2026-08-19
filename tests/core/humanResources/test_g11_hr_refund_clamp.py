@@ -91,10 +91,14 @@ def test_g11_partial_headroom_cancel_clamps_to_max(
         human_resources, governance, setupHrConfig, setupLedgerBalance, valid_contributor_terms
     )
     orig = c.compensation()
-    official_delta_budget(switchboard_delta, governance, MAX_UINT256 - orig + 1)
+    start_budget = MAX_UINT256 - orig + 1
+    official_delta_budget(switchboard_delta, governance, start_budget)
+    credited = MAX_UINT256 - start_budget
+    assert 0 < credited < orig
     _, ok = official_delta_cancel(switchboard_delta, governance, c)
     assert ok is True
     assert c.compensation() == 0
+    assert ledger.ripeAvailForHr() == start_budget + credited
     assert ledger.ripeAvailForHr() == MAX_UINT256
 
 

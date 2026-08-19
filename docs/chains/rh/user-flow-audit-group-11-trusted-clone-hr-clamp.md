@@ -1,9 +1,11 @@
 # Group 11 — trusted clone, HR refund clamp
 
-**Status: owner-approved 2026-08-19. Implementing.**
+**Status: owner-approved 2026-08-19. Implemented in #195 @ c8eead4.**
 
 This brief is self-contained. It records the owner-approved
 no-Ledger redesign for Human Resources cancellation credit.
+The clamp is written against the unchanged Base Ledger
+(`refundRipeAfterCancelPaycheck` is a bare `ripeAvailForHr += _amount`).
 
 Closed draft PR: https://github.com/Ripe-Foundation/ripe-protocol/pull/194
 
@@ -30,7 +32,9 @@ Approved 2026-08-19:
    excess credit is intentionally discarded.
 6. Human Resources still calls
    `Ledger.refundRipeAfterCancelPaycheck(0)` when no headroom
-   exists. The Ledger call is never skipped.
+   exists. The Ledger call is never skipped, so Ledger pause and
+   authorization stay on the cancellation path even when credit
+   is zero.
 7. `RipePaycheckCancelled.forfeitedAmount` reports the full
    forfeiture, not the credited amount.
 8. Do not add storage, signatures, return values, or events.
@@ -52,6 +56,20 @@ at any time and discards credit that cannot be represented.
 | 5 | Infeasible `minCliff > maxVest` reverts on Delta execute. |
 
 Hunks 1, 2, 3, and 5 remain. The trusted-clone ruling remains.
+
+Hunk 2’s seven representability bounds reject a create when:
+
+1. `compensation > MAX_UINT256 // 2`
+2. `vestingLength > 2**128`
+3. `depositLockDuration > MAX_UINT256 - 2**64`
+4. `startDelay > MAX_UINT256 - block.timestamp`
+5. `vestingLength > MAX_UINT256 - startTime`
+6. `cliffLength > MAX_UINT256 - startTime`
+7. `unlockLength > MAX_UINT256 - startTime`
+
+Those are static overflow checks. They do not read live
+`ripeGovVaultConfig` and do not reject a lock merely for sitting
+below the live minimum or above the live maximum.
 
 Hunk 4 is only this Human Resources boundary:
 
@@ -81,11 +99,12 @@ or setter-headroom guard.
 
 ## Accepted residuals
 
+- At `MAX`, any positive forfeiture credits `0`. The event still
+  reports the full forfeiture. Excess credit that cannot be
+  represented is discarded.
 - After a fully paid, never-cancelled vest, `setRipeAvailForHr(MAX)`
   succeeds. There is no leftover reserved notional.
 - After a post-cliff or frozen cancel of `C-P` at a below-ceiling
   budget, the budget increases by `C-P` exactly.
-- At `MAX`, any positive forfeiture credits `0`. The event still
-  reports the full forfeiture.
 - Official cash cannot remint: the trusted clone sends
   `getClaimable()` and increments `totalClaimed`.
