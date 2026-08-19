@@ -321,6 +321,12 @@ def _handleGovDataOnWithdrawal(
     _ledger: address,
 ) -> uint256:
     userData: GovData = self.userGovData[_user][_asset]
+    shouldUpdatePoints: bool = not self._isGovPointAccrualDisabled(_user)
+    newPoints: uint256 = 0
+    if shouldUpdatePoints:
+        # Courtesy may zero unlock on this touch. Accrue through this block with
+        # the pre-release unlock and the live terms/weight first.
+        newPoints = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
 
     # refresh unlock / terms
     userData.unlock = self._refreshUnlock(userData.unlock, _config.lockTerms, userData.lastTerms)
@@ -333,7 +339,7 @@ def _handleGovDataOnWithdrawal(
     # Disabled users forfeit no stored points on a partial exit. A complete
     # per-asset exit clears only the frozen points already recorded for that
     # asset; unsafe pending accrual is intentionally never calculated.
-    if self._isGovPointAccrualDisabled(_user):
+    if not shouldUpdatePoints:
         userData.lastShares = vaultData.userBalances[_user][_asset]
         userData.lastPointsUpdate = block.number
         if userData.lastShares == 0:
@@ -346,7 +352,6 @@ def _handleGovDataOnWithdrawal(
         self.userGovData[_user][_asset] = userData
         return 0
 
-    newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
     prevSavedPoints: uint256 = userData.govPoints
 
     # handle points penalty for withdrawal

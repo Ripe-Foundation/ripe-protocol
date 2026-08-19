@@ -35,6 +35,45 @@ def _deposit_with_lock(vault, token, funder, user, teller, amount, lock_duration
     return data
 
 
+def _live_lock_terms(kwargs):
+    return _switchboard_lock_terms(
+        kwargs.get("_minLockDuration", 100),
+        kwargs.get("_maxLockDuration", 1000),
+        kwargs.get("_maxLockBoost", 200_00),
+        kwargs.get("_canExit", True),
+        kwargs.get("_exitFee", 10_00),
+    )
+
+
+def _expected_courtesy_withdraw_points(
+    vault, user, token, withdraw_amount, live_terms, live_weight
+):
+    before = vault.userGovData(user, token)
+    pending = vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
+        before.unlock,
+        live_terms,
+        live_weight,
+    )
+    new_user_points = before.govPoints + pending
+    withdrawal_shares = vault.amountToShares(token, withdraw_amount, True)
+    if withdrawal_shares == before.lastShares:
+        points_to_reduce = new_user_points
+    else:
+        points_to_reduce = min(
+            new_user_points,
+            new_user_points * withdrawal_shares // before.lastShares,
+        )
+    return (
+        new_user_points - points_to_reduce,
+        pending,
+        points_to_reduce,
+        withdrawal_shares,
+        before,
+    )
+
+
 def _gov_position_snapshot(vault, token, user):
     data = vault.userGovData(user, token)
     terms = data.lastTerms
@@ -2272,12 +2311,232 @@ def test_ripe_gov_vault_courtesy_checkpoint_then_release_lock_not_needed(
     assert is_depleted
 
 
-def test_ripe_gov_vault_courtesy_checkpoint_keeps_lock_bonus_direct_withdraw_does_not(
+@pytest.mark.parametrize(
+    "new_kwargs",
+    [
+        {"_canExit": False, "_exitFee": 0, "_assetWeight": 150_00},
+        {"_exitFee": 20_00, "_assetWeight": 150_00},
+        {"_maxLockBoost": 150_00, "_assetWeight": 150_00},
+        {"_minLockDuration": 200, "_assetWeight": 150_00},
+    ],
+    ids=["can_exit_lost", "fee_up", "boost_down", "min_up"],
+)
+def test_ripe_gov_vault_courtesy_checkpoint_then_partial_matches_direct_partial(
     ripe_gov_vault,
     ripe_token,
     whale,
     bob,
-    alice,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+    new_kwargs,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+    boa.env.time_travel(blocks=50)
+
+    live_weight = new_kwargs.get("_assetWeight", 100_00)
+    live_terms = _live_lock_terms(new_kwargs)
+    setupRipeGovVaultConfig(**new_kwargs)
+    half = deposit_amount // 2
+    remaining, pending, _, _, before = _expected_courtesy_withdraw_points(
+        ripe_gov_vault, bob, ripe_token, half, live_terms, live_weight
+    )
+    pending_if_zeroed = ripe_gov_vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
+        0,
+        live_terms,
+        live_weight,
+    )
+    pending_old_weight = ripe_gov_vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
+        before.unlock,
+        live_terms,
+        100_00,
+    )
+    pending_old_terms = ripe_gov_vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
+        before.unlock,
+        _switchboard_lock_terms(100, 1000, 200_00, True, 10_00),
+        live_weight,
+    )
+    assert pending > pending_if_zeroed
+    assert pending != pending_old_weight
+    if new_kwargs.get("_maxLockBoost") or new_kwargs.get("_minLockDuration"):
+        assert pending != pending_old_terms
+
+    with boa.env.anchor():
+        ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+        checkpointed = ripe_gov_vault.userGovData(bob, ripe_token)
+        assert checkpointed.govPoints == pending
+        assert checkpointed.unlock == 0
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob, ripe_token, half, bob, sender=teller.address
+        )
+        path_a = ripe_gov_vault.userGovData(bob, ripe_token)
+        path_a_points = path_a.govPoints
+        path_a_user = ripe_gov_vault.totalUserGovPoints(bob)
+        path_a_global = ripe_gov_vault.totalGovPoints()
+        assert path_a_points == remaining
+        assert path_a.unlock == 0
+
+    ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, half, bob, sender=teller.address
+    )
+    path_b = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert path_b.govPoints == remaining
+    assert path_b.govPoints == path_a_points
+    assert path_b.unlock == 0
+    assert ripe_gov_vault.totalUserGovPoints(bob) == remaining
+    assert ripe_gov_vault.totalGovPoints() == remaining
+    assert ripe_gov_vault.totalUserGovPoints(bob) == path_a_user
+    assert ripe_gov_vault.totalGovPoints() == path_a_global
+
+
+@pytest.mark.parametrize(
+    "new_kwargs",
+    [
+        {"_canExit": False, "_exitFee": 0, "_assetWeight": 150_00},
+        {"_exitFee": 20_00, "_assetWeight": 150_00},
+        {"_maxLockBoost": 150_00, "_assetWeight": 150_00},
+        {"_maxLockDuration": 1200, "_assetWeight": 150_00},
+    ],
+    ids=["can_exit_lost", "fee_up", "boost_down", "max_up"],
+)
+def test_ripe_gov_vault_courtesy_partial_withdraw_uses_prerelease_unlock(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+    new_kwargs,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+    boa.env.time_travel(blocks=50)
+
+    live_weight = new_kwargs.get("_assetWeight", 100_00)
+    live_terms = _live_lock_terms(new_kwargs)
+    setupRipeGovVaultConfig(**new_kwargs)
+    half = deposit_amount // 2
+    remaining, pending, points_to_reduce, withdrawal_shares, before = (
+        _expected_courtesy_withdraw_points(
+            ripe_gov_vault, bob, ripe_token, half, live_terms, live_weight
+        )
+    )
+    pending_if_zeroed = ripe_gov_vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
+        0,
+        live_terms,
+        live_weight,
+    )
+    pending_old_weight = ripe_gov_vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
+        before.unlock,
+        live_terms,
+        100_00,
+    )
+    pending_old_terms = ripe_gov_vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
+        before.unlock,
+        _switchboard_lock_terms(100, 1000, 200_00, True, 10_00),
+        live_weight,
+    )
+    assert pending > pending_if_zeroed
+    assert pending != pending_old_weight
+    if new_kwargs.get("_maxLockBoost") or new_kwargs.get("_maxLockDuration"):
+        assert pending != pending_old_terms
+    assert points_to_reduce == pending * withdrawal_shares // before.lastShares
+    assert remaining == pending - points_to_reduce
+
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, half, bob, sender=teller.address
+    )
+    after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert withdrawn == half
+    assert not is_depleted
+    assert after.unlock == 0
+    assert after.lastTerms.canExit == live_terms[3]
+    assert after.lastTerms.exitFee == live_terms[4]
+    assert after.govPoints == remaining
+    assert ripe_gov_vault.totalUserGovPoints(bob) == remaining
+    assert ripe_gov_vault.totalGovPoints() == remaining
+
+    boa.env.time_travel(blocks=20)
+    future = ripe_gov_vault.getLatestGovPoints(
+        after.lastShares,
+        after.lastPointsUpdate,
+        after.unlock,
+        live_terms,
+        live_weight,
+    )
+    future_if_still_locked = ripe_gov_vault.getLatestGovPoints(
+        after.lastShares,
+        after.lastPointsUpdate,
+        before.unlock,
+        live_terms,
+        live_weight,
+    )
+    assert future_if_still_locked > future
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints == remaining + future
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+
+def test_ripe_gov_vault_courtesy_full_withdraw_clears_points(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+    boa.env.time_travel(blocks=50)
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    remaining, pending, points_to_reduce, _, before = _expected_courtesy_withdraw_points(
+        ripe_gov_vault,
+        bob,
+        ripe_token,
+        deposit_amount,
+        _switchboard_lock_terms(100, 1000, 200_00, False, 0),
+        100_00,
+    )
+    assert pending > 0
+    assert remaining == 0
+    assert points_to_reduce == pending
+
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, deposit_amount, bob, sender=teller.address
+    )
+    after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert withdrawn == deposit_amount
+    assert is_depleted
+    assert after.unlock == 0
+    assert after.lastShares == 0
+    assert after.govPoints == 0
+    assert ripe_gov_vault.totalUserGovPoints(bob) == 0
+    assert ripe_gov_vault.totalGovPoints() == 0
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+
+
+def test_ripe_gov_vault_courtesy_disabled_user_skips_pending_and_clears_on_full(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
     teller,
     switchboard_alpha,
     setupRipeGovVaultConfig,
@@ -2285,50 +2544,90 @@ def test_ripe_gov_vault_courtesy_checkpoint_keeps_lock_bonus_direct_withdraw_doe
     setupRipeGovVaultConfig()
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
-    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, alice, teller, deposit_amount)
-    boa.env.time_travel(blocks=50)
+    boa.env.time_travel(blocks=20)
+    ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_alpha.address)
+    stored = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert stored.govPoints > 0
+    stored_points = stored.govPoints
+    stored_unlock = stored.unlock
+    user_total = ripe_gov_vault.totalUserGovPoints(bob)
+    global_total = ripe_gov_vault.totalGovPoints()
 
-    new_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
+    boa.env.time_travel(blocks=20)
+    live_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
     setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
-
-    bob_before = ripe_gov_vault.userGovData(bob, ripe_token)
-    alice_before = ripe_gov_vault.userGovData(alice, ripe_token)
-    pending_with_lock = ripe_gov_vault.getLatestGovPoints(
-        bob_before.lastShares,
-        bob_before.lastPointsUpdate,
-        bob_before.unlock,
-        new_terms,
+    skipped_pending = ripe_gov_vault.getLatestGovPoints(
+        stored.lastShares,
+        stored.lastPointsUpdate,
+        stored.unlock,
+        live_terms,
         100_00,
     )
-    pending_if_zeroed = ripe_gov_vault.getLatestGovPoints(
-        bob_before.lastShares,
-        bob_before.lastPointsUpdate,
-        0,
-        new_terms,
-        100_00,
-    )
-    assert pending_with_lock > pending_if_zeroed
-
-    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
-    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints == pending_with_lock
-    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+    assert skipped_pending > 0
 
     half = deposit_amount // 2
-    alice_pending_unlocked = ripe_gov_vault.getLatestGovPoints(
-        alice_before.lastShares,
-        alice_before.lastPointsUpdate,
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, half, bob, sender=teller.address
+    )
+    partial = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert withdrawn == half
+    assert not is_depleted
+    assert partial.unlock == 0
+    assert stored_unlock > boa.env.evm.patch.block_number
+    assert partial.govPoints == stored_points
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == global_total
+
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, half, bob, sender=teller.address
+    )
+    emptied = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert withdrawn == half
+    assert is_depleted
+    assert emptied.govPoints == 0
+    assert emptied.lastShares == 0
+    assert ripe_gov_vault.totalUserGovPoints(bob) == 0
+    assert ripe_gov_vault.totalGovPoints() == 0
+
+
+def test_ripe_gov_vault_courtesy_partial_transfer_uses_prerelease_unlock(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    setupRipeGovVaultConfig,
+):
+    setupRipeGovVaultConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
+    boa.env.time_travel(blocks=50)
+    live_terms = _switchboard_lock_terms(100, 1000, 200_00, False, 0)
+    setupRipeGovVaultConfig(_canExit=False, _exitFee=0)
+    half = deposit_amount // 2
+    remaining, pending, _, _, before = _expected_courtesy_withdraw_points(
+        ripe_gov_vault, bob, ripe_token, half, live_terms, 100_00
+    )
+    pending_if_zeroed = ripe_gov_vault.getLatestGovPoints(
+        before.lastShares,
+        before.lastPointsUpdate,
         0,
-        new_terms,
+        live_terms,
         100_00,
     )
-    withdrawal_shares = ripe_gov_vault.amountToShares(ripe_token, half, True)
-    ripe_gov_vault.withdrawTokensFromVault(
-        alice, ripe_token, half, alice, sender=teller.address
+    assert pending > pending_if_zeroed
+
+    transferred, is_depleted = ripe_gov_vault.transferBalanceWithinVault(
+        ripe_token, bob, alice, half, sender=auction_house.address
     )
-    expected_alice = alice_pending_unlocked - (
-        alice_pending_unlocked * withdrawal_shares // alice_before.lastShares
-    )
-    assert ripe_gov_vault.userGovData(alice, ripe_token).govPoints == expected_alice
+    sender = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert transferred == half
+    assert not is_depleted
+    assert sender.unlock == 0
+    assert sender.govPoints == remaining
+    assert ripe_gov_vault.totalUserGovPoints(bob) == remaining
 
 
 def test_ripe_gov_vault_courtesy_switchboard_then_teller_withdraw(
