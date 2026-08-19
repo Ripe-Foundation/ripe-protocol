@@ -88,12 +88,41 @@ Read directly from `relay-depository/packages/ethereum-vm/src/RelayDepository.so
   `depositErc20(address,address,uint256,bytes32)` (`0xe8017952`). The sibling
   selector `0x5a1ee3ac` deposits the caller's **entire existing allowance** and
   is unnecessary for Ripe; it must be rejected. Relay quotes must request
-  `includeProtocolData=true`; that signed protocol data must be schema-decoded
-  so the order id, effective depositor, configured solver-EOA signature,
-  refund/output/call fields, deadlines, fees, and extra data can be rebound
-  independently before signing. Zero depositor resolves to
+  `includeProtocolData=true`; that returns the solver-signed order material, not
+  a Relay Oracle attestation or proof that a deposit occurred. It must be
+  schema-decoded so the order id, effective depositor, configured solver-EOA
+  signature, refund/output/call fields, deadlines, fees, and extra data can be
+  rebound independently before signing (`relay-docs@94bf717
+  references/api/changelog.mdx:83-87`; `relay-kit@a5f6cb5
+  packages/sdk/src/types/api.ts:2957-2979`). Zero depositor resolves to
   `msg.sender` and is safe only when the wallet calls the Depository directly,
   not through an intermediary.
+- Because the quote recipient receives that solver signature before depositing,
+  it cannot itself authorize a Ripe payout. The minimum proposed topology admits
+  only a top-level `fill` transaction directly from the configured solver EOA
+  after its service observes the deposit; Relay's EVM verifier inspects the
+  top-level calldata suffix, so an inner wrapper call is not equivalent
+  (`relay-protocol-oracle@55b22de
+  src/services/attestation/vm/ethereum-vm/index.ts:407-468`).
+- Custom payout quoting is not yet established by the pinned examples. Relay's
+  standard EVM `output.extraData` canonically ABI-encodes a `fillContract`, but
+  the captured examples point it at Relay's Router rather than a Ripe payout;
+  some examples also have unequal `minimumAmount` and `expectedAmount`. Relay
+  must demonstrate a live token-specific custom/exact-output policy before the
+  proposed payout may assume either shape
+  (`relay-settlement@98ad1a0 packages/sdk/src/order/index.ts:269-305`;
+  `relay-docs@94bf717 features/price-stabilization.mdx:630-636` and
+  `references/api/api_resources/contract-addresses.mdx:33`).
+- Amount admission must include signed fees. The Oracle credits the input to the
+  solver and then debits each successful-fill fee from that Hub balance, after
+  requiring the fee currency to match the input. A payout policy that checks
+  only `output <= input` can therefore create an origin shortfall; require
+  overflow-safe `output + feeSum <= input` in the approved input currency. The
+  proposed fixed 1:1 payout ledger goes further and requires equality; otherwise
+  any surplus receivable must also be counted in the provider full-loss
+  allocation. A shortfall requires an explicitly budgeted treasury subsidy
+  (`relay-protocol-oracle@55b22de
+  src/services/attestation/index.ts:375-399,1917-1975`).
 - The only way funds leave is `execute(CallRequest, signature)`
   (`RelayDepository.sol:159-181`), where `CallRequest` is an **arbitrary
   array of `{to, data, value, allowFailure}` calls**, gated by exactly one

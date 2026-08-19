@@ -240,11 +240,17 @@ cross-chain stop.
 
 The destination payout component must be a separate Ripe-controlled contract
 with zero mint authority and its own guardian-controlled bridge switch. It
-rechecks the switch, every order field, and every exposure limit at fill
-execution; a valid solver-EOA signature alone is insufficient. An API precheck
-prevents a good-faith user from entering a lane that will not fill; it is UX
-admission, not enforcement. A user can call Relay's permissionless deposit
-directly, so only the payout contract can bound Ripe's inventory exposure.
+accepts only a top-level `fill` transaction directly from the configured solver
+EOA after its service observes the origin deposit, then rechecks the switch,
+every order field, and every exposure limit at execution. The solver signature
+is already public to the quote recipient and does not prove a deposit, so it is
+necessary but insufficient. The service's HSM/MPC may sign the direct fill only
+after a successful finalized configured-Depository event binds the exact chain,
+contract, token, order id, effective depositor, actual amount/net fee economics,
+recipient, and unused transaction-log identity. An API precheck prevents a
+good-faith user from entering a lane that will not fill; it is UX admission, not
+enforcement. A user can call Relay's permissionless deposit directly, so only
+the payout contract can bound Ripe's inventory exposure.
 
 ### H-6 — stop the drain whenever canonical refill is disabled
 
@@ -253,13 +259,18 @@ token transfer, while replenishment is a CCIP destination mint. If destination
 `RipeHq.mintEnabled()` is `False`, fills otherwise keep draining inventory while
 every refill is blocked after the origin burn.
 
-Every fill must therefore fail closed when either the dedicated lane pause is
-engaged **or** the destination `RipeHq.mintEnabled()` staticcall is false or
-reverts. This restores the existing protocol-wide mint stop as a stop on fast
-cross-chain outflow while retaining a narrower bridge-only pause. Incident
-automation must pause the payout lane before or in the same destination-chain
-governance batch that disables minting. This does not rescue CCIP messages
-already in flight; H-5's preflight and manual-execution runbook remain required.
+Every fill must therefore first read `token.ripeHq()`, require it to equal the
+payout instance's expected HQ, then fail closed when either the dedicated lane
+pause is engaged **or** that HQ's `mintEnabled()` staticcall is false/reverts.
+The equality matters because the token's HQ is mutable: after an HQ migration,
+CCIP minting consults the new HQ while an unguarded payout could keep reading an
+old HQ that still reports `true`. A migration retires the immutable payout and
+requires a new deployment. This restores the existing protocol-wide mint stop
+as a stop on fast cross-chain outflow while retaining a narrower bridge-only
+pause. Incident automation must pause the payout lane before or in the same
+destination-chain governance batch that disables minting. This does not rescue
+CCIP messages already in flight; H-5's preflight and manual-execution runbook
+remain required.
 
 ### H-2 — bound blacklist-blocked settlement
 
@@ -288,78 +299,117 @@ For the direct ERC-20 path:
   Depository directly;
 - request `includeProtocolData=true`, schema-decode the signed order, recompute
   the order id, bind calldata `id`, and verify the configured Ripe solver-EOA
-  signature;
-- bind every input, output, refund, call, deadline, fee, and extra-data field.
+  signature; this is the solver's signature, not a Relay Oracle attestation or
+  proof of deposit;
+- bind every input, output, refund, call, deadline, fee, and extra-data field;
+  require all fill fees in the approved origin input chain/currency and enforce
+  `output + feeSum == input` with overflow-safe arithmetic, because Relay debits
+  those fees from the solver's origin receivable and the fixed 1:1 ledger must
+  track neither a shortfall nor an uncounted surplus.
 
 Unknown order versions, opaque payloads, raw transfers, deposit-address routes,
 and unenumerated periphery calls fail closed.
 
+The pinned standard examples do not yet prove the required payout shape: they
+encode Relay's Router rather than a Ripe payout in
+`output.extraData.fillContract`, and some have unequal minimum/expected output
+amounts. Provider onboarding must produce a live, token-specific order that
+intentionally binds the Ripe payout, exact-output policy, and fee-denominated
+1:1 accounting before any field is treated as supported.
+
 ## Exposure accounting for a Ripe-operated Relay lane
 
-The implementation needs four independent bounds:
+The implementation needs five independent controls:
 
-| Bound | What it limits | Enforcement |
+| Control | What it limits | Enforcement |
 | --- | --- | --- |
-| Per-transfer quote cap | One user's fill | API display plus payout contract at execution |
+| Per-transfer hard cap | One user's fill | API display plus independent payout-contract `maxFillAmount` at execution |
 | Payout inventory ceiling | GREEN or RIPE held in Ripe's destination hot contract | Treasury funding policy and on-chain balance/withdrawal controls |
-| Relay receivable cap, age, and entry count | Filled value not yet withdrawn from Relay | Chain-local payout allocation; governance-bounded aggregate; bounded storage/work |
-| CCIP rebalance backlog cap, age, and entry count | Withdrawn origin inventory not yet restored on destination | Payout contract/reconciler, independently from Relay status; bounded storage/work |
+| Aggregate outstanding hard allocation | Stage A plus stage B | Chain-local payout contract; governance partitions a common-mode budget |
+| Relay receivable health thresholds | Filled value not yet withdrawn from Relay (stage A) | New-fill admission, age trip, and bounded storage/work |
+| CCIP rebalance health thresholds | Withdrawn origin inventory not yet restored on destination (stage B) | Reconciliation health trip, independently from Relay status; bounded storage/work |
 
-Governance first sets one common-mode receivable loss budget, then partitions it
-into hard per-origin-chain/token allocations whose sum cannot exceed that budget.
-Each destination payout contract enforces only its local allocation; the design
-does not pretend independent contracts can atomically read a cross-chain
-aggregate.
+Governance first sets one common-mode loss budget, then partitions it into hard
+per-origin-chain/token aggregate allocations whose sum cannot exceed that
+budget. Each destination payout contract enforces only its local A+B allocation;
+the design does not pretend independent contracts can atomically read a
+cross-chain aggregate. Per-stage values are admission/health thresholds, not
+both hard state invariants: a truthful A→B transition can cross the stage-B
+threshold and must still be recorded before atomically pausing the lane.
 
-Reserve local receivable exposure **before** transferring destination tokens,
-then perform the external transfer (checks-effects-interactions). Concurrent
-fills must not overshoot the local allocation. Capacity may move from the Relay
+Reserve local receivable and aggregate exposure **before** transferring
+destination tokens, then perform the external transfer
+(checks-effects-interactions). Concurrent fills must not overshoot either the
+per-fill ceiling or local aggregate allocation. Exposure may move from the Relay
 receivable ledger to the CCIP backlog only after a finalized origin withdrawal
-is proven. An API status, requested withdrawal, or unsigned indexer observation
-is insufficient. The proof/coordinator mechanism for that cross-chain transition
-is an unresolved implementation gate and requires its own replay, finality,
-authorization, and compromise analysis. Until it exists, no production lane
-can safely release the reservation early.
+is proven, and that transition releases no aggregate capacity. An API status,
+requested withdrawal, or unsigned indexer observation is insufficient. The
+proof/coordinator mechanism for that cross-chain transition is an unresolved
+implementation gate and requires its own replay, finality, authorization, and
+compromise analysis. Until it exists, no production lane can safely move the
+stage-A record; an origin withdrawal never reopens aggregate capacity by itself.
 
 A requested short withdrawal cadence reduces duration only when Relay actually
 signs and the withdrawal confirms; Ripe cannot unilaterally collect from the
 Depository.
 
-No `fill` path may scan an unbounded outstanding-entry set. Each stage needs a
-hard maximum entry count in addition to notional and age. Age tracking must use
-an O(1) or explicitly bounded structure whose correctness does not assume Relay
-settles in insertion order. Reconciliation may be batched, but every batch has a
-hard work bound. Stage-B state distinguishes `in-flight` from `known-failed`:
-the latter pauses and alerts immediately rather than aging until an ordinary cap
-breach. The four observed CCIP deliveries are samples, not an age-cap bound;
-configuration waits for source finality plus the measured commit-round tail and
-an explicit margin.
+No `fill` path may scan an unbounded outstanding-entry set. Each stage needs an
+entry-count health threshold in addition to notional and age, and the aggregate
+outstanding-entry count is the hard storage bound. Age tracking must use an O(1)
+or explicitly bounded structure whose correctness does not assume Relay settles
+in insertion order. Reconciliation may be batched, but every batch has a hard
+work bound. Operational reconciliation state distinguishes `in-flight` from
+`known-failed`: because a reverting callback cannot persist a mark and no
+authenticated failure proof is selected, the watcher immediately alerts and
+triggers the existing guardian pause without clearing exposure. The failure
+must not age into an ordinary threshold breach. The four observed CCIP
+deliveries are samples of only
+`ccipSend`→destination receipt, not an age-threshold bound; stage B starts at
+authenticated withdrawal. Configuration also waits for withdrawal
+finalization/detection; origin-proof generation, delivery, and destination
+inclusion; and pre-send rebalancer batching, nonce, submission, and source
+inclusion measurements, plus source-finality and consecutive-sequence
+commit/execution measurements across multiple rounds. Use a full measured
+time-to-next-round bound plus destination execution/finality and margin only if
+those measurements confirm the batching model.
 
 The payout design must additionally preserve these invariants:
 
 - no payout, solver, keeper, Relay, settlement, or reconciliation address receives
   `RipeHq` mint authority;
 - bridge pause and cap checks happen in the same transaction as the payout;
-- destination `RipeHq.mintEnabled()` is true in that transaction, and a failed
-  read fails closed;
+- destination `token.ripeHq()` equals the instance's expected HQ and that HQ's
+  `mintEnabled()` is true in the transaction; any failed/malformed read fails
+  closed;
 - exposure cannot be released from an unverified off-chain status assertion;
-- chain-local receivable allocations cannot sum above the governance-approved
+- chain-local aggregate exposure allocations cannot sum above the governance-approved
   common-mode loss budget;
 - token transfers use exact amounts, safe return-value handling,
   reentrancy protection, and balance-delta checks where token behavior warrants;
+- when pool rate limiting is enabled, `maxFillAmount` fits one exact-entry CCIP
+  refill under the configured origin outbound/destination inbound capacities;
+  it also fits every applicable per-message limit;
+- each data-bearing refill requests supported out-of-order execution, so one
+  proof-order callback failure cannot block later messages;
+- remote pool admins pause and drain exact entries larger than any proposed
+  lower capacity/per-message limit before the change; cross-chain config drift
+  pauses new fills, and lowering local `maxFillAmount` never blocks restoration
+  of an existing larger entry;
 - no arbitrary target or calldata execution exists in the payout contract;
 - fill gas and reconciliation work remain bounded at the maximum configured
   outstanding-entry count; no hot path iterates an unbounded set;
-- privileged funding, pause, and reconciliation roles are separated and held by
-  approved multisigs; the Relay-required solver EOA is an explicit exception
-  backed by an audited HSM/MPC policy and never directly authorizes payout; and
+- privileged funding, configuration, and pause roles are separated and held by
+  approved multisigs; reconciliation is authorized by verified proofs rather
+  than a privileged submitter; the Relay-required solver EOA is an explicit
+  HSM/MPC-backed exception that directly submits `fill` but cannot bypass order,
+  health, or cap checks; and
 - upgrades, emergency recovery, and loss socialization are explicit owner
   decisions, not implicit implementation choices.
 
-No payout contract or solver-key policy is designed or authorized by this
-synthesis. Any candidate is new custody/signing infrastructure and requires
-red-before-green unit/fuzz/invariant tests plus an independent audit before real
-funds.
+The accompanying payout document is a specification, not an implementation or
+authorization. Any candidate contract and solver-key policy is new
+custody/signing infrastructure and requires red-before-green
+unit/fuzz/invariant tests plus an independent audit before real funds.
 
 ## GREEN and RIPE have the same fast-fill mechanics
 
@@ -448,20 +498,28 @@ Conditional Relay protocol token:
   each prevent payout;
 - configured chain-local allocations cannot sum above the approved aggregate
   budget, and concurrent/fuzzed fills cannot overshoot a local allocation;
-- receivable exposure is reserved before transfer and released only after a
-  finalized origin withdrawal; forged, stale, replayed, or wrong-chain
-  transition evidence cannot release it;
+- receivable and aggregate exposure is reserved before transfer; finalized
+  origin withdrawal moves it from stage A to B without releasing the aggregate,
+  and only authenticated destination restoration clears it. Forged, stale,
+  replayed, or wrong-chain evidence changes neither stage;
 - wrong effective depositor, order id, solver signature, refund/output field,
   selector, order version, or opaque call cannot reach signing;
+- a quote recipient cannot use the public pre-deposit solver signature to call
+  `fill`, and wrapper/account-abstraction calls from the solver are rejected;
+- dust, wrong chain/Depository/token/order/depositor/amount/net economics,
+  duplicate, reverted, pre-finality, or reorged observations cannot reach the
+  solver HSM/MPC's direct-fill signing call;
 - the full-allowance overload can never be selected;
 - loss or unavailability of either Relay EOA leaves the payout contract safely refusing
   new exposure; a compromised Ripe solver signer cannot bypass payout-contract
   checks, and its receiver-redirection loss is bounded by the receivable cap;
 - fill gas remains bounded as the outstanding set reaches its entry-count cap;
   minimum-size signed fills cannot create an unbounded iteration path;
-- a known-failed CCIP replenishment pauses and alerts immediately rather than
-  presenting later as an undifferentiated age-cap breach;
-  and
+- the operational watcher classifies a known-failed CCIP replenishment and
+  triggers the guardian pause/alert without writing or clearing payout exposure;
+- `maxFillAmount` fits one refill under every applicable enabled
+  origin/destination pool limit, and
+  a failed callback cannot head-of-line block later out-of-order refills; and
 - the set of `RipeHq.canMintGreen`/`canMintRipe` addresses is unchanged.
 
 CCIP:

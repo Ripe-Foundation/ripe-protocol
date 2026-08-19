@@ -2,14 +2,15 @@
 
 Reviewer: Leto
 Date: 2026-08-18
-Revised: 2026-08-18 (rev 2 — rescoped, H-2 corrected, invariant corrected;
+Revised: 2026-08-19 (rev 2 — rescoped, H-2 corrected, invariant corrected;
 rev 3 — added H-3, post-deposit authority fields;
 rev 4 — added H-4 custody exposure;
 rev 5 — H-3 Relay resolution retracted, H-4 ceiling corrected to receivable;
 rev 6 — bound effective Relay attribution, added live cross-layer privilege graph;
 rev 7 — added M-3, token-level denylist for the Across GREEN/RIPE footgun;
 rev 8 — added H-5, destination-side stranding on the live CCIP burn/mint path;
-rev 9 — added H-6 refill/drain asymmetry and M-4 age-cap liveness trap)
+rev 9 — added H-6 refill/drain asymmetry and M-4 age-cap liveness trap;
+rev 10 — corrected Relay order authorization, reconciliation, and cap semantics)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -153,9 +154,10 @@ single governance call.
 
 Recommendation, in order of preference:
 
-1. Bound the exposure rather than assume immunity: separate hard notional and
-   age caps for the Relay receivable and the CCIP rebalancing backlog (see M-1),
-   so a blocked settlement leg is capped rather than open-ended.
+1. Bound the exposure rather than assume immunity: separate per-stage
+   notional/age/entry-count health thresholds plus an aggregate hard
+   notional/count allocation (see M-1), so a blocked settlement leg is bounded
+   rather than open-ended.
 2. Check blacklist status of recipient, float, and settlement addresses at fill
    time, before the fast payout — cheap and catches the common case.
 3. If a protected-settlement-address primitive is wanted, it is **new work** on
@@ -175,13 +177,18 @@ The circuit breaker for this must be driven by the *observed end-to-end fill
 lifecycle* and act on the **send** side. Track its two stages separately:
 (a) destination value paid but the origin Relay receivable not yet withdrawn,
 and (b) origin value withdrawn but destination inventory not yet restored through
-CCIP. Each stage needs a hard notional cap and maximum age. A breaker that only
-reacts to the destination chain's state is one round-trip too late.
+CCIP. Each stage needs notional, age, and entry-count health thresholds, while a
+separate aggregate notional/count allocation remains the hard invariant. A
+breaker that only reacts to the destination chain's state is one round-trip too
+late.
 
-Recommendation: enforce both ledgers in the payout contract and fail closed when
-either would exceed its notional or age bound. These caps are also the bound that
-makes H-2 tolerable; one aggregate number must not hide which recovery path is
-stalled.
+Recommendation: enforce both ledgers in the payout contract. A new fill fails
+closed when stage A would exceed its threshold, either stage is already
+unhealthy, or the aggregate hard allocation would be exceeded. A finalized A→B
+proof records the remote fact even if it crosses a stage-B threshold, then
+atomically pauses the lane; it must not become unrecordable merely because B is
+full. The aggregate hard allocation is the loss boundary, while the stage
+thresholds identify which recovery path is stalled.
 
 ### M-2 — Hold the line on mint authority: a new mint-authorized bridge has no fast kill switch
 
@@ -361,6 +368,33 @@ terms.
 Unknown order versions, raw transfers, deposit-address routes, and unenumerated
 periphery calls fail closed.
 
+The amount policy must include fees, not only `output <= input`. The pinned
+Oracle credits the input to the solver and debits each signed fill fee from that
+Hub balance. Require every such fee to use the approved origin input
+chain/currency and, for the fixed 1:1 ledger, enforce with overflow-safe
+arithmetic `output + feeSum == input`. Less creates a refill shortfall; greater
+creates provider-custodied receivable that the exposure ledger fails to count.
+Any treasury fee subsidy or separately tracked surplus is a different accounting
+model and needs explicit budgeting/review
+(`relay-protocol-oracle@55b22de`,
+`src/services/attestation/index.ts:375-399,1917-1975`).
+
+That order signature is returned to the user at quote time and proves only the
+order fields, not a deposit. It cannot by itself authorize payout: otherwise the
+quote recipient can claim inventory before depositing. The minimum topology
+requires `fill` to be a top-level transaction sent directly by the configured
+solver EOA after its service observes the deposit; wrappers, account abstraction,
+and delegated EOA code fail closed. Before its HSM/MPC signs that second
+transaction, the service must observe a successful finalized event from the
+configured Depository and bind chain, contract, token, order id, effective
+depositor, actual amount/net fee economics, recipient, and uniqueness. Dust,
+wrong-field, duplicate, reverted, pre-finality, and reorged observations
+authorize nothing. The current pinned examples also encode
+Relay's Router as `output.extraData.fillContract`, and some use unequal minimum
+and expected output amounts. A live quote that intentionally binds the Ripe
+payout and its exact-output amount policy is therefore an onboarding blocker,
+not an assumption the implementation may make.
+
 **Constraint on the deferred atomic variant.** Atomic bridge-and-deposit is out
 of v1, and this is a reason to keep it there. A destination-side fill handler
 receiving funds and depositing on the user's behalf makes the message the
@@ -433,17 +467,18 @@ receivable; it takes the pool that every relayer's receivable is claimed
 against. Ripe's loss is bounded by what it is owed, but the probability is not
 independent of other participants' exposure.
 
-The design therefore carries three independent numbers: (1) the Ripe-controlled
-payout inventory/hot-contract ceiling; (2) a per-token, per-chain **and
-aggregate** ceiling plus maximum age for outstanding Relay receivables; and (3)
-the end-to-end CCIP rebalancing backlog notional and age caps from M-1. The same
-two admin keys across Base and Robinhood make provider loss correlated, which is
-why (2) needs an aggregate bound.
+The design therefore carries independent controls: (1) the Ripe-controlled
+payout inventory/hot-contract ceiling; (2) a per-fill ceiling; (3) a hard
+per-token, per-chain A+B allocation under one common-mode aggregate budget; and
+(4) separate notional/age/entry-count health thresholds for the Relay receivable
+and end-to-end CCIP backlog stages. The same two admin keys across Base and
+Robinhood make provider loss correlated, which is why (3) needs the aggregate
+budget.
 
 Independent destination payout contracts cannot atomically observe a cross-chain
-aggregate. Implement (2) by partitioning the governance-approved common-mode
+aggregate. Implement (3) by partitioning the governance-approved common-mode
 budget into hard chain-local allocations whose sum cannot exceed it. Transition
-capacity from the Relay-receivable ledger to the CCIP-backlog ledger only through
+exposure from the Relay-receivable ledger to the CCIP-backlog ledger only through
 a separately reviewed proof/coordinator that verifies origin finality, replay,
 and chain/domain binding. A provider API or unsigned indexer status cannot release
 exposure. That transition mechanism remains an implementation gate.
@@ -530,7 +565,15 @@ has already been destroyed elsewhere. Concretely:
 1. **Size each lane's inbound bucket strictly above its outbound bucket**, so
    anything that can leave can always arrive. This keeps the entire safety
    benefit of rate limiting and removes condition 2. Do not set symmetric
-   buckets.
+   buckets. For the exact-entry fast-lane refill, also require
+   `maxFillAmount` to fit one message under both capacities whenever rate
+   limiting is enabled, and under every applicable per-message limit; otherwise
+   an admitted entry can be permanently too large to restore even though the
+   aggregate bucket policy is asymmetric. Pool-admin changes must pause and
+   drain every larger exact-entry refill before lowering either remote
+   capacity/limit; a cross-chain monitor pauses new fills on uncoordinated drift.
+   Lowering local `maxFillAmount` applies only to new fills and must not
+   invalidate restoration of existing larger entries.
 2. **Give `setMintingEnabled(false)` a documented bridge interaction.** The
    cheap fix is operational: disable the origin lane first, let the in-flight
    window drain, then disable minting. The alternative — a mint path for the
@@ -560,17 +603,18 @@ interaction, and the missing half reverses the sign of the finding.
 
 The destination float is refilled over CCIP, and per H-5 that refill is a
 burn/mint transfer whose destination mint enters `RipeToken.mint` →
-`RipeHq.canMintRipe`, which returns `False` on `mintEnabled` alone
-(`contracts/registries/RipeHq.vy:392`) before reading any config. So the same
-single action has opposite effects on the two legs:
+`RipeHq.canMintRipe` or `GreenToken.mint` → `RipeHq.canMintGreen`. Both return
+`False` on `mintEnabled` before reading the caller's token-specific config
+(`contracts/registries/RipeHq.vy:377-399`). So the same single action has
+opposite effects on the two legs:
 
 | Leg | Path | Effect of destination `mintEnabled = False` |
 |---|---|---|
 | **Fill** (float out) | `safeTransfer` | **Unaffected — keeps running at full rate** |
-| **Refill** (float in) | CCIP `releaseOrMint` → `mint` | **Blocked, and the origin RIPE is already burned** |
+| **Refill** (float in) | CCIP `releaseOrMint` → `mint` | **Blocked, and the origin token is already burned** |
 
-**The protocol's emergency lever therefore disables the safe leg and leaves the
-risky one running.** The resulting sequence during an incident that has nothing
+**The protocol's emergency lever therefore disables restoration while leaving
+the drain running.** The resulting sequence during an incident that has nothing
 to do with bridging:
 
 1. Governance disables minting on the destination for an unrelated reason — bad
@@ -584,28 +628,48 @@ to do with bridging:
    not before it. Unpausing is a governance action, i.e. the same body already
    consumed by the original incident.
 
-**Fix — gate the fill on both.** The lane check should be
-`lanePaused || !RipeHq(hq).mintEnabled()`, not `lanePaused` alone. This keeps the
-dedicated pause for lane-specific incidents, so halting the lane still does not
-require halting protocol issuance, while restoring `setMintingEnabled(false)` to
-a complete stop on cross-chain movement. Cost is one staticcall on the hot path.
-It does couple lane liveness to RipeHq, which is the correct direction — the
-lane failing closed on a RipeHq fault is the desired behaviour — but it should be
-a deliberate choice rather than an inherited one.
+**Fix — gate the fill on both, through the token's live HQ.** First require
+`token.ripeHq() == expectedHq`, then require
+`!lanePaused && RipeHq(expectedHq).mintEnabled()`. `ripeHq` is mutable through
+the token's confirmed HQ-change flow; without the equality check, CCIP minting
+can move to a new HQ while the payout keeps reading a stale old HQ that still
+reports `true`. An HQ change therefore retires this immutable payout and
+requires redeployment. The dedicated pause still handles lane-specific
+incidents without halting protocol issuance, while `setMintingEnabled(false)`
+again stops cross-chain movement. Both staticcalls fail closed.
 
-**Second fix — do not size `maxStageBAge` off the happy path.** The measured
-CCIP hops are 18m52s–24m46s with a 44m11s observed round trip. A stranded
-message is not a slow message: recovery needs the destination condition cleared
-*and* a manual re-execution, which is unbounded in wall-clock and currently
-depends on a runbook that does not exist (H-5, item 4). A `maxStageBAge` chosen
-as a multiple of 44m11s will therefore fire on the first CCIP operational
-failure rather than on a genuine solvency problem.
+**Second fix — do not size `maxStageBAge` off the four-point sample.** The
+measured CCIP hops are 18m52s–24m46s, but the adjacent Base→Robinhood sequences
+1806/1807 were sent 96 seconds apart and arrived 384 seconds apart. Their 4m48s
+latency spread is intra-lane, so direction and drift over the hour do not explain
+it; the samples are different assets and cannot rule out token/pool-specific
+effects. Commit batching is a plausible mechanism, not a proven one, and `24m46s` is the
+maximum of four observations rather than a bound or SLA. A stage-B refill is
+one relevant hop, so the sum of two opposite-direction samples is not its
+parameter either.
 
-That conflation is itself the defect: a tripped cap is supposed to mean
+The four samples measure only `ccipSend`→destination receipt, while stage B
+starts at authenticated `withdrawnAt`. Do not fix a numeric threshold until the
+withdrawal finalization/detection, origin-proof generation/delivery and
+destination inclusion, rebalancer queue/batch cadence, nonce, submission, and
+source inclusion delay before `ccipSend` are also measured,
+together with source finality and consecutive-sequence commit/execution timing
+across multiple rounds. If that evidence confirms next-round inclusion for
+healthy traffic, include a full measured time-to-next-round bound, destination
+execution/finality, and margin. A stranded message is not a slow message:
+recovery needs the destination condition cleared *and* a manual re-execution,
+which is unbounded in wall-clock and currently depends on a runbook that does
+not exist (H-5, item 4).
+
+That conflation is itself the defect: a tripped threshold is supposed to mean
 "exposure is too large or too old," and here it would mean "a CCIP message
-failed." The ledger should distinguish **in-flight** from **known-failed**
-replenishment and alarm immediately on the latter, rather than letting a failure
-age silently until it presents as a cap breach with no indication of cause.
+failed." The reconciliation/monitoring model should distinguish **in-flight**
+from **known-failed** replenishment and alarm immediately on the latter. There is
+no selected authenticated destination failure proof, and a reverting callback
+cannot persist its own flag, so the watcher triggers the guardian's existing
+pause without clearing exposure; `known-failed` is not writable payout state.
+Otherwise a failure ages silently until it presents as a threshold breach with
+no indication of cause.
 
 ### M-4 — The age cap is the one control that can brick the contract enforcing it
 
@@ -632,25 +696,22 @@ out-of-order settlement forces the head pointer to stall or the code to fall
 back to iteration.
 
 **Recommendation: add a third cap per stage — maximum outstanding entry count.**
-It bounds iteration cost directly, is O(1) to enforce, and it is the only one of
-the three caps that protects the contract's own liveness rather than the balance
-sheet. It also bounds the batch size that `recordWithdrawn`/`recordRestored`
-must handle, which matters because those must not be solver- or
-keeper-assertable and will therefore be batched governance or verified-keeper
-operations.
+It is O(1) to check and bounds live storage plus the batch size that
+`recordWithdrawn`/`recordRestored` must handle. It does **not** make an entry
+scan O(1); `fill` still must not scan. Use a structure with direct oldest lookup
+and arbitrary removal (for example, a chronological linked list when local
+timestamps are sufficient, or an indexed min-heap for authenticated remote
+timestamps submitted out of order). This cap is the only one of the three that
+protects the contract's own liveness rather than the balance sheet.
 
-**Separately, a framing correction for whoever implements the spec.** The check
-`order.outputAmount <= order.inputAmount` is described as "the solvency
-invariant: never pay out more than the deposit backing it." It is worth keeping,
-but it does not establish solvency. `inputAmount` is an assertion in a
-solver-signed order, not an observation of an origin deposit — the same spec
-states two paragraphs later that the contract cannot verify the deposit
-happened. Both numbers are therefore attacker-controlled under key compromise
-and the check passes trivially with `inputAmount == outputAmount`. Its real value
-is catching a *buggy* solver overpaying against a genuine deposit. Implemented
-from the current wording, a developer could reasonably believe the float is
-protected by an invariant that does not exist; the caps remain the only
-boundary, exactly as the spec's own conclusion says.
+**Separately, a framing correction for whoever implements the spec.** Comparing
+the signed output payment with the signed input amount is worth keeping, but it
+does not establish solvency. Both values are fields in a solver-signed order,
+not observations of an origin deposit — the payout contract cannot verify the
+deposit happened. Both are therefore attacker-controlled under key compromise
+and the check passes trivially when they are equal. Its real value is catching a
+*buggy* solver overpaying against a genuine deposit. The aggregate cap remains
+the loss boundary.
 
 ## Test obligations
 
@@ -659,8 +720,10 @@ Whatever design lands, these must be red-before-green:
 1. Fill reverts when the dedicated bridge gate is off (H-1).
 2. Fill reverts when recipient, float, or settlement address is blacklisted
    (H-2).
-3. Relay-receivable and CCIP-rebalancing notional/age caps each fail closed and
-   cannot release or double-count exposure across the stage transition (M-1).
+3. New fills fail closed at the stage-A health thresholds and aggregate hard
+   allocation. A verified A→B proof that crosses a stage-B threshold records the
+   transition and pauses; it never releases, loses, or double-counts exposure
+   (M-1).
 4. Invariant: the set of addresses satisfying `RipeHq.canMintGreen` /
    `canMintRipe` is unchanged by the Relay integration — specifically, no
    filler, float, settlement, or Relay-owned address joins it. Assert against
@@ -696,7 +759,10 @@ Whatever design lands, these must be red-before-green:
 11. A valid signature from the configured Ripe solver EOA is insufficient by
     itself to move payout inventory: the contract independently revalidates the
     order, pause, limits, recipient, and exact amount. A hostile withdrawal
-    receiver can lose at most the already-reserved receivable allocation.
+    receiver can lose at most the already-reserved receivable allocation. The
+    quote recipient and any wrapper cannot call `fill`; only a top-level call
+    from the configured solver EOA after its independent deposit observation is
+    admitted.
 12. `deposit` of GREEN or RIPE into a listed Across SpokePool reverts at the
     token, on a fork, from an address holding no Ripe privilege and using a
     transaction Ripe's frontend did not construct — the third-party path, which
@@ -713,19 +779,27 @@ Whatever design lands, these must be red-before-green:
     greater than the same lane's outbound bucket, asserted against live pool
     config rather than intended config (H-5). This is the invariant that keeps a
     rate-limit policy from becoming a stranding trigger, and it silently breaks
-    whenever either side is retuned alone.
+    whenever either side is retuned alone. For a fast-lane refill, separately
+    assert `maxFillAmount` fits one message under both enabled capacities and
+    every applicable per-message limit.
 15. With destination `mintEnabled == False`, `fill` reverts (H-6). The paired
     negative test is the one that fails today: assert that a fill *succeeds*
     when the gate reads `lanePaused` alone, proving the coupling is what closes
-    it rather than some incidental check.
-16. A drain scenario, not a unit assertion: destination minting disabled, then N
-    fills, then N stranded replenishments. Assert the float is never depleted
-    below the point at which stage-B exposure would have halted the lane — i.e.
-    that the halt precedes the drain rather than following it (H-6).
-17. `fill` gas is bounded independent of outstanding entry count (M-4): fill to
-    the entry-count cap, then assert the next `fill`'s gas is within a fixed
-    bound of the first's. A gas-griefing test using minimum-size fills from a
-    valid solver signature must not be able to raise `fill` cost without bound.
+    it rather than some incidental check. After `token.confirmHqChange`, the old
+    payout also reverts even if its stale expected HQ still reports
+    `mintEnabled == True`.
+16. A drain scenario, not a unit assertion: create N fills and dispatch their
+    refills while minting is enabled, then disable destination minting so those
+    in-flight refills strand. Assert every subsequent fill attempt reverts and
+    the float cannot drain beyond the already-reserved exposure (H-6).
+17. `fill` performs no linear scan over outstanding entries (M-4): exercise one
+    entry and the maximum entry count, then assert gas stays within the audited
+    bound of the selected O(1) / O(log `maxEntries`) structure. A gas-griefing
+    test using minimum-size fills from a valid solver signature must not be able
+    to raise `fill` cost without the configured bound.
+18. The data-bearing CCIP rebalancer pins out-of-order execution on every refill.
+    A proof-order race may make one callback fail pending manual re-execution;
+    that failed message cannot head-of-line block later independent refills.
 
 ## Sign-off
 
