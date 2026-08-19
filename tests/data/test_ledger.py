@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
+from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, MAX_UINT256
 
 
 ############
@@ -837,9 +837,10 @@ def test_ledger_auction_unauthorized_calls(ledger, alice, bob, sample_fungible_a
 #########################
 
 def test_ledger_add_hr_contributor(ledger, alice, human_resources):
-    """Test adding HR contributor."""
+    """Create deducts budget and bumps reserved by C."""
     compensation = 1000 * EIGHTEEN_DECIMALS
     initial_avail = ledger.ripeAvailForHr()
+    initial_reserved = ledger.hrReservedCompensation()
     
     # Initially not a contributor
     assert not ledger.isHrContributor(alice)
@@ -854,9 +855,10 @@ def test_ledger_add_hr_contributor(ledger, alice, human_resources):
     assert ledger.contributors(1) == alice
     assert ledger.indexOfContributor(alice) == 1
     
-    # Check compensation was deducted
+    # Check compensation was deducted and reserved
     expected_avail = initial_avail - compensation
     assert ledger.ripeAvailForHr() == expected_avail
+    assert ledger.hrReservedCompensation() == initial_reserved + compensation
 
 def test_ledger_add_hr_contributor_duplicate(ledger, alice, human_resources):
     """Test adding duplicate HR contributor fails gracefully."""
@@ -867,12 +869,14 @@ def test_ledger_add_hr_contributor_duplicate(ledger, alice, human_resources):
     initial_count = ledger.numContributors()
     initial_avail = ledger.ripeAvailForHr()
     
+    reserved = ledger.hrReservedCompensation()
     # Try to add again
     ledger.addHrContributor(alice, compensation, sender=human_resources.address)
     
     # Should not change anything
     assert ledger.numContributors() == initial_count
     assert ledger.ripeAvailForHr() == initial_avail
+    assert ledger.hrReservedCompensation() == reserved
 
 def test_ledger_add_hr_contributor_unauthorized(ledger, alice, bob):
     """Test that only HumanResources can add contributors."""
@@ -881,18 +885,39 @@ def test_ledger_add_hr_contributor_unauthorized(ledger, alice, bob):
     with boa.reverts("only hr allowed"):
         ledger.addHrContributor(alice, compensation, sender=bob)
 
-def test_ledger_set_ripe_avail_for_hr(ledger, switchboard_alpha, human_resources):
-    """Test setting RIPE available for HR."""
+def test_ledger_set_ripe_avail_for_hr(ledger, switchboard_alpha, human_resources, alice):
+    """Setter headroom is reserved grant notional. Cash is not a Ledger reducer."""
     new_amount = 5000 * EIGHTEEN_DECIMALS
     
-    # Test via Switchboard
     ledger.setRipeAvailForHr(new_amount, sender=switchboard_alpha.address)
     assert ledger.ripeAvailForHr() == new_amount
-    
-    # Test via HumanResources
-    refund_amount = 3000 * EIGHTEEN_DECIMALS
+
+    compensation = 4000 * EIGHTEEN_DECIMALS
+    ledger.addHrContributor(alice, compensation, sender=human_resources.address)
+    assert ledger.hrReservedCompensation() == compensation
+    assert ledger.ripeAvailForHr() == new_amount - compensation
+
+    with boa.reverts("exceeds hr budget headroom"):
+        ledger.setRipeAvailForHr(MAX_UINT256, sender=switchboard_alpha.address)
+    ledger.setRipeAvailForHr(MAX_UINT256 - compensation, sender=switchboard_alpha.address)
+    assert ledger.ripeAvailForHr() == MAX_UINT256 - compensation
+
+    refund_amount = compensation
     ledger.refundRipeAfterCancelPaycheck(refund_amount, sender=human_resources.address)
-    assert ledger.ripeAvailForHr() == new_amount + refund_amount
+    assert ledger.hrReservedCompensation() == 0
+    assert ledger.ripeAvailForHr() == MAX_UINT256
+
+
+def test_ledger_refund_ripe_after_cancel_underflow(ledger, switchboard_alpha, human_resources, bob):
+    compensation = 1000 * EIGHTEEN_DECIMALS
+    ledger.setRipeAvailForHr(compensation, sender=switchboard_alpha.address)
+    ledger.addHrContributor(bob, compensation, sender=human_resources.address)
+    reserved = ledger.hrReservedCompensation()
+    budget = ledger.ripeAvailForHr()
+    with boa.reverts("hr reserve underflow"):
+        ledger.refundRipeAfterCancelPaycheck(reserved + 1, sender=human_resources.address)
+    assert ledger.hrReservedCompensation() == reserved
+    assert ledger.ripeAvailForHr() == budget
 
 def test_ledger_set_ripe_avail_for_hr_unauthorized(ledger, alice):
     """Test that only authorized contracts can set HR RIPE."""

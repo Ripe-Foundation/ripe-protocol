@@ -496,7 +496,18 @@ def _getTotalVested() -> uint256:
     compensation: uint256 = self.compensation
     if compensation == 0:
         return 0 # cancelled / terminal agreement
-    return min(compensation, compensation * (block.timestamp - startTime) // (self.endTime - startTime))
+    return self._vestedAmount(compensation, startTime, self.endTime, block.timestamp)
+
+
+@view
+@internal
+def _vestedAmount(_compensation: uint256, _startTime: uint256, _endTime: uint256, _timestamp: uint256) -> uint256:
+    elapsed: uint256 = _timestamp - _startTime
+    vestLen: uint256 = _endTime - _startTime
+    assert vestLen <= 2 ** 128
+    if elapsed >= vestLen:
+        return _compensation
+    return (_compensation // vestLen) * elapsed + (_compensation % vestLen) * elapsed // vestLen
 
 
 # unvested

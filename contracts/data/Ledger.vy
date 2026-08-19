@@ -170,6 +170,7 @@ numFungLiqUsers: public(uint256) # num liq users
 
 # hr contributors
 ripeAvailForHr: public(uint256)
+hrReservedCompensation: public(uint256) # live grant notional; not reduced on cash
 contributors: public(HashMap[uint256, address]) # index -> contributor addr
 indexOfContributor: public(HashMap[address, uint256]) # contributor -> index
 numContributors: public(uint256) # num contributors
@@ -823,12 +824,16 @@ def addHrContributor(_contributor: address, _compensation: uint256):
 
     # update ripe avail for hr
     self.ripeAvailForHr -= _compensation
+    assert self.hrReservedCompensation <= max_value(uint256) - _compensation  # dev: hr reserve overflow
+    self.hrReservedCompensation += _compensation
+    assert self.ripeAvailForHr <= max_value(uint256) - self.hrReservedCompensation
 
 
 @external
 def setRipeAvailForHr(_amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
+    assert _amount <= max_value(uint256) - self.hrReservedCompensation  # dev: exceeds hr budget headroom
     self.ripeAvailForHr = _amount
 
 
@@ -836,7 +841,10 @@ def setRipeAvailForHr(_amount: uint256):
 def refundRipeAfterCancelPaycheck(_amount: uint256):
     assert msg.sender == addys._getHumanResourcesAddr() # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
+    assert _amount <= self.hrReservedCompensation  # dev: hr reserve underflow
+    self.hrReservedCompensation -= _amount
     self.ripeAvailForHr += _amount
+    assert self.ripeAvailForHr <= max_value(uint256) - self.hrReservedCompensation
 
 
 #########

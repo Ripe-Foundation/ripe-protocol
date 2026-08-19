@@ -365,6 +365,22 @@ def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, 
     if empty(address) in [_terms.owner, _terms.manager]:
         return False
 
+    if _terms.compensation > max_value(uint256) // 2:
+        return False
+    if _terms.vestingLength > 2 ** 128:
+        return False
+    if _terms.depositLockDuration > max_value(uint256) - 2 ** 64:
+        return False
+    if _terms.startDelay > max_value(uint256) - block.timestamp:
+        return False
+    startTime: uint256 = block.timestamp + _terms.startDelay
+    if _terms.vestingLength > max_value(uint256) - startTime:
+        return False
+    if _terms.cliffLength > max_value(uint256) - startTime:
+        return False
+    if _terms.unlockLength > max_value(uint256) - startTime:
+        return False
+
     return True
 
 
@@ -453,7 +469,7 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
     burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
     if burnAmount != 0:
-        extcall RipeToken(a.ripeToken).burn(burnAmount)
+        assert extcall RipeToken(a.ripeToken).burn(burnAmount)  # dev: ripe burn failed
 
 
 #########
@@ -483,7 +499,10 @@ def getTotalClaimed() -> uint256:
         contributorAddr: address = staticcall Ledger(ledger).contributors(i)
         if contributorAddr == empty(address):
             continue
-        totalClaimed += staticcall HrContributor(contributorAddr).totalClaimed()
+        claimed: uint256 = staticcall HrContributor(contributorAddr).totalClaimed()
+        if totalClaimed > max_value(uint256) - claimed:
+            return max_value(uint256)
+        totalClaimed += claimed
 
     return totalClaimed
 
@@ -502,6 +521,9 @@ def getTotalCompensation() -> uint256:
         contributorAddr: address = staticcall Ledger(ledger).contributors(i)
         if contributorAddr == empty(address):
             continue
-        totalCompensation += staticcall HrContributor(contributorAddr).compensation()
+        compensation: uint256 = staticcall HrContributor(contributorAddr).compensation()
+        if totalCompensation > max_value(uint256) - compensation:
+            return max_value(uint256)
+        totalCompensation += compensation
 
     return totalCompensation

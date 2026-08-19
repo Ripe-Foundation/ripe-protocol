@@ -1389,6 +1389,7 @@ def executePendingAction(_aid: uint256) -> bool:
         config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
         p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.minCliffLength = p.minCliffLength
+        assert not (config.maxVestingLength != 0 and config.minCliffLength > config.maxVestingLength)  # dev: infeasible hr config
         extcall MissionControl(mc).setHrConfig(config)
         log HrMinCliffLengthSet(minCliffLength=p.minCliffLength)
 
@@ -1404,6 +1405,7 @@ def executePendingAction(_aid: uint256) -> bool:
         p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.minVestingLength = p.minVestingLength
         config.maxVestingLength = p.maxVestingLength
+        assert not (config.maxVestingLength != 0 and config.minCliffLength > config.maxVestingLength)  # dev: infeasible hr config
         extcall MissionControl(mc).setHrConfig(config)
         log HrVestingLengthBoundariesSet(minVestingLength=p.minVestingLength, maxVestingLength=p.maxVestingLength)
 
