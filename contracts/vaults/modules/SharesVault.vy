@@ -305,6 +305,9 @@ def _sharesToAmount(
     return amount
 
 
+# safe math
+
+
 @view
 @internal
 def _mulDiv(_x: uint256, _y: uint256, _d: uint256) -> uint256:
