@@ -1223,6 +1223,96 @@ def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, 
     assert len(config.priorityLiqAssetVaults) == 1
     assert len(config.priorityStabVaults) == 1
 
+
+def test_get_gen_liq_config_skips_retired_priority_liq_vault(
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    governance,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    alpha_token,
+    bravo_token,
+):
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    rebase_id = vault_book.getRegId(rebase_erc20_vault)
+    mission_control.setPriorityLiqAssetVaults(
+        [(simple_id, alpha_token.address), (rebase_id, bravo_token.address)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert vault_book.startAddressDisableInRegistry(
+        rebase_id, sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        rebase_id, sender=governance.address
+    )
+
+    stored = mission_control.getPriorityLiqAssetVaults()
+    assert [(row.vaultId, row.asset) for row in stored] == [
+        (simple_id, alpha_token.address),
+        (rebase_id, bravo_token.address),
+    ]
+    assert vault_book.isValidRegId(rebase_id)
+    assert vault_book.getAddr(rebase_id) == ZERO_ADDRESS
+
+    resolved = mission_control.getGenLiqConfig().priorityLiqAssetVaults
+    assert [(row.vaultId, row.vaultAddr, row.asset) for row in resolved] == [
+        (simple_id, simple_erc20_vault.address, alpha_token.address),
+    ]
+    assert all(row.vaultAddr != ZERO_ADDRESS for row in resolved)
+
+
+def test_get_gen_liq_config_skips_retired_priority_stab_vault(
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    governance,
+    stability_pool,
+    alternate_stability_pool,
+    savings_green,
+):
+    live_id = vault_book.getRegId(stability_pool)
+    assert vault_book.startAddNewAddressToRegistry(
+        alternate_stability_pool,
+        "Second Stability Pool",
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    retired_id = vault_book.confirmNewAddressToRegistry(
+        alternate_stability_pool, sender=governance.address
+    )
+    assert retired_id != live_id
+    assert vault_book.getAddr(retired_id) == alternate_stability_pool.address
+
+    mission_control.setPriorityStabVaults(
+        [(live_id, savings_green.address), (retired_id, savings_green.address)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert vault_book.startAddressDisableInRegistry(
+        retired_id, sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        retired_id, sender=governance.address
+    )
+
+    stored = mission_control.getPriorityStabVaults()
+    assert [(row.vaultId, row.asset) for row in stored] == [
+        (live_id, savings_green.address),
+        (retired_id, savings_green.address),
+    ]
+    assert vault_book.isValidRegId(retired_id)
+    assert vault_book.getAddr(retired_id) == ZERO_ADDRESS
+
+    resolved = mission_control.getGenLiqConfig().priorityStabVaults
+    assert [(row.vaultId, row.vaultAddr, row.asset) for row in resolved] == [
+        (live_id, stability_pool.address, savings_green.address),
+    ]
+    assert all(row.vaultAddr != ZERO_ADDRESS for row in resolved)
+
 def test_mission_control_get_asset_liq_config(mission_control, switchboard_alpha, alpha_token, sample_asset_config):
     """Test getting asset liquidation configuration."""
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)

@@ -1563,8 +1563,8 @@ def test_teller_withdraw_high_ltv_asset(
     # Without bravo: $100 alpha, $30 capacity
     # Need: $100 * 1.01 = $101
     # Bravo must cover: $101 - $30 = $71
-    # Min bravo: $71 / 90% = $78.888...
-    # Can withdraw: $100 - $78.889 = $21.111
+    # Min bravo: ceil(71e18 * 10000 / 9000) = $78.888... + 1 wei
+    # Can withdraw: $100 - $78.888... - 1 wei
     max_withdrawable_bravo = credit_engine.getMaxWithdrawableForAsset(
         bob,
         vault_id,
@@ -1574,11 +1574,10 @@ def test_teller_withdraw_high_ltv_asset(
 
     # Calculation in wei:
     # gap = 101e18 - 30e18 = 71e18
-    # minBravo = 71e18 * 10000 // 9000 = 78.888...e18 (rounds down in division)
     # 71e18 * 10000 = 710000e18
-    # 710000e18 // 9000 = 78888888888888888888 (78.888... tokens)
-    # withdraw = 100e18 - 78888888888888888888 = 21111111111111111112
-    expected = 21111111111111111112  # ~21.111 tokens
+    # 710000e18 // 9000 = 78888888888888888888 with leftover, so ceil + 1
+    # withdraw = 100e18 - 78888888888888888889 = 21111111111111111111
+    expected = 21111111111111111111
     assert max_withdrawable_bravo == expected
 
     # Verify can actually withdraw this amount
