@@ -85,6 +85,10 @@ interface UnderscoreLedger:
 
 interface UnderscoreRegistry:
     def getAddr(_addyId: uint256) -> address: view
+    def isValidAddr(_addr: address) -> bool: view
+
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -474,6 +478,8 @@ TELLER_ID: constant(uint256) = 17
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 UNDERSCORE_LEDGER_ID: constant(uint256) = 1
+UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
+UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 BOND_ROOM_ID: constant(uint256) = 12
 LOOTBOX_ID: constant(uint256) = 16
 DELEVERAGE_ID: constant(uint256) = 18
@@ -1152,7 +1158,24 @@ def _isValidUnderscoreAddr(_addr: address) -> bool:
         return False
 
     # make sure has interface
-    return not staticcall UnderscoreLedger(undyLedger).isUserWallet(empty(address))
+    if staticcall UnderscoreLedger(undyLedger).isUserWallet(empty(address)):
+        return False
+
+    # root isValidAddr(empty) must be False; missing / revert rejects
+    if staticcall UnderscoreRegistry(_addr).isValidAddr(empty(address)):
+        return False
+
+    vaultRegistry: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry != empty(address):
+        if staticcall VaultRegistry(vaultRegistry).isEarnVault(empty(address)):
+            return False
+
+    legoBook: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEGOBOOK_ID)
+    if legoBook != empty(address):
+        if staticcall UnderscoreRegistry(legoBook).isValidAddr(empty(address)):
+            return False
+
+    return True
 
 
 ###########################
