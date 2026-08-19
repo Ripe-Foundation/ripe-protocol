@@ -12,6 +12,7 @@ interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
     def hasPendingGovChange() -> bool: view
     def greenToken() -> address: view
+    def savingsGreen() -> address: view
     def governance() -> address: view
     def ripeToken() -> address: view
 
@@ -225,7 +226,10 @@ def _transfer(_sender: address, _recipient: address, _amount: uint256):
 
 @external
 def approve(_spender: address, _amount: uint256) -> bool:
-    self._validateNewApprovals(msg.sender, _spender)
+    if _amount == 0:
+        self._validateSpender(_spender)
+    else:
+        self._validateNewApprovals(msg.sender, _spender)
     self._approve(msg.sender, _spender, _amount)
     return True
 
@@ -260,7 +264,7 @@ def increaseAllowance(_spender: address, _amount: uint256) -> bool:
 
 @external
 def decreaseAllowance(_spender: address, _amount: uint256) -> bool:
-    self._validateNewApprovals(msg.sender, _spender)
+    self._validateSpender(_spender)
     currentAllowance: uint256 = self.allowance[msg.sender][_spender]
     newAllowance: uint256 = currentAllowance - min(_amount, currentAllowance)
     if newAllowance != currentAllowance:
@@ -273,11 +277,17 @@ def decreaseAllowance(_spender: address, _amount: uint256) -> bool:
 
 @view
 @internal
+def _validateSpender(_spender: address):
+    assert _spender != empty(address) # dev: invalid spender
+
+
+@view
+@internal
 def _validateNewApprovals(_owner: address, _spender: address):
+    self._validateSpender(_spender)
     assert not self.isPaused # dev: token paused
     assert not self.blacklisted[_owner] # dev: owner blacklisted
     assert not self.blacklisted[_spender] # dev: spender blacklisted
-    assert _spender != empty(address) # dev: invalid spender
 
 
 #####################
@@ -303,9 +313,31 @@ def _mint(_recipient: address, _amount: uint256) -> bool:
 # burn tokens
 
 
+@view
+@internal
+def _selfAsset() -> address:
+    success: bool = False
+    response: Bytes[64] = b""
+    success, response = raw_call(
+        self,
+        method_id("asset()", output_type=Bytes[4]),
+        max_outsize=64,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return empty(address)
+    return abi_decode(response, address)
+
+
 @external
 def burn(_amount: uint256) -> bool:
     assert not self.isPaused # dev: token paused
+    assert not (self.blacklisted[msg.sender] and self._selfAsset() != empty(address)) # dev: sender blacklisted
+    if _amount != 0 and _amount == self.totalSupply and self.balanceOf[msg.sender] >= _amount:
+        asset: address = self._selfAsset()
+        if asset != empty(address):
+            assert staticcall IERC20(asset).balanceOf(self) == 0 # dev: cannot strand vault assets
     self._burn(msg.sender, _amount)
     return True
 
@@ -352,7 +384,10 @@ def permit(
     _deadline: uint256,
     _signature: Bytes[65],
 ) -> bool:
-    self._validateNewApprovals(_owner, _spender)
+    if _value == 0:
+        self._validateSpender(_spender)
+    else:
+        self._validateNewApprovals(_owner, _spender)
     assert _owner != empty(address) and block.timestamp <= _deadline # dev: permit expired
 
     nonce: uint256 = self.nonces[_owner]
@@ -415,9 +450,13 @@ def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
 def burnBlacklistTokens(_addr: address, _amount: uint256 = max_value(uint256)) -> bool:
     assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
     assert self.blacklisted[_addr] # dev: not blacklisted
-
     amount: uint256 = min(_amount, self.balanceOf[_addr])
     assert amount != 0 # dev: cannot burn 0 tokens
+    if self == staticcall RipeHq(self.ripeHq).greenToken():
+        assert _addr != staticcall RipeHq(self.ripeHq).savingsGreen() # dev: cannot burn vault backing
+    asset: address = self._selfAsset()
+    if amount == self.totalSupply and asset != empty(address):
+        assert staticcall IERC20(asset).balanceOf(self) == 0 # dev: cannot strand vault assets
     self._burn(_addr, amount)
     return True
 
@@ -515,7 +554,7 @@ def _isValidNewRipeHq(_newHq: address, _prevHq: address) -> bool:
         return False
 
     # tokens must be set
-    if staticcall RipeHq(_newHq).greenToken() == empty(address) or staticcall RipeHq(_newHq).ripeToken() == empty(address):
+    if staticcall RipeHq(_newHq).greenToken() == empty(address) or staticcall RipeHq(_newHq).ripeToken() == empty(address) or staticcall RipeHq(_newHq).savingsGreen() == empty(address):
         return False
 
     # make sure it has the necessary interfaces
