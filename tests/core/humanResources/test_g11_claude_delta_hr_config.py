@@ -96,22 +96,6 @@ def test_g11c_two_parallel_delta_hr_config_pendings_merge_without_stomping(
 # ---------------------------------------------------- cross-field feasibility
 
 
-def _no_boundary_candidate_validates(human_resources, cfg, owner, manager, comp):
-    """Sweep every boundary-compatible candidate; all must fail."""
-    cliffs = {cfg.minCliffLength, cfg.minCliffLength + 1, cfg.maxVestingLength,
-              cfg.maxVestingLength + 1, cfg.minVestingLength, cfg.minVestingLength + 1}
-    vests = {cfg.minVestingLength, cfg.minVestingLength + 1,
-             cfg.maxVestingLength, cfg.maxVestingLength - 1}
-    for cl in sorted(cliffs):
-        for ve in sorted(vests):
-            for un in sorted({cl, ve, max(cl, ve)}):
-                t = terms(owner=owner, manager=manager, compensation=comp,
-                          startDelay=0, vestingLength=ve, cliffLength=cl, unlockLength=un)
-                if human_resources.areValidContributorTerms(*term_args(t)):
-                    return False, (cl, un, ve)
-    return True, None
-
-
 def test_g11c_infeasible_min_cliff_execute_reverts_and_keeps_pending(
     human_resources, mission_control, switchboard_delta, contributor_template,
     ledger, governance, alice, bob, sally,
@@ -246,3 +230,46 @@ def test_g11c_zero_max_vesting_uses_2_128_effective_ceiling(
     _exec(switchboard_delta, governance, equal)
     assert _cfg(mission_control).minCliffLength == 2**128
     assert _cfg(mission_control).maxVestingLength == 0
+
+
+def test_g11c_oversize_nonzero_max_vesting_still_caps_at_2_128(
+    mission_control,
+    switchboard_delta,
+    switchboard_alpha,
+    contributor_template,
+    governance,
+):
+    """A nonzero maxVestingLength above 2**128 is still capped at 2**128."""
+    set_hr_config(
+        mission_control,
+        switchboard_delta,
+        contributor_template,
+        minCliffLength=WEEK + 1,
+        minVestingLength=0,
+        maxVestingLength=4 * YEAR,
+    )
+    live = _cfg(mission_control)
+    seeded = (
+        live.contribTemplate,
+        live.maxCompensation,
+        live.minCliffLength,
+        live.maxStartDelay,
+        live.minVestingLength,
+        2**129,
+    )
+    mission_control.setHrConfig(seeded, sender=switchboard_alpha.address)
+    assert _cfg(mission_control).maxVestingLength == 2**129
+
+    over = switchboard_delta.setMinCliffLength(2**128 + 1, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    with boa.reverts("infeasible hr config"):
+        switchboard_delta.executePendingAction(over, sender=governance.address)
+    cfg = _cfg(mission_control)
+    assert cfg.minCliffLength == live.minCliffLength
+    assert cfg.maxVestingLength == 2**129
+    assert switchboard_delta.actionType(over) != 0
+
+    equal = switchboard_delta.setMinCliffLength(2**128, sender=governance.address)
+    _exec(switchboard_delta, governance, equal)
+    assert _cfg(mission_control).minCliffLength == 2**128
+    assert _cfg(mission_control).maxVestingLength == 2**129

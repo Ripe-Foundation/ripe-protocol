@@ -38,17 +38,18 @@ Approved 2026-08-19:
 7. `RipePaycheckCancelled.forfeitedAmount` reports the full
    forfeiture, not the credited amount.
 8. Do not add storage, signatures, return values, or events.
-9. Create-time `depositLockDuration` follows the #188 live-max band:
-   `0 < D <= live RipeGov max`, live max must be configured, `D`
-   below the live min remains allowed, and confirmed terms are not
-   rewritten after later min/max changes. Keep the static
-   `D <= MAX_UINT256 - 2**64` overflow ceiling.
+9. Create-time `depositLockDuration` follows the live-max band now
+   on `rh` after #188 merged: `0 < D <= live RipeGov max`, live max
+   must be configured, `D` below the live min remains allowed, and
+   confirmed terms are not rewritten after later min/max changes.
+   Keep the static `D <= MAX_UINT256 - 2**64` overflow ceiling.
 
 Ruling 9 supersedes and reverses the earlier draft-6 ruling that
 HR create validation should be static slack only and must not
 read `ripeGovVaultConfig`. Draft 6 still applies to cash and
 final transfer: paycheck deposits remain live-clamped, and the
-stored term is forwarded raw on owner transfer.
+stored term is forwarded raw on owner transfer. #188 is already
+merged; its live lock-band behavior is now base `rh` behavior.
 
 This also reverses draft 6’s previous no-saturation direction for
 Hunk 4. Draft 6 kept ordinary `budget += forfeitedAmount` and
@@ -107,17 +108,22 @@ and false-return rollback stay. No `hrGrant`, no
 `hrCancelCreditLiability`, no `consumeHrContributorCash`, no
 `applyHrContributorSettlement`.
 
-Hunk 5 uses an effective vesting maximum at Delta execute:
+Hunk 5 uses an effective vesting maximum at Delta execute that
+mirrors Human Resources’ absolute `vestingLength <= 2**128`
+ceiling:
 
-- configured `maxVestingLength`, when nonzero;
-- `2**128`, when configured max is zero.
+- `2**128` when configured `maxVestingLength` is zero;
+- `min(configured max, 2**128)` when configured max is nonzero.
 
-Require `minCliffLength <= effectiveMaxVestingLength`. Equality
-is accepted. A failed execute keeps the `# dev: infeasible hr
-config` reason, rolls back the config write, and leaves the
-pending action in place. HR still hard-caps
-`vestingLength <= 2**128`, so a zero configured max is not
-unbounded.
+That covers an alternate registered switchboard seeding
+`maxVestingLength > 2**128`. Official Delta cannot then accept
+`minCliffLength > 2**128`. Equality at `2**128` is accepted.
+A failed execute keeps the `# dev: infeasible hr config` reason,
+rolls back the config write, and leaves the pending action.
+The zero-max reject/equality test remains, and an Alpha-seeded
+`maxVestingLength = 2**129` proof shows `minCliff = 2**128 + 1`
+reverts while `2**128` succeeds. Restoring the old “trust any
+nonzero max” check makes that oversize-max test fail.
 
 ## Rejected reserve design (historical)
 

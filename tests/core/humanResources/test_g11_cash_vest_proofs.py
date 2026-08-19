@@ -339,7 +339,8 @@ def test_g11_overflow_compensation_safe_cash_control(
     teller,
 ):
     _prep(setupRipeGovVaultConfig)
-    # Vest-safe and share-safe: first empty-vault deposit does amount * 1e8.
+    # 10**40 keeps this first empty-vault deposit's amount * 1e8 in uint256.
+    # That is not a general SharesVault-overflow claim.
     safe = 10**40
     terms = dict(valid_contributor_terms)
     terms["compensation"] = safe

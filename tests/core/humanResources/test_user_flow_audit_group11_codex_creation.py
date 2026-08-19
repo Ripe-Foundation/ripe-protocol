@@ -35,7 +35,7 @@ def test_g11_two_overlapping_hr_pendings_fail_closed_at_second_confirm(
     valid_contributor_terms,
     governance,
 ):
-    """Each pending fits at initiation; only the first may reserve the budget."""
+    """Each pending fits at initiation; only the first may consume the budget."""
     terms = dict(valid_contributor_terms)
     setupHrConfig()
     setupLedgerBalance(terms["compensation"])

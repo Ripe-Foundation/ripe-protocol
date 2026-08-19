@@ -33,24 +33,6 @@ def _vault_assets(vault, user, asset):
     return vault.sharesToAmount(asset, shares, False)
 
 
-def _deploy(human_resources, setupHrConfig, setupLedgerBalance, governance,
-            valid_contributor_terms, **overrides):
-    terms = dict(valid_contributor_terms)
-    terms.update(overrides)
-    setupHrConfig()
-    setupLedgerBalance(terms["compensation"])
-    aid = human_resources.initiateNewContributor(
-        terms["owner"], terms["manager"], terms["compensation"],
-        terms["startDelay"], terms["vestingLength"], terms["cliffLength"],
-        terms["unlockLength"], terms["depositLockDuration"],
-        sender=governance.address,
-    )
-    boa.env.time_travel(blocks=human_resources.actionTimeLock())
-    assert human_resources.confirmNewContributor(aid, sender=governance.address)
-    events = filter_logs(human_resources, "NewContributorConfirmed")
-    return Contributor.at(events[-1].contributorAddr)
-
-
 def _ts():
     return boa.env.evm.patch.timestamp
 
@@ -60,12 +42,6 @@ def _travel_to_ts(t):
     if now < t:
         boa.env.time_travel(seconds=t - now)
     assert _ts() >= t
-
-
-def _fresh_log_events(c_handle, event_name):
-    """Event cursors are per-handle (and a no-event tx can rewind a used one),
-    so read logs through a brand-new handle after exactly one emitting tx."""
-    return filter_logs(Contributor.at(c_handle.address), event_name)
 
 
 def test_g11_cash_boundary_identity_owner_manager_delta(

@@ -190,7 +190,7 @@ def test_g11_frozen_handoff_window_and_lite_cancel(
     c.confirmOwnershipChange(sender=bob)
     assert c.owner() == bob
     # after confirm, Delta cancel has nothing to cancel
-    with boa.reverts():
+    with boa.reverts("no pending change"):
         switchboard_delta.cancelOwnershipChangeForContributor(c.address, sender=alice)
     assert switchboard_delta.freezeContributor(c.address, False, sender=governance.address)
 

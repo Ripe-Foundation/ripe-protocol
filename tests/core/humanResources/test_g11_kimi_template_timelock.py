@@ -7,9 +7,10 @@ bytecode was deployed and that terms were revalidated against the LIVE config.
 
 NOTE: two blueprints of the SAME Contributor.vy source have identical runtime
 bytecode, so bytecode cannot distinguish template A from a fresh Contributor
-template B. The functional proof uses an INCOMPATIBLE contract (Ledger) as
-template B: confirm must revert inside create_from_blueprint, proving confirm
-reads the live contribTemplate rather than the initiate-time one.
+template B. The functional proof uses deployed Ledger runtime as template B.
+That code is not valid EIP-5202 blueprint bytecode, so confirm must revert
+inside create_from_blueprint and thereby prove confirm reads the live
+contribTemplate rather than the initiate-time one.
 
 Delta timelock boundaries: executePendingAction before confirmBlock returns
 False without cancelling; at exact expiration it clears the pending and returns
@@ -35,7 +36,7 @@ def test_g11_rotated_template_confirm_uses_live_config(
     switchboard_delta, mission_control, contributor_template, ledger,
     valid_contributor_terms,
 ):
-    """Initiate under template A; Delta rotates to an incompatible template;
+    """Initiate under template A; Delta rotates to non-blueprint Ledger runtime;
     confirm reverts (proving the live template is read); rotate back to a fresh
     Contributor blueprint; the same pending confirms."""
     t = valid_contributor_terms
@@ -48,14 +49,16 @@ def test_g11_rotated_template_confirm_uses_live_config(
         t["vestingLength"], t["cliffLength"], t["unlockLength"], t["depositLockDuration"],
         sender=governance.address)
 
-    # (2) rotate to an INCOMPATIBLE template (Ledger) through the real Delta path
+    # (2) rotate to deployed Ledger runtime through the real Delta path.
+    # Ledger is ordinary runtime, not EIP-5202 blueprint code.
     rot_aid = switchboard_delta.setContributorTemplate(ledger.address, sender=governance.address)
     assert _delta_execute(switchboard_delta, governance, rot_aid)
     assert mission_control.hrConfig().contribTemplate == ledger.address
 
     # (3) confirm the original HR action: reverts inside create_from_blueprint
-    # (Ledger's constructor signature is incompatible) — proving confirm reads
-    # the LIVE contribTemplate, not the initiate-time one
+    # because the live template is not blueprint code — proving confirm reads
+    # the LIVE contribTemplate, not the initiate-time one. Boa does not expose
+    # a stable nested reason from that create failure.
     boa.env.time_travel(blocks=human_resources.actionTimeLock())
     with boa.reverts():
         human_resources.confirmNewContributor(aid, sender=governance.address)
