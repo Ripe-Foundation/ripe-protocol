@@ -28,7 +28,7 @@ EXPECTED_RUNTIME_BYTES = {
     "HumanResources": 13292,
     "AuctionHouse": 24566,
     "CreditEngine": 24502,
-    "CreditRedeem": 8329,
+    "CreditRedeem": 8415,
     "Deleverage": 24459,
     "StabilityPool": 24269,
     "BlueChipYieldPrices": 22749,

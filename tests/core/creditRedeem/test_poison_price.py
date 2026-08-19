@@ -1,7 +1,98 @@
 import boa
+import pytest
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs, redeem_collateral
+
+
+UNDER_SEND_VAULT_SOURCE = """
+# @version 0.4.3
+
+struct Addys:
+    hq: address
+    greenToken: address
+    savingsGreen: address
+    ripeToken: address
+    ledger: address
+    missionControl: address
+    switchboard: address
+    priceDesk: address
+    vaultBook: address
+    auctionHouse: address
+    auctionHouseNft: address
+    boardroom: address
+    bondRoom: address
+    creditEngine: address
+    endaoment: address
+    humanResources: address
+    lootbox: address
+    teller: address
+
+asset: public(address)
+underSendAmount: public(uint256)
+vaultAmount: public(uint256)
+balances: public(HashMap[address, uint256])
+
+@external
+def configure(_asset: address, _user: address, _amount: uint256, _underSendAmount: uint256):
+    self.asset = _asset
+    self.balances[_user] = _amount
+    self.vaultAmount = _amount
+    self.underSendAmount = _underSendAmount
+
+@view
+@external
+def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
+    if _asset != self.asset:
+        return 0
+    return self.balances[_user]
+
+@view
+@external
+def numUserAssets(_user: address) -> uint256:
+    if self.balances[_user] == 0:
+        return 0
+    return 2
+
+@view
+@external
+def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    if _index != 1 or self.balances[_user] == 0:
+        return empty(address), 0
+    return self.asset, self.balances[_user]
+
+@view
+@external
+def doesUserHaveBalance(_user: address, _asset: address) -> bool:
+    return _asset == self.asset and self.balances[_user] != 0
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    if _asset != self.asset:
+        return 0
+    return self.vaultAmount
+
+@view
+@external
+def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    if _asset != self.asset:
+        return 0
+    return self.balances[_user]
+
+@external
+def transferBalanceWithinVault(
+    _asset: address,
+    _fromUser: address,
+    _toUser: address,
+    _transferAmount: uint256,
+    _a: Addys = empty(Addys),
+) -> (uint256, bool):
+    sent: uint256 = self.underSendAmount
+    self.balances[_fromUser] -= sent
+    self.balances[_toUser] += sent
+    return sent, self.balances[_fromUser] == 0
+"""
 
 
 def _redeem_terms(createDebtTerms):
@@ -30,18 +121,25 @@ def _make_bob_redeemable_on_poisoned_bravo(
     bravo_token,
     bravo_token_whale,
     bravo_amount,
+    vault=None,
+    vault_ids=None,
 ):
     setGeneralConfig()
     debt_terms = _redeem_terms(createDebtTerms)
-    setAssetConfig(alpha_token, _debtTerms=debt_terms)
-    setAssetConfig(bravo_token, _debtTerms=debt_terms)
+    extra = {} if vault_ids is None else {"_vaultIds": vault_ids}
+    setAssetConfig(alpha_token, _debtTerms=debt_terms, **extra)
+    setAssetConfig(bravo_token, _debtTerms=debt_terms, **extra)
     setGeneralDebtConfig()
 
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
 
-    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-    performDeposit(bob, bravo_amount, bravo_token, bravo_token_whale)
+    if vault is None:
+        performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+        performDeposit(bob, bravo_amount, bravo_token, bravo_token_whale)
+    else:
+        performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, vault)
+        performDeposit(bob, bravo_amount, bravo_token, bravo_token_whale, vault)
     teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
 
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
@@ -56,11 +154,13 @@ def _fund_alice(green_token, whale, teller, alice, amount):
     return green_token.balanceOf(alice)
 
 
-def _snapshot_redeem_state(
+def _snapshot_dust_state(
     credit_engine,
     green_token,
+    credit_redeem,
+    teller,
     bravo_token,
-    simple_erc20_vault,
+    vault,
     lootbox,
     vault_id,
     bob,
@@ -69,9 +169,12 @@ def _snapshot_redeem_state(
     debt, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
     return {
         "debt": debt.amount,
+        "principal": debt.principal,
         "alice_green": green_token.balanceOf(alice),
+        "alice_allowance": green_token.allowance(alice, teller),
+        "credit_redeem_green": green_token.balanceOf(credit_redeem),
         "alice_bravo": bravo_token.balanceOf(alice),
-        "bob_bravo": simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        "bob_bravo": vault.getTotalAmountForUser(bob, bravo_token),
         "points": lootbox.getLatestDepositPoints(bob, vault_id, bravo_token),
     }
 
@@ -274,6 +377,7 @@ def test_credit_redeem_sub_token_reverts_whole_tx(
     mock_price_source,
     teller,
     credit_engine,
+    credit_redeem,
     bob,
     alice,
     alpha_token,
@@ -305,10 +409,19 @@ def test_credit_redeem_sub_token_reverts_whole_tx(
     )
     _fund_alice(green_token, whale, teller, alice, 100 * EIGHTEEN_DECIMALS)
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    before = _snapshot_redeem_state(
-        credit_engine, green_token, bravo_token, simple_erc20_vault, lootbox, vault_id, bob, alice
+    before = _snapshot_dust_state(
+        credit_engine,
+        green_token,
+        credit_redeem,
+        teller,
+        bravo_token,
+        simple_erc20_vault,
+        lootbox,
+        vault_id,
+        bob,
+        alice,
     )
-    with boa.reverts("could not burn green"):
+    with boa.reverts("no redemptions occurred"):
         redeem_collateral(
             teller,
             bob,
@@ -318,14 +431,32 @@ def test_credit_redeem_sub_token_reverts_whole_tx(
             should_refund_savings_green=False,
             sender=alice,
         )
-    after = _snapshot_redeem_state(
-        credit_engine, green_token, bravo_token, simple_erc20_vault, lootbox, vault_id, bob, alice
+    after = _snapshot_dust_state(
+        credit_engine,
+        green_token,
+        credit_redeem,
+        teller,
+        bravo_token,
+        simple_erc20_vault,
+        lootbox,
+        vault_id,
+        bob,
+        alice,
     )
     assert after == before
+    assert after["credit_redeem_green"] == 0
     assert filter_logs(teller, "CollateralRedeemed") == []
 
 
-def test_credit_redeem_mixed_batch_reverts(
+@pytest.mark.parametrize("dust_first", [True, False], ids=["dust-first", "dust-last"])
+@pytest.mark.parametrize(
+    "should_transfer_balance",
+    [False, True],
+    ids=["withdraw", "transfer"],
+)
+def test_credit_redeem_mixed_batch_skips_dust_keeps_healthy(
+    dust_first,
+    should_transfer_balance,
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -345,8 +476,9 @@ def test_credit_redeem_mixed_batch_reverts(
     simple_erc20_vault,
     vault_book,
     lootbox,
+    price_desk,
 ):
-    bravo_amount = EIGHTEEN_DECIMALS // 2
+    dust_amount = EIGHTEEN_DECIMALS // 2
     _make_bob_redeemable_on_poisoned_bravo(
         setGeneralConfig,
         setAssetConfig,
@@ -361,35 +493,258 @@ def test_credit_redeem_mixed_batch_reverts(
         alpha_token_whale,
         bravo_token,
         bravo_token_whale,
-        bravo_amount,
+        dust_amount,
     )
-    green_budget = 100 * EIGHTEEN_DECIMALS
-    _fund_alice(green_token, whale, teller, alice, green_budget)
-    vault_id = vault_book.getRegId(simple_erc20_vault)
-    before = _snapshot_redeem_state(
-        credit_engine, green_token, bravo_token, simple_erc20_vault, lootbox, vault_id, bob, alice
+    vault = simple_erc20_vault
+    vault_id = vault_book.getRegId(vault)
+    healthy_repayment = 10 * EIGHTEEN_DECIMALS
+    total_budget = 100 * EIGHTEEN_DECIMALS
+    expected_alpha = price_desk.getAssetAmount(alpha_token, healthy_repayment, False)
+    alice_green_before = _fund_alice(green_token, whale, teller, alice, total_budget)
+
+    before = {
+        "debt": credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount,
+        "green_supply": green_token.totalSupply(),
+        "bob_alpha": vault.getTotalAmountForUser(bob, alpha_token),
+        "bob_bravo": vault.getTotalAmountForUser(bob, bravo_token),
+        "bob_has_bravo": vault.doesUserHaveBalance(bob, bravo_token),
+        "bob_num_assets": vault.getNumUserAssets(bob),
+        "alice_alpha_ext": alpha_token.balanceOf(alice),
+        "alice_bravo_ext": bravo_token.balanceOf(alice),
+        "bob_alpha_internal": vault.userBalances(bob, alpha_token),
+        "bob_bravo_internal": vault.userBalances(bob, bravo_token),
+        "alice_alpha_internal": vault.userBalances(alice, alpha_token),
+        "alice_bravo_internal": vault.userBalances(alice, bravo_token),
+        "vault_alpha_tokens": alpha_token.balanceOf(vault),
+        "vault_bravo_tokens": bravo_token.balanceOf(vault),
+        "bob_bravo_points": lootbox.getLatestDepositPoints(bob, vault_id, bravo_token),
+        "alice_bravo_points": lootbox.getLatestDepositPoints(alice, vault_id, bravo_token),
+        "bob_alpha_points": lootbox.getLatestDepositPoints(bob, vault_id, alpha_token),
+        "alice_alpha_points": lootbox.getLatestDepositPoints(alice, vault_id, alpha_token),
+    }
+
+    dust_entry = (bob, vault_id, bravo_token.address, MAX_UINT256)
+    healthy_entry = (bob, vault_id, alpha_token.address, healthy_repayment)
+    redemptions = [dust_entry, healthy_entry] if dust_first else [healthy_entry, dust_entry]
+
+    spent = teller.redeemCollateralFromMany(
+        redemptions,
+        total_budget,
+        False,
+        should_transfer_balance,
+        False,
+        alice,
+        sender=alice,
     )
-    alice_alpha = alpha_token.balanceOf(alice)
-    bob_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    with boa.reverts("could not burn green"):
+
+    assert spent == healthy_repayment
+    assert spent < total_budget
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == before["debt"] - spent
+    assert green_token.balanceOf(alice) == alice_green_before - spent
+    assert green_token.totalSupply() == before["green_supply"] - spent
+
+    assert vault.getTotalAmountForUser(bob, bravo_token) == before["bob_bravo"] == dust_amount
+    assert vault.doesUserHaveBalance(bob, bravo_token) == before["bob_has_bravo"]
+    assert vault.getNumUserAssets(bob) == before["bob_num_assets"]
+    assert vault.userBalances(bob, bravo_token) == before["bob_bravo_internal"]
+    assert bravo_token.balanceOf(vault) == before["vault_bravo_tokens"]
+    assert bravo_token.balanceOf(alice) == before["alice_bravo_ext"]
+    assert lootbox.getLatestDepositPoints(bob, vault_id, bravo_token) == before["bob_bravo_points"]
+    assert lootbox.getLatestDepositPoints(alice, vault_id, bravo_token) == before["alice_bravo_points"]
+
+    logs = filter_logs(teller, "CollateralRedeemed")
+    assert [lg.asset for lg in logs] == [alpha_token.address]
+    assert logs[0].amount == expected_alpha
+    assert logs[0].repayValue == spent
+    assert logs[0].user == bob
+    assert logs[0].recipient == alice
+
+    assert vault.getTotalAmountForUser(bob, alpha_token) == before["bob_alpha"] - expected_alpha
+    if should_transfer_balance:
+        assert alpha_token.balanceOf(alice) == before["alice_alpha_ext"]
+        assert alpha_token.balanceOf(vault) == before["vault_alpha_tokens"]
+        assert vault.userBalances(bob, alpha_token) == before["bob_alpha_internal"] - expected_alpha
+        assert vault.userBalances(alice, alpha_token) == before["alice_alpha_internal"] + expected_alpha
+        assert vault.userBalances(alice, bravo_token) == before["alice_bravo_internal"]
+        assert lootbox.getLatestDepositPoints(bob, vault_id, alpha_token) != before["bob_alpha_points"]
+        assert lootbox.getLatestDepositPoints(alice, vault_id, alpha_token) != before["alice_alpha_points"]
+    else:
+        assert alpha_token.balanceOf(alice) == before["alice_alpha_ext"] + expected_alpha
+        assert alpha_token.balanceOf(vault) == before["vault_alpha_tokens"] - expected_alpha
+        assert vault.userBalances(alice, alpha_token) == before["alice_alpha_internal"]
+
+
+def test_credit_redeem_rebase_vault_preview_skips_zero_credit(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    bob,
+    alice,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    rebase_erc20_vault,
+    vault_book,
+    price_desk,
+):
+    vault = rebase_erc20_vault
+    vault_id = vault_book.getRegId(vault)
+    dust_amount = EIGHTEEN_DECIMALS // 2
+    _make_bob_redeemable_on_poisoned_bravo(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        credit_engine,
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        bravo_token,
+        bravo_token_whale,
+        dust_amount,
+        vault=vault,
+        vault_ids=[vault_id],
+    )
+
+    assert vault.getTotalAmountForUser(bob, bravo_token) == dust_amount
+    dust_shares = vault.userBalances(bob, bravo_token)
+    dust_vault_tokens = bravo_token.balanceOf(vault)
+    healthy_repayment = 10 * EIGHTEEN_DECIMALS
+    total_budget = 100 * EIGHTEEN_DECIMALS
+    expected_alpha = price_desk.getAssetAmount(alpha_token, healthy_repayment, False)
+    alice_green_before = _fund_alice(green_token, whale, teller, alice, total_budget)
+    green_supply_before = green_token.totalSupply()
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    vault_alpha_before = alpha_token.balanceOf(vault)
+    alice_alpha_before = alpha_token.balanceOf(alice)
+
+    spent = teller.redeemCollateralFromMany(
+        [
+            (bob, vault_id, bravo_token.address, MAX_UINT256),
+            (bob, vault_id, alpha_token.address, healthy_repayment),
+        ],
+        total_budget,
+        False,
+        False,
+        False,
+        alice,
+        sender=alice,
+    )
+
+    assert spent == healthy_repayment
+    assert vault.getTotalAmountForUser(bob, bravo_token) == dust_amount
+    assert vault.userBalances(bob, bravo_token) == dust_shares
+    assert bravo_token.balanceOf(vault) == dust_vault_tokens
+    assert green_token.balanceOf(alice) == alice_green_before - spent
+    assert green_token.totalSupply() == green_supply_before - spent
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - spent
+
+    logs = filter_logs(teller, "CollateralRedeemed")
+    assert [lg.asset for lg in logs] == [alpha_token.address]
+    assert logs[0].amount == expected_alpha
+    assert logs[0].repayValue == spent
+    assert alpha_token.balanceOf(alice) == alice_alpha_before + expected_alpha
+    assert alpha_token.balanceOf(vault) == vault_alpha_before - expected_alpha
+    assert bravo_token.balanceOf(alice) == 0
+
+
+def test_credit_redeem_registered_under_send_reverts_atomically(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    credit_redeem,
+    ledger,
+    lootbox,
+    vault_book,
+    governance,
+    bob,
+    alice,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    green_token,
+    whale,
+):
+    setGeneralConfig()
+    debt_terms = _redeem_terms(createDebtTerms)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    mock = boa.loads(UNDER_SEND_VAULT_SOURCE, name="cr_under_send_vault")
+    assert vault_book.startAddNewAddressToRegistry(
+        mock, "cr under-send vault", sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock() + 1)
+    mock_vault_id = vault_book.confirmNewAddressToRegistry(mock, sender=governance.address)
+    assert vault_book.getAddr(mock_vault_id) == mock.address
+    setAssetConfig(bravo_token, _debtTerms=debt_terms, _vaultIds=[mock_vault_id])
+
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 1)
+
+    reported = EIGHTEEN_DECIMALS
+    under_send = EIGHTEEN_DECIMALS // 2
+    mock.configure(bravo_token.address, bob, reported, under_send)
+    ledger.addVaultToUser(bob, mock_vault_id, sender=teller.address)
+    assert credit_engine.canRedeemUserCollateral(bob)
+    assert mock.getTotalAmountForUser(bob, bravo_token) == reported
+
+    _fund_alice(green_token, whale, teller, alice, 100 * EIGHTEEN_DECIMALS)
+    before = {
+        "debt": credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount,
+        "principal": credit_engine.getLatestUserDebtAndTerms(bob, False)[0].principal,
+        "alice_green": green_token.balanceOf(alice),
+        "alice_allowance": green_token.allowance(alice, teller),
+        "credit_redeem_green": green_token.balanceOf(credit_redeem),
+        "green_supply": green_token.totalSupply(),
+        "bob_mock": mock.balances(bob),
+        "alice_mock": mock.balances(alice),
+        "bob_points": lootbox.getLatestDepositPoints(bob, mock_vault_id, bravo_token),
+        "alice_points": lootbox.getLatestDepositPoints(alice, mock_vault_id, bravo_token),
+    }
+
+    with boa.reverts("zero repayment value (vault under-send)"):
         teller.redeemCollateralFromMany(
-            [
-                (bob, vault_id, bravo_token, MAX_UINT256),
-                (bob, vault_id, alpha_token, MAX_UINT256),
-            ],
-            green_budget,
+            [(bob, mock_vault_id, bravo_token.address, MAX_UINT256)],
+            100 * EIGHTEEN_DECIMALS,
             False,
-            False,
+            True,
             False,
             alice,
             sender=alice,
         )
-    after = _snapshot_redeem_state(
-        credit_engine, green_token, bravo_token, simple_erc20_vault, lootbox, vault_id, bob, alice
-    )
-    assert after == before
-    assert alpha_token.balanceOf(alice) == alice_alpha
-    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == bob_alpha
+
+    after_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0]
+    assert after_debt.amount == before["debt"]
+    assert after_debt.principal == before["principal"]
+    assert green_token.balanceOf(alice) == before["alice_green"]
+    assert green_token.allowance(alice, teller) == before["alice_allowance"]
+    assert green_token.balanceOf(credit_redeem) == before["credit_redeem_green"] == 0
+    assert green_token.totalSupply() == before["green_supply"]
+    assert mock.balances(bob) == before["bob_mock"] == reported
+    assert mock.balances(alice) == before["alice_mock"] == 0
+    assert lootbox.getLatestDepositPoints(bob, mock_vault_id, bravo_token) == before["bob_points"]
+    assert lootbox.getLatestDepositPoints(alice, mock_vault_id, bravo_token) == before["alice_points"]
     assert filter_logs(teller, "CollateralRedeemed") == []
 
 
@@ -459,7 +814,7 @@ def test_wsuper_price_desk_credit_redeem_tx(
     assert price_desk.getPrice(bravo_token) == 0
     _fund_alice(green_token, whale, teller, alice, 100 * EIGHTEEN_DECIMALS)
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    with boa.reverts():
+    with boa.reverts("no redemptions occurred"):
         redeem_collateral(
             teller,
             bob,

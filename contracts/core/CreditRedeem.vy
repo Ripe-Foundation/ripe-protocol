@@ -188,7 +188,8 @@ def _redeemCollateral(
         return 0
 
     # user must have a usable balance
-    if staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset) == 0:
+    userAmount: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
+    if userAmount == 0:
         return 0
 
     # cannot redeem from underscore vaults
@@ -240,7 +241,12 @@ def _redeemCollateral(
 
     # max asset amount to take from user
     maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, False)
-    if maxAssetAmount == 0:
+
+    # Skip expected zero-credit positions before vault mutation. A later
+    # post-transfer zero repayment is an unexpected under-send and reverts.
+    previewAmount: uint256 = min(userAmount, maxAssetAmount)
+    # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
+    if maxAssetAmount == 0 or previewAmount <= (maxAssetAmount - 1) // maxRedeemValue:
         return 0
 
     # withdraw or transfer balance to redeemer
@@ -249,10 +255,11 @@ def _redeemCollateral(
     if amountSent == 0:
         return 0
 
-    # repay debt. amountSent is known only after the vault caps; a floored-to-zero
-    # payment after a nonzero transfer must revert the whole transaction.
+    # Expected zero-credit positions are skipped before transfer. A
+    # post-transfer zero repayment means the vault sent less than previewed
+    # and must revert atomically.
     repayValue: uint256 = min(amountSent * maxRedeemValue // maxAssetAmount, userDebt.amount)
-    assert repayValue != 0 # dev: could not burn green
+    assert repayValue != 0 # dev: zero repayment value (vault under-send)
     assert extcall GreenToken(_a.greenToken).burn(repayValue) # dev: could not burn green
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, repayValue, newInterest, d.numUserVaults, _a)
 
