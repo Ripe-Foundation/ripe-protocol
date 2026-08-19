@@ -496,6 +496,102 @@ def test_contributor_final_transfer_honors_its_separate_deposit_lock_term(
     assert not ripe_gov_vault.doesUserHaveBalance(contributor, ripe_token)
 
 
+def test_contributor_final_transfer_honors_duration_after_later_max_reduction(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    ripe_token,
+    alice,
+    bob,
+):
+    general_min_lock = 100
+    stored_duration = 500
+    setupRipeGovVaultConfig(
+        _minLockDuration=general_min_lock,
+        _maxLockDuration=1_000,
+    )
+    terms = dict(valid_contributor_terms)
+    terms["owner"] = alice
+    terms["manager"] = bob
+    terms["depositLockDuration"] = stored_duration
+    contributor = Contributor.at(deployedContributor(terms))
+
+    boa.env.time_travel(seconds=terms["startDelay"] + terms["unlockLength"] + 1)
+    contributor.initiateRipeTransfer(sender=alice)
+    contributor_data = ripe_gov_vault.userGovData(contributor, ripe_token)
+    # 500 is inside live [100, 1000], so the ordinary paycheck path keeps it.
+    assert contributor_data.unlock == boa.env.evm.patch.block_number + stored_duration
+
+    setupRipeGovVaultConfig(
+        _minLockDuration=general_min_lock,
+        _maxLockDuration=100,
+    )
+    boa.env.time_travel(blocks=contributor.keyActionDelay())
+    contributor.confirmRipeTransfer(False, sender=alice)
+    owner_data = ripe_gov_vault.userGovData(alice, ripe_token)
+    assert owner_data.unlock == boa.env.evm.patch.block_number + stored_duration
+    assert stored_duration > 100
+
+
+def test_contributor_final_transfer_uses_stored_duration_in_weighted_owner_lock(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    teller,
+    alice,
+    bob,
+):
+    general_min_lock = 100
+    stored_duration = 25
+    live_terms = (general_min_lock, 1_000, 200_00, True, 10_00)
+    setupRipeGovVaultConfig(
+        _minLockDuration=general_min_lock,
+        _maxLockDuration=1_000,
+    )
+    terms = dict(valid_contributor_terms)
+    terms["owner"] = alice
+    terms["manager"] = bob
+    terms["depositLockDuration"] = stored_duration
+    contributor = Contributor.at(deployedContributor(terms))
+
+    owner_deposit = 10 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, owner_deposit, sender=whale)
+    ripe_gov_vault.depositTokensWithLockDuration(
+        alice, ripe_token, owner_deposit, 1_000, sender=teller.address
+    )
+
+    boa.env.time_travel(seconds=terms["startDelay"] + terms["unlockLength"] + 1)
+    contributor.initiateRipeTransfer(sender=alice)
+    boa.env.time_travel(blocks=contributor.keyActionDelay())
+
+    owner_shares = ripe_gov_vault.userBalances(alice, ripe_token)
+    owner_unlock = ripe_gov_vault.userGovData(alice, ripe_token).unlock
+    contributor_shares = ripe_gov_vault.userBalances(contributor, ripe_token)
+    expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        stored_duration,
+        live_terms,
+        owner_shares,
+        owner_unlock,
+    )
+    clamped_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        general_min_lock,
+        live_terms,
+        owner_shares,
+        owner_unlock,
+    )
+    assert expected_unlock != clamped_unlock
+
+    contributor.confirmRipeTransfer(False, sender=alice)
+    assert ripe_gov_vault.userGovData(alice, ripe_token).unlock == expected_unlock
+    assert ripe_gov_vault.userBalances(contributor, ripe_token) == 0
+
+
 def test_contributor_confirm_ripe_transfer_too_early(
     contributor_contract,
     setupRipeGovVaultConfig,

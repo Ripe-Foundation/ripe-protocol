@@ -460,8 +460,6 @@ def transferContributorRipeTokens(
     # config
     config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(a.ripeToken, a.missionControl)
     assert config.lockTerms.maxLockDuration != 0 # dev: no lock terms
-    lockDuration: uint256 = max(config.lockTerms.minLockDuration, _lockDuration)
-    lockDuration = min(lockDuration, config.lockTerms.maxLockDuration)
 
     # transfer tokens (using shares module)
     ripeAmount: uint256 = 0
@@ -469,8 +467,9 @@ def transferContributorRipeTokens(
     na: bool = False
     ripeAmount, transferShares, na = sharesVault._transferBalanceWithinVault(a.ripeToken, _contributor, _toUser, max_value(uint256))
 
-    # handle gov data/points
-    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
+    # Confirmed Contributor duration is forwarded exactly. Do not clamp to the
+    # live min/max; a later maximum reduction must not rewrite the agreement.
+    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
     return ripeAmount

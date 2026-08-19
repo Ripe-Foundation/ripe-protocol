@@ -16,10 +16,6 @@ ASSET_WEIGHT = 100_00
 LOCK_TERMS = (100, 1_000, 200_00, True, 10_00)
 
 
-def _clamp_lock_duration(duration, terms=LOCK_TERMS):
-    return min(max(duration, terms[0]), terms[1])
-
-
 def _configure_ripe_gov_asset(
     mission_control,
     setAssetConfig,
@@ -2690,6 +2686,13 @@ def test_actual_hr_contributor_position_migrates_with_points_and_lock(
         sender=switchboard_delta.address,
     )
     ledger.setRipeAvailForHr(compensation, sender=switchboard_delta.address)
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID, target_id],
+    )
     action_id = human_resources.initiateNewContributor(
         alice,
         bob,
@@ -3483,12 +3486,11 @@ def test_gov_transfer_to_a_different_user_still_moves_shares(
 
 
 # --------------------------------------------------------------------------
-# Contributor transfers clamp duration to the vault [minLock, maxLock] range
+# Contributor transfers honor the stored duration exactly while terms exist
 # --------------------------------------------------------------------------
 
 
 CONTRIBUTOR_DURATIONS = (
-    ("zero", 0),
     ("one", 1),
     ("below_general_min", LOCK_TERMS[0] - 1),
     ("at_min", LOCK_TERMS[0]),
@@ -3502,7 +3504,7 @@ CONTRIBUTOR_DURATIONS = (
 @pytest.mark.parametrize(
     "duration", [d for _label, d in CONTRIBUTOR_DURATIONS], ids=[l for l, _d in CONTRIBUTOR_DURATIONS]
 )
-def test_contributor_transfer_clamps_configured_duration_on_fresh_recipient(
+def test_contributor_transfer_honors_configured_duration_on_fresh_recipient(
     duration,
     ripe_gov_vault,
     ripe_token,
@@ -3515,10 +3517,7 @@ def test_contributor_transfer_clamps_configured_duration_on_fresh_recipient(
     setAssetConfig,
     switchboard_alpha,
 ):
-    """HR duration is clamped to the vault [minLock, maxLock] range before install.
-
-    Formerly `test_contributor_transfer_honors_configured_duration_on_fresh_recipient`.
-    """
+    """HR duration is installed exactly, including below min and above live max."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3536,11 +3535,11 @@ def test_contributor_transfer_clamps_configured_duration_on_fresh_recipient(
     )
 
     assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == (
-        boa.env.evm.patch.block_number + _clamp_lock_duration(duration)
+        boa.env.evm.patch.block_number + duration
     )
 
 
-def test_contributor_transfer_uses_clamped_duration_in_weighted_recipient_lock(
+def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock(
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -3553,10 +3552,7 @@ def test_contributor_transfer_uses_clamped_duration_in_weighted_recipient_lock(
     switchboard_alpha,
     switchboard_bravo,
 ):
-    """An existing recipient lock is blended with the clamped HR term.
-
-    Formerly `test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock`.
-    """
+    """An existing recipient lock is blended with the raw HR term, not a clamp."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3591,11 +3587,19 @@ def test_contributor_transfer_uses_clamped_duration_in_weighted_recipient_lock(
     unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
     expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
         contributor_shares,
-        _clamp_lock_duration(contributor_duration),
+        contributor_duration,
         LOCK_TERMS,
         recipient_shares,
         unlock_before,
     )
+    clamped_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        LOCK_TERMS[0],
+        LOCK_TERMS,
+        recipient_shares,
+        unlock_before,
+    )
+    assert expected_unlock != clamped_unlock
 
     ripe_gov_vault.transferContributorRipeTokens(
         sally, bob, contributor_duration, sender=human_resources.address
@@ -3604,6 +3608,109 @@ def test_contributor_transfer_uses_clamped_duration_in_weighted_recipient_lock(
     assert unlock_after == expected_unlock
     assert unlock_after < unlock_before
     assert ripe_gov_vault.userBalances(sally, ripe_token) == 0
+
+
+def test_contributor_transfer_uses_above_max_duration_in_weighted_recipient_lock(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+    switchboard_bravo,
+):
+    """A later live-max reduction is modeled by forwarding a duration above max."""
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+
+    contributor_duration = LOCK_TERMS[1] * 10
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        10 * EIGHTEEN_DECIMALS,
+        teller,
+        lock_duration=LOCK_TERMS[1],
+        switchboard=switchboard_bravo,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        sally,
+        1_000 * EIGHTEEN_DECIMALS,
+        teller,
+    )
+
+    recipient_shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    contributor_shares = ripe_gov_vault.userBalances(sally, ripe_token)
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        contributor_duration,
+        LOCK_TERMS,
+        recipient_shares,
+        unlock_before,
+    )
+    clamped_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        LOCK_TERMS[1],
+        LOCK_TERMS,
+        recipient_shares,
+        unlock_before,
+    )
+    assert expected_unlock != clamped_unlock
+
+    ripe_gov_vault.transferContributorRipeTokens(
+        sally, bob, contributor_duration, sender=human_resources.address
+    )
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == expected_unlock
+
+
+def test_contributor_transfer_reverts_without_lock_terms(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    _direct_deposit(
+        ripe_gov_vault, ripe_token, whale, sally, 100 * EIGHTEEN_DECIMALS, teller
+    )
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+        lock_terms=(0, 0, 0, False, 0),
+    )
+    with boa.reverts("no lock terms"):
+        ripe_gov_vault.transferContributorRipeTokens(
+            sally, bob, 50, sender=human_resources.address
+        )
 
 
 # --------------------------------------------------------------------------

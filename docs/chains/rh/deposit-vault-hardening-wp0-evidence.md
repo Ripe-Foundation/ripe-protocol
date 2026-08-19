@@ -168,6 +168,14 @@ existing lock. The proposed M3 change is rejected; ordinary paycheck deposits re
 their existing general-bound behavior while the final transfer retains the explicit
 Contributor term and weighted-lock semantics.
 
+**Owner refinement — 2026-08-19 (F-07).** The 2026-08-11 decision did not approve
+transfer-time clamping, and that rejection stands. Creation and confirmation now
+require `0 < depositLockDuration <= live RipeGov maxLockDuration`. Being below the
+live general minimum remains allowed. After confirmation, later min/max changes do
+not amend the stored term; the final transfer still forwards that stored duration
+exactly, even if it is then below the live minimum or above a later-reduced live
+maximum.
+
 **The remaining 7 rows are still unapproved** (DV-04, DV-08, DV-09, DV-10,
 DV-13, DV-14, DV-15) and no production source is edited for them, so §17
 continues to apply to each. Note that DV-10's candidate (M7c, §13) is now
