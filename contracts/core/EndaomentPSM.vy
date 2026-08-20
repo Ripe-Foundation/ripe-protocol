@@ -160,8 +160,7 @@ UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_USDC: constant(uint256) = 10 ** 6
 ONE_GREEN: constant(uint256) = 10 ** 18
-# At the minimum nonzero price, PriceDesk can scale the GREEN cap by ONE_USDC;
-# the fee gross-up can then scale it by HUNDRED_PERCENT when its divisor is 1.
+# At the minimum nonzero price, PriceDesk can scale the GREEN cap by ONE_USDC, then the fee gross-up by HUNDRED_PERCENT when its divisor is 1.
 # The constructor's 6-decimal payment-token check makes this bound exact.
 MAX_SAFE_INTERVAL_MINT: constant(uint256) = max_value(uint256) // (ONE_USDC * HUNDRED_PERCENT)
 

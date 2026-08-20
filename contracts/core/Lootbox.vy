@@ -55,8 +55,8 @@ interface MissionControl:
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def getRewardsConfig() -> RewardsConfig: view
-    def coreRipeGovVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
+    def coreRipeGovVaultId() -> uint256: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -71,11 +71,11 @@ interface UnderscoreLootDistributor:
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
 
-interface AddressRegistry:
-    def getAddr(_vaultId: uint256) -> address: view
-
 interface VaultShareTotals:
     def totalBalances(_asset: address) -> uint256: view
+
+interface AddressRegistry:
+    def getAddr(_vaultId: uint256) -> address: view
 
 struct RipeRewards:
     borrowers: uint256
@@ -195,8 +195,7 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
-# Matches SharesVault.DECIMAL_OFFSET and StabVault.DECIMAL_OFFSET.
-SHARE_DECIMAL_OFFSET: constant(uint256) = 10 ** 8
+SHARE_DECIMAL_OFFSET: constant(uint256) = 10 ** 8 # matches SharesVault.DECIMAL_OFFSET and StabVault.DECIMAL_OFFSET.
 MIN_UNDERSCORE_SEND_INTERVAL: immutable(uint256)
 
 
@@ -315,11 +314,8 @@ def _claimLoot(
                 # claim loot first -- whether this asset can be cleaned up depends on the result
                 totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, _a)
 
-                # Save to clean up later, but ONLY once the entitlement is gone. A deferred claim
-                # leaves `balancePoints` intact, and deregistering here would put those points beyond
-                # ordinary enumeration -- `claimDepositLootForAsset` is department-gated, so the user
-                # could not recover them on their own. Deregistration does not depend on points
-                # (`deregisterUserAsset` only checks the balance), so waiting costs nothing.
+                # Queue cleanup only after the entitlement is gone. A deferred claim leaves `balancePoints` intact, and deregistering now would hide them from ordinary enumeration.
+                # `claimDepositLootForAsset` is department-gated, so the user could not recover them. Deregistration only checks the balance, so waiting costs nothing.
                 if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
                     b: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, vaultId, asset)
                     if b.userPoints.balancePoints == 0:
@@ -880,9 +876,8 @@ def _getLatestDepositPoints(
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
-    # One MissionControl call serves both the share-normalize and funding
-    # branches. RipeGov shares are already normalized; MissionControl retains
-    # every historical core id because old positions can remain claimable.
+    # One MissionControl call serves both the share-normalize and funding branches. RipeGov shares are already normalized.
+    # MissionControl retains every historical core id because old positions can remain claimable.
     isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
 
     # Update holder lastBalance before lastUsdValue so gen-reward funding only
@@ -897,14 +892,8 @@ def _getLatestDepositPoints(
         assetPoints.lastBalance += userLootShare
         userPoints.lastBalance = userLootShare
 
-    # General-depositor USD is funded only when stakersPointsAlloc == 0.
-    # Valuation is aggregate: lastBalance * precision, never the caller rate.
-    # Dispatch: RipeGov → empty book → StabilityPool → sharesToAmount probe
-    # → nominal-compatible fallback → fund zero. All share conversions
-    # round down and cap at usable custody. A successful exact-32-byte
-    # sharesToAmount result is SharesVault-compatible even if it is zero.
-    # A failed probe plus totalBalances == usable custody is only
-    # nominal-compatible accounting, not a vault-type proof.
+    # Fund general-depositor USD only when stakersPointsAlloc == 0. Value is aggregate (`lastBalance * precision`), never the caller rate.
+    # Round down, cap at custody. Exact-32-byte sharesToAmount is SharesVault-compatible even if 0; failed matching probe is only nominal.
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
         if isRipeGovVault:

@@ -51,6 +51,11 @@ interface Ledger:
     def numContributors() -> uint256: view
     def ripeAvailForHr() -> uint256: view
 
+interface MissionControl:
+    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
+    def coreRipeGovVaultId() -> uint256: view
+    def hrConfig() -> cs.HrConfig: view
+
 interface RipeGovVault:
     def transferContributorRipeTokens(_contributor: address, _toUser: address, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def withdrawContributorTokensToBurn(_user: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -58,11 +63,6 @@ interface RipeGovVault:
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256) -> bool: nonpayable
-
-interface MissionControl:
-    def coreRipeGovVaultId() -> uint256: view
-    def hrConfig() -> cs.HrConfig: view
-    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
 
 interface HrContributor:
     def totalClaimed() -> uint256: view
@@ -372,30 +372,47 @@ def _areValidContributorTerms(
     if empty(address) in [_terms.owner, _terms.manager]:
         return False
 
-    # Distinct Contributor agreement: 0 < duration <= live RipeGov max.
-    # Being below the live general minimum is allowed. Later min/max changes
-    # do not amend a confirmed term; this check is creation/confirmation only.
+    # Distinct Contributor agreement: 0 < duration <= live RipeGov max. Being below the live general minimum is allowed.
+    # Later min/max changes do not amend a confirmed term; this check is creation/confirmation only.
     if _terms.depositLockDuration == 0:
         return False
+
+    # live ripe gov max lock must be configured
     ripeGovConfig: cs.RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_ripeToken)
     if ripeGovConfig.lockTerms.maxLockDuration == 0:
         return False
+
+    # deposit lock cannot exceed live ripe gov max
     if _terms.depositLockDuration > ripeGovConfig.lockTerms.maxLockDuration:
         return False
 
+    # compensation cannot overflow vesting math
     if _terms.compensation > max_value(uint256) // 2:
         return False
+
+    # vesting length cannot overflow vested-amount math
     if _terms.vestingLength > 2 ** 128:
         return False
+
+    # deposit lock must leave room for block.number + duration
     if _terms.depositLockDuration > max_value(uint256) - 2 ** 64:
         return False
+
+    # start delay cannot overflow start time
     if _terms.startDelay > max_value(uint256) - block.timestamp:
         return False
+
     startTime: uint256 = block.timestamp + _terms.startDelay
+
+    # vesting cannot overflow end time
     if _terms.vestingLength > max_value(uint256) - startTime:
         return False
+
+    # cliff cannot overflow cliff time
     if _terms.cliffLength > max_value(uint256) - startTime:
         return False
+
+    # unlock cannot overflow unlock time
     if _terms.unlockLength > max_value(uint256) - startTime:
         return False
 

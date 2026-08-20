@@ -63,14 +63,17 @@ interface MissionControl:
     def coreRipeGovVaultId() -> uint256: view
     def shouldCheckLastTouch() -> bool: view
 
+interface Ledger:
+    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
+    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+    def isLockedAccount(_user: address) -> bool: view
+    def isPaused() -> bool: view
+
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateUser(_liqUser: address, _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-
-interface Deleverage:
-    def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -82,16 +85,13 @@ interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface Ledger:
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
-    def isPaused() -> bool: view
-    def isLockedAccount(_user: address) -> bool: view
-    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
-    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
-
 interface StabVault:
     def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface Deleverage:
+    def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface AddressRegistry:
     def isValidAddr(_addr: address) -> bool: view
