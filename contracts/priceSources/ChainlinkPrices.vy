@@ -270,16 +270,8 @@ def getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0
 
 @view
 @internal
-def _liveDecimalsMatch(_feed: address, _cachedDecimals: uint256) -> bool:
-    if _feed == empty(address):
-        return False
-    return convert(staticcall ChainlinkFeed(_feed).decimals(), uint256) == _cachedDecimals
-
-
-@view
-@internal
 def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
-    if not self._liveDecimalsMatch(_feed, _decimals):
+    if _feed == empty(address):
         return 0
 
     oracle: ChainlinkRound = staticcall ChainlinkFeed(_feed).latestRoundData()
@@ -369,7 +361,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending new feed
-    if not self._liveDecimalsMatch(d.config.feed, d.config.decimals) or not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
+    if not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -476,7 +468,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending update feed
     oldFeed: address = self.feedConfig[_asset].feed
-    if not self._liveDecimalsMatch(d.config.feed, d.config.decimals) or not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
+    if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 

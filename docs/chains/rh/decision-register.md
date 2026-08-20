@@ -1439,13 +1439,21 @@ reports the sanitized count only; it does not emit the id list.
 
 PriceDesk must precede the new RedStone selector during deployment.
 
+Metadata captured through typed calls at governance admission is
+authoritative until governance updates or disables the configuration.
 Chainlink and RedStone cache feed decimals at proposal (and Chainlink
 constructor capture on deploy). Price scaling uses that cached value.
-Confirm and read re-check live `decimals()` as fail-closed equality
-guards: mismatch returns 0 and failed confirmation auto-cancels. A later
-feed-decimal change does not mis-scale on this head. A later change that
-removes those guards must replace this sentence; keeping both would make
-the register self-contradictory.
+They do not re-read live decimals on confirm or price. Decimal drift
+during the pending timelock is inside the accepted risk: confirmation
+admits the cached decimals and can mis-scale immediately. After
+admission, a later feed-decimal change can mis-scale prices by
+`10 ** abs(oldDecimals - newDecimals)` until governance acts. Curve
+ordinary and GREEN-reference feeds keep proposal-time MetaRegistry
+metadata and alternative-token decimals; confirmation still validates
+pending parameter bounds, live prices, timestamps, rounds, pool
+observations, snapshots, recursion, permissions, and timelocks, but
+does not reconstruct MetaRegistry metadata. Governance must update or
+disable a configuration if identity or decimals change.
 
 Registered Underscore Earn Vaults and their underlyings are trusted not
 to change asset() or decimals. If an upgrade changes either, governance

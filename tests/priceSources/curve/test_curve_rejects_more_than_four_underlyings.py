@@ -234,7 +234,7 @@ def test_exactly_four_accepted(
     assert curve.curveConfig(lp).numUnderlying == 4
 
 
-def test_four_then_five_cancels_new_and_update(
+def test_new_and_update_confirm_store_pending_four_coin_config_after_registry_drift(
     ripe_hq,
     governance,
     green_token,
@@ -254,36 +254,71 @@ def test_four_then_five_cancels_new_and_update(
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
 
     assert curve.addNewPriceFeed(lp, pool, sender=governance.address)
+    pending = curve.pendingUpdates(lp).config
+    assert pending.numUnderlying == 4
+    drifted_coins = [
+        extra[0],
+        extra[1],
+        extra[2],
+        extra[3],
+        alpha_token.address,
+        bravo_token.address,
+        charlie_token.address,
+        delta_token.address,
+    ]
     boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
-    mr.setN(5)
-    for token in (alpha_token, bravo_token, charlie_token, delta_token):
-        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-    assert not curve.confirmNewPriceFeed(lp, sender=governance.address)
-    assert not curve.hasPriceFeed(lp)
-    assert not curve.hasPendingPriceFeedUpdate(lp)
-
-    mr.setN(4)
-    for token in (alpha_token, bravo_token, charlie_token, delta_token):
-        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-    assert curve.addNewPriceFeed(lp, pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+    mr.setN(8)
+    mr.setCoins(drifted_coins)
     for token in (alpha_token, bravo_token, charlie_token, delta_token):
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
     assert curve.confirmNewPriceFeed(lp, sender=governance.address)
+    stored = curve.curveConfig(lp)
+    assert stored.pool == pool.address
+    assert stored.lpToken == lp
+    assert stored.numUnderlying == 4
+    assert [str(a).lower() for a in stored.underlying] == [
+        str(alpha_token.address).lower(),
+        str(bravo_token.address).lower(),
+        str(charlie_token.address).lower(),
+        str(delta_token.address).lower(),
+    ]
+    assert curve.hasPriceFeed(lp)
+    assert curve.getPrice(lp) != 0
 
     other_pool = boa.loads(CURVE_POOL)
     assert other_pool.address != pool.address
     mr.setN(4)
+    mr.setCoins(
+        [
+            alpha_token.address,
+            bravo_token.address,
+            charlie_token.address,
+            delta_token.address,
+            extra[0],
+            extra[1],
+            extra[2],
+            extra[3],
+        ]
+    )
     for token in (alpha_token, bravo_token, charlie_token, delta_token):
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
     assert curve.updatePriceFeed(lp, other_pool, sender=governance.address)
     boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
     mr.setN(5)
+    mr.setCoins(drifted_coins)
     for token in (alpha_token, bravo_token, charlie_token, delta_token):
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-    assert not curve.confirmPriceFeedUpdate(lp, sender=governance.address)
-    assert curve.curveConfig(lp).numUnderlying == 4
-    assert curve.curveConfig(lp).pool == pool.address
+    assert curve.confirmPriceFeedUpdate(lp, sender=governance.address)
+    updated = curve.curveConfig(lp)
+    assert updated.pool == other_pool.address
+    assert updated.numUnderlying == 4
+    assert [str(a).lower() for a in updated.underlying] == [
+        str(alpha_token.address).lower(),
+        str(bravo_token.address).lower(),
+        str(charlie_token.address).lower(),
+        str(delta_token.address).lower(),
+    ]
+    assert curve.getPrice(lp) != 0
 
 
 def test_stored_num_underlying_over_four_prices_zero(

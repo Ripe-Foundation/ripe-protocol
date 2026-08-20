@@ -557,19 +557,18 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again against a live reconstruct; store only if trust fields match
+    # validate the pending admission-time config; do not reconstruct MetaRegistry
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending new feed
-    live: CurvePriceConfig = self._getCurvePoolConfig(d.config.pool)
-    if not self._isValidNewFeed(_asset, live) or not self._trustSensitiveConfigMatches(d.config, live):
+    if not self._isValidNewFeed(_asset, d.config):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
-    # save new feed config
-    self.curveConfig[_asset] = live
+    # save pending feed config
+    self.curveConfig[_asset] = d.config
     self.pendingUpdates[_asset] = empty(PendingCurvePrice)
     priceData._addPricedAsset(_asset)
 
@@ -651,20 +650,19 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again against a live reconstruct; store only if trust fields match
+    # validate the pending admission-time config; do not reconstruct MetaRegistry
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending update feed
     prevPool: address = self.curveConfig[_asset].pool
-    live: CurvePriceConfig = self._getCurvePoolConfig(d.config.pool)
-    if not self._isValidUpdateFeed(_asset, live, prevPool) or not self._trustSensitiveConfigMatches(d.config, live):
+    if not self._isValidUpdateFeed(_asset, d.config, prevPool):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
-    # save new feed config
-    self.curveConfig[_asset] = live
+    # save pending feed config
+    self.curveConfig[_asset] = d.config
     self.pendingUpdates[_asset] = empty(PendingCurvePrice)
 
     log CurvePriceConfigUpdated(asset=_asset, pool=d.config.pool, prevPool=prevPool)
@@ -749,25 +747,6 @@ def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
         return True
 
     return self._getCurvePrice(_asset, _config, empty(address)) != 0
-
-
-@pure
-@internal
-def _trustSensitiveConfigMatches(_pending: CurvePriceConfig, _live: CurvePriceConfig) -> bool:
-    if _pending.pool != _live.pool:
-        return False
-    if _pending.lpToken != _live.lpToken:
-        return False
-    if _pending.numUnderlying != _live.numUnderlying:
-        return False
-    if _pending.poolType != _live.poolType:
-        return False
-    if _pending.hasEcoToken != _live.hasEcoToken:
-        return False
-    for i: uint256 in range(4):
-        if _pending.underlying[i] != _live.underlying[i]:
-            return False
-    return True
 
 
 ################
@@ -948,13 +927,16 @@ def setGreenRefPoolConfig(
     if greenToken == poolConfig.underlying[1]:
         greenIndex = 1
     altAsset: address = poolConfig.underlying[1 - greenIndex]
+    altAssetDecimals: uint256 = 0
+    if altAsset != empty(address):
+        altAssetDecimals = convert(staticcall IERC20Detailed(altAsset).decimals(), uint256)
 
     refConfig: GreenRefPoolConfig = GreenRefPoolConfig(
         pool=_pool,
         lpToken=poolConfig.lpToken,
         greenIndex=greenIndex,
         altAsset=altAsset,
-        altAssetDecimals=convert(staticcall IERC20Detailed(altAsset).decimals(), uint256),
+        altAssetDecimals=altAssetDecimals,
         maxNumSnapshots=_maxNumSnapshots,
         dangerTrigger=_dangerTrigger,
         staleBlocks=_staleBlocks,
@@ -978,12 +960,10 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again against live pool metadata and the current block
+    # validate pending parameter bounds and current pool-observation usability
     d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
     assert d.pool != empty(address) # dev: no pending update
-    poolConfig: CurvePriceConfig = self._getCurvePoolConfig(d.pool)
-    greenToken: address = addys._getGreenToken()
-    assert self._isValidGreenRefPoolConfig(poolConfig, d, d.maxNumSnapshots, d.dangerTrigger, d.staleBlocks, d.stabilizerAdjustWeight, d.stabilizerMaxPoolDebt, greenToken) # dev: invalid ref pool config
+    assert self._isValidPendingGreenRefPoolConfig(d) # dev: invalid ref pool config
 
     # check time lock
     assert timeLock._confirmAction(_aid) # dev: time lock not reached
@@ -1078,6 +1058,60 @@ def cancelGreenRefPoolConfig(_aid: uint256) -> bool:
 
 @view
 @internal
+def _isValidPendingGreenRefPoolConfig(_refConfig: GreenRefPoolConfig) -> bool:
+    return self._isValidGreenRefPoolParams(
+        _refConfig,
+        _refConfig.maxNumSnapshots,
+        _refConfig.dangerTrigger,
+        _refConfig.staleBlocks,
+        _refConfig.stabilizerAdjustWeight,
+        _refConfig.stabilizerMaxPoolDebt,
+    )
+
+
+@view
+@internal
+def _isValidGreenRefPoolParams(
+    _refConfig: GreenRefPoolConfig,
+    _maxNumSnapshots: uint256,
+    _dangerTrigger: uint256,
+    _staleBlocks: uint256,
+    _stabilizerAdjustWeight: uint256,
+    _stabilizerMaxPoolDebt: uint256,
+) -> bool:
+    if _refConfig.greenIndex > 1:
+        return False
+
+    if _refConfig.altAssetDecimals > 18:
+        return False
+
+    if _maxNumSnapshots == 0 or _maxNumSnapshots > MAX_SNAPSHOTS:
+        return False
+
+    if _dangerTrigger < 50_00 or _dangerTrigger >= HUNDRED_PERCENT: # 50% - 99.99%
+        return False
+
+    if _staleBlocks != 0 and _staleBlocks > max_value(uint256) - block.number:
+        return False
+
+    if _stabilizerAdjustWeight == 0 or _stabilizerAdjustWeight > HUNDRED_PERCENT:
+        return False
+
+    if _stabilizerMaxPoolDebt == 0 or _stabilizerMaxPoolDebt > 25_000_000 * EIGHTEEN_DECIMALS: # 25 million
+        return False
+
+    # current pool observation must still be usable
+    greenBalance: uint256 = 0
+    greenRatio: uint256 = 0
+    greenBalance, greenRatio = self._getCurvePoolData(_refConfig.pool, _refConfig.greenIndex, _refConfig.altAssetDecimals)
+    if greenRatio == 0:
+        return False
+
+    return True
+
+
+@view
+@internal
 def _isValidGreenRefPoolConfig(
     _poolConfig: CurvePriceConfig,
     _refConfig: GreenRefPoolConfig,
@@ -1106,35 +1140,14 @@ def _isValidGreenRefPoolConfig(
     if _poolConfig.underlying[1 - _refConfig.greenIndex] != _refConfig.altAsset:
         return False
 
-    if _refConfig.altAssetDecimals > 18:
-        return False
-
-    if convert(staticcall IERC20Detailed(_refConfig.altAsset).decimals(), uint256) != _refConfig.altAssetDecimals:
-        return False
-
-    if _maxNumSnapshots == 0 or _maxNumSnapshots > MAX_SNAPSHOTS:
-        return False
-
-    if _dangerTrigger < 50_00 or _dangerTrigger >= HUNDRED_PERCENT: # 50% - 99.99%
-        return False
-
-    if _staleBlocks != 0 and _staleBlocks > max_value(uint256) - block.number:
-        return False
-
-    if _stabilizerAdjustWeight == 0 or _stabilizerAdjustWeight > HUNDRED_PERCENT:
-        return False
-
-    if _stabilizerMaxPoolDebt == 0 or _stabilizerMaxPoolDebt > 25_000_000 * EIGHTEEN_DECIMALS: # 25 million
-        return False
-
-    # make sure this curve integration works
-    greenBalance: uint256 = 0
-    greenRatio: uint256 = 0
-    greenBalance, greenRatio = self._getCurvePoolData(_refConfig.pool, _refConfig.greenIndex, _refConfig.altAssetDecimals)
-    if greenRatio == 0:
-        return False
-
-    return True
+    return self._isValidGreenRefPoolParams(
+        _refConfig,
+        _maxNumSnapshots,
+        _dangerTrigger,
+        _staleBlocks,
+        _stabilizerAdjustWeight,
+        _stabilizerMaxPoolDebt,
+    )
 
 
 ########################
