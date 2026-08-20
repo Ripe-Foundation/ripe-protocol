@@ -14,7 +14,9 @@ rev 10 — corrected Relay order authorization, reconciliation, and cap semantic
 rev 11 — M-5 routing evidence pinned and claim narrowed; added H-7, H-8, M-6, M-7
 against the implemented `FastLaneFloat`;
 rev 12 — H-7, M-6, M-7 verified resolved; H-8 corrected down to Medium;
-rev 13 — M-8 verified resolved)
+rev 13 — M-8 verified resolved;
+rev 14 — M-8 reopened: the rev-12 horizon check bounded time-to-expiry, not
+order age; closed with a signed `issuedAt`)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -930,8 +932,9 @@ cancelling is a tightening operation and belongs with the other fast levers.
 
 ### H-8 — *Downgraded to M-8 in rev 12.* Solver-order lifetime
 
-**Resolved in `71e8781` (verified rev 13).** `MAX_ORDER_HORIZON = 15 min`,
-enforced at admission (`:313`), and `clearSolverSigner` writes
+**Partially resolved in `71e8781`. The deadline half was NOT closed and rev
+13's verification of it was wrong — reopened and closed properly in rev 14,
+below.** `clearSolverSigner` writes
 `isBurnedSigner[prev] = True` (`:623`) with `ACTION_SET_SOLVER` refusing a
 burned address (`:746`). The denylist is one-way — no clearing path exists —
 and it burns only the *currently configured* signer, so a guardian cannot burn
@@ -989,6 +992,52 @@ recording as an instance of the pattern this review keeps hitting: the finding
 was closed against the delivery path it happened to be demonstrated through,
 rather than against its root cause — and here it was the demonstration, not the
 gate, that was too narrow.
+
+### M-8 (rev 14) — `deadline` alone cannot express freshness, and rev 13 signed off on a check that did not work
+
+**Severity: Medium. Reproduced by `tests/core/test_fast_lane_float_audit.py`.**
+
+Rev 12 recommended bounding the order horizon as
+`deadline <= block.timestamp + MAX_ORDER_HORIZON`. That was implemented
+faithfully at `71e8781` and rev 13 recorded M-8 resolved. **The check does not
+do what it was asked to do.**
+
+Combined with the existing `block.timestamp <= deadline` it admits an order
+exactly during `[deadline - HORIZON, deadline]`, so it bounds *time-to-expiry
+at fill*, never *order age*. An order signed today with a one-year deadline is
+refused today — which is what made the check look correct — and a year later
+`block.timestamp` catches up and it becomes fillable for fifteen minutes. That
+window is not a leak, it is scheduled, at a time the signer selected when they
+chose the deadline.
+`test_m8_a_year_old_order_is_refused_in_its_final_horizon` is the regression;
+its final assertion failed before the fix.
+
+**Age is only knowable from a value inside the signature.** Closed in `7d0c76f`
+by adding `issuedAt` to `FillOrder` and `ORDER_TYPEHASH` and asserting
+`issuedAt <= block.timestamp <= deadline`,
+`deadline - issuedAt <= MAX_ORDER_HORIZON` and
+`block.timestamp - issuedAt <= MAX_ORDER_HORIZON`. The last is implied by the
+others and stated anyway, because it is the property that actually matters and
+the one the previous check only appeared to give. Backdating and post-dating
+each get their own test, since `issuedAt` is signed and therefore only as good
+as the checks around it.
+
+**Carried into the canonical port.** Whatever `OrderV1` normalization lands must
+bound age the same way. If the canonical Relay order carries no issuance field,
+freshness cannot be derived from it at all and the lane needs one from
+elsewhere rather than an approximation from the deadline — the approximation is
+this finding.
+
+**On how this got through.** Two messages before signing it off I argued that an
+inverted PoC inherits its original's threat model, and that a fix's test should
+be written from the invariant rather than the exploit. I then wrote a
+recommendation from my exploit — `deadline = 2**255`, travel a century — and
+verified the implementation against the recommendation rather than against the
+property. The exploit-shaped test passes against the broken check. The lesson
+generalises past tests to recommendations: **a fix specified from an exploit
+inherits the exploit's threat model too**, and the reviewer who proposes a
+remedy is the worst-placed person to verify it, because verification collapses
+into checking that their own words were followed.
 
 ### M-6 — `pauseLane` does not stop value leaving, and `ACTION_WITHDRAW` ignores the drain floor
 
@@ -1150,8 +1199,9 @@ Whatever design lands, these must be red-before-green:
 
 ## Sign-off
 
-Not signed off. **Six highs open, seven mediums** (rev 13: H-7, M-6, M-7 and
-M-8 all verified resolved against `71e8781`; H-8 corrected down to M-8 first).
+Not signed off. **Six highs open, seven mediums** (rev 14: M-8 reopened —
+rev 13's sign-off on it was wrong — and closed with a signed `issuedAt` at
+`7d0c76f`).
 
 **No open finding in this review is a `FastLaneFloat` control defect.** Every
 one raised against the implemented contract is closed and re-tested. What
