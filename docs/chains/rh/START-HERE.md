@@ -7,7 +7,7 @@ Choose the source for your audience or phase:
 | Deployment owner or deployment agent | [`deployment-owner-quickstart.md`](deployment-owner-quickstart.md) — sole canonical human deployment handoff |
 | Machine/dashboard current status | [`status.yaml`](status.yaml) — sole machine-readable current authority |
 | Accepted launch architecture and follow-on decisions | [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md) and [`curve-launch-activation.md`](curve-launch-activation.md) |
-| Bridge integration recommendation and evidence | [`bridge-integration-synthesis.md`](bridge-integration-synthesis.md) — Across collateral, CCIP protocol-token, and conditional Relay GREEN boundaries |
+| Relay fast lane for GREEN/RIPE | [`relay-fast-lane.md`](relay-fast-lane.md) — how Relay works, what a direct lane costs, what blocks it |
 | Protocol-wide component and transaction-flow audit | [`../../audit/AUDIT_PROCESS_PLAN.md`](../../audit/AUDIT_PROCESS_PLAN.md) — canonical audit organization, evidence, parallel-agent, and completion model for the `rh` code line |
 | Detailed deployment validation | [`robinhood-deployment-validation-plan.md`](robinhood-deployment-validation-plan.md) |
 | Operator rehearsal and manifest handling | [`robinhood-manifest-operator-runbook.md`](robinhood-manifest-operator-runbook.md) |

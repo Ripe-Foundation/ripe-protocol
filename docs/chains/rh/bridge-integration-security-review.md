@@ -24,7 +24,7 @@ properties of the *fast-fill-from-float* shape and apply to any future
 liquidity-based lane. H-3 and H-4 are provider-specific. The original
 RipeHq-side review did not audit Relay's contracts; those two findings now
 consume the separate pinned-source and live privilege evaluation in
-`relay-settlement-evaluation.md`.
+[`relay-fast-lane.md`](relay-fast-lane.md).
 
 Out of scope: the local-mint acquisition flow. That is a separate product path,
 not a GREEN transfer route. RIPE has no fast lane in the selected venue-first
@@ -215,7 +215,7 @@ through `GreenToken.mint` should be rejected on this basis alone.
 **Severity: Medium (user funds, no attacker profit). Mitigation available and
 unilateral; not yet specified anywhere. Added rev 7.**
 
-`across-settlement-evaluation.md` establishes that `SpokePool._depositV3`
+[`relay-fast-lane.md`](relay-fast-lane.md) establishes that `SpokePool._depositV3`
 performs no input-token allowlist check, that route enablement is dead code
 (`SpokePool.sol:92`), and that `deposit(GREEN, ...)` therefore **succeeds
 on-chain** and is then unrecoverable absent Across admin action. The synthesis
@@ -289,7 +289,7 @@ Added rev 3.**
 
 Across V4 supplies the worked example, established at pinned commit
 `8aa73521538caff624f76d1fc9e6f8984a1b01be` and recorded in
-`across-settlement-evaluation.md`. `SpokePool._depositV3` validates `depositor`
+[`relay-fast-lane.md`](relay-fast-lane.md). `SpokePool._depositV3` validates `depositor`
 only as a bytes32 address format (`uint256(_bytes32) >> 160 == 0`,
 `libraries/AddressConverters.sol:19`) while pulling funds from `msg.sender`, so
 payer and recorded depositor are independent. The recorded depositor can then
@@ -422,7 +422,7 @@ destination inventory in Ripe's custody and pays the user; the Depository holds
 the *user's* origin-chain deposit, which Ripe later collects. So what Ripe
 has inside Relay's custody is an **outstanding, unwithdrawn receivable**, not
 its whole inventory. The correct loss ceiling is that receivable. This matches
-the cap framing in `relay-settlement-evaluation.md` and supersedes the wording
+the cap framing in [`relay-fast-lane.md`](relay-fast-lane.md) and supersedes the wording
 here.
 
 The custody finding itself stands, live-queried on Base and Robinhood at
