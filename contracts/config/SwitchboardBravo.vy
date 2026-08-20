@@ -36,12 +36,12 @@ interface StabilityPool:
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
-    def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
+    def getRipeHq() -> address: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -53,11 +53,10 @@ interface SwitchboardAlpha:
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
-interface Switchboard:
-    def getAddr(_regId: uint256) -> address: view
-
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
+    def tokenScale(_asset: address) -> uint256: view
+    def syncTokenScale(_asset: address): nonpayable
 
 flag ActionType:
     ASSET_ADD_NEW
@@ -543,7 +542,7 @@ def _isValidAssetLiqConfig(
 @internal
 def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
     switchboard: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ID)
-    switchboardAlpha: address = staticcall Switchboard(switchboard).getAddr(SWITCHBOARD_ALPHA_ID)
+    switchboardAlpha: address = staticcall RipeHq(switchboard).getAddr(SWITCHBOARD_ALPHA_ID)
     return staticcall SwitchboardAlpha(switchboardAlpha).areValidAuctionParams(_params)
 
 
@@ -578,10 +577,7 @@ def setAssetDebtTerms(
         borrowRate=_borrowRate,
         daowry=_daowry,
     )
-    assert self._isLtvWithinMaxDeviation(debtTerms.ltv, assetConfig.debtTerms.ltv, maxDeviation) # dev: ltv is outside max deviation
-    assert self._isWithinMaxStepDown(debtTerms.redemptionThreshold, assetConfig.debtTerms.redemptionThreshold, maxDeviation) # dev: redemption threshold is outside max deviation
-    assert self._isWithinMaxStepDown(debtTerms.liqThreshold, assetConfig.debtTerms.liqThreshold, maxDeviation) # dev: liq threshold is outside max deviation
-    assert self._isWithinMaxStepUp(debtTerms.borrowRate, assetConfig.debtTerms.borrowRate, maxDeviation) # dev: borrow rate is outside max deviation
+    self._assertDebtTermsWithinMaxStep(debtTerms, assetConfig.debtTerms, maxDeviation)
     assert self._isValidDebtTerms(debtTerms) # dev: invalid debt terms
     return self._setPendingAssetConfig(ActionType.ASSET_DEBT_TERMS, _asset, _missionControl, [], 0, 0, 0, 0, 0, debtTerms)
 
@@ -619,14 +615,6 @@ def _isWithinMaxStepDown(_new: uint256, _prev: uint256, _maxDeviation: uint256) 
 
 @view
 @internal
-def _isWithinMaxStepUp(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
-    if _prev == 0 or _maxDeviation == 0:
-        return True
-    return _new <= _prev or _new - _prev <= _maxDeviation
-
-
-@view
-@internal
 def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation: uint256) -> bool:
 
     # cannot set ltv to 0 after already non-zero
@@ -637,6 +625,14 @@ def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation:
         return True
 
     return HUNDRED_PERCENT > _newLtv and self._isWithinMaxStepDown(_newLtv, _prevLtv, _maxDeviation)
+
+
+@internal
+def _assertDebtTermsWithinMaxStep(_new: cs.DebtTerms, _prev: cs.DebtTerms, _maxDeviation: uint256):
+    assert self._isLtvWithinMaxDeviation(_new.ltv, _prev.ltv, _maxDeviation) # dev: ltv is outside max deviation
+    assert self._isWithinMaxStepDown(_new.redemptionThreshold, _prev.redemptionThreshold, _maxDeviation) # dev: redemption threshold is outside max deviation
+    assert self._isWithinMaxStepDown(_new.liqThreshold, _prev.liqThreshold, _maxDeviation) # dev: liq threshold is outside max deviation
+    assert _prev.borrowRate == 0 or _maxDeviation == 0 or _new.borrowRate <= _prev.borrowRate or _new.borrowRate - _prev.borrowRate <= _maxDeviation # dev: borrow rate is outside max deviation
 
 
 #####################
@@ -824,6 +820,11 @@ def executePendingAction(_aid: uint256) -> bool:
         assert not staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: must be new asset
         assert self._isValidAssetConfig(p.asset, p.config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, p.config)
+        if not p.config.isNft:
+            priceDesk: address = staticcall RipeHq(staticcall MissionControl(mc).getRipeHq()).getAddr(7)
+            assert priceDesk != empty(address) # dev: missing price desk
+            if staticcall RipeHq(priceDesk).tokenScale(p.asset) == 0:
+                extcall RipeHq(priceDesk).syncTokenScale(p.asset)
         log AssetAdded(asset=p.asset)
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:
@@ -858,10 +859,7 @@ def executePendingAction(_aid: uint256) -> bool:
         previousTerms: cs.DebtTerms = config.debtTerms
         pendingTerms: cs.DebtTerms = p.config.debtTerms
         maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
-        assert self._isLtvWithinMaxDeviation(pendingTerms.ltv, previousTerms.ltv, maxDeviation) # dev: ltv is outside max deviation
-        assert self._isWithinMaxStepDown(pendingTerms.redemptionThreshold, previousTerms.redemptionThreshold, maxDeviation) # dev: redemption threshold is outside max deviation
-        assert self._isWithinMaxStepDown(pendingTerms.liqThreshold, previousTerms.liqThreshold, maxDeviation) # dev: liq threshold is outside max deviation
-        assert self._isWithinMaxStepUp(pendingTerms.borrowRate, previousTerms.borrowRate, maxDeviation) # dev: borrow rate is outside max deviation
+        self._assertDebtTermsWithinMaxStep(pendingTerms, previousTerms, maxDeviation)
         config.debtTerms = pendingTerms
         assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)

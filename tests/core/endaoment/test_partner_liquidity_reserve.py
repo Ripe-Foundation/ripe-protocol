@@ -7,7 +7,7 @@ import vyper.ast as vy_ast
 from vyper.compiler.output import build_abi_output
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
 
 
 LEGO_SOURCE = """
@@ -543,6 +543,8 @@ def partner_liquidity_env(
         sender=switchboard_alpha.address,
     )
     mock_price_source.setPrice(charlie_token.address, ONE_GREEN)
+    sync_deployed_token(charlie_token)
+    sync_deployed_token(green_token)
 
     return SimpleNamespace(
         endaoment=endaoment,
@@ -589,6 +591,7 @@ def _controlled_delta_token(ctx, mode, delta):
         name=f"controlled_delta_mode_{mode}",
     )
     ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
+    sync_deployed_token(token)
     return token
 
 
@@ -793,6 +796,7 @@ def test_sc18_mint_partner_liquidity_values_actual_received_amount(
     fee_token.setTransferFee(fee_bps, sender=ctx.governance.address)
     fee_token.approve(ctx.endaoment.address, nominal_amount, sender=alice)
     ctx.price_source.setPrice(fee_token.address, EIGHTEEN_DECIMALS)
+    sync_deployed_token(fee_token)
     reserve = 30 * EIGHTEEN_DECIMALS
     ctx.green.transfer(ctx.endaoment_funds.address, reserve, sender=whale)
 
@@ -932,6 +936,7 @@ def test_sc18_dual_role_switchboard_token_cannot_reenter(
     token.approve(ctx.endaoment.address, nominal, sender=alice)
     token.approve(ctx.endaoment.address, nested_amount, sender=bob)
     ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
+    sync_deployed_token(token)
 
     ctx.switchboard.startAddNewAddressToRegistry(
         token.address,
@@ -1274,6 +1279,7 @@ def test_sc18_composed_fee_route_reverts_with_preexisting_inventory(
     fee_token.setTransferFee(fee_bps, sender=ctx.governance.address)
     fee_token.approve(ctx.endaoment.address, nominal, sender=alice)
     ctx.price_source.setPrice(fee_token.address, EIGHTEEN_DECIMALS)
+    sync_deployed_token(fee_token)
     before = (
         fee_token.balanceOf(alice),
         fee_token.balanceOf(ctx.endaoment.address),
@@ -1332,6 +1338,7 @@ def test_sc18_upstream_curve_gross_report_is_not_net_venue_receipt(
     token.mint(lego.address, inventory)
     token.approve(ctx.endaoment.address, gross, sender=alice)
     ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
+    sync_deployed_token(token)
     supply_before = ctx.green.totalSupply()
 
     result = ctx.endaoment.addPartnerLiquidity(

@@ -3,7 +3,7 @@ import pytest
 from hypothesis import HealthCheck, example, given, settings, strategies as st
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
-from conf_utils import redeem_from_stability_pool
+from conf_utils import ensure_token_scale, redeem_from_stability_pool
 from test_stab_vault_hardening import (
     ACTIVATION_THRESHOLD,
     CLAIM_ASSET_ACTIVE,
@@ -45,8 +45,22 @@ def fuzz_claim_tokens(governance):
     )
 
 
-def _prepare_claim_token(token, governance, holder, amount):
+def _prepare_claim_token(
+    token,
+    governance,
+    holder,
+    amount,
+    price_desk=None,
+    switchboard_bravo=None,
+):
     token.mint(holder, amount, sender=governance.address)
+    if price_desk is not None:
+        sender = (
+            switchboard_bravo.address
+            if switchboard_bravo is not None
+            else governance.address
+        )
+        ensure_token_scale(price_desk, token, sender)
     return token
 
 
@@ -221,6 +235,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
     green_token,
     savings_green,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     with boa.env.anchor():
         _seed_stability_asset(
@@ -237,6 +253,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                 governance,
                 alice,
                 20 * EIGHTEEN_DECIMALS,
+                price_desk,
+                switchboard_bravo,
             )
             for index in range(NUM_FUZZ_CLAIM_ASSETS)
         ]
@@ -245,6 +263,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
             governance,
             alice,
             20 * EIGHTEEN_DECIMALS,
+            price_desk,
+            switchboard_bravo,
         )
         tokens = sampled_tokens + [prologue_token]
 
@@ -512,6 +532,8 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
     setGeneralConfig,
     setAssetConfig,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     candidate_amount, active_increment = case
 
@@ -532,6 +554,8 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
                 governance,
                 alice,
                 ACTIVATION_THRESHOLD + (active_increment if index == 0 else 0),
+                price_desk,
+                switchboard_bravo,
             )
             for index in range(MAX_ACTIVE_CLAIM_ASSETS)
         ]
@@ -554,6 +578,8 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             governance,
             alice,
             candidate_amount,
+            price_desk,
+            switchboard_bravo,
         )
         mock_price_source.setPrice(candidate, EIGHTEEN_DECIMALS)
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
@@ -696,6 +722,8 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
     setGeneralConfig,
     setAssetConfig,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     pair_balance, max_claim_value = case
 
@@ -724,6 +752,8 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
             governance,
             alice,
             2 * pair_balance,
+            price_desk,
+            switchboard_bravo,
         )
         setAssetConfig(claim)
         mock_price_source.setPrice(claim, EIGHTEEN_DECIMALS)
@@ -856,6 +886,8 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
     setGeneralConfig,
     setAssetConfig,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     alpha_balance, charlie_balance, first_payment, second_payment = case
 
@@ -884,6 +916,8 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
             governance,
             alice,
             alpha_balance + charlie_balance,
+            price_desk,
+            switchboard_bravo,
         )
         setAssetConfig(claim)
         mock_price_source.setPrice(claim, EIGHTEEN_DECIMALS)

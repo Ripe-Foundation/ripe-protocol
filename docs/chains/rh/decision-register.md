@@ -1481,6 +1481,26 @@ merge. Samples do not prove future Hermes payloads stay under 2,048 B.
 The packet records the future-publishTime zero-read (run 3b). Verdict
 CONDITIONAL. This grants no Pyth registration or activation.
 
+PriceDesk stores admission-time token scale as trusted metadata.
+`getUsdValue` and `getAssetAmount` never call token `decimals()`.
+Scale `0` means unset; scale `1` is a valid zero-decimal token; the
+ETH sentinel always uses `10**18` without storage or token calls.
+Missing scale returns `0` or reverts `missing token scale` before any
+price source is contacted. Decimal drift misprices by
+`10 ** abs(oldDecimals - newDecimals)` until governance resynchronizes
+or sets the scale. SwitchboardBravo synchronizes unset fungible scales
+on `ASSET_ADD_NEW` against the target MissionControl’s PriceDesk
+(`MissionControl.getRipeHq()` → `RipeHq.getAddr(7)`). A
+governance-preseeded scale wins and skips `decimals()`. `setTokenScale`
+is governance-only and supports trusted tokens with unusual
+`decimals()` behavior and PriceDesk redeployment. Every priced
+Deleverage underlying requires scale even if it is not onboarded.
+Missing Endaoment partner/treasury scale makes soft USD telemetry zero.
+Cached scale remains after MissionControl asset removal so residual
+positions can still be valued. NFT admission, configuration updates,
+and SwitchboardCharlie actions do not synchronize scale. RH-D043 and
+deployment/activation authority are unchanged.
+
 Batch 3, AUD-FLOW-11, RH-D043, Pyth registration and activation,
 full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and
 GREEN-reference activation remain open. This wrap-up grants no

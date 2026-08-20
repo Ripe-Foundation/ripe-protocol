@@ -47,9 +47,17 @@ interface MissionControl:
 interface UnderscoreRegistry:
     def getAddr(_regId: uint256) -> address: view
 
+interface IERC20Detailed:
+    def decimals() -> uint8: view
+
 struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
+
+event TokenScaleSet:
+    asset: indexed(address)
+    decimals: indexed(uint256)
+    scale: indexed(uint256)
 
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -57,12 +65,14 @@ UNDERSCORE_APPRAISER_ID: constant(uint256) = 7
 PRICE_SOURCE_PRICE_GAS: constant(uint256) = 250_000
 PRICE_SOURCE_HAS_FEED_GAS: constant(uint256) = 75_000
 PRICE_SOURCE_SNAPSHOT_GAS: constant(uint256) = 150_000
-TOKEN_DECIMALS_GAS: constant(uint256) = 30_000
 # 10 ** 77 fits in uint256. This bound only guarantees the decimal scale
 # can be constructed. Price/amount multiplication remains checked uint256
 # arithmetic, so conversions whose product exceeds uint256 revert. This is
 # not a universal overflow-safe conversion guarantee.
 MAX_SUPPORTED_TOKEN_DECIMALS: constant(uint256) = 77
+
+# 0 = unset. 1 = valid zero-decimal token (10 ** 0).
+tokenScale: public(HashMap[address, uint256])
 
 
 @deploy
@@ -93,12 +103,11 @@ def __init__(
 def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256:
     if _amount == 0 or _asset == empty(address):
         return 0
-    price: uint256 = self._getPrice(_asset, _shouldRaise)
-    if price == 0:
-        return 0
-
     tokenScale: uint256 = self._readTokenScale(_asset, _shouldRaise)
     if tokenScale == 0:
+        return 0
+    price: uint256 = self._getPrice(_asset, _shouldRaise)
+    if price == 0:
         return 0
 
     numerator: uint256 = price * _amount
@@ -122,12 +131,12 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
     if _usdValue == 0 or _asset == empty(address):
         return 0
 
-    price: uint256 = self._getPrice(_asset, _shouldRaise)
-    if price == 0:
-        return 0
-
     tokenScale: uint256 = self._readTokenScale(_asset, _shouldRaise)
     if tokenScale == 0:
+        return 0
+
+    price: uint256 = self._getPrice(_asset, _shouldRaise)
+    if price == 0:
         return 0
 
     return _usdValue * tokenScale // price
@@ -152,27 +161,40 @@ def _readTokenScale(_asset: address, _shouldRaise: bool) -> uint256:
     if _asset == ETH:
         return 10 ** 18
 
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        _asset,
-        method_id("decimals()"),
-        max_outsize=33,
-        gas=TOKEN_DECIMALS_GAS,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
+    scale: uint256 = self.tokenScale[_asset]
+    if scale == 0:
         if _shouldRaise:
-            raise "invalid token decimals"
+            raise "missing token scale"
         return 0
+    return scale
 
-    decimals: uint256 = abi_decode(response, uint256)
-    if decimals > MAX_SUPPORTED_TOKEN_DECIMALS:
-        if _shouldRaise:
-            raise "invalid token decimals"
-        return 0
-    return 10 ** decimals
+
+#################
+# Token Scales  #
+#################
+
+
+@external
+def syncTokenScale(_asset: address):
+    assert self._canSyncTokenScale(msg.sender) # dev: no perms
+    assert _asset != empty(address) and _asset != ETH # dev: invalid asset
+    self._storeTokenScale(_asset, convert(staticcall IERC20Detailed(_asset).decimals(), uint256))
+
+
+@external
+def setTokenScale(_asset: address, _decimals: uint256):
+    assert self._canSetTokenScale(msg.sender) # dev: no perms
+    assert _asset != empty(address) and _asset != ETH # dev: invalid asset
+    self._storeTokenScale(_asset, _decimals)
+
+
+@internal
+def _storeTokenScale(_asset: address, _decimals: uint256):
+    if _decimals > MAX_SUPPORTED_TOKEN_DECIMALS:
+        raise "invalid token decimals"
+    scale: uint256 = 10 ** _decimals
+    self.tokenScale[_asset] = scale
+    log TokenScaleSet(asset=_asset, decimals=_decimals, scale=scale)
 
 
 @view
@@ -464,4 +486,18 @@ def _isUndyAppraiser(_addr: address) -> bool:
 @view
 @internal
 def _canPerformAction(_caller: address) -> bool:
+    return gov._canGovern(_caller) and not deptBasics.isPaused
+
+
+@view
+@internal
+def _canSyncTokenScale(_caller: address) -> bool:
+    if deptBasics.isPaused:
+        return False
+    return gov._canGovern(_caller) or addys._isSwitchboardAddr(_caller)
+
+
+@view
+@internal
+def _canSetTokenScale(_caller: address) -> bool:
     return gov._canGovern(_caller) and not deptBasics.isPaused

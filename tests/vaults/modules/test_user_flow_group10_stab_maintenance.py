@@ -11,7 +11,7 @@ which impersonates AuctionHouse and therefore skips the Group 1 swap path.
 import boa
 import pytest
 
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
@@ -511,6 +511,7 @@ def four_active_claims(
             f"G10 Claim {i}", f"G10C{i}", 18, 0, name=f"g10_claim_{i}",
         )
         tok.mint(alice, 1000 * EIGHTEEN_DECIMALS, sender=governance.address)
+        sync_deployed_token(tok)
         mock_price_source.setPrice(tok, EIGHTEEN_DECIMALS)
         _record_claim(stability_pool, alpha_token, tok, alice,
                       ACTIVATION_THRESHOLD - 1, bob, auction_house, green_token,
@@ -705,6 +706,7 @@ def test_prune_on_one_cohort_leaves_the_other_cohort_untouched(
     charlie_token_whale = alice
     charlie_token.mint(alice, 1000 * EIGHTEEN_DECIMALS,
                        sender=governance.address)
+    sync_deployed_token(charlie_token)
     mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
     _record_claim(stability_pool, alpha_token, charlie_token,
                   charlie_token_whale, ACTIVATION_THRESHOLD - 1, bob,
@@ -875,6 +877,7 @@ def test_activate_skip_matrix_and_boundaries(
     tiny = boa.load("contracts/mock/MockErc20.vy", governance, "G10 Tiny",
                     "G10T", 18, 0, name="g10_tiny")
     tiny.mint(alice, EIGHTEEN_DECIMALS, sender=governance.address)
+    sync_deployed_token(tiny)
     mock_price_source.setPrice(tiny, EIGHTEEN_DECIMALS)
     _record_claim(stability_pool, alpha_token, tiny, alice, 100, bob,
                   auction_house, green_token, savings_green)
@@ -1057,6 +1060,7 @@ def test_cross_cohort_custody_deficit_blocks_activate_on_the_other_cohort(
     shared = boa.load("contracts/mock/MockErc20.vy", governance, "G10 Cross",
                       "G10X", 18, 0, name="g10_cross")
     shared.mint(alice, 1000 * EIGHTEEN_DECIMALS, sender=governance.address)
+    sync_deployed_token(shared)
     mock_price_source.setPrice(shared, EIGHTEEN_DECIMALS)
 
     # cohort A: dormant sub-floor row. cohort B: large active row.
@@ -1103,6 +1107,7 @@ def _mk_claim_token(governance, holder, tag):
     tok = boa.load("contracts/mock/MockErc20.vy", governance, f"G10 {tag}",
                    f"G10{tag}", 18, 0, name=f"g10_cap_{tag}")
     tok.mint(holder, 1000 * EIGHTEEN_DECIMALS, sender=governance.address)
+    sync_deployed_token(tok)
     return tok
 
 

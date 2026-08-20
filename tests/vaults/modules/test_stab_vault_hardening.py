@@ -11,6 +11,7 @@ from conf_utils import (
     clear_transient_storage,
     filter_logs,
     redeem_from_stability_pool,
+    sync_deployed_token,
 )
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
@@ -340,6 +341,7 @@ def _seed_stability_asset(
     amount=100 * EIGHTEEN_DECIMALS,
 ):
     mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    sync_deployed_token(asset)
     asset.transfer(stability_pool, amount, sender=whale)
     assert stability_pool.depositTokensInVault(
         user,
@@ -384,6 +386,7 @@ def _deposit_and_get_shares(
     amount,
 ):
     mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    sync_deployed_token(asset)
     asset.transfer(stability_pool, amount, sender=whale)
     stability_pool.depositTokensInVault(
         user,
@@ -563,6 +566,7 @@ def _deploy_claim_token(governance, holder, index, amount=EIGHTEEN_DECIMALS):
         name=f"hard_claim_{index}",
     )
     token.mint(holder, amount, sender=governance.address)
+    sync_deployed_token(token)
     return token
 
 
@@ -3192,6 +3196,7 @@ def test_inbound_fee_on_transfer_settlement_reverts_atomically(
         override_address=boa.env.generate_address(),
     )
     mock_price_source.setPrice(fee_token, EIGHTEEN_DECIMALS)
+    sync_deployed_token(fee_token)
 
     declared = 10 * EIGHTEEN_DECIMALS
     fee_token.transfer(stability_pool, declared, sender=governance.address)

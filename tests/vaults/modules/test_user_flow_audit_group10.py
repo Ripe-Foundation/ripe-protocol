@@ -17,7 +17,7 @@ from pathlib import Path
 import boa
 import pytest
 
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
 from constants import MAX_UINT256
 
 
@@ -63,6 +63,7 @@ def _deploy_claim_token(governance, holder, index, amount=10 * EIGHTEEN):
         name=f"g10_claim_{index}",
     )
     token.mint(holder, amount, sender=governance.address)
+    sync_deployed_token(token)
     return token
 
 

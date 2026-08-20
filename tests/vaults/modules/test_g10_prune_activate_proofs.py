@@ -15,6 +15,7 @@ from conf_utils import (
     claim_from_stability_pool,
     filter_logs,
     redeem_from_stability_pool,
+    sync_deployed_token,
 )
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
@@ -79,6 +80,7 @@ def _deploy_claim_token(governance, holder, index, amount=EIGHTEEN_DECIMALS):
         name=f"g10_claim_{index}",
     )
     token.mint(holder, amount, sender=governance.address)
+    sync_deployed_token(token)
     return token
 
 

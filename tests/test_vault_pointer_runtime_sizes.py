@@ -15,7 +15,7 @@ EIP170_LIMIT = 24_576
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
     "SwitchboardAlpha": 24571,
-    "SwitchboardBravo": 24364,
+    "SwitchboardBravo": 24541,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23192,
     "VaultMigrator": 12464,
@@ -31,7 +31,7 @@ EXPECTED_RUNTIME_BYTES = {
     "CreditEngine": 24502,
     "CreditRedeem": 8415,
     "Endaoment": 23693,
-    "PriceDesk": 17305,
+    "PriceDesk": 17698,
     "Deleverage": 24459,
     "StabilityPool": 24269,
     "BlueChipYieldPrices": 22749,

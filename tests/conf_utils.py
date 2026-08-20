@@ -8,6 +8,37 @@ def advance_timelock_blocks(blocks):
     boa.env.evm.patch.block_number += blocks
 
 
+def ensure_token_scale(price_desk, asset, sender):
+    """Synchronize PriceDesk scale when a priced asset has none cached yet."""
+    if asset is None:
+        return
+    asset_addr = getattr(asset, "address", asset)
+    if asset_addr in (ZERO_ADDRESS, price_desk.ETH()):
+        return
+    if price_desk.tokenScale(asset_addr) == 0:
+        price_desk.syncTokenScale(asset_addr, sender=sender)
+
+
+_SCALE_BIND = {}
+
+
+def bind_token_scale(price_desk, sender):
+    _SCALE_BIND["desk"] = price_desk
+    _SCALE_BIND["sender"] = sender
+
+
+def unbind_token_scale():
+    _SCALE_BIND.clear()
+
+
+def sync_deployed_token(token):
+    desk = _SCALE_BIND.get("desk")
+    sender = _SCALE_BIND.get("sender")
+    if desk is None or sender is None:
+        return
+    ensure_token_scale(desk, token, sender)
+
+
 def clear_transient_storage():
     """Emulate a real EVM transaction boundary under titanoboa 0.2.7."""
     boa.env.evm.vm.state.clear_transient_storage()
@@ -516,7 +547,7 @@ def createAuctionParams():
 
 
 @pytest.fixture(scope="session")
-def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms):
+def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms, price_desk):
     def setAssetConfig(
         _asset,
         _vaultIds = [3], # default simple erc20 vault
@@ -565,6 +596,8 @@ def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms):
             _isNft,
         )
         mission_control.setAssetConfig(_asset, asset_config, sender=switchboard_bravo.address)
+        if not _isNft:
+            ensure_token_scale(price_desk, _asset, switchboard_bravo.address)
     yield setAssetConfig
 
 
