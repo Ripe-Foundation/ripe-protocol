@@ -35,6 +35,7 @@ interface RipeHq:
 interface RipeErc20:
     def blacklisted(_addr: address) -> bool: view
     def isPaused() -> bool: view
+    def ripeHq() -> address: view
 
 struct FillOrder:
     recipient: address
@@ -57,6 +58,7 @@ struct Entry:
     next: bytes32
 
 struct PendingChange:
+    epoch: uint256
     actionType: uint8
     addrVal: address
     numVal: uint256
@@ -107,6 +109,10 @@ event ChangeConfirmed:
     actionId: indexed(uint256)
     actionType: uint8
 
+event Retired:
+    caller: indexed(address)
+    retiredAt: uint256
+
 event FloatFloorSet:
     newFloor: uint256
     caller: indexed(address)
@@ -142,6 +148,22 @@ quoteThreshold: public(uint256)
 # zero, whatever the cause.
 minFloatBalance: public(uint256)
 
+# Tokens this contract believes it holds. Restoration must be matched by real
+# balance, not merely asserted by a governor, so clearing exposure requires the
+# balance to have risen. Direct transfers only ever create slack, which is safe:
+# the tokens are genuinely present however they arrived.
+accountedBalance: public(uint256)
+
+# One-way. Retirement pauses, drops the signer, and permanently blocks every
+# reactivation path, so a superseded instance cannot be rekeyed back into use.
+isRetired: public(bool)
+retiredAt: public(uint256)
+
+# Bumped by every emergency or tightening action. A timelocked action confirms
+# only in the epoch it was queued in, so a matured unpause cannot undo a
+# guardian pause that happened after it was queued.
+configEpoch: public(uint256)
+
 # ledger
 entries: public(HashMap[bytes32, Entry])
 oldestEntry: public(bytes32)
@@ -174,6 +196,10 @@ ACTION_RAISE_CAPS: constant(uint8) = 2
 ACTION_UNPAUSE: constant(uint8) = 3
 ACTION_WITHDRAW: constant(uint8) = 4
 ACTION_LOWER_FLOOR: constant(uint8) = 5
+
+RETIREMENT_DELAY: constant(uint256) = 7 * 24 * 3600
+MIN_RESTORE_BPS: constant(uint256) = 9_500
+HUNDRED_PCT: constant(uint256) = 10_000
 
 MAX_BATCH: constant(uint256) = 50
 ENTRY_CEILING: constant(uint256) = 1000
@@ -250,6 +276,10 @@ def fill(_order: FillOrder, _signature: Bytes[65]) -> bytes32:
     #    that it does not - so without this clause disabling minting would stop
     #    the float being replenished while leaving it draining at full rate
     assert not self.lanePaused # dev: lane paused
+    assert not self.isRetired # dev: retired
+    # the token's HQ is mutable; if it migrates, this instance's refill
+    # authority is obsolete while the old HQ may still report enabled
+    assert staticcall RipeErc20(TOKEN).ripeHq() == RIPE_HQ # dev: hq migrated
     assert staticcall RipeHq(RIPE_HQ).mintEnabled() # dev: minting disabled
     assert not staticcall RipeErc20(TOKEN).isPaused() # dev: token paused
 
@@ -292,6 +322,8 @@ def fill(_order: FillOrder, _signature: Bytes[65]) -> bytes32:
     self.stageANotional += _order.inputAmount
     self.stageAEntries += 1
     self._appendEntry(orderId, _order.inputAmount)
+    accounted: uint256 = self.accountedBalance
+    self.accountedBalance = accounted - min(accounted, _order.outputAmount)
 
     # interaction
     assert extcall IERC20(TOKEN).transfer(_order.recipient, _order.outputAmount, default_return_value=True) # dev: transfer failed
@@ -442,14 +474,26 @@ def recordWithdrawn(_orderIds: DynArray[bytes32, MAX_BATCH]) -> uint256:
 
 
 @external
-def recordRestored(_orderIds: DynArray[bytes32, MAX_BATCH]) -> uint256:
+def recordRestored(_orderIds: DynArray[bytes32, MAX_BATCH], _receivedAmount: uint256) -> uint256:
     """
-    @notice Clear entries once destination inventory is verifiably restored
-    @dev Governance only, for the same reason as `recordWithdrawn`. This is the
-         only path that reduces exposure or the age clock.
+    @notice Clear entries once destination inventory is back on this contract
+    @dev Governance authorises WHICH entries clear, but it cannot assert THAT
+         inventory returned: the balance must actually have risen by
+         `_receivedAmount` above what this contract already accounted for. A
+         mistaken or compromised governor therefore cannot recycle the aggregate
+         cap without real tokens arriving. This is a balance proof, not a CCIP
+         receipt proof - it binds amount but not origin, so it does not remove
+         the need for an authenticated receiver.
     """
     assert gov._canGovern(msg.sender) # dev: no perms
+    assert _receivedAmount != 0 # dev: zero received
+
+    accounted: uint256 = self.accountedBalance
+    balance: uint256 = staticcall IERC20(TOKEN).balanceOf(self)
+    assert balance >= accounted + _receivedAmount # dev: inventory not restored
+
     count: uint256 = 0
+    clearedTotal: uint256 = 0
     for orderId: bytes32 in _orderIds:
         entry: Entry = self.entries[orderId]
         if entry.stage != STAGE_B:
@@ -458,9 +502,15 @@ def recordRestored(_orderIds: DynArray[bytes32, MAX_BATCH]) -> uint256:
         self.stageBEntries -= 1
         self.outstandingNotional -= entry.amount
         self.outstandingEntries -= 1
+        clearedTotal += entry.amount
         self._unlinkEntry(orderId)
         count += 1
         log ExposureCleared(orderId=orderId, amount=entry.amount, ageSeconds=block.timestamp - entry.paidAt)
+
+    assert clearedTotal != 0 # dev: nothing cleared
+    # tolerate bridge fees, but not an arbitrary shortfall
+    assert _receivedAmount >= clearedTotal * MIN_RESTORE_BPS // HUNDRED_PCT # dev: restored short
+    self.accountedBalance = accounted + _receivedAmount
     return count
 
 
@@ -504,7 +554,9 @@ def canFill(_inputAmount: uint256) -> bool:
     @notice Advisory pre-check for the quoting layer. Reserves nothing: two
             concurrent quotes can both pass and only one may fit.
     """
-    if self.lanePaused or _inputAmount == 0 or _inputAmount > self.maxFillAmount:
+    if self.lanePaused or self.isRetired or _inputAmount == 0 or _inputAmount > self.maxFillAmount:
+        return False
+    if staticcall RipeErc20(TOKEN).ripeHq() != RIPE_HQ:
         return False
     if not staticcall RipeHq(RIPE_HQ).mintEnabled():
         return False
@@ -534,6 +586,7 @@ def pauseLane():
     assert self.isGuardian[msg.sender] or gov._canGovern(msg.sender) # dev: no perms
     assert not self.lanePaused # dev: already paused
     self.lanePaused = True
+    self.configEpoch += 1
     log LanePauseSet(isPaused=True, caller=msg.sender)
 
 
@@ -546,6 +599,7 @@ def clearSolverSigner():
     prev: address = self.solverSigner
     assert prev != empty(address) # dev: no signer
     self.solverSigner = empty(address)
+    self.configEpoch += 1
     log SolverSignerCleared(prevSigner=prev, caller=msg.sender)
 
 
@@ -574,7 +628,26 @@ def lowerCaps(_maxFill: uint256, _maxExposure: uint256, _maxEntries: uint256, _m
     self.maxAggregateExposure = _maxExposure
     self.maxOutstandingEntries = _maxEntries
     self.maxEntryAge = _maxAge
+    self.configEpoch += 1
     log CapsLowered(maxFill=_maxFill, maxExposure=_maxExposure, maxEntries=_maxEntries, maxAge=_maxAge)
+
+
+@external
+def retire():
+    """
+    @notice Permanently retire this instance. Governance only, irreversible.
+    @dev Atomically pauses and drops the signer, and blocks every reactivation
+         path thereafter. This is what makes an HQ migration or a redeploy safe:
+         the superseded instance cannot be rekeyed back into service.
+    """
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not self.isRetired # dev: already retired
+    self.isRetired = True
+    self.retiredAt = block.timestamp
+    self.lanePaused = True
+    self.solverSigner = empty(address)
+    self.configEpoch += 1
+    log Retired(caller=msg.sender, retiredAt=block.timestamp)
 
 
 @external
@@ -588,6 +661,7 @@ def raiseFloatFloor(_newFloor: uint256):
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _newFloor > self.minFloatBalance # dev: not a raise
     self.minFloatBalance = _newFloor
+    self.configEpoch += 1
     log FloatFloorSet(newFloor=_newFloor, caller=msg.sender)
 
 
@@ -614,7 +688,21 @@ def fundFloat(_amount: uint256):
     """
     assert _amount != 0 # dev: zero amount
     assert extcall IERC20(TOKEN).transferFrom(msg.sender, self, _amount, default_return_value=True) # dev: transfer failed
+    self.accountedBalance += _amount
     log FloatFunded(funder=msg.sender, amount=_amount)
+
+
+@external
+def syncAccountedBalance():
+    """
+    @notice Account for float that arrived by direct transfer
+    @dev Only ever raises `accountedBalance`, which makes restoration strictly
+         harder to claim. It can never be used to manufacture restoration room.
+    """
+    assert gov._canGovern(msg.sender) # dev: no perms
+    balance: uint256 = staticcall IERC20(TOKEN).balanceOf(self)
+    assert balance > self.accountedBalance # dev: nothing to sync
+    self.accountedBalance = balance
 
 
 ###############
@@ -627,10 +715,25 @@ def initiateChange(_actionType: uint8, _addrVal: address, _numVal: uint256) -> u
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _actionType in [ACTION_SET_SOLVER, ACTION_RAISE_CAPS, ACTION_UNPAUSE, ACTION_WITHDRAW, ACTION_LOWER_FLOOR] # dev: invalid action
 
+    # a retired instance may only ever pay its float out; nothing may bring it back
+    if self.isRetired:
+        assert _actionType == ACTION_WITHDRAW # dev: retired
+
     if _actionType == ACTION_SET_SOLVER:
         assert _addrVal != empty(address) and not _addrVal.is_contract # dev: solver must be eoa
+    elif _actionType == ACTION_UNPAUSE:
+        # queueing an unpause while already unpaused would let it sit matured
+        # and instantly undo a later guardian pause
+        assert self.lanePaused # dev: not paused
     elif _actionType == ACTION_WITHDRAW:
+        # every precondition is checked here AND revalidated at confirmation.
+        # Checking at initiation matters because RETIREMENT_DELAY is longer than
+        # the timelock expiration window: an action queued before the delay
+        # elapsed could never be confirmed before expiring.
         assert _numVal != 0 # dev: zero amount
+        assert self.isRetired # dev: not retired
+        assert block.timestamp >= self.retiredAt + RETIREMENT_DELAY # dev: retirement delay
+        assert self.outstandingEntries == 0 # dev: live exposure
     elif _actionType == ACTION_LOWER_FLOOR:
         assert _numVal < self.minFloatBalance # dev: not a reduction
 
@@ -638,6 +741,7 @@ def initiateChange(_actionType: uint8, _addrVal: address, _numVal: uint256) -> u
 
     aid: uint256 = timeLock._initiateAction()
     self.pendingChanges[aid] = PendingChange(
+        epoch=self.configEpoch,
         actionType=_actionType, addrVal=_addrVal, numVal=_numVal,
         maxFill=0, maxExposure=0, maxEntries=0, maxAge=0,
     )
@@ -653,6 +757,7 @@ def initiateCapRaise(_maxFill: uint256, _maxExposure: uint256, _maxEntries: uint
             raised quickly.
     """
     assert gov._canGovern(msg.sender) # dev: no perms
+    assert not self.isRetired # dev: retired
     assert _maxFill >= self.maxFillAmount # dev: not a raise
     assert _maxExposure >= self.maxAggregateExposure # dev: not a raise
     assert _maxEntries >= self.maxOutstandingEntries # dev: not a raise
@@ -662,6 +767,7 @@ def initiateCapRaise(_maxFill: uint256, _maxExposure: uint256, _maxEntries: uint
 
     aid: uint256 = timeLock._initiateAction()
     self.pendingChanges[aid] = PendingChange(
+        epoch=self.configEpoch,
         actionType=ACTION_RAISE_CAPS, addrVal=empty(address), numVal=0,
         maxFill=_maxFill, maxExposure=_maxExposure, maxEntries=_maxEntries, maxAge=_maxAge,
     )
@@ -675,6 +781,10 @@ def confirmChange(_actionId: uint256) -> bool:
     assert timeLock._confirmAction(_actionId) # dev: time lock not reached
     p: PendingChange = self.pendingChanges[_actionId]
     self.pendingChanges[_actionId] = empty(PendingChange)
+
+    # a queued action is void if anything was paused, tightened or retired after
+    # it was queued - it must be re-queued against the current configuration
+    assert p.epoch == self.configEpoch # dev: stale action
 
     if p.actionType == ACTION_SET_SOLVER:
         self.solverSigner = p.addrVal
@@ -692,8 +802,17 @@ def confirmChange(_actionId: uint256) -> bool:
     elif p.actionType == ACTION_WITHDRAW:
         # float only ever leaves to a fixed address chosen at deploy - no
         # caller-supplied recipient and no arbitrary calldata anywhere in this
-        # contract
+        # contract - and only from a quiesced, retired instance whose entries
+        # have all been reconciled
+        assert self.isRetired # dev: not retired
+        assert block.timestamp >= self.retiredAt + RETIREMENT_DELAY # dev: retirement delay
+        assert self.outstandingEntries == 0 # dev: live exposure
+        before: uint256 = staticcall IERC20(TOKEN).balanceOf(self)
         assert extcall IERC20(TOKEN).transfer(FLOAT_RECIPIENT, p.numVal, default_return_value=True) # dev: transfer failed
+        after: uint256 = staticcall IERC20(TOKEN).balanceOf(self)
+        assert before - after == p.numVal # dev: unexpected balance delta
+        accounted: uint256 = self.accountedBalance
+        self.accountedBalance = accounted - min(accounted, p.numVal)
 
     log ChangeConfirmed(actionId=_actionId, actionType=p.actionType)
     return True

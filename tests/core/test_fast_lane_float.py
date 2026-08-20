@@ -39,7 +39,8 @@ def flf(ripe_hq_deploy, ripe_token, float_recipient, charlie, whale, solver):
         FLOOR,
         name="fast_lane_float",
     )
-    ripe_token.transfer(c.address, FLOAT, sender=whale)
+    ripe_token.approve(c.address, FLOAT, sender=whale)
+    c.fundFloat(FLOAT, sender=whale)
     # charlie is local governance for this contract
     aid = c.initiateChange(1, solver.address, 0, sender=charlie)
     boa.env.time_travel(blocks=11)
@@ -66,6 +67,12 @@ def _sign(flf, solver, order):
     digest = flf.getDigest(order)
     sig = Account._sign_hash(digest, solver.key)
     return bytes(sig.signature)
+
+
+def _restore(flf, token, whale, ids, amount, gov_sender):
+    """Restoration requires real tokens to arrive, not a governance assertion."""
+    token.transfer(flf.address, amount, sender=whale)
+    return flf.recordRestored(ids, amount, sender=gov_sender)
 
 
 def _fill(flf, solver, order):
@@ -132,7 +139,7 @@ def test_solver_cannot_free_capacity(flf, solver, bob):
     with boa.reverts("no perms"):
         flf.recordWithdrawn([order_id], sender=solver.address)
     with boa.reverts("no perms"):
-        flf.recordRestored([order_id], sender=solver.address)
+        flf.recordRestored([order_id], 1, sender=solver.address)
 
 
 # ---------- H-6: the mintEnabled coupling ----------
@@ -258,17 +265,17 @@ def test_transition_does_not_free_aggregate_capacity(flf, solver, bob, charlie):
     assert flf.stageBNotional() == before
 
 
-def test_only_verified_restoration_clears_exposure(flf, solver, bob, charlie):
+def test_restoration_requires_real_tokens_not_a_governance_assertion(flf, solver, bob, charlie, ripe_token, whale):
     order_id = _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS))
     flf.recordWithdrawn([order_id], sender=charlie)
-    flf.recordRestored([order_id], sender=charlie)
+    _restore(flf, ripe_token, whale, [order_id], 100 * EIGHTEEN_DECIMALS, charlie)
     assert flf.outstandingNotional() == 0
     assert flf.outstandingEntries() == 0
     assert flf.oldestEntry() == b"\x00" * 32
     assert flf.isHealthy()
 
 
-def test_out_of_order_restoration_keeps_oldest_correct(flf, solver, bob, charlie):
+def test_out_of_order_restoration_keeps_oldest_correct(flf, solver, bob, charlie, ripe_token, whale):
     """Entries may settle in any order; the age clock must still track the true
     oldest outstanding entry."""
     ids = []
@@ -278,11 +285,11 @@ def test_out_of_order_restoration_keeps_oldest_correct(flf, solver, bob, charlie
     assert flf.oldestEntry() == ids[0]
     # settle the middle one first
     flf.recordWithdrawn([ids[1]], sender=charlie)
-    flf.recordRestored([ids[1]], sender=charlie)
+    _restore(flf, ripe_token, whale, [ids[1]], 1 * EIGHTEEN_DECIMALS, charlie)
     assert flf.oldestEntry() == ids[0]
     # now settle the oldest
     flf.recordWithdrawn([ids[0]], sender=charlie)
-    flf.recordRestored([ids[0]], sender=charlie)
+    _restore(flf, ripe_token, whale, [ids[0]], 1 * EIGHTEEN_DECIMALS, charlie)
     assert flf.oldestEntry() == ids[2]
     assert flf.outstandingEntries() == 1
 
@@ -362,12 +369,100 @@ def test_solver_must_be_an_eoa(flf, charlie, governance):
         flf.initiateChange(1, governance.address, 0, sender=charlie)
 
 
-def test_withdraw_only_goes_to_the_fixed_recipient(flf, charlie, float_recipient, ripe_token):
-    before = ripe_token.balanceOf(float_recipient)
+def test_live_float_cannot_be_swept(flf, solver, bob, charlie):
+    """Sweeping a live instance would strand every outstanding entry."""
+    _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS))
+    with boa.reverts("not retired"):
+        flf.initiateChange(4, ZERO_ADDRESS, 10 * EIGHTEEN_DECIMALS, sender=charlie)
+
+
+def test_withdraw_requires_retirement_delay_and_quiescence(flf, solver, bob, charlie, float_recipient, ripe_token, whale):
+    order_id = _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS))
+    flf.retire(sender=charlie)
+    assert flf.isRetired() and flf.lanePaused() and flf.solverSigner() == ZERO_ADDRESS
+
+    with boa.reverts("retirement delay"):
+        flf.initiateChange(4, ZERO_ADDRESS, 10 * EIGHTEEN_DECIMALS, sender=charlie)
+
+    boa.env.time_travel(seconds=7 * 24 * 3600 + 1)
+    with boa.reverts("live exposure"):
+        flf.initiateChange(4, ZERO_ADDRESS, 10 * EIGHTEEN_DECIMALS, sender=charlie)
+
+    flf.recordWithdrawn([order_id], sender=charlie)
+    _restore(flf, ripe_token, whale, [order_id], 100 * EIGHTEEN_DECIMALS, charlie)
     aid = flf.initiateChange(4, ZERO_ADDRESS, 10 * EIGHTEEN_DECIMALS, sender=charlie)
     boa.env.time_travel(blocks=11)
+    before = ripe_token.balanceOf(float_recipient)
     flf.confirmChange(aid, sender=charlie)
     assert ripe_token.balanceOf(float_recipient) == before + 10 * EIGHTEEN_DECIMALS
+
+
+def test_retirement_is_one_way(flf, charlie, solver):
+    flf.retire(sender=charlie)
+    with boa.reverts("retired"):
+        flf.initiateChange(3, ZERO_ADDRESS, 0, sender=charlie)
+    with boa.reverts("retired"):
+        flf.initiateChange(1, solver.address, 0, sender=charlie)
+    with boa.reverts("retired"):
+        flf.initiateCapRaise(MAX_FILL, MAX_EXPOSURE, MAX_ENTRIES, MAX_AGE, sender=charlie)
+
+
+def test_instance_halts_when_the_token_hq_is_not_its_own(
+    solver, bob, ripe_hq_deploy, ripe_token, green_token, savings_green,
+    float_recipient, charlie, whale, deploy3r, fork,
+):
+    """The token's HQ is mutable. An instance whose immutable RIPE_HQ no longer
+    matches the token's live HQ must refuse to fill: the old HQ can still report
+    mint-enabled while this instance's refill authority is obsolete."""
+    from config.BluePrint import PARAMS
+
+    # a token whose HQ is a different deployment than the float is bound to
+    other_hq = boa.load(
+        "contracts/registries/RipeHq.vy",
+        green_token.address, savings_green.address, ripe_token.address, deploy3r,
+        PARAMS[fork]["RIPE_HQ_MIN_GOV_TIMELOCK"], PARAMS[fork]["RIPE_HQ_MAX_GOV_TIMELOCK"],
+        PARAMS[fork]["RIPE_HQ_MIN_REG_TIMELOCK"], PARAMS[fork]["RIPE_HQ_MAX_REG_TIMELOCK"],
+        name="other_hq",
+    )
+    stale = boa.load(
+        "contracts/core/FastLaneFloat.vy",
+        other_hq.address,           # this instance believes the token's HQ is other_hq
+        ripe_token.address,         # but the token actually points at ripe_hq_deploy
+        float_recipient, charlie, 10, 1_000,
+        MAX_FILL, MAX_EXPOSURE, MAX_ENTRIES, MAX_AGE, FLOOR, name="flf_stale",
+    )
+    assert ripe_token.ripeHq() != other_hq.address
+    assert other_hq.mintEnabled()      # the stale HQ still reports enabled
+    assert not stale.canFill(1 * EIGHTEEN_DECIMALS)
+
+    aid = stale.initiateChange(1, solver.address, 0, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    stale.confirmChange(aid, sender=charlie)
+    ripe_token.approve(stale.address, FLOAT, sender=whale)
+    stale.fundFloat(FLOAT, sender=whale)
+    aid = stale.initiateChange(3, ZERO_ADDRESS, 0, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    stale.confirmChange(aid, sender=charlie)
+
+    order = _order(bob, 1 * EIGHTEEN_DECIMALS)
+    sig = bytes(Account._sign_hash(stale.getDigest(order), solver.key).signature)
+    with boa.reverts("hq migrated"):
+        stale.fill(order, sig, sender=solver.address)
+
+
+def test_matured_unpause_cannot_undo_a_later_guardian_pause(flf, charlie, alice):
+    """A matured action must not survive an emergency response taken after it
+    was queued."""
+    flf.setGuardian(alice, True, sender=charlie)
+    with boa.reverts("not paused"):
+        flf.initiateChange(3, ZERO_ADDRESS, 0, sender=charlie)
+
+    flf.pauseLane(sender=alice)
+    aid = flf.initiateChange(3, ZERO_ADDRESS, 0, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.clearSolverSigner(sender=alice)   # a later emergency action
+    with boa.reverts("stale action"):
+        flf.confirmChange(aid, sender=charlie)
 
 
 # ---------- M-4: liveness ----------
