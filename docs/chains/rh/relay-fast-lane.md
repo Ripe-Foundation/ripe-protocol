@@ -123,9 +123,23 @@ Two consequences:
    security review refuses pending recursive decode.
 
 Detection must key on **route shape, not cost**: `swapImpact` reads −0.34% on
-the approved pure-bridge collateral route and ~0.00% on a genuinely deep swap.
-The reliable discriminators are `router != 'relay'` on either leg, or a leg
-whose input and output symbols differ.
+the approved pure-bridge collateral route and ~0.00% on a genuinely deep swap,
+so it separates neither direction.
+
+The load-bearing check is **`(chainId, address)` identity**: every leg's input
+and output currency must equal the endpoint Ripe configured for that leg. A
+route that is genuinely a bridge has identity legs by construction — USDC→USDC,
+USDG→USDG — and anything else is a swap. Do not compare token *symbols*: they
+are attacker-controlled metadata on the token contract, so a symbol match proves
+nothing about which asset moved.
+
+`router != 'relay'` is a useful **observed heuristic** on top, not a proof. Every
+swap leg we sampled named a third-party aggregator and every bridge leg named
+`relay`, but that is Relay's current labelling, not a guarantee — a first-party
+Relay swap would presumably label itself `relay` and defeat it. Note also that
+the aggregator name is not stable across identical calls (`kyberswap` on one,
+`okxEvm` on the next), so allowlisting aggregator names is not an option
+either.
 
 ---
 
@@ -146,7 +160,7 @@ Per token per chain, so GREEN and RIPE across two chains is four deployments.
 ## What we built
 
 [`contracts/core/FastLaneFloat.vy`](../../../contracts/core/FastLaneFloat.vy) —
-Vyper 0.4.3, 50 tests. Holds the float and pays a fill against a solver-signed
+Vyper 0.4.3, 53 tests. Holds the float and pays a fill against a solver-signed
 order.
 
 **It cannot verify that the origin deposit happened.** There is no proof of it
