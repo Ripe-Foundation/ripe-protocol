@@ -70,11 +70,10 @@ def test_loot_ripe_rewards_time_edge_cases(
     assert rewards.newRipeRewards == 0
     assert rewards.lastUpdate == boa.env.evm.patch.block_number
 
-    # Test single block: gross 5 floors to 1 per 25% bucket, reserving 4
+    # Test single block
     boa.env.time_travel(blocks=1)
     rewards = lootbox.updateRipeRewards(sender=teller.address)
-    assert rewards.newRipeRewards == 4
-    assert rewards.borrowers == rewards.stakers == rewards.voters == rewards.genDepositors == 1
+    assert rewards.newRipeRewards == ripe_per_block
     assert rewards.lastUpdate == boa.env.evm.patch.block_number
 
     # Test multiple updates in same block
@@ -226,8 +225,7 @@ def test_loot_ripe_rewards_zero_per_block(
 
     boa.env.time_travel(blocks=elapsed)
     rewards_c = lootbox.updateRipeRewards(sender=teller.address)
-    # gross 50 floors to 12 per 25% bucket; only the credited 48 is reserved
-    assert rewards_c.newRipeRewards == 4 * (5 * elapsed * alloc // 100_00)
+    assert rewards_c.newRipeRewards == 5 * elapsed
     assert rewards_c.borrowers == rewards_c.stakers == rewards_c.voters == rewards_c.genDepositors == (5 * elapsed * alloc // 100_00)
 
 
@@ -266,13 +264,10 @@ def test_loot_ripe_rewards_ledger_state(
     assert ledger_data.stakers == rewards.stakers == (expected_total * alloc // 100_00)
     assert ledger_data.voters == rewards.voters == (expected_total * alloc // 100_00)
     assert ledger_data.genDepositors == rewards.genDepositors == (expected_total * alloc // 100_00)
-
-    # only the floored bucket credits are reserved; rounding dust stays available
-    expected_reserved = 4 * (expected_total * alloc // 100_00)
-    assert ledger_data.newRipeRewards == rewards.newRipeRewards == expected_reserved
+    assert ledger_data.newRipeRewards == rewards.newRipeRewards == expected_total
 
     # Verify available rewards are reduced
-    assert ledger.ripeAvailForRewards() == initial_avail - expected_reserved
+    assert ledger.ripeAvailForRewards() == initial_avail - expected_total
 
 
 def test_loot_ripe_rewards_ledger_accumulation(
@@ -310,14 +305,11 @@ def test_loot_ripe_rewards_ledger_accumulation(
     assert ledger_data2.stakers == ledger_data1.stakers + (expected_total * alloc // 100_00)
     assert ledger_data2.voters == ledger_data1.voters + (expected_total * alloc // 100_00)
     assert ledger_data2.genDepositors == ledger_data1.genDepositors + (expected_total * alloc // 100_00)
+    assert ledger_data2.newRipeRewards == expected_total  # Only new rewards, not accumulated
 
-    # Only new (floored) credits are reserved, not accumulated buckets
-    expected_reserved = 4 * (expected_total * alloc // 100_00)
-    assert ledger_data2.newRipeRewards == expected_reserved
-
-    # Verify available rewards are reduced by total credited across two updates
-    total_reserved = expected_reserved * 2  # Two updates
-    assert ledger.ripeAvailForRewards() == initial_avail - total_reserved
+    # Verify available rewards are reduced by total distributed
+    total_distributed = expected_total * 2  # Two updates
+    assert ledger.ripeAvailForRewards() == initial_avail - total_distributed
 
 
 def test_loot_ripe_rewards_limits(
@@ -343,10 +335,9 @@ def test_loot_ripe_rewards_limits(
     rewards = lootbox.updateRipeRewards(sender=teller.address)
     ledger_data = ledger.ripeRewards()
 
-    # Verify only the credited share of the capped amount was reserved
-    expected_reserved = 4 * (initial_avail * alloc // 100_00)
-    assert rewards.newRipeRewards == expected_reserved
-    assert ledger.ripeAvailForRewards() == initial_avail - expected_reserved
+    # Verify only available amount was distributed
+    assert rewards.newRipeRewards == initial_avail
+    assert ledger.ripeAvailForRewards() == 0
     assert ledger_data.borrowers == (initial_avail * alloc // 100_00)
 
 
@@ -415,7 +406,7 @@ def test_loot_ripe_rewards_state_transitions(
     
     # Verify rewards start accumulating from new config
     expected_rewards = ripe_per_block * elapsed
-    assert rewards.newRipeRewards == 4 * (expected_rewards * alloc // 100_00)
+    assert rewards.newRipeRewards == expected_rewards
     assert rewards.borrowers == (expected_rewards * alloc // 100_00)
     assert rewards.stakers == (expected_rewards * alloc // 100_00)
     assert rewards.voters == (expected_rewards * alloc // 100_00)

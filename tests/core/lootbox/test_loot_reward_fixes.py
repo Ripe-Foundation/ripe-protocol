@@ -1,19 +1,24 @@
 import boa
 
 from conf_utils import clear_transient_storage
-from constants import EIGHTEEN_DECIMALS
-
-ONE_DAY_BLOCKS = 43_200  # matches the lootbox fixture's underscore send interval
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 MODE_PASSIVE = 0
 MODE_REENTER_CLAIM = 1
 MODE_REENTER_DISTRIBUTE = 2
 MODE_FAIL = 3
+MODE_STAB_CLAIM = 4
 
-# Test-only distributor that doubles as the underscore registry (getAddr
-# returns itself, like MockUndyV2). Its addDepositRewards callback records
-# what a real distributor would see mid-distribution and can optionally
-# reenter the protocol or fail, driven by `mode`.
+# Lootbox resolves its distributor at underscore registry id 6
+# (Lootbox.UNDERSCORE_LOOT_DISTRIBUTOR_ID).
+UNDERSCORE_LOOT_DISTRIBUTOR_ID = 6
+
+# Test-only distributor that doubles as the underscore registry: getAddr
+# answers only UNDERSCORE_LOOT_DISTRIBUTOR_ID with itself so every other
+# underscore lookup (wallet/vault/ledger probes) fails closed. Its
+# addDepositRewards callback records what a real distributor sees
+# mid-distribution and can reenter the protocol through real public routes
+# or fail, driven by `mode`.
 REWARD_FIX_DISTRIBUTOR_SOURCE = """
 # @version 0.4.3
 
@@ -25,14 +30,24 @@ interface LootboxDist:
 
 interface TellerClaim:
     def claimLoot(_user: address, _shouldStake: bool) -> uint256: nonpayable
+    def claimManyFromStabilityPool(_vaultId: uint256, _claims: DynArray[StabPoolClaim, 15], _user: address, _shouldAutoDeposit: bool) -> uint256: nonpayable
 
 interface LedgerView:
     def ripeAvailForRewards() -> uint256: view
+
+struct StabPoolClaim:
+    stabAsset: address
+    claimAsset: address
+    maxUsdValue: uint256
 
 MODE_PASSIVE: constant(uint256) = 0
 MODE_REENTER_CLAIM: constant(uint256) = 1
 MODE_REENTER_DISTRIBUTE: constant(uint256) = 2
 MODE_FAIL: constant(uint256) = 3
+MODE_STAB_CLAIM: constant(uint256) = 4
+
+# Lootbox.UNDERSCORE_LOOT_DISTRIBUTOR_ID
+UNDERSCORE_LOOT_DISTRIBUTOR_ID: constant(uint256) = 6
 
 lootbox: public(address)
 teller: public(address)
@@ -42,6 +57,10 @@ didReenter: public(bool)
 observedAvail: public(uint256)
 observedLastSend: public(uint256)
 reenteredClaimAmount: public(uint256)
+stabVaultId: public(uint256)
+stabAsset: public(address)
+stabClaimAsset: public(address)
+claimedStabUsdValue: public(uint256)
 
 
 @deploy
@@ -55,7 +74,7 @@ def __init__(_lootbox: address, _teller: address, _ledger: address):
 @external
 def getAddr(_regId: uint256) -> address:
     # act as the loot distributor only; other underscore lookups fail closed
-    if _regId == 6:
+    if _regId == UNDERSCORE_LOOT_DISTRIBUTOR_ID:
         return self
     return empty(address)
 
@@ -64,6 +83,13 @@ def getAddr(_regId: uint256) -> address:
 def setMode(_mode: uint256):
     self.mode = _mode
     self.didReenter = False
+
+
+@external
+def setStabClaim(_vaultId: uint256, _stabAsset: address, _claimAsset: address):
+    self.stabVaultId = _vaultId
+    self.stabAsset = _stabAsset
+    self.stabClaimAsset = _claimAsset
 
 
 @external
@@ -78,6 +104,15 @@ def addDepositRewards(_asset: address, _amount: uint256):
     if mode == MODE_REENTER_CLAIM and not self.didReenter:
         self.didReenter = True
         self.reenteredClaimAmount = extcall TellerClaim(self.teller).claimLoot(self, False)
+
+    if mode == MODE_STAB_CLAIM and not self.didReenter:
+        self.didReenter = True
+        claims: DynArray[StabPoolClaim, 15] = [StabPoolClaim(
+            stabAsset=self.stabAsset,
+            claimAsset=self.stabClaimAsset,
+            maxUsdValue=max_value(uint256),
+        )]
+        self.claimedStabUsdValue = extcall TellerClaim(self.teller).claimManyFromStabilityPool(self.stabVaultId, claims, self, False)
 
     if mode == MODE_REENTER_DISTRIBUTE:
         if not self.didReenter:
@@ -101,6 +136,9 @@ def _deploy_reward_fix_distributor(lootbox, teller, ledger):
 
 
 def _setup_borrow_loot(user, ledger, lootbox, teller, credit_engine, createDebtTerms):
+    # synthetic defense-in-depth: positive current debt with a raw vault count
+    # of zero cannot arise from normal borrowing (borrowing requires deposited
+    # collateral); it is seeded directly through the Ledger test route
     debt_terms = createDebtTerms()
     user_debt = (100 * EIGHTEEN_DECIMALS, 100 * EIGHTEEN_DECIMALS, debt_terms, 0, False)
     ledger.setUserDebt(user, user_debt, 0, (0, 0), sender=credit_engine.address)
@@ -110,7 +148,7 @@ def _setup_borrow_loot(user, ledger, lootbox, teller, credit_engine, createDebtT
 
 
 #########################################
-# Fix 1: claim switch on every route    #
+# Claim switch on every dedicated route #
 #########################################
 
 
@@ -221,31 +259,114 @@ def test_claim_switch_blocks_zero_payout_attempts(
     setGeneralConfig,
     setAssetConfig,
     setRipeRewardsConfig,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
     lootbox,
     teller,
     alpha_token,
+    ripe_token,
     switchboard_alpha,
 ):
     setGeneralConfig()
     setAssetConfig(alpha_token)
     setRipeRewardsConfig()
+    vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # sally has no loot at all; a disabled attempt must still revert
     assert lootbox.getClaimableBorrowLoot(sally) == 0
 
     assert switchboard_alpha.setCanClaimLoot(False, sender=governance.address)
 
+    user_points_before = ledger.userBorrowPoints(sally)
+    global_points_before = ledger.globalBorrowPoints()
+    deposit_points_before = ledger.userDepositPoints(sally, vault_id, alpha_token)
+    rewards_before = ledger.ripeRewards()
+    avail_before = ledger.ripeAvailForRewards()
+    balance_before = ripe_token.balanceOf(sally)
+    supply_before = ripe_token.totalSupply()
+
     with boa.reverts(dev="loot claims disabled"):
         lootbox.claimBorrowLoot(sally, sender=teller.address)
     with boa.reverts(dev="loot claims disabled"):
-        lootbox.claimDepositLootForAsset(sally, 3, alpha_token, sender=teller.address)
+        lootbox.claimDepositLootForAsset(sally, vault_id, alpha_token, sender=teller.address)
+
+    assert ledger.userBorrowPoints(sally) == user_points_before
+    assert ledger.globalBorrowPoints() == global_points_before
+    assert ledger.userDepositPoints(sally, vault_id, alpha_token) == deposit_points_before
+    assert ledger.ripeRewards() == rewards_before
+    assert ledger.ripeAvailForRewards() == avail_before
+    assert ripe_token.balanceOf(sally) == balance_before
+    assert ripe_token.totalSupply() == supply_before
 
     assert switchboard_alpha.setCanClaimLoot(True, sender=governance.address)
     assert lootbox.claimBorrowLoot(sally, sender=teller.address) == 0
+    assert lootbox.claimDepositLootForAsset(sally, vault_id, alpha_token, sender=teller.address) == 0
+
+
+def test_charlie_dedicated_deposit_route_respects_claim_switch(
+    bob,
+    governance,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    switchboard_alpha,
+    switchboard_charlie,
+):
+    # SwitchboardCharlie.claimDepositLootForAsset is the actual in-protocol
+    # dedicated deposit route; dedicated claimBorrowLoot currently has no
+    # in-protocol caller
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setRipeRewardsConfig()
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    boa.env.time_travel(blocks=20)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    claimable = lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token)
+    assert claimable > 0
+
+    assert switchboard_alpha.setCanClaimLoot(False, sender=governance.address)
+
+    points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    rewards_before = ledger.ripeRewards()
+    avail_before = ledger.ripeAvailForRewards()
+    balance_before = ripe_token.balanceOf(bob)
+    supply_before = ripe_token.totalSupply()
+
+    with boa.reverts(dev="loot claims disabled"):
+        switchboard_charlie.claimDepositLootForAsset(bob, vault_id, alpha_token, sender=governance.address)
+
+    points_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    assert points_after.balancePoints == points_before.balancePoints
+    assert points_after.lastUpdate == points_before.lastUpdate
+    assert ledger.ripeRewards() == rewards_before
+    assert ledger.ripeAvailForRewards() == avail_before
+    assert ripe_token.balanceOf(bob) == balance_before
+    assert ripe_token.totalSupply() == supply_before
+    assert lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token) == claimable
+
+    # re-enabled: Charlie delivers the original entitlement exactly once
+    assert switchboard_alpha.setCanClaimLoot(True, sender=governance.address)
+    ripe_amount = switchboard_charlie.claimDepositLootForAsset(bob, vault_id, alpha_token, sender=governance.address)
+    assert ripe_amount == claimable
+    assert ripe_token.balanceOf(bob) == balance_before + ripe_amount
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+    assert switchboard_charlie.claimDepositLootForAsset(bob, vault_id, alpha_token, sender=governance.address) == 0
 
 
 ###########################################################
-# Fix 2: reserve underscore rewards before external calls #
+# Underscore rewards: persist before external interaction #
 ###########################################################
 
 
@@ -266,7 +387,7 @@ def test_underscore_distribution_reserves_before_external_interaction(
 
     avail = 500 * EIGHTEEN_DECIMALS
     ledger.setRipeAvailForRewards(avail, sender=switchboard_alpha.address)
-    boa.env.time_travel(blocks=ONE_DAY_BLOCKS + 1)
+    boa.env.time_travel(blocks=lootbox.underscoreSendInterval() + 1)
 
     supply_before = ripe_token.totalSupply()
     current_block = boa.env.evm.patch.block_number
@@ -312,9 +433,9 @@ def test_reentering_claim_cannot_consume_reserved_capacity(
     ledger.setUserDebt(mock.address, user_debt, 0, (0, 0), sender=credit_engine.address)
     lootbox.updateBorrowPoints(mock.address, sender=teller.address)
 
-    elapsed = ONE_DAY_BLOCKS + 1
+    elapsed = lootbox.underscoreSendInterval() + 1
     drip = elapsed * rate
-    undy_total = 200 * EIGHTEEN_DECIMALS
+    undy_total = lootbox.undyDepositRewardsAmount() + lootbox.undyYieldBonusAmount()
     # margin above (drip + undy) so a double-decrement is visible instead of clamping at zero
     avail = 2 * drip + undy_total + 1
     ledger.setRipeAvailForRewards(avail, sender=switchboard_alpha.address)
@@ -367,7 +488,7 @@ def test_reentering_distribution_reverts_too_early(
     mock.setMode(MODE_REENTER_DISTRIBUTE)
     mission_control.setUnderscoreRegistry(mock.address, sender=switchboard_alpha.address)
     ledger.setRipeAvailForRewards(1_000 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
-    boa.env.time_travel(blocks=ONE_DAY_BLOCKS + 1)
+    boa.env.time_travel(blocks=lootbox.underscoreSendInterval() + 1)
 
     last_send_before = lootbox.lastUnderscoreSend()
     avail_before = ledger.ripeAvailForRewards()
@@ -399,7 +520,7 @@ def test_failed_distributor_call_restores_state(
 
     avail = 500 * EIGHTEEN_DECIMALS
     ledger.setRipeAvailForRewards(avail, sender=switchboard_alpha.address)
-    boa.env.time_travel(blocks=ONE_DAY_BLOCKS + 1)
+    boa.env.time_travel(blocks=lootbox.underscoreSendInterval() + 1)
 
     last_send_before = lootbox.lastUnderscoreSend()
     rewards_before = ledger.ripeRewards()
@@ -427,12 +548,132 @@ def test_failed_distributor_call_restores_state(
     assert ripe_token.balanceOf(mock.address) == balance_before + total
 
 
-##################################################
-# Fix 3: reserve only the credited bucket sum    #
-##################################################
+def test_underscore_callback_real_stability_claim_sees_reserved_budget(
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mission_control,
+    switchboard_alpha,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    ripe_gov_vault,
+    stability_pool,
+    vault_book,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    auction_house,
+    savings_green,
+    mock_price_source,
+):
+    # The distributor's callback performs a REAL Stability claim:
+    # StabVault -> VaultBook.mintRipeForStabPoolClaims ->
+    # Ledger.didGetRewardsFromStabClaims. Setup mirrors the module-scoped
+    # setupStabPoolClaimsRewards fixture in tests/vaults/modules/
+    # test_stab_vault_claims.py, copied inline because that fixture cannot be
+    # injected across modules.
+    setGeneralConfig()
+    ripe_per_dollar = EIGHTEEN_DECIMALS  # 1 RIPE per claimed dollar
+    setRipeRewardsConfig(True, 1, 10_00, 90_00, 0, 0, _stabPoolRipePerDollarClaimed=ripe_per_dollar)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (0, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    core_id = mission_control.coreRipeGovVaultId()
+    assert core_id != 0
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    setAssetConfig(bravo_token)
+    price = EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    mock = _deploy_reward_fix_distributor(lootbox, teller, ledger)
+    stab_vault_id = vault_book.getRegId(stability_pool)
+    mock.setStabClaim(stab_vault_id, alpha_token.address, bravo_token.address)
+    mock.setMode(MODE_STAB_CLAIM)
+    mission_control.setUnderscoreRegistry(mock.address, sender=switchboard_alpha.address)
+
+    # Stability entitlement for the distributor itself: deposit then a
+    # liquidation swap leaves it claimable bravo worth 10 USD
+    deposit_amount = 10 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(mock.address, alpha_token, deposit_amount, sender=teller.address)
+    bravo_token.transfer(stability_pool, deposit_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        deposit_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    # flush pending accrual, then budget exactly gross drip + undy + margin
+    lootbox.updateRipeRewards(sender=teller.address)
+    interval = lootbox.underscoreSendInterval()
+    elapsed = interval + 1
+    gross_drip = elapsed * 1  # ripePerBlock = 1
+    undy_total = lootbox.undyDepositRewardsAmount() + lootbox.undyYieldBonusAmount()
+    stability_margin = 7 * EIGHTEEN_DECIMALS
+    stab_entitlement = deposit_amount * ripe_per_dollar // EIGHTEEN_DECIMALS
+    assert stab_entitlement > stability_margin
+    initial_budget = gross_drip + undy_total + stability_margin
+    ledger.setRipeAvailForRewards(initial_budget, sender=switchboard_alpha.address)
+
+    rewards_before = ledger.ripeRewards()
+    supply_before = ripe_token.totalSupply()
+    gov_before = ripe_gov_vault.getTotalAmountForUser(mock.address, ripe_token)
+    bravo_before = bravo_token.balanceOf(mock.address)
+    ripe_before = ripe_token.balanceOf(mock.address)
+
+    boa.env.time_travel(blocks=elapsed)
+    clear_transient_storage()
+    current_block = boa.env.evm.patch.block_number
+
+    deposit_rewards, yield_bonus = lootbox.distributeUnderscoreRewards(sender=switchboard_alpha.address)
+    assert deposit_rewards + yield_bonus == undy_total
+
+    # mid-callback the gross drip (including its one wei of terminal dust)
+    # and the underscore amount were already charged: only the margin remains
+    assert mock.observedAvail() == stability_margin
+    assert mock.observedLastSend() == current_block
+
+    # gross reservation persisted before the callback: buckets hold the
+    # floored credits (4_320 + 38_880 at interval 43_200) while the full
+    # 43_201 gross was charged
+    stored = ledger.ripeRewards()
+    assert stored.borrowers == rewards_before.borrowers + (gross_drip * 10_00 // 100_00)
+    assert stored.stakers == rewards_before.stakers + (gross_drip * 90_00 // 100_00)
+
+    # the real Stability claim was capped at the margin despite a larger
+    # entitlement, and its reward landed in the claimer's RipeGov position
+    assert mock.claimedStabUsdValue() == deposit_amount
+    gov_delta = ripe_gov_vault.getTotalAmountForUser(mock.address, ripe_token) - gov_before
+    assert gov_delta == stability_margin
+
+    # exact reconciliation: budget, supply, and balances
+    assert ledger.ripeAvailForRewards() == 0
+    assert ripe_token.totalSupply() == supply_before + undy_total + stability_margin
+    assert ripe_token.balanceOf(mock.address) == ripe_before + undy_total
+    assert bravo_token.balanceOf(mock.address) == bravo_before + deposit_amount
+    assert lootbox.lastUnderscoreSend() == current_block
 
 
-def test_reward_reservation_matches_floored_bucket_credits(
+###############################################
+# Gross-drip reservation (restored baseline)  #
+###############################################
+
+
+def test_gross_drip_reservation_charges_full_distribution(
     setGeneralConfig,
     setRipeRewardsConfig,
     switchboard_alpha,
@@ -440,8 +681,10 @@ def test_reward_reservation_matches_floored_bucket_credits(
     lootbox,
     teller,
 ):
+    # restored baseline policy: the full gross distribution is reserved even
+    # when the floored bucket credits sum to less
     setGeneralConfig()
-    setRipeRewardsConfig(True, 19, 10, 90, 0, 0)
+    setRipeRewardsConfig(True, 19, 10_00, 90_00, 0, 0)
 
     # flush pending accrual so the next update spans exactly one block
     lootbox.updateRipeRewards(sender=teller.address)
@@ -451,29 +694,21 @@ def test_reward_reservation_matches_floored_bucket_credits(
     boa.env.time_travel(blocks=1)
     updated = lootbox.updateRipeRewards(sender=teller.address)
 
-    # gross 19 with 10/90 allocations: floored credits 1 and 17, reservation 18
+    # gross 19 at 10_00/90_00: floored credits are 1 and 17
     assert updated.borrowers == rewards_before.borrowers + 1
     assert updated.stakers == rewards_before.stakers + 17
     assert updated.voters == rewards_before.voters
     assert updated.genDepositors == rewards_before.genDepositors
-    assert updated.newRipeRewards == 18
 
+    # the reservation is the full gross distribution
+    assert updated.newRipeRewards == 19
     stored = ledger.ripeRewards()
+    assert stored.newRipeRewards == 19
     assert stored.borrowers == rewards_before.borrowers + 1
     assert stored.stakers == rewards_before.stakers + 17
-    assert stored.voters == rewards_before.voters
-    assert stored.genDepositors == rewards_before.genDepositors
-    assert stored.newRipeRewards == 18
 
-    # the flooring remainder stays available instead of being reserved
-    assert ledger.ripeAvailForRewards() == 1
-
-    # and it can still flow to a later distribution
-    setRipeRewardsConfig(True, 19, 100_00, 0, 0, 0)
-    boa.env.time_travel(blocks=1)
-    later = lootbox.updateRipeRewards(sender=teller.address)
-    assert later.borrowers == stored.borrowers + 1
-    assert later.newRipeRewards == 1
+    # the unassigned one wei was charged as gross terminal dust: the budget
+    # is exhausted even though only 18 wei landed in buckets
     assert ledger.ripeAvailForRewards() == 0
 
 
@@ -486,7 +721,7 @@ def test_exactly_divisible_distribution_fully_reserved(
     teller,
 ):
     setGeneralConfig()
-    setRipeRewardsConfig(True, 100, 10, 90, 0, 0)
+    setRipeRewardsConfig(True, 100, 10_00, 90_00, 0, 0)
 
     lootbox.updateRipeRewards(sender=teller.address)
     ledger.setRipeAvailForRewards(100, sender=switchboard_alpha.address)
@@ -501,9 +736,9 @@ def test_exactly_divisible_distribution_fully_reserved(
     assert ledger.ripeAvailForRewards() == 0
 
 
-#####################################################
-# Fix 4: deliver positive borrow claims, zero vaults #
-#####################################################
+######################################################
+# Zero-vault borrow claims still deliver their payout #
+######################################################
 
 
 def test_zero_vault_positive_borrow_claim_delivers(
@@ -537,6 +772,61 @@ def test_zero_vault_positive_borrow_claim_delivers(
     # a repeated claim cannot receive the same reward again
     assert lootbox.claimLootForUser(bob, bob, False, sender=teller.address) == 0
     assert ripe_token.balanceOf(bob) == balance_before + total_ripe
+
+
+def test_teller_default_stake_zero_vault_borrow_claim(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    ledger,
+    lootbox,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    ripe_token,
+    ripe_gov_vault,
+    mission_control,
+    switchboard_alpha,
+    mock_price_source,
+):
+    # Teller-level route with the default _shouldStake=True: the delivered
+    # borrow loot lands in the core RipeGov vault, not the wallet
+    setGeneralConfig()
+    setRipeRewardsConfig(True)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (0, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    core_id = mission_control.coreRipeGovVaultId()
+    assert core_id != 0
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+
+    _setup_borrow_loot(bob, ledger, lootbox, teller, credit_engine, createDebtTerms)
+    assert ledger.numUserVaults(bob) == 0
+    claimable = lootbox.getClaimableBorrowLoot(bob)
+    assert claimable > 0
+
+    wallet_before = ripe_token.balanceOf(bob)
+    gov_before = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    clear_transient_storage()
+    total_ripe = teller.claimLoot(bob, sender=bob)
+    assert total_ripe == claimable
+
+    # staked delivery: wallet unchanged, RipeGov position receives the amount
+    assert ripe_token.balanceOf(bob) == wallet_before
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == gov_before + total_ripe
+    assert ledger.userBorrowPoints(bob).points == 0
+
+    # a second claim cannot deliver the same reward again
+    clear_transient_storage()
+    assert teller.claimLoot(bob, sender=bob) == 0
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == gov_before + total_ripe
 
 
 def test_zero_vault_zero_payout_claim_safe_without_core_pointer(

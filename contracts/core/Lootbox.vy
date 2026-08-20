@@ -1277,17 +1277,13 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
     # allocate ripe rewards to global buckets
     total: uint256 = _config.borrowersAlloc + _config.stakersAlloc + _config.votersAlloc + _config.genDepositorsAlloc
     if total != 0:
-        borrowersCredit: uint256 = newRipeDistro * _config.borrowersAlloc // total
-        stakersCredit: uint256 = newRipeDistro * _config.stakersAlloc // total
-        votersCredit: uint256 = newRipeDistro * _config.votersAlloc // total
-        genDepositorsCredit: uint256 = newRipeDistro * _config.genDepositorsAlloc // total
-        rewards.borrowers += borrowersCredit
-        rewards.stakers += stakersCredit
-        rewards.voters += votersCredit
-        rewards.genDepositors += genDepositorsCredit
+        rewards.borrowers += newRipeDistro * _config.borrowersAlloc // total
+        rewards.stakers += newRipeDistro * _config.stakersAlloc // total
+        rewards.voters += newRipeDistro * _config.votersAlloc // total
+        rewards.genDepositors += newRipeDistro * _config.genDepositorsAlloc // total
 
-        # reserve only what the buckets actually received -- flooring dust stays available
-        rewards.newRipeRewards = borrowersCredit + stakersCredit + votersCredit + genDepositorsCredit
+        # rewards were distro'd, save important data
+        rewards.newRipeRewards = newRipeDistro
 
     return rewards
 
