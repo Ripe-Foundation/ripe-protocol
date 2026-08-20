@@ -252,48 +252,67 @@ def test_zero_reserve_returns_zero_without_manufacturing_a_feed(
     assert fixture.source.getPriceAndHasFeed(fixture.ripe.address) == (0, False)
 
 
-@pytest.mark.parametrize("response_mode", [1, 2])
-def test_malformed_pool_response_fails_closed(
-    uniswap_v2_monitor_builder,
-    response_mode,
-):
+def test_short_pool_response_reverts(uniswap_v2_monitor_builder):
     fixture = uniswap_v2_monitor_builder()
-    fixture.pair.setReserveResponseMode(response_mode)
+    fixture.pair.setReserveResponseMode(1)
+    with boa.reverts():
+        fixture.source.getRipePoolState()
+    with boa.reverts():
+        fixture.source.getRipeWethMonitoringPrice()
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
 
-    assert fixture.source.getRipePoolState() == (0, 0, 0)
-    assert fixture.source.getRipeWethMonitoringPrice() == 0
-    assert fixture.source.getRipeUsdMonitoringPrice() == 0
+
+def test_overlong_pool_response_uses_abi_prefix(uniswap_v2_monitor_builder):
+    fixture = uniswap_v2_monitor_builder()
+    fixture.pair.setReserveResponseMode(2)
+    ripe_reserve = 100 * EIGHTEEN_DECIMALS
+    weth_reserve = 10 * EIGHTEEN_DECIMALS
+    assert fixture.source.getRipePoolState() == (
+        ripe_reserve,
+        weth_reserve,
+        fixture.pair.pairTimestamp(),
+    )
+    assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
+    assert fixture.source.getRipeUsdMonitoringPrice() == 200 * EIGHTEEN_DECIMALS
 
 
-def test_reverting_pool_read_fails_closed(uniswap_v2_monitor_builder):
+def test_reverting_pool_read_reverts(uniswap_v2_monitor_builder):
     fixture = uniswap_v2_monitor_builder()
     fixture.pair.setShouldRevert(True)
+    with boa.reverts():
+        fixture.source.getRipePoolState()
+    with boa.reverts():
+        fixture.source.getRipeWethMonitoringPrice()
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
 
-    assert fixture.source.getRipePoolState() == (0, 0, 0)
-    assert fixture.source.getRipeWethMonitoringPrice() == 0
-    assert fixture.source.getRipeUsdMonitoringPrice() == 0
+
+def test_short_price_desk_response_reverts_usd_view(uniswap_v2_monitor_builder):
+    fixture = uniswap_v2_monitor_builder()
+    fixture.price_desk.setResponseMode(1)
+    assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
 
 
-@pytest.mark.parametrize("response_mode", [1, 2, 3])
-def test_unavailable_or_malformed_weth_usd_price_only_zeroes_usd_monitoring(
+@pytest.mark.parametrize("response_mode", [2, 3])
+def test_overlong_price_desk_response_uses_abi_prefix(
     uniswap_v2_monitor_builder,
     response_mode,
 ):
     fixture = uniswap_v2_monitor_builder()
     fixture.price_desk.setResponseMode(response_mode)
-
     assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
-    assert fixture.source.getRipeUsdMonitoringPrice() == 0
+    assert fixture.source.getRipeUsdMonitoringPrice() == 200 * EIGHTEEN_DECIMALS
 
 
-def test_reverting_weth_usd_price_only_zeroes_usd_monitoring(
-    uniswap_v2_monitor_builder,
-):
+def test_reverting_weth_usd_price_reverts_usd_view(uniswap_v2_monitor_builder):
     fixture = uniswap_v2_monitor_builder()
     fixture.price_desk.setShouldRevert(True)
-
     assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
-    assert fixture.source.getRipeUsdMonitoringPrice() == 0
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
 
 
 def test_missing_price_desk_only_zeroes_usd_monitoring(

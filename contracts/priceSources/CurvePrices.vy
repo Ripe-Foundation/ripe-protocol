@@ -255,29 +255,6 @@ def __init__(
         )
 
 
-######################
-# Checked Arithmetic #
-######################
-
-
-@pure
-@internal
-def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a > max_value(uint256) - _b:
-        return False, 0
-    return True, unsafe_add(_a, _b)
-
-
-@pure
-@internal
-def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a == 0 or _b == 0:
-        return True, 0
-    if _a > max_value(uint256) // _b:
-        return False, 0
-    return True, unsafe_mul(_a, _b)
-
-
 ###############
 # Core Prices #
 ###############
@@ -1452,3 +1429,26 @@ def getGreenStabilizerConfig() -> StabilizerConfig:
 def _getSavingsGreenPrice(_savingsGreen: address, _greenPrice: uint256) -> uint256:
     pricePerShare: uint256 = staticcall IERC4626(_savingsGreen).convertToAssets(EIGHTEEN_DECIMALS)
     return _greenPrice * pricePerShare // EIGHTEEN_DECIMALS
+
+
+######################
+# Checked Arithmetic #
+######################
+
+
+@pure
+@internal
+def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a > max_value(uint256) - _b:
+        return False, 0
+    return True, unsafe_add(_a, _b)
+
+
+@pure
+@internal
+def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a == 0 or _b == 0:
+        return True, 0
+    if _a > max_value(uint256) // _b:
+        return False, 0
+    return True, unsafe_mul(_a, _b)

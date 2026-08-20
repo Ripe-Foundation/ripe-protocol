@@ -1,5 +1,16 @@
-# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2026
+#   ___    __             __________     ______  _______                      _____              
+#   __ |  / /_____ ____  ____  /_  /_    ___   |/  /__(_)______ _____________ __  /______________
+#   __ | / /_  __ `/  / / /_  /_  __/    __  /|_/ /__  /__  __ `/_  ___/  __ `/  __/  __ \_  ___/
+#   __ |/ / / /_/ // /_/ /_  / / /_      _  /  / / _  / _  /_/ /_  /   / /_/ // /_ / /_/ /  /    
+#   _____/  \__,_/ \__,_/ /_/  \__/      /_/  /_/  /_/  _\__, / /_/    \__,_/ \__/ \____//_/     
+#                                                       /____/                                   
+#     ╔═══════════════════════════════════════╗
+#     ║  ** Vault Migrator **                 ║
+#     ║  Handles vault position migrations.   ║
+#     ╚═══════════════════════════════════════╝
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -36,8 +47,8 @@ interface RipeGovVault:
 interface MissionControl:
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
-    def isStabVaultId(_vaultId: uint256) -> bool: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
 
 interface AddressRegistry:
@@ -135,9 +146,8 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
     targetVault: address = empty(address)
     sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, _targetVaultId, a.vaultBook, a.missionControl)
 
-    # A core-pointer rotation must never make a former RipeGov eligible for the
-    # generic balance-only path. MissionControl's monotonic classification
-    # records every historical core id.
+    # A core-pointer rotation must never make a former RipeGov eligible for the generic balance-only path.
+    # MissionControl's monotonic classification records every historical core id.
     assert not staticcall MissionControl(a.missionControl).isRipeGovVaultId(_sourceVaultId) # dev: source is ripe gov
     assert not staticcall MissionControl(a.missionControl).isRipeGovVaultId(_targetVaultId) # dev: target is ripe gov
 
