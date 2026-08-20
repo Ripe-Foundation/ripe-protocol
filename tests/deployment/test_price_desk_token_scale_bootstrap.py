@@ -104,14 +104,24 @@ def test_bootstrap_enumerates_mission_control_live_assets_and_sets_nonzero_scale
     assert price_desk.tokenScale(nft) == 0
 
 
+def test_sync_usdg_token_scale_synchronizes_nonzero_scale():
+    usdg = "0x00000000000000000000000000000000000000aa"
+    price_desk = _PriceDesk()
+
+    PRICE_SOURCES.sync_usdg_token_scale(_execute, price_desk, usdg)
+
+    assert usdg.lower() in price_desk.synced
+    assert price_desk.tokenScale(usdg) != 0
+
+
 def test_bootstrap_reads_live_mission_control_list_before_price_desk_promotion():
     source = MIGRATION.read_text()
-    assert "sync_existing_token_scales(" in source
+    migrate_src = source[source.index("def migrate"):]
+    promotion = 'hq.startAddNewAddressToRegistry, price_desk, "PriceDesk"'
     assert "for index in range(1, num_assets)" in source
     assert "mission_control.assets(index)" in source or "mission_control.assets(" in source
     assert "numAssets()" in source
-    assert source.index("sync_existing_token_scales(") < source.index(
-        'hq.startAddNewAddressToRegistry, price_desk, "PriceDesk"'
-    )
+    assert migrate_src.index("    sync_existing_token_scales(") < migrate_src.index(promotion)
+    assert migrate_src.index("    sync_usdg_token_scale(") < migrate_src.index(promotion)
     assert "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73" not in source
     assert "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0" not in source

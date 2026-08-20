@@ -1485,21 +1485,37 @@ PriceDesk stores admission-time token scale as trusted metadata.
 `getUsdValue` and `getAssetAmount` never call token `decimals()`.
 Scale `0` means unset; scale `1` is a valid zero-decimal token; the
 ETH sentinel always uses `10**18` without storage or token calls.
-Missing scale returns `0` or reverts `missing token scale` before any
-price source is contacted. Decimal drift misprices by
-`10 ** abs(oldDecimals - newDecimals)` until governance resynchronizes
-or sets the scale. SwitchboardBravo synchronizes unset fungible scales
-on `ASSET_ADD_NEW` against the target MissionControl’s PriceDesk
+Missing scale returns `0` on soft telemetry and reverts
+`missing token scale` on strict paths before any price source is
+contacted. Strict Endaoment partner-liquidity valuation hard-reverts.
+Decimal-drift error magnitude is
+`10 ** abs(oldDecimals - newDecimals)`; direction depends on the
+drift. SwitchboardBravo synchronizes unset fungible scales on
+`ASSET_ADD_NEW` against the target MissionControl’s PriceDesk
 (`MissionControl.getRipeHq()` → `RipeHq.getAddr(7)`). A
-governance-preseeded scale wins and skips `decimals()`. `setTokenScale`
-is governance-only and supports trusted tokens with unusual
-`decimals()` behavior and PriceDesk redeployment. Every priced
-Deleverage underlying requires scale even if it is not onboarded.
-Missing Endaoment partner/treasury scale makes soft USD telemetry zero.
+governance-preseeded scale wins and skips `decimals()`. Pausing
+PriceDesk currently blocks Bravo ADD_NEW because scale
+synchronization reverts. `setTokenScale` is governance-only and
+supports trusted tokens with unusual `decimals()` behavior and
+PriceDesk redeployment. Migration 0003 seeds MissionControl live
+assets and explicitly seeds USDG, which is not a MissionControl
+asset. Every priced non-MissionControl Deleverage underlying or
+claim asset needs an explicit cached scale before strict valuation.
 Cached scale remains after MissionControl asset removal so residual
 positions can still be valued. NFT admission, configuration updates,
-and SwitchboardCharlie actions do not synchronize scale. RH-D043 and
-deployment/activation authority are unchanged.
+and SwitchboardCharlie actions do not synchronize scale. Debt-terms
+assert consolidation offset ADD_NEW hook growth and kept Bravo under
+EIP-170. Bravo grew net 177 bytes, 24,364 to 24,541 (35 bytes
+headroom). PriceDesk is 17,698 bytes. Focused side-by-side Boa
+probe compared parent
+`6a4a0f2fed38f3ea7653c1a2c12fb6131fa32cf4`
+to the PriceDesk implementation at
+`a85ac39e1f7fe6ab92f45dd7b7e176d36f4b1b34`:
+`getUsdValue` 7,819 → 7,223 (Δ −596);
+`getAssetAmount` 7,733 → 7,183 (Δ −550).
+The deltas, not fixture-dependent absolute totals, are the durable
+comparison evidence. Deployment and activation
+authority are unchanged.
 
 Batch 3, AUD-FLOW-11, RH-D043, Pyth registration and activation,
 full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and

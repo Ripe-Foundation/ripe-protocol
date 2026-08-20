@@ -55,6 +55,8 @@ interface Whitelist:
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
+
+interface PriceDesk:
     def tokenScale(_asset: address) -> uint256: view
     def syncTokenScale(_asset: address): nonpayable
 
@@ -194,8 +196,9 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
 MISSION_CONTROL_ID: constant(uint256) = 5
-VAULT_BOOK_ID: constant(uint256) = 8
 SWITCHBOARD_ID: constant(uint256) = 6
+PRICE_DESK_ID: constant(uint256) = 7
+VAULT_BOOK_ID: constant(uint256) = 8
 SWITCHBOARD_ALPHA_ID: constant(uint256) = 1
 
 
@@ -821,10 +824,10 @@ def executePendingAction(_aid: uint256) -> bool:
         assert self._isValidAssetConfig(p.asset, p.config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, p.config)
         if not p.config.isNft:
-            priceDesk: address = staticcall RipeHq(staticcall MissionControl(mc).getRipeHq()).getAddr(7)
+            priceDesk: address = staticcall RipeHq(staticcall MissionControl(mc).getRipeHq()).getAddr(PRICE_DESK_ID)
             assert priceDesk != empty(address) # dev: missing price desk
-            if staticcall RipeHq(priceDesk).tokenScale(p.asset) == 0:
-                extcall RipeHq(priceDesk).syncTokenScale(p.asset)
+            if staticcall PriceDesk(priceDesk).tokenScale(p.asset) == 0:
+                extcall PriceDesk(priceDesk).syncTokenScale(p.asset)
         log AssetAdded(asset=p.asset)
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:

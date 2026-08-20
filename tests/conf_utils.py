@@ -34,8 +34,8 @@ def unbind_token_scale():
 def sync_deployed_token(token):
     desk = _SCALE_BIND.get("desk")
     sender = _SCALE_BIND.get("sender")
-    if desk is None or sender is None:
-        return
+    assert desk is not None, "PriceDesk token-scale bind is not active"
+    assert sender is not None, "token-scale sender bind is not active"
     ensure_token_scale(desk, token, sender)
 
 

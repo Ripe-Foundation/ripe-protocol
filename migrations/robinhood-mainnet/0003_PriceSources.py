@@ -50,6 +50,11 @@ def sync_existing_token_scales(execute, price_desk, mission_control, eth_sentine
         )
 
 
+def sync_usdg_token_scale(execute, price_desk, usdg):
+    execute(price_desk.syncTokenScale, usdg)
+    assert int(price_desk.tokenScale(usdg)) != 0
+
+
 def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq")
     green_token = migration.get_contract("GreenToken")
@@ -122,6 +127,11 @@ def migrate(migration: Migration):
         price_desk,
         migration.get_contract("MissionControl"),
         address("NATIVE_ETH_SENTINEL"),
+    )
+    sync_usdg_token_scale(
+        migration.execute,
+        price_desk,
+        usdg,
     )
 
     # PriceDesk must be registered in RipeHq before any feed is added: the price
