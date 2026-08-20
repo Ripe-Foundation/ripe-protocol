@@ -199,6 +199,15 @@ order-id calldata suffix. A real Relay signature will not verify, and Relay's
 Oracle cannot attest a transaction shaped like this one. Porting the canonical
 schema against pinned SDK vectors is deliberately deferred rather than guessed.
 
+One requirement the port must inherit, because it was learned the expensive way:
+**bound order age, not time-to-expiry.** `deadline <= now + horizon` combined with
+`now <= deadline` admits exactly `[deadline - horizon, deadline]`, so a year-old
+order is merely inadmissible until its final window and then fills — at a moment
+the signer chose by picking the deadline. Age is only knowable from a signed
+issuance value. If canonical `OrderV1` carries no issuance field, freshness
+cannot be approximated from the deadline; the lane needs one from elsewhere,
+because that approximation is the defect.
+
 **Restoration is a balance proof, not a receipt proof.** Clearing exposure
 requires the float to have actually risen, so a mistaken governor cannot recycle
 capacity — but it binds amount, not origin. An authenticated CCIP receiver is

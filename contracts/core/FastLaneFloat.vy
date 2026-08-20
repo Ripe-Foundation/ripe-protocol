@@ -10,7 +10,8 @@
 # @version 0.4.3
 
 # UNAUDITED. Not authorized for real funds. See
-# docs/chains/rh/fast-lane-payout-contract-spec.md.
+# docs/chains/rh/relay-fast-lane.md for what this is and what blocks it, and
+# docs/chains/rh/bridge-integration-security-review.md for the open findings.
 #
 # This contract CANNOT verify that the origin-chain deposit asserted by an order
 # actually happened. It pays against a signature. The caps below - not the
