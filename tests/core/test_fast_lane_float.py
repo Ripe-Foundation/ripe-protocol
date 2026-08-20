@@ -58,7 +58,7 @@ def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None):
         amount,
         out if out is not None else amount,
         origin,
-        deadline if deadline is not None else boa.env.timestamp + 3600,
+        deadline if deadline is not None else boa.env.timestamp + 600,
         salt or boa.env.timestamp.to_bytes(32, "big"),
     )
 
@@ -570,3 +570,42 @@ def test_can_fill_reflects_the_floor(flf, charlie):
     assert flf.canFill(10 * EIGHTEEN_DECIMALS)
     flf.raiseFloatFloor(FLOAT, sender=charlie)
     assert not flf.canFill(10 * EIGHTEEN_DECIMALS)
+
+
+# ---------- M-8: order staleness and burned signers ----------
+
+
+def test_order_priced_arbitrarily_long_ago_is_refused(flf, solver, bob):
+    """An unbounded deadline admits an order whose pricing no longer corresponds
+    to anything. This is the contract's own stated threat model -- a buggy solver
+    overpaying against a real deposit -- not the key-compromise one."""
+    with boa.reverts("deadline too far"):
+        _fill(flf, solver, _order(bob, 1 * EIGHTEEN_DECIMALS, deadline=boa.env.timestamp + 100 * 365 * 24 * 3600))
+
+    # and one signed inside the horizon does not survive past it
+    order = _order(bob, 1 * EIGHTEEN_DECIMALS, deadline=boa.env.timestamp + 14 * 60)
+    boa.env.time_travel(seconds=15 * 60)
+    with boa.reverts("order expired"):
+        _fill(flf, solver, order)
+
+
+def test_burned_signer_cannot_be_reinstated_so_the_backlog_is_dead(flf, solver, bob, alice, charlie):
+    """Rotating back to a burned address serves a full timelock and carries a
+    current epoch, so without this the whole pre-signed backlog revives."""
+    flf.setGuardian(alice, True, sender=charlie)
+    order = _order(bob, MAX_FILL, deadline=boa.env.timestamp + 10 * 60)
+    sig = _sign(flf, solver, order)
+
+    flf.clearSolverSigner(sender=alice)
+    assert flf.isBurnedSigner(solver.address)
+
+    with boa.reverts("signer burned"):
+        flf.initiateChange(1, solver.address, 0, sender=charlie)
+
+    # a genuinely new key is still fine, and cannot verify the old signature
+    fresh = Account.create()
+    aid = flf.initiateChange(1, fresh.address, 0, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)
+    with boa.reverts("not solver"):
+        flf.fill(order, sig, sender=solver.address)

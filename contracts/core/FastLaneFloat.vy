@@ -126,6 +126,13 @@ lanePaused: public(bool)
 solverSigner: public(address)
 isGuardian: public(HashMap[address, bool])
 
+# A signer dropped in an incident can never be reinstated. Without this,
+# rotating back to the same address serves a full timelock, carries a current
+# configEpoch, and revives every order ever signed under it - the pre-signed
+# backlog is dormant rather than dead. Burning forces rotation to a NEW key,
+# which is the only rotation that actually retires the old signatures.
+isBurnedSigner: public(HashMap[address, bool])
+
 # hard caps - the security boundary
 maxFillAmount: public(uint256)
 maxAggregateExposure: public(uint256)
@@ -200,6 +207,7 @@ ACTION_UNPAUSE: constant(uint8) = 3
 ACTION_WITHDRAW: constant(uint8) = 4
 ACTION_LOWER_FLOOR: constant(uint8) = 5
 
+MAX_ORDER_HORIZON: constant(uint256) = 15 * 60
 RETIREMENT_DELAY: constant(uint256) = 7 * 24 * 3600
 MIN_RESTORE_BPS: constant(uint256) = 9_500
 HUNDRED_PCT: constant(uint256) = 10_000
@@ -295,7 +303,14 @@ def fill(_order: FillOrder, _signature: Bytes[65]) -> bytes32:
     self._validateSignature(orderId, _signature, signer)
 
     # 4. order terms
+    # An unbounded deadline admits an order priced arbitrarily long ago. That
+    # bites in this contract's OWN threat model, not just the adversarial one:
+    # the outputAmount <= inputAmount check exists to catch a buggy solver
+    # overpaying against a real deposit, and an order built, signed, dropped by
+    # a retry queue and replayed later against a deposit that no longer
+    # corresponds is exactly that bug.
     assert block.timestamp <= _order.deadline # dev: order expired
+    assert _order.deadline <= block.timestamp + MAX_ORDER_HORIZON # dev: deadline too far
     assert _order.originChainId != chain.id # dev: same chain
     assert _order.recipient != empty(address) # dev: invalid recipient
     assert _order.recipient != self # dev: self recipient
@@ -605,6 +620,7 @@ def clearSolverSigner():
     prev: address = self.solverSigner
     assert prev != empty(address) # dev: no signer
     self.solverSigner = empty(address)
+    self.isBurnedSigner[prev] = True
     self.configEpoch += 1
     log SolverSignerCleared(prevSigner=prev, caller=msg.sender)
 
@@ -727,6 +743,7 @@ def initiateChange(_actionType: uint8, _addrVal: address, _numVal: uint256) -> u
 
     if _actionType == ACTION_SET_SOLVER:
         assert _addrVal != empty(address) and not _addrVal.is_contract # dev: solver must be eoa
+        assert not self.isBurnedSigner[_addrVal] # dev: signer burned
     elif _actionType == ACTION_UNPAUSE:
         # queueing an unpause while already unpaused would let it sit matured
         # and instantly undo a later guardian pause
