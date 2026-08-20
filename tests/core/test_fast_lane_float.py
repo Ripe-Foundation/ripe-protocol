@@ -497,29 +497,60 @@ def test_no_arbitrary_call_surface(flf):
 # ---------- the drain floor: cause-agnostic ----------
 
 
-def test_drain_halts_at_the_floor_not_at_zero(flf, solver, bob, ripe_token, charlie):
-    """H-6 gates the fill on mintEnabled, but that is one of six conditions that
-    block the CCIP refill. Three of them this contract cannot observe at all.
-    So the floor must close on the consequence they share -- the float stops
-    being replenished -- with every gate the contract CAN see satisfied."""
-    flf.raiseFloatFloor(99_000 * EIGHTEEN_DECIMALS, sender=charlie)
-    aid = flf.initiateCapRaise(MAX_FILL, MAX_EXPOSURE * 100, MAX_ENTRIES, MAX_AGE, sender=charlie)
-    boa.env.time_travel(blocks=11)
-    flf.confirmChange(aid, sender=charlie)
-
-    filled = 0
+def test_aggregate_cap_is_what_stops_a_stalled_refill(flf, solver, bob, ripe_token):
+    """Under normal configuration the AGGREGATE ledger closes admission when
+    replenishment stalls -- not the floor. Exposure cannot clear without real
+    tokens returning, so outstandingNotional climbs to the cap."""
     for i in range(1, MAX_ENTRIES + 1):
         try:
             _fill(flf, solver, _order(bob, MAX_FILL, salt=bytes([i]) * 32))
-            filled += 1
         except Exception:
             break
+    assert flf.outstandingNotional() == MAX_EXPOSURE
+    with boa.reverts("exposure cap"):
+        _fill(flf, solver, _order(bob, 1 * EIGHTEEN_DECIMALS, salt=b"\xee" * 32))
+    # the floor never came near binding: it is not the control that fired
+    assert ripe_token.balanceOf(flf.address) > flf.minFloatBalance() * 90
 
-    # halted with float still on hand, and nothing else was the cause
-    assert ripe_token.balanceOf(flf.address) >= 99_000 * EIGHTEEN_DECIMALS
-    assert flf.lanePaused() is False
+
+def test_floor_binds_only_when_tighter_than_remaining_aggregate_capacity(flf, solver, bob, charlie, ripe_token):
+    """The floor is a reserve invariant, not a refill-failure detector. It fires
+    only where `balance - floor` is tighter than the remaining exposure room."""
+    aid = flf.initiateCapRaise(MAX_FILL, MAX_EXPOSURE * 100, MAX_ENTRIES, MAX_AGE, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)
+    flf.raiseFloatFloor(FLOAT - MAX_FILL, sender=charlie)
+
+    _fill(flf, solver, _order(bob, MAX_FILL, salt=b"\x01" * 32))
     with boa.reverts("float floor"):
-        _fill(flf, solver, _order(bob, MAX_FILL, salt=b"\xee" * 32))
+        _fill(flf, solver, _order(bob, MAX_FILL, salt=b"\x02" * 32))
+    assert flf.outstandingNotional() < flf.maxAggregateExposure()
+
+
+def test_floor_holds_even_if_the_exposure_ledger_is_wrong(flf, solver, bob, charlie, ripe_token, whale):
+    """The floor's reason to exist: every other cap reads counters this contract
+    maintains, so they fail together if that accounting is wrong. The floor reads
+    balanceOf, so it still reserves inventory."""
+    aid = flf.initiateCapRaise(MAX_FILL, MAX_EXPOSURE * 100, MAX_ENTRIES, MAX_AGE, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)
+    flf.raiseFloatFloor(FLOAT - (2 * MAX_FILL), sender=charlie)
+
+    ids = []
+    for i in range(1, 3):
+        ids.append(_fill(flf, solver, _order(bob, MAX_FILL, salt=bytes([i]) * 32)))
+
+    # simulate the ledger being cleared without inventory returning, by funding
+    # the restoration from elsewhere: the exposure counters go to zero...
+    flf.recordWithdrawn(ids, sender=charlie)
+    _restore(flf, ripe_token, whale, ids, 2 * MAX_FILL, charlie)
+    assert flf.outstandingNotional() == 0
+
+    # ...and the floor still refuses once the balance is spent down to it
+    _fill(flf, solver, _order(bob, MAX_FILL, salt=b"\x0a" * 32))
+    _fill(flf, solver, _order(bob, MAX_FILL, salt=b"\x0b" * 32))
+    with boa.reverts("float floor"):
+        _fill(flf, solver, _order(bob, MAX_FILL, salt=b"\x0c" * 32))
 
 
 def test_floor_raises_immediately_but_lowers_only_through_the_timelock(flf, charlie):

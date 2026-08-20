@@ -135,17 +135,20 @@ maxEntryAge: public(uint256)
 # advisory only: read by the quoting layer, never enforced here
 quoteThreshold: public(uint256)
 
-# Cause-agnostic drain floor. H-6 gates the fill on mintEnabled because that
-# blocks the CCIP refill leg, but mintEnabled is only ONE of six destination
-# conditions that block `releaseOrMint` (H-5). This contract can observe three
-# of them - mintEnabled, token isPaused, and its own blacklisting, which is
-# symmetric so it closes the fill too. It cannot see an RMN curse, an exhausted
-# inbound rate limit, or the pool losing canMintRipe.
+# Inventory reserve invariant. This is NOT the control that detects stalled
+# replenishment: if restoration stops, exposure cannot clear, outstandingNotional
+# climbs and `maxAggregateExposure` closes admission. That ledger bound is the
+# cause-agnostic refill-failure control, and it predates this floor.
 #
-# Enumerating causes is what let the gate decay in the first place, so this
-# gates on the consequence they share: replenishment stops, so the balance falls
-# while exposure persists. The drain then halts at a chosen floor rather than at
-# zero, whatever the cause.
+# The floor enforces only `postFillBalance >= minFloatBalance`, so it binds only
+# when `balance - floor` is tighter than the remaining aggregate capacity. Under
+# a float much larger than the exposure cap it never fires.
+#
+# It is kept because it is the ONLY cap with an independent data source. Every
+# other bound - aggregate notional, entry count, entry age - is computed from
+# counters this contract maintains, so all three fail together if that
+# accounting is ever wrong. The floor reads balanceOf from the token, so it
+# still holds tokens back when the ledger does not.
 minFloatBalance: public(uint256)
 
 # Tokens this contract believes it holds. Restoration must be matched by real
