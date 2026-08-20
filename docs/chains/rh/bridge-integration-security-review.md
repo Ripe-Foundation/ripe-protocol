@@ -10,7 +10,9 @@ rev 6 — bound effective Relay attribution, added live cross-layer privilege gr
 rev 7 — added M-3, token-level denylist for the Across GREEN/RIPE footgun;
 rev 8 — added H-5, destination-side stranding on the live CCIP burn/mint path;
 rev 9 — added H-6 refill/drain asymmetry and M-4 age-cap liveness trap;
-rev 10 — corrected Relay order authorization, reconciliation, and cap semantics)
+rev 10 — corrected Relay order authorization, reconciliation, and cap semantics;
+rev 11 — M-5 routing evidence pinned and claim narrowed; added H-7, H-8, M-6, M-7
+against the implemented `FastLaneFloat`)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -831,10 +833,182 @@ surfacing decision:
    in either direction. That is a real advantage over the swap route
    independent of price impact, and it has not been counted as one.
 
+**Direct routing evidence, and the caveat that bounds it (rev 11).** The
+identification is no longer inferred from `router: "kyberswap"`. At Base block
+`50,196,592`, live `CurvePrices.greenRefPoolConfig()` returns reference pool
+`0xd6c283...459dc` paired with USDC `0x833589...2913`, and the sampled Relay
+quote's nested Kyber calldata contains that exact pool address immediately
+followed by that USDC address. The sampled route therefore does sell GREEN
+through the borrow-rate reference pool as a matter of decoded calldata.
+
+The claim is correspondingly narrowed: this is proven of **the sampled live
+route**, not of "the swap lane" as a class. Kyber routing is dynamic and a
+future quote may select a different pool — which cuts both ways, since it also
+means a route measured clean today can select the reference pool tomorrow. The
+durable control is therefore not "check whether the quoted path touches
+`0xd6c283...`" but the route-shape refusal recorded in the fast-lane doc:
+reject protocol-token swap legs outright, or recursively decode and validate
+every quoted path before admission.
+
+**The pressure is live on the current Base deployment, and the pool is small.**
+Verified by direct `eth_call` at Base block `50,180,753`:
+`getCurrentGreenPoolStatus()` reports `weightedRatio = 50.61%` against
+`dangerTrigger = 60.00%` with `numBlocksInDanger = 0`, and the reference pool
+holds roughly 6,073 USDC / 5,809 GREEN (~$11.9k, `A = 100`). A 9.4-point gap on
+a pool that size puts the trigger within reach of ordinary bridging volume
+rather than of an attacker — but that reach is a StableSwap sanity check, not a
+simulation, and item 1 below is what turns it into a number.
+
 Note this is a Base-side finding reached from Robinhood work, and it is
 unaffected by every bridge control in this review: no cap, pause, allowlist or
 denylist here touches it, because nothing about it is a bridge transaction from
 Ripe's contracts' point of view.
+
+### H-7 — Every immediate emergency lever in `FastLaneFloat` is undone in one transaction by a pre-staged timelock action
+
+**Severity: High (defeats the incident-response model; no key compromise
+required beyond the one the levers exist to answer). Added rev 11. Reproduced
+by `tests/core/test_fast_lane_float_audit.py`.**
+
+`FastLaneFloat` splits its controls into fast levers that only ever tighten
+(`pauseLane`, `clearSolverSigner`, `lowerCaps`, `raiseFloatFloor`) and slow
+levers that loosen and must pass the timelock (`ACTION_UNPAUSE`,
+`ACTION_SET_SOLVER`, `initiateCapRaise`, `ACTION_LOWER_FLOOR`). The split is the
+right shape. The timelock does not implement it.
+
+`timeLock._initiateAction` (`contracts/modules/TimeLock.vy:65`) stamps
+`confirmBlock = block.number + actionTimeLock` and
+`expiration = confirmBlock + self.expiration` at **initiate** time. The float
+constructs the module as `timeLock.__init__(_minTimeLock, _maxTimeLock,
+_minTimeLock, _maxTimeLock)`, so `expiration == _maxTimeLock`: once matured, an
+action stays confirmable for a further `_maxTimeLock` blocks. Nothing in
+`confirmChange` re-reads the state the action loosens. So for that entire
+window the "delay" on loosening is zero, and the only question is whether a
+matured action happens to be sitting there.
+
+Three instances, each proven:
+
+- **`ACTION_UNPAUSE` vs. the guardian pause.** A guardian halts the lane; one
+  `confirmChange` of a previously-staged unpause reopens it in the same block.
+  `test_poc_f1_stale_unpause_defeats_guardian_pause`.
+- **`initiateCapRaise` vs. `lowerCaps`.** `lowerCaps` is the only immediate
+  lever that tightens the loss bound, and the caps are stated as the security
+  boundary. A matured raise restores the pre-incident caps with **no**
+  re-validation — not against live exposure, not against the values just set.
+  `test_poc_f1c_stale_cap_raise_undoes_emergency_lower_caps`.
+- **`ACTION_SET_SOLVER` vs. `clearSolverSigner`.** A guardian burns a
+  compromised solver key; a matured set-solver reinstates it immediately. See
+  H-8 for what that costs.
+
+Two aggravating details. Guardians can pause and clear but **cannot cancel** —
+`cancelChange` requires `gov._canGovern`, so the party trusted to react fastest
+cannot neutralise the thing that reverses its reaction. And this is invisible
+in review: the staged action is initiated during ordinary operations, long
+before the incident, and looks like routine maintenance at the time.
+
+The existing tests do not catch it because they only exercise the intended
+ordering — `test_unpause_requires_the_timelock` initiates *after* the pause and
+correctly observes the delay. The defect is in the other ordering.
+
+**Recommendation.** Bind each pending action to the state it loosens, at
+confirm time rather than initiate time. Cheapest correct form: keep a
+monotonic `controlEpoch`, bump it in `pauseLane`, `clearSolverSigner` and
+`lowerCaps`, stamp it into `PendingChange` at initiate, and reject
+`confirmChange` when it no longer matches. That makes every tightening action
+automatically invalidate every staged loosening, without enumerating which
+action loosens what — the enumeration is precisely what has decayed twice
+already in this review. Additionally, let guardians call `cancelChange`;
+cancelling is a tightening operation and belongs with the other fast levers.
+
+### H-8 — Reinstating a cleared solver signer revives its entire unfilled pre-signed backlog
+
+**Severity: High (direct fund-loss path, bounded only by the caps). Added
+rev 11. Reproduced by `tests/core/test_fast_lane_float_audit.py`.**
+
+Independent of H-7, and it survives a fully-elapsed timelock.
+
+`fill` protects against replay with `isFilled[orderId]`, which records only
+orders that were **filled**. An order that was signed and never submitted
+leaves no trace. Two other properties make that permanent: `_order.deadline` is
+checked (`block.timestamp <= _order.deadline`) but **not bounded**, so a signer
+can mint orders valid for centuries; and clearing `solverSigner` invalidates
+nothing at order level, because validity is recomputed against whatever address
+is configured at fill time.
+
+So the response to a solver-key compromise is incomplete by construction.
+`clearSolverSigner` stops the bleeding while the address is unset. The moment
+governance restores that same address — after remediation, believing the
+incident closed, or via a stale H-7 action — every order the attacker signed
+during the compromise becomes live again, and can be drained straight into the
+caps.
+`test_poc_f2_stale_set_solver_revives_presigned_orders` walks it: three
+max-size orders signed up front, the signer cleared, fills reverting, then a
+single `confirmChange` followed by all three filling for `3 x maxFillAmount`.
+
+**Recommendation.** Two changes, both small:
+
+1. **Version the signer.** Keep `signerEpoch`, increment it in
+   `clearSolverSigner` and on every `ACTION_SET_SOLVER` confirmation, and
+   include it in `ORDER_TYPEHASH`. Clearing the signer then invalidates every
+   outstanding signature by that key permanently, and reinstating the address
+   does not revive them.
+2. **Bound the deadline.** Reject `_order.deadline > block.timestamp +
+   MAX_ORDER_HORIZON`. A fast lane quotes in seconds; an order valid for more
+   than a few minutes has no legitimate use and is only ever a bearer
+   instrument someone can stockpile.
+
+### M-6 — `pauseLane` does not stop value leaving, and `ACTION_WITHDRAW` ignores the drain floor
+
+**Severity: Medium. Added rev 11. Reproduced by
+`tests/core/test_fast_lane_float_audit.py`.**
+
+`minFloatBalance` was added (H-6 follow-up) to halt the drain at a chosen floor
+"whatever the cause". It is enforced in `fill` and in `canFill`, and nowhere
+else. `confirmChange`'s `ACTION_WITHDRAW` branch transfers `p.numVal` to
+`FLOAT_RECIPIENT` with no check against `minFloatBalance` and none against
+`outstandingNotional`. The floor is therefore cause-agnostic only across the
+causes that flow through `fill`.
+
+Compounding it, `lanePaused` gates `fill` alone. A guardian pause is the signal
+"stop, something is wrong", and it leaves a matured withdrawal fully
+confirmable.
+`test_poc_f3_paused_lane_still_confirms_full_withdrawal_below_floor` pauses the
+lane and then empties the contract to zero against a floor of 1,000e18, while
+entries are outstanding.
+
+Governance being able to recover inventory is legitimate and should stay. The
+defect is that it is not visibly separated from the floor's stated guarantee,
+and that a pause does not hold it. **Recommendation:** require
+`balance - amount >= minFloatBalance` for withdrawals below the floor to go
+through an explicitly-named second action type rather than silently through the
+ordinary one; require `outstandingEntries == 0` for a full sweep; and refuse
+`ACTION_WITHDRAW` confirmation while `lanePaused` is set, so that halting the
+lane halts every outflow rather than one of them.
+
+### M-7 — The drain floor is the one cap that can be deployed inert
+
+**Severity: Medium. Added rev 11. Reproduced by
+`tests/core/test_fast_lane_float_audit.py`.**
+
+The constructor asserts every other bound non-zero — `_maxOutstandingEntries !=
+0`, `_maxFillAmount != 0 and _maxAggregateExposure != 0 and _maxEntryAge != 0`
+— and omits `_minFloatBalance`. A deployment that passes `0` compiles, deploys
+and passes the entire existing suite with the floor disabled
+(`test_poc_f4_floor_can_be_zero_at_deploy`). `ACTION_LOWER_FLOOR` can likewise
+take it to zero, since `assert _numVal < self.minFloatBalance` admits `0`
+(`test_poc_f4_floor_can_be_lowered_to_zero`).
+
+This matters more than an ordinary parameter check because of what the floor is
+for. It exists precisely because the enumerated liveness gates were found
+incomplete — it is the control that catches the causes nobody listed. A control
+of that kind failing silently open at deploy time is the worst available
+failure mode, and there is no runtime signal: `isHealthy()` does not consider
+the floor at all.
+
+**Recommendation.** Assert `_minFloatBalance != 0` in the constructor alongside
+the other caps, require `ACTION_LOWER_FLOOR` to keep it non-zero, and include
+`balance >= minFloatBalance` in `isHealthy()` so an inert or breached floor is
+externally observable.
 
 ## Test obligations
 
@@ -932,6 +1106,22 @@ Whatever design lands, these must be red-before-green:
     assumption, not a control.
 
 ## Sign-off
+
+Not signed off. **Eight highs open, seven mediums.**
+
+`FastLaneFloat` (`contracts/core/FastLaneFloat.vy`, head `80e15c8`) is code now,
+not a specification, and the four findings added in rev 11 are against the
+implementation rather than the design. Its own suite is 34 green; that number
+establishes the implemented behaviour matches the implementer's model of it, and
+H-7 and H-8 are both cases where that model is the thing at fault, so a green
+suite is not evidence against them. Each is reproduced in
+`tests/core/test_fast_lane_float_audit.py`, red against the current contract.
+
+H-7 and H-8 together mean the contract's incident response does not currently
+work: the fast levers can be reversed in one transaction (H-7) and clearing a
+compromised signer is not durable (H-8). Both are cheap to fix — one epoch
+counter each — and both must land before the contract holds value, because
+neither is detectable after the fact from the contract's own state.
 
 Not signed off. H-1, H-2, and H-4 remain unresolved owner decisions. H-3's
 rev-4 rationale was wrong and is retracted; the required answer is now the
