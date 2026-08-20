@@ -3105,7 +3105,7 @@ def test_ripe_gov_vault_transfer_contributor_ripe_tokens_no_balance(
     
     # Transfer when bob has no balance should fail with the SharesVault assertion
     # This is expected behavior - you can't transfer what doesn't exist
-    with boa.reverts():  # Will revert with "no asset to withdraw" from SharesVault
+    with boa.reverts("no asset to withdraw"):  # Will revert with "no asset to withdraw" from SharesVault
         ripe_gov_vault.transferContributorRipeTokens(
             bob, alice, 500, sender=human_resources.address
         )

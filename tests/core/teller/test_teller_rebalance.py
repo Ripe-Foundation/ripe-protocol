@@ -1050,7 +1050,7 @@ def test_teller_rebalance_no_withdrawal_balance(
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # attempt rebalance should fail when trying to withdraw alpha (none available)
-    with boa.reverts():  # Will fail in withdrawal validation
+    with boa.reverts("user does not have this asset"):  # Will fail in withdrawal validation
         teller.rebalance(
             bravo_token.address,  # deposit asset
             vault_id,  # deposit vault id
@@ -1345,7 +1345,7 @@ def test_m1_rebalance_short_deposit_reverts_before_withdrawal_atomically(
     hostile_claim_before = simple_erc20_vault.getTotalAmountForUser(bob, hostile)
     debt_before = credit_engine.getUserDebtAmount(bob)
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.rebalance(
             hostile,
             vault_id,

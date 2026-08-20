@@ -959,7 +959,7 @@ def test_external_housekeeping_rolls_back_touch_when_supplied_addys_fail_later(
 ):
     supplied = _addys_bundle(teller, priceDesk=ZERO_ADDRESS)
 
-    with boa.reverts():
+    with boa.reverts("extcodesize is zero"):
         teller.performHousekeeping(
             False,
             alice,
@@ -1119,7 +1119,7 @@ def test_initial_robinhood_underscore_omission_cannot_create_exemption(
         False,
         sender=deleverage.address,
     )
-    with boa.reverts():
+    with boa.reverts("one action per block"):
         teller.performHousekeeping(
             True,
             alice,

@@ -4703,7 +4703,7 @@ def test_preview_and_purchase_across_future_scheduled_epoch(
 
     assert bond_room.previewNextEpoch() == (future_start, future_end)
     # The helper preserves the future epoch, so payout progress underflows before start.
-    with boa.reverts():
+    with boa.reverts("safesub"):
         bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     with boa.reverts("not within epoch window"):
         teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
@@ -4771,7 +4771,7 @@ def test_preview_and_purchase_across_auto_restart_delay_gap(
         )
         assert bond_room.previewNextEpoch() == (new_start, new_end)
         # The helper preserves the future epoch, so payout progress underflows in the gap.
-        with boa.reverts():
+        with boa.reverts("safesub"):
             bond_room.previewRipeBondPayout(bob, 0, EIGHTEEN_DECIMALS)
         with boa.reverts("not within epoch window"):
             teller.purchaseRipeBond(alpha_token, EIGHTEEN_DECIMALS, sender=bob)

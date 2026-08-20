@@ -866,9 +866,9 @@ def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
     # price therefore blocks valuation and share-changing operations while the
     # active registration and all accounting remain intact.
     mock_price_source.setPrice(bravo_token, 0)
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.getTotalValue(alpha_token)
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.getTotalUserValue(bob, alpha_token)
 
     with boa.env.anchor():
@@ -877,14 +877,14 @@ def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
             EIGHTEEN_DECIMALS,
             sender=alpha_token_whale,
         )
-        with boa.reverts():
+        with boa.reverts("has price config, no price"):
             stability_pool.depositTokensInVault(
                 alice,
                 alpha_token,
                 EIGHTEEN_DECIMALS,
                 sender=teller.address,
             )
-        with boa.reverts():
+        with boa.reverts("has price config, no price"):
             stability_pool.withdrawTokensFromVault(
                 bob,
                 alpha_token,
@@ -916,7 +916,7 @@ def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
     stability_pool.pause(False, sender=switchboard_alpha.address)
     assert not stability_pool.isPaused()
     mock_price_source.disablePriceFeed(bravo_token)
-    with boa.reverts():
+    with boa.reverts("no price for claim asset"):
         stability_pool.getTotalValue(alpha_token)
 
     # Restoring the feed puts the collateral back into NAV immediately; no
@@ -1556,13 +1556,13 @@ def test_stability_pool_recovery_entrypoints_are_disabled_for_all_callers(
     alpha_token.transfer(stability_pool, 50, sender=alpha_token_whale)
     pool_shares_before = stability_pool.totalBalances(alpha_token)
     for caller in (switchboard_alpha.address, bob, alice):
-        with boa.reverts():
+        with boa.reverts("recovery disabled"):
             stability_pool.recoverFunds(
                 bob,
                 alpha_token,
                 sender=caller,
             )
-        with boa.reverts():
+        with boa.reverts("recovery disabled"):
             stability_pool.recoverFundsMany(
                 bob,
                 [alpha_token],
@@ -3316,7 +3316,7 @@ def test_outbound_failing_delivery_rolls_back_the_whole_claim(
         probe.setRevertTransfers(True, sender=governance.address)
 
     before = _stab_state_snapshot(stability_pool, alpha_token, [probe], [bob])
-    with boa.reverts():
+    with boa.reverts("transfer failed"):
         claim_from_stability_pool(teller, vault_id, alpha_token, probe, sender=bob)
     assert _stab_state_snapshot(stability_pool, alpha_token, [probe], [bob]) == before
 
@@ -3387,7 +3387,7 @@ def test_outbound_fee_on_transfer_short_delivery_reverts_atomically(
     fee_token.setTransferFee(5_00, sender=governance.address)
     before = _stab_state_snapshot(stability_pool, alpha_token, [fee_token], [bob])
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         claim_from_stability_pool(teller, vault_id, alpha_token, fee_token, sender=bob)
     assert _stab_state_snapshot(stability_pool, alpha_token, [fee_token], [bob]) == before
 
@@ -3416,7 +3416,7 @@ def test_outbound_fee_on_transfer_stability_asset_does_not_burn_shares(
         stability_pool.totalBalances(fee_token),
     )
 
-    with boa.reverts():
+    with boa.reverts("invalid recipient delivery"):
         stability_pool.withdrawTokensFromVault(
             bob, fee_token, amount, bob, sender=teller.address
         )
@@ -3514,7 +3514,12 @@ def test_claim_asset_price_state_nav_outcome(
         assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
         assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == healthy_position
     else:
-        with boa.reverts():
+        expected = (
+            "no price for claim asset"
+            if state == "absent_feed"
+            else "has price config, no price"
+        )
+        with boa.reverts(expected):
             stability_pool.getTotalValue(alpha_token)
         assert not stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
         assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
@@ -3670,7 +3675,7 @@ def test_claim_only_cohort_with_unpriceable_stab_asset_is_skipped_and_recovers(
     # the exact residual path identified in review.
     mock_price_source.setPrice(stab_token, 0)
     assert stability_pool.getTotalValue(stab_token) == claim_amount
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.getTotalAmountForUser(bob, stab_token)
     assert not stability_pool.canAcceptLiquidationAsset(stab_token, bravo_token)
     assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
@@ -3792,7 +3797,7 @@ def test_reverting_price_source_takes_down_every_nav_dependent_action(
         ) == active_index
         return
 
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         if action == "total_value":
             stability_pool.getTotalValue(alpha_token)
         elif action == "user_value":
@@ -3820,7 +3825,7 @@ def test_reverting_price_source_is_fully_atomic_and_recovers(
     before = _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob, alice])
 
     mock_price_source.setShouldRevert(bravo_token, True)
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.depositTokensInVault(
             alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
         )
@@ -3887,7 +3892,12 @@ def test_unavailable_claim_price_blocks_deposits_and_withdrawals(
     alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
     _apply_price_state(mock_price_source, bravo_token, state)
 
-    with boa.reverts():
+    expected = (
+        "no price for claim asset"
+        if state == "absent_feed"
+        else "has price config, no price"
+    )
+    with boa.reverts(expected):
         if action == "deposit":
             stability_pool.depositTokensInVault(
                 alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
@@ -3914,7 +3924,7 @@ def test_withdrawal_during_zero_price_outage_reverts_without_abandoning_claims(
     before = _stab_state_snapshot(
         stability_pool, alpha_token, [bravo_token], [bob], False
     )
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.withdrawTokensFromVault(
             bob, alpha_token, amount, bob, sender=teller.address
         )
@@ -3940,7 +3950,7 @@ def test_claim_and_redemption_resume_exactly_after_price_restoration(
     before = _stab_state_snapshot(
         stability_pool, alpha_token, [bravo_token], [bob], False
     )
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
     assert _stab_state_snapshot(
         stability_pool, alpha_token, [bravo_token], [bob], False
@@ -3984,7 +3994,7 @@ def test_zero_price_at_the_maximum_active_claim_asset_count(
 
     mock_price_source.setPrice(target, 0)
 
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.getTotalValue(alpha_token)
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == MAX_ACTIVE_CLAIM_ASSETS
     assert stability_pool.indexOfClaimableAsset(alpha_token, target) == index_before
@@ -4980,12 +4990,12 @@ def test_redemption_fails_closed_during_outage_and_resumes_after_restoration(
 
     # During the outage the redemption fails closed and changes nothing.
     mock_price_source.setPrice(bravo_token, 0)
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.getTotalValue(alpha_token)
     before = _stab_state_snapshot(
         stability_pool, alpha_token, [bravo_token], [bob], include_values=False
     )
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         redeem_from_stability_pool(
             teller, vault_id, bravo_token, redeem_amount, bob, sender=bob
         )

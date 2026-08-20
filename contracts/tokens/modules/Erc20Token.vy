@@ -403,6 +403,7 @@ def permit(
         assert staticcall ERC1271(_owner).isValidSignature(digest, _signature) == ERC1271_MAGIC_VAL # dev: invalid signature
 
     else:
+        assert len(_signature) == 65 # dev: invalid signature length
         r: bytes32 = convert(slice(_signature, 0, 32), bytes32)
         s: bytes32 = convert(slice(_signature, 32, 32), bytes32)
         v: uint8 = convert(slice(_signature, 64, 1), uint8)

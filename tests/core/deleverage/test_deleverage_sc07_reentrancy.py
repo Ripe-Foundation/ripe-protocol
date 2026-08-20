@@ -446,7 +446,7 @@ def test_sc07_cross_entry_deleverage_reentrancy_blocked(
     pre_endao = reenter_token.balanceOf(endaoment_funds)
     pre_position = _vault_position_snapshot(simple_erc20_vault, bob, reenter_token)
 
-    with boa.reverts():  # shared nonreentrant lock -> bare revert
+    with boa.reverts("token transfer failed"):  # shared nonreentrant lock -> bare revert
         teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
 
     # rejected before any state change (lock fires before the debt-refresh guard)
@@ -509,7 +509,7 @@ def test_sc07_swap_collateral_blocks_cross_vault_deleverage_reentry(
     # The callback fires while the simple-vault leg is in flight. Its processable
     # fallback is deliberately in the unlocked rebase vault, so the vault-local
     # mutex cannot mask whether Deleverage's contract-wide lock is held.
-    with boa.reverts():
+    with boa.reverts("is governance"):
         deleverage.swapCollateral(
             bob,
             simple_id,

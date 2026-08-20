@@ -216,9 +216,9 @@ def getTotalAmountForVault(_asset: address) -> uint256:
 
 @external
 def recoverFunds(_recipient: address, _asset: address):
-    raise
+    raise # dev: recovery disabled
 
 
 @external
 def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
-    raise
+    raise # dev: recovery disabled

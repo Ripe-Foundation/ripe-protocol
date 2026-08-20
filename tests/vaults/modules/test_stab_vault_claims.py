@@ -1002,7 +1002,7 @@ def test_claim_many_arb_sys_rejects_second_same_action_block(
             MAX_UINT256,
         ),
     ]
-    with boa.reverts():
+    with boa.reverts("one action per block"):
         teller.claimManyFromStabilityPool(
             vault_id,
             second_claims,
@@ -1201,7 +1201,7 @@ def test_stab_vault_claim_many_exceeds_limit(
     vault_id = vault_book.getRegId(stability_pool)
     
     # Should fail with bounds check error when trying to pass 16 claims to DynArray[StabPoolClaim, 15]
-    with boa.reverts():  # Generic revert since it's a compiler bounds check
+    with boa.reverts("DynArray[StabPoolClaim, 15] bounds check"):  # Generic revert since it's a compiler bounds check
         teller.claimManyFromStabilityPool(vault_id, claims, sender=bob)
 
 
@@ -1432,7 +1432,7 @@ def test_stab_vault_claims_price_oracle_zero(
     vault_id = vault_book.getRegId(stability_pool)
     
     # Should raise an exception due to price oracle returning 0 with _shouldRaise=True
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
 
 

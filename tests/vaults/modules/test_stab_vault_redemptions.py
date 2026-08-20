@@ -490,7 +490,7 @@ def test_stab_vault_redemptions_price_oracle_zero(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     # Should revert due to price oracle returning 0
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)
 
 

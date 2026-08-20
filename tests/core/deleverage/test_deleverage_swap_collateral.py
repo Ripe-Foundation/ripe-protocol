@@ -1325,7 +1325,7 @@ def test_swap_no_collateral_fails(
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # Bob has no alpha collateral, so withdrawal should fail
-    with boa.reverts():
+    with boa.reverts("no collateral withdrawn"):
         deleverage.swapCollateral(
             bob,
             vault_id,

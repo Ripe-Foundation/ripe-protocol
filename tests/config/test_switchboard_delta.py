@@ -1079,7 +1079,7 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
 def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, governance, alice):
     """Test setRipeBondBooster validation for invalid bond booster addresses"""
     # Non-contract address should fail validation (will revert when trying to call getBoostRatio)
-    with boa.reverts():  # This will catch any revert, not a specific message
+    with boa.reverts("returndatasize too small"):  # This will catch any revert, not a specific message
         switchboard_delta.setRipeBondBooster(alice, sender=governance.address)
     
     # Empty address is actually allowed by the validation logic
@@ -1198,19 +1198,19 @@ def test_switchboard_delta_set_booster_min_lock_duration(switchboard_delta, bond
 def test_set_underscore_registry_success(switchboard_delta, governance, mock_rando_contract):
     """Test that setUnderscoreRegistry can be called by governance"""
     # This will fail validation as mock_rando_contract doesn't implement the required interface
-    with boa.reverts():  # Just check it reverts, don't match exact message
+    with boa.reverts("external call failed"):  # Just check it reverts, don't match exact message
         switchboard_delta.setUnderscoreRegistry(mock_rando_contract, sender=governance.address)
 
 
 def test_underscore_registry_validation_comprehensive(switchboard_delta, governance):
     """Test underscore registry validation with various scenarios"""
     # Test with contract that doesn't implement expected interface
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_delta.setUnderscoreRegistry(governance.address, sender=governance.address)
 
     # Test with EOA (not a contract)
     eoa_address = boa.env.generate_address()
-    with boa.reverts():
+    with boa.reverts("invalid underscore registry"):
         switchboard_delta.setUnderscoreRegistry(eoa_address, sender=governance.address)
 
 

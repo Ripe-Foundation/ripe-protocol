@@ -511,7 +511,12 @@ def test_standard_external_route_distinguishes_m2_movement_checks(
         vault_id,
     )
 
-    with boa.reverts():
+    expected = (
+        "invalid vault outflow"
+        if transfer_mode == 1
+        else "invalid recipient delivery"
+    )
+    with boa.reverts(expected):
         buy_fungible_auction(teller,
             bob,
             vault_id,
@@ -624,7 +629,7 @@ def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
         vault_id,
     )
 
-    with boa.reverts():
+    with boa.reverts("no green spent"):
         buy_fungible_auction(teller,
             bob,
             vault_id,

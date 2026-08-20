@@ -597,7 +597,7 @@ def test_short_received_after_existing_user_backing_reverts_atomically(
     stock_token.approve(teller, requested, sender=alice)
     stock_token.setUpgradeBehavior(3, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.deposit(stock_token, requested, alice, vault, sender=alice)
 
     assert stock_token.balanceOf(alice) == requested
@@ -642,7 +642,7 @@ def test_donation_cannot_mask_short_current_receipt(
     stock_token.approve(teller, requested, sender=bob)
     stock_token.setUpgradeBehavior(3, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.deposit(stock_token, requested, bob, vault, sender=bob)
 
     assert stock_token.balanceOf(bob) == requested
@@ -740,7 +740,7 @@ def test_external_auction_after_total_issuer_burn_reverts_atomically(
     green_token.approve(teller, payment, sender=alice)
     green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
-    with boa.reverts():
+    with boa.reverts("no green spent"):
         buy_fungible_auction(teller,
             bob,
             vault_id,
@@ -1023,7 +1023,7 @@ def test_transfer_guards_block_deposit_atomically_and_retry(
     else:
         stock_token.setUpgradeBehavior(upgrade_mode, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("token transfer failed"):
         teller.deposit(stock_token, amount, bob, vault, sender=bob)
     assert stock_token.balanceOf(bob) == amount
     assert stock_token.balanceOf(vault) == 0
@@ -1293,7 +1293,7 @@ def test_new_borrow_after_total_issuer_burn(
     teller.deposit(stock_token, amount, bob, vault, sender=bob)
     stock_token.adminBurn(vault, amount, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("quarantined asset"):
         teller.borrow(borrow_amount, bob, False, sender=bob)
     assert credit_engine.getUserDebtAmount(bob) == 0
 

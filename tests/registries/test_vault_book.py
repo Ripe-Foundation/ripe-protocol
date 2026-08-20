@@ -365,7 +365,7 @@ def test_nonzero_incompatible_vault_remains_fail_closed(
 
     info_before = vault_book.getAddrInfo(vault_id)
     num_addrs_before = vault_book.getNumAddrs()
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         _start_retirement(
             action_kind,
             vault_book,
