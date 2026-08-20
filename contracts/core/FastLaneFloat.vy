@@ -231,6 +231,9 @@ def __init__(
     assert empty(address) not in [_ripeHq, _token, _floatRecipient] # dev: invalid addr
     assert _maxOutstandingEntries != 0 and _maxOutstandingEntries <= ENTRY_CEILING # dev: invalid entry cap
     assert _maxFillAmount != 0 and _maxAggregateExposure != 0 and _maxEntryAge != 0 # dev: invalid caps
+    # the floor is a cap like any other: a zero floor deploys it inert, which is
+    # the failure mode of a gate whose condition can be satisfied vacuously
+    assert _minFloatBalance != 0 # dev: invalid floor
     assert _maxFillAmount <= _maxAggregateExposure # dev: fill cap above exposure cap
 
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
@@ -739,6 +742,7 @@ def initiateChange(_actionType: uint8, _addrVal: address, _numVal: uint256) -> u
         assert self.outstandingEntries == 0 # dev: live exposure
     elif _actionType == ACTION_LOWER_FLOOR:
         assert _numVal < self.minFloatBalance # dev: not a reduction
+        assert _numVal != 0 # dev: zero floor
 
     assert _actionType != ACTION_RAISE_CAPS # dev: use initiateCapRaise
 
