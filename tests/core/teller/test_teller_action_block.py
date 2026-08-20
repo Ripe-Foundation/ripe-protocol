@@ -432,7 +432,7 @@ ROUTE_CASES = (
     ),
     pytest.param("claimLoot", False, "user", True, "conditional", id="claimLoot"),
     pytest.param("adjustLock", False, "user", True, "always", id="adjustLock"),
-    pytest.param("releaseLock", False, "user", True, "always", id="releaseLock"),
+    pytest.param("releaseLock", True, "user", True, "always", id="releaseLock"),
     pytest.param("withdraw", True, "user", True, "always", id="withdraw"),
     pytest.param("withdrawMany", True, "user", True, "always", id="withdrawMany"),
     pytest.param("rebalance", True, "user", True, "always", id="rebalance"),

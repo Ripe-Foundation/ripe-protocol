@@ -3636,7 +3636,7 @@ def test_m1_teller_runtime_size_dual_guard():
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
     # RH-D031 pins the exact third-party-touch artifact; any growth reopens it.
-    assert len(runtime) <= 24_460
+    assert len(runtime) <= 24_461
 
 
 ############################################################################

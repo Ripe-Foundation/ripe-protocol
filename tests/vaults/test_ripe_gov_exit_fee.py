@@ -53,6 +53,34 @@ def _deposit(vault, token, funder, user, amount, teller, lock_duration=500):
     )
 
 
+def _deposit_via_teller(teller, token, funder, user, amount, lock_duration=500):
+    token.transfer(user, amount, sender=funder)
+    token.approve(teller, amount, sender=user)
+    return teller.depositIntoGovVault(
+        token,
+        amount,
+        lock_duration,
+        user,
+        sender=user,
+    )
+
+
+def _post_release_capacity(vault, token, user, exit_fee, ltv):
+    custody = token.balanceOf(vault)
+    total_shares = vault.totalBalances(token)
+    user_shares = vault.userBalances(user, token)
+    user_claim = claim(user_shares, total_shares, custody)
+    retained_shares = maximal_retained_shares(
+        user_shares,
+        total_shares - user_shares,
+        custody,
+        target_claim(user_claim, exit_fee),
+    )
+    post_total_shares = total_shares - user_shares + retained_shares
+    post_claim = claim(retained_shares, post_total_shares, custody)
+    return retained_shares, post_total_shares, post_claim * ltv // HUNDRED_PERCENT
+
+
 def _point_tuple(points):
     return tuple(points)
 
@@ -291,6 +319,100 @@ def test_paused_lootbox_rolls_back_complete_teller_release_atomically(
     # `exitFee` is the configured basis-point rate, not an asset amount or the
     # realized fee after indivisible-share rounding.
     assert events[0].exitFee == exit_fee
+
+
+@pytest.mark.parametrize(
+    ("debt_delta", "should_revert"),
+    (
+        pytest.param(0, False, id="exact-post-release-capacity"),
+        pytest.param(1, True, id="one-wei-over-post-release-capacity"),
+    ),
+)
+def test_teller_release_lock_enforces_post_fee_debt_health_boundary(
+    debt_delta,
+    should_revert,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    ledger,
+    credit_engine,
+    mission_control,
+    setAssetConfig,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    mock_price_source,
+    switchboard_alpha,
+):
+    exit_fee = 10_00
+    ltv = 50_00
+    _configure_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        exit_fee=exit_fee,
+    )
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    mission_control.setShouldCheckLastTouch(False, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+
+    _deposit_via_teller(
+        teller,
+        ripe_token,
+        whale,
+        bob,
+        1_000 * EIGHTEEN_DECIMALS,
+    )
+    _deposit_via_teller(
+        teller,
+        ripe_token,
+        whale,
+        alice,
+        1 * EIGHTEEN_DECIMALS,
+    )
+
+    retained_shares, post_total_shares, post_max_debt = _post_release_capacity(
+        ripe_gov_vault,
+        ripe_token,
+        bob,
+        exit_fee,
+        ltv,
+    )
+    teller.borrow(post_max_debt + debt_delta, bob, False, sender=bob)
+
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
+    bob_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    alice_claim_before = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    user_data_before = tuple(ripe_gov_vault.userGovData(bob, ripe_token))
+    debt_before = ledger.userDebt(bob).amount
+
+    if should_revert:
+        with boa.reverts("bad debt health"):
+            teller.releaseLock(ripe_token, sender=bob)
+
+        assert ripe_token.balanceOf(ripe_gov_vault) == custody_before
+        assert ripe_gov_vault.userBalances(bob, ripe_token) == bob_shares_before
+        assert ripe_gov_vault.totalBalances(ripe_token) == total_shares_before
+        assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == alice_claim_before
+        assert tuple(ripe_gov_vault.userGovData(bob, ripe_token)) == user_data_before
+        assert ledger.userDebt(bob).amount == debt_before
+        assert filter_logs(teller, "LockReleased") == []
+        return
+
+    teller.releaseLock(ripe_token, sender=bob)
+
+    assert ripe_gov_vault.userBalances(bob, ripe_token) == retained_shares
+    assert ripe_gov_vault.totalBalances(ripe_token) == post_total_shares
+    assert ripe_token.balanceOf(ripe_gov_vault) == custody_before
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) > alice_claim_before
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+    assert ledger.userDebt(bob).amount == debt_before == post_max_debt
+    assert credit_engine.getUserBorrowTerms(bob, False).totalMaxDebt == post_max_debt
 
 
 def test_remaining_holder_guard_is_address_level_not_beneficial_owner_level(
