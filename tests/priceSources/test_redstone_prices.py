@@ -2,6 +2,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS
+from config.BluePrint import ADDYS, CORE_TOKENS
 
 
 CHAINLINK_DECIMALS = 10**8
@@ -268,3 +269,114 @@ def test_redstone_eth_leg_uses_resolved_stale_on_pricedesk(
             redstone.getPrice(alpha_token, 0, price_desk)
         with boa.reverts("has price config, no price"):
             redstone.getPrice(alpha_token, 10, price_desk)
+
+
+def _advance_timelock_blocks(blocks):
+    """Advance governance NUMBER without aging historical fork oracles."""
+
+    boa.env.evm.patch.block_number += blocks
+
+
+def _load_aggregator(addr, name):
+    return boa.from_etherscan(addr, name=name)
+
+
+def _normalized_aggregator_price(feed):
+    rnd = feed.latestRoundData()
+    answer = int(getattr(rnd, "answer", rnd[1]))
+    decimals = int(feed.decimals())
+    assert answer > 0
+    assert decimals <= 18
+    price = answer
+    if decimals < 18:
+        price *= 10 ** (18 - decimals)
+    return price, decimals
+
+
+def _assert_redstone_config(config, feed, decimals, stale_time, needs_eth=False):
+    assert config.feed == feed
+    assert config.decimals == decimals
+    assert config.needsEthToUsd is needs_eth
+    assert config.staleTime == stale_time
+
+
+@pytest.base
+def test_base_redstone_generic_aggregator_sol_propose_confirm_and_pricedesk(
+    redstone,
+    chainlink,
+    price_desk,
+    governance,
+    fork,
+):
+    # Real Base AggregatorV3 mechanics via the repository-configured SOL feed.
+    # This is not a RedStone-provider feed.
+    asset = CORE_TOKENS[fork]["USOL"]
+    feed_addr = ADDYS[fork]["CHAINLINK_SOL_USD"]
+    feed = _load_aggregator(feed_addr, "chainlink_sol_usd")
+    expected_price, expected_decimals = _normalized_aggregator_price(feed)
+
+    assert not redstone.hasPriceFeed(asset)
+    assert not chainlink.hasPriceFeed(asset)
+    assert price_desk.getPrice(asset) == 0
+    assert redstone.addNewPriceFeed(asset, feed_addr, 0, False, sender=governance.address)
+    pending = redstone.pendingUpdates(asset).config
+    _assert_redstone_config(pending, feed_addr, expected_decimals, 0, False)
+    _advance_timelock_blocks(redstone.actionTimeLock() + 1)
+    assert redstone.confirmNewPriceFeed(asset, sender=governance.address)
+
+    stored = redstone.feedConfig(asset)
+    _assert_redstone_config(
+        stored,
+        pending.feed,
+        pending.decimals,
+        pending.staleTime,
+        pending.needsEthToUsd,
+    )
+    assert stored.decimals == expected_decimals
+    assert redstone.getPrice(asset) == expected_price
+    assert redstone.getPriceAndHasFeed(asset) == (expected_price, True)
+    assert redstone.getPrice(asset, 0, price_desk.address) == expected_price
+    assert price_desk.getPrice(asset) == expected_price
+
+
+@pytest.base
+def test_base_redstone_needs_eth_to_usd_three_arg_pricedesk_path(
+    redstone,
+    chainlink,
+    price_desk,
+    governance,
+    fork,
+):
+    # Prove generic AggregatorV3 * ETH/USD conversion. The DOGE feed is a
+    # repository-configured Chainlink aggregator, not a RedStone provider.
+    asset = CORE_TOKENS[fork]["CBDOGE"]
+    feed_addr = ADDYS[fork]["CHAINLINK_DOGE_USD"]
+    feed = _load_aggregator(feed_addr, "chainlink_doge_usd")
+    doge_usd, expected_decimals = _normalized_aggregator_price(feed)
+    eth = ADDYS[fork]["ETH"]
+    eth_usd = chainlink.getPrice(eth)
+    assert eth_usd != 0
+    expected = doge_usd * eth_usd // EIGHTEEN_DECIMALS
+    assert expected != 0
+
+    # No other source registers this asset; the asserts below prove it.
+    assert not redstone.hasPriceFeed(asset)
+    assert not chainlink.hasPriceFeed(asset)
+    assert price_desk.getPrice(asset) == 0
+    assert redstone.addNewPriceFeed(asset, feed_addr, 0, True, sender=governance.address)
+    pending = redstone.pendingUpdates(asset).config
+    _assert_redstone_config(pending, feed_addr, expected_decimals, 0, True)
+    _advance_timelock_blocks(redstone.actionTimeLock() + 1)
+    assert redstone.confirmNewPriceFeed(asset, sender=governance.address)
+
+    stored = redstone.feedConfig(asset)
+    _assert_redstone_config(
+        stored,
+        pending.feed,
+        pending.decimals,
+        pending.staleTime,
+        pending.needsEthToUsd,
+    )
+    assert stored.needsEthToUsd is True
+    assert redstone.getPrice(asset, 0, price_desk.address) == expected
+    assert price_desk.getPrice(asset) == expected

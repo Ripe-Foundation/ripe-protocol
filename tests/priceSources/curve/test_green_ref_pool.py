@@ -245,6 +245,7 @@ def test_reference_pool_basic(
 
     # setup
     aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
+    pending = curve_prices.pendingGreenRefPoolConfig(aid)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -257,6 +258,16 @@ def test_reference_pool_basic(
 
     # verify config
     config = curve_prices.greenRefPoolConfig()
+    assert config.pool == pending.pool
+    assert config.lpToken == pending.lpToken
+    assert config.greenIndex == pending.greenIndex
+    assert config.altAsset == pending.altAsset
+    assert config.altAssetDecimals == pending.altAssetDecimals
+    assert config.maxNumSnapshots == pending.maxNumSnapshots
+    assert config.dangerTrigger == pending.dangerTrigger
+    assert config.staleBlocks == pending.staleBlocks
+    assert config.stabilizerAdjustWeight == pending.stabilizerAdjustWeight
+    assert config.stabilizerMaxPoolDebt == pending.stabilizerMaxPoolDebt
     assert config.pool == deployed_green_pool
     assert config.greenIndex == 1
     assert config.altAsset == usdc_token.address
