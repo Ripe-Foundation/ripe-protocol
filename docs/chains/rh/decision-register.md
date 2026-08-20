@@ -1431,6 +1431,12 @@ directly. The execution event reports the actual sanitized count.
 
 PriceDesk must precede the new RedStone selector during deployment.
 
+Registered Underscore Earn Vaults and their underlyings are trusted not
+to change asset() or decimals. If an upgrade changes either, governance
+must disable and re-register the feed. This reverses PR #193's
+live-identity checks; a changed identity serves mis-scaled prices until
+disabled (upside bounded by maxUpsideDeviation).
+
 Batch 3, AUD-FLOW-11, RH-D043, Pyth real-payload qualification,
 full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and
 GREEN-reference activation remain open. This wrap-up grants no
