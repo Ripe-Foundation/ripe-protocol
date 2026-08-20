@@ -42,6 +42,7 @@ struct FillOrder:
     inputAmount: uint256
     outputAmount: uint256
     originChainId: uint256
+    issuedAt: uint256
     deadline: uint256
     salt: bytes32
 
@@ -216,7 +217,7 @@ MAX_BATCH: constant(uint256) = 50
 ENTRY_CEILING: constant(uint256) = 1000
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-ORDER_TYPEHASH: constant(bytes32) = keccak256("FillOrder(address recipient,uint256 inputAmount,uint256 outputAmount,uint256 originChainId,uint256 deadline,bytes32 salt)")
+ORDER_TYPEHASH: constant(bytes32) = keccak256("FillOrder(address recipient,uint256 inputAmount,uint256 outputAmount,uint256 originChainId,uint256 issuedAt,uint256 deadline,bytes32 salt)")
 NAME_HASH: constant(bytes32) = keccak256("RipeFastLaneFloat")
 VERSION_HASH: constant(bytes32) = keccak256("1")
 ECRECOVER_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000001
@@ -303,14 +304,26 @@ def fill(_order: FillOrder, _signature: Bytes[65]) -> bytes32:
     self._validateSignature(orderId, _signature, signer)
 
     # 4. order terms
-    # An unbounded deadline admits an order priced arbitrarily long ago. That
-    # bites in this contract's OWN threat model, not just the adversarial one:
-    # the outputAmount <= inputAmount check exists to catch a buggy solver
-    # overpaying against a real deposit, and an order built, signed, dropped by
-    # a retry queue and replayed later against a deposit that no longer
-    # corresponds is exactly that bug.
+    # Freshness is bounded against a SIGNED issuance time, not against the
+    # deadline. An unbounded deadline admits an order priced arbitrarily long
+    # ago, which bites in this contract's OWN threat model rather than only the
+    # adversarial one: the outputAmount <= inputAmount check exists to catch a
+    # buggy solver overpaying against a real deposit, and an order built,
+    # signed, dropped by a retry queue and replayed later against a deposit that
+    # no longer corresponds is exactly that bug.
+    #
+    # `deadline <= block.timestamp + MAX_ORDER_HORIZON` does NOT close that, and
+    # was the first attempt: it bounds time-to-expiry at fill, not order age, so
+    # a year-long order is merely inadmissible until its final horizon and then
+    # becomes fillable for fifteen minutes at a moment the signer picked. Age is
+    # only knowable from a value inside the signature.
+    assert _order.issuedAt <= block.timestamp # dev: order from the future
     assert block.timestamp <= _order.deadline # dev: order expired
-    assert _order.deadline <= block.timestamp + MAX_ORDER_HORIZON # dev: deadline too far
+    assert _order.issuedAt <= _order.deadline # dev: deadline before issuance
+    assert _order.deadline - _order.issuedAt <= MAX_ORDER_HORIZON # dev: quote window too long
+    # implied by the three above, and stated anyway because it is the property
+    # that actually matters and the one the previous check only appeared to give
+    assert block.timestamp - _order.issuedAt <= MAX_ORDER_HORIZON # dev: order too old
     assert _order.originChainId != chain.id # dev: same chain
     assert _order.recipient != empty(address) # dev: invalid recipient
     assert _order.recipient != self # dev: self recipient
@@ -383,6 +396,7 @@ def _orderId(_order: FillOrder) -> bytes32:
             _order.inputAmount,
             _order.outputAmount,
             _order.originChainId,
+            _order.issuedAt,
             _order.deadline,
             _order.salt,
         )

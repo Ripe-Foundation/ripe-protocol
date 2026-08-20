@@ -46,8 +46,9 @@ def flf(ripe_hq_deploy, ripe_token, float_recipient, charlie, whale, solver):
     return c
 
 
-def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None):
+def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None, issued=None):
     return (recipient, amount, out if out is not None else amount, origin,
+            issued if issued is not None else boa.env.timestamp,
             deadline if deadline is not None else boa.env.timestamp + 600,
             salt or boa.env.timestamp.to_bytes(32, "big"))
 
@@ -173,7 +174,7 @@ def test_m8_order_horizon_is_bounded_so_a_stale_order_cannot_fill(flf, solver, b
     """
     o = _order(bob, MAX_FILL, deadline=2**255, salt=b"\xaa" * 32)
     sig = _sign(flf, solver, o)
-    with boa.reverts("deadline too far"):
+    with boa.reverts("quote window too long"):
         flf.fill(o, sig, sender=solver.address)
 
     # an order inside the horizon still cannot outlive it
@@ -209,3 +210,47 @@ def test_m8_burned_signer_cannot_be_reinstated_so_the_backlog_is_dead(flf, solve
         flf.initiateChange(ACTION_SET_SOLVER, solver.address, 0, sender=charlie)
     assert flf.solverSigner() == ZERO_ADDRESS
     assert flf.outstandingNotional() == 0
+
+
+# ---------- M-8 reopened: `deadline` alone cannot express freshness ----------
+
+
+def test_m8_a_year_old_order_is_refused_in_its_final_horizon(flf, solver, bob):
+    """The regression for the hole in rev 13's own recommendation.
+
+    `deadline <= now + MAX_ORDER_HORIZON` bounds time-to-expiry at fill, not
+    order age. A year-long order is merely *inadmissible until* its final
+    horizon; then `now` catches up and it becomes fillable for fifteen minutes,
+    at a moment the signer chose when they set the deadline. Written from the
+    invariant - "no order older than MAX_ORDER_HORIZON is ever fillable" -
+    rather than from the exploit, because the exploit-shaped test
+    (`deadline=2**255`, travel a century) passes against the broken check.
+    """
+    year = 365 * 24 * 3600
+    o = _order(bob, MAX_FILL, deadline=boa.env.timestamp + year, salt=b"\xbb" * 32)
+    sig = _sign(flf, solver, o)
+
+    with boa.reverts("quote window too long"):       # refused when signed
+        flf.fill(o, sig, sender=solver.address)
+
+    boa.env.time_travel(seconds=year - 300)          # five minutes before expiry
+    with boa.reverts("quote window too long"):       # and still refused
+        flf.fill(o, sig, sender=solver.address)
+    assert flf.outstandingNotional() == 0
+
+
+def test_m8_a_fresh_order_backdated_to_look_old_is_refused(flf, solver, bob):
+    """`issuedAt` is signed, so it binds. An order claiming an issuance an hour
+    ago cannot buy a longer life than the horizon allows."""
+    o = _order(bob, MAX_FILL, issued=boa.env.timestamp - 3600,
+               deadline=boa.env.timestamp + 300, salt=b"\xbc" * 32)
+    with boa.reverts("quote window too long"):
+        flf.fill(o, _sign(flf, solver, o), sender=solver.address)
+
+
+def test_m8_an_order_from_the_future_is_refused(flf, solver, bob):
+    """Post-dating `issuedAt` would otherwise reset the age clock forward."""
+    o = _order(bob, MAX_FILL, issued=boa.env.timestamp + 3600,
+               deadline=boa.env.timestamp + 3900, salt=b"\xbd" * 32)
+    with boa.reverts("order from the future"):
+        flf.fill(o, _sign(flf, solver, o), sender=solver.address)

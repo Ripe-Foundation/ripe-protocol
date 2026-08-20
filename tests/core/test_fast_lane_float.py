@@ -52,12 +52,13 @@ def flf(ripe_hq_deploy, ripe_token, float_recipient, charlie, whale, solver):
     return c
 
 
-def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None):
+def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None, issued=None):
     return (
         recipient,
         amount,
         out if out is not None else amount,
         origin,
+        issued if issued is not None else boa.env.timestamp,
         deadline if deadline is not None else boa.env.timestamp + 600,
         salt or boa.env.timestamp.to_bytes(32, "big"),
     )
@@ -170,7 +171,8 @@ def test_replay_rejected(flf, solver, bob):
 
 
 def test_expired_order_rejected(flf, solver, bob):
-    order = _order(bob, 100 * EIGHTEEN_DECIMALS, deadline=boa.env.timestamp - 1)
+    order = _order(bob, 100 * EIGHTEEN_DECIMALS, issued=boa.env.timestamp - 60,
+                   deadline=boa.env.timestamp - 1)
     with boa.reverts("order expired"):
         _fill(flf, solver, order)
 
@@ -579,7 +581,7 @@ def test_order_priced_arbitrarily_long_ago_is_refused(flf, solver, bob):
     """An unbounded deadline admits an order whose pricing no longer corresponds
     to anything. This is the contract's own stated threat model -- a buggy solver
     overpaying against a real deposit -- not the key-compromise one."""
-    with boa.reverts("deadline too far"):
+    with boa.reverts("quote window too long"):
         _fill(flf, solver, _order(bob, 1 * EIGHTEEN_DECIMALS, deadline=boa.env.timestamp + 100 * 365 * 24 * 3600))
 
     # and one signed inside the horizon does not survive past it
