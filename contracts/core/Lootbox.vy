@@ -292,52 +292,50 @@ def _claimLoot(
     vaultsToRemove: DynArray[uint256, MAX_VAULTS_TO_CLEAN] = []
     numUserVaults: uint256 = staticcall Ledger(_a.ledger).numUserVaults(_user)
 
-    # if no vaults, return 0
-    if numUserVaults == 0:
-        return totalRipeForUser
-
-    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(_a.missionControl)
-    for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
-        vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
-        if vaultAddr == empty(address):
-            continue
-
-        assetsToRemove: DynArray[address, MAX_ASSETS_TO_CLEAN] = []
-        numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
-        if numUserAssets == 0:
-            continue
-        for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
-            asset: address = empty(address)
-            hasBalance: bool = False
-            asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
-            if asset == empty(address):
+    # deposit loot exists only when the user has registered vaults; borrow loot
+    # above is already consumed and must still reach the mint below
+    if numUserVaults != 0:
+        for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
+            vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
+            vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
+            if vaultAddr == empty(address):
                 continue
 
-            # claim loot first -- whether this asset can be cleaned up depends on the result
-            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, _a)
+            assetsToRemove: DynArray[address, MAX_ASSETS_TO_CLEAN] = []
+            numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+            if numUserAssets == 0:
+                continue
+            for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
+                asset: address = empty(address)
+                hasBalance: bool = False
+                asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
+                if asset == empty(address):
+                    continue
 
-            # Save to clean up later, but ONLY once the entitlement is gone. A deferred claim
-            # leaves `balancePoints` intact, and deregistering here would put those points beyond
-            # ordinary enumeration -- `claimDepositLootForAsset` is department-gated, so the user
-            # could not recover them on their own. Deregistration does not depend on points
-            # (`deregisterUserAsset` only checks the balance), so waiting costs nothing.
-            if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
-                b: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, vaultId, asset)
-                if b.userPoints.balancePoints == 0:
-                    assetsToRemove.append(asset)
+                # claim loot first -- whether this asset can be cleaned up depends on the result
+                totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, _a)
 
-        # clean up user assets (storage optimization)
-        stillInVault: bool = self._cleanUpUserAssets(_user, vaultAddr, assetsToRemove)
-        if not stillInVault and len(vaultsToRemove) < MAX_VAULTS_TO_CLEAN:
-            vaultsToRemove.append(vaultId)
+                # Save to clean up later, but ONLY once the entitlement is gone. A deferred claim
+                # leaves `balancePoints` intact, and deregistering here would put those points beyond
+                # ordinary enumeration -- `claimDepositLootForAsset` is department-gated, so the user
+                # could not recover them on their own. Deregistration does not depend on points
+                # (`deregisterUserAsset` only checks the balance), so waiting costs nothing.
+                if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
+                    b: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, vaultId, asset)
+                    if b.userPoints.balancePoints == 0:
+                        assetsToRemove.append(asset)
 
-    # clean up user vaults (storage optimization)
-    self._cleanUpUserVaults(_user, vaultsToRemove, _a.ledger)
+            # clean up user assets (storage optimization)
+            stillInVault: bool = self._cleanUpUserAssets(_user, vaultAddr, assetsToRemove)
+            if not stillInVault and len(vaultsToRemove) < MAX_VAULTS_TO_CLEAN:
+                vaultsToRemove.append(vaultId)
+
+        # clean up user vaults (storage optimization)
+        self._cleanUpUserVaults(_user, vaultsToRemove, _a.ledger)
 
     # mint ripe, then stake or transfer to user
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, config, coreRipeGovVaultId, _a)
+        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, config, self._getCoreRipeGovVaultId(_a.missionControl), _a)
 
     return totalRipeForUser
 
@@ -388,11 +386,12 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
+    config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
+    assert config.canClaimLoot # dev: loot claims disabled
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
     totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, a)
     if totalRipeForUser != 0:
-        config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
         self._handleRipeMint(_user, totalRipeForUser, False, config, coreRipeGovVaultId, a)
     return totalRipeForUser
 
@@ -1152,9 +1151,10 @@ def claimBorrowLoot(_user: address) -> uint256:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
+    config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
+    assert config.canClaimLoot # dev: loot claims disabled
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
     if totalRipeForUser != 0:
-        config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
         coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
         self._handleRipeMint(_user, totalRipeForUser, False, config, coreRipeGovVaultId, a)
     return totalRipeForUser
@@ -1277,13 +1277,17 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
     # allocate ripe rewards to global buckets
     total: uint256 = _config.borrowersAlloc + _config.stakersAlloc + _config.votersAlloc + _config.genDepositorsAlloc
     if total != 0:
-        rewards.borrowers += newRipeDistro * _config.borrowersAlloc // total
-        rewards.stakers += newRipeDistro * _config.stakersAlloc // total
-        rewards.voters += newRipeDistro * _config.votersAlloc // total
-        rewards.genDepositors += newRipeDistro * _config.genDepositorsAlloc // total
+        borrowersCredit: uint256 = newRipeDistro * _config.borrowersAlloc // total
+        stakersCredit: uint256 = newRipeDistro * _config.stakersAlloc // total
+        votersCredit: uint256 = newRipeDistro * _config.votersAlloc // total
+        genDepositorsCredit: uint256 = newRipeDistro * _config.genDepositorsAlloc // total
+        rewards.borrowers += borrowersCredit
+        rewards.stakers += stakersCredit
+        rewards.voters += votersCredit
+        rewards.genDepositors += genDepositorsCredit
 
-        # rewards were distro'd, save important data
-        rewards.newRipeRewards = newRipeDistro
+        # reserve only what the buckets actually received -- flooring dust stays available
+        rewards.newRipeRewards = borrowersCredit + stakersCredit + votersCredit + genDepositorsCredit
 
     return rewards
 
@@ -1467,12 +1471,20 @@ def distributeUnderscoreRewards() -> (uint256, uint256):
         depositRewards = newUndyRewards * undyDepositRewardsAmount // totalRewardsAmount
         yieldBonusAmount = newUndyRewards - depositRewards
 
-    # mint RIPE tokens
-    extcall RipeToken(a.ripeToken).mint(self, newUndyRewards)
-
     # get underscore distributor address
     underscoreDistributor: address = self._getUnderscoreLootDistributor(a.missionControl)
     assert underscoreDistributor != empty(address) # dev: no underscore distributor
+
+    # update last rewards distribution block
+    self.lastUnderscoreSend = block.number
+
+    # update Ledger accounting - use RipeRewards.newRipeRewards to decrement ripeAvailForRewards
+    # reserve BEFORE minting or calling out so a reentering claim cannot consume this capacity
+    ripeRewards.newRipeRewards += newUndyRewards
+    extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
+
+    # mint RIPE tokens
+    extcall RipeToken(a.ripeToken).mint(self, newUndyRewards)
 
     # add deposit rewards
     if depositRewards != 0:
@@ -1483,13 +1495,6 @@ def distributeUnderscoreRewards() -> (uint256, uint256):
     # transfer yield bonus to underscore distributor
     if yieldBonusAmount != 0:
         assert extcall IERC20(a.ripeToken).transfer(underscoreDistributor, yieldBonusAmount, default_return_value=True) # dev: ripe transfer failed
-
-    # update last rewards distribution block
-    self.lastUnderscoreSend = block.number
-
-    # update Ledger accounting - use RipeRewards.newRipeRewards to decrement ripeAvailForRewards
-    ripeRewards.newRipeRewards += newUndyRewards
-    extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
 
     log UnderscoreRewardsDistributed(
         underscoreAddr=underscoreDistributor,

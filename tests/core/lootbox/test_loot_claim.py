@@ -744,7 +744,7 @@ def test_empty_category_terminal_detection_covers_every_reward_flow_gate(
 
 
 @pytest.mark.parametrize("should_exit", (False, True))
-def test_final_reward_wei_that_rounds_out_of_every_bucket_is_terminal(
+def test_final_reward_wei_that_rounds_out_of_every_bucket_stays_available(
     should_exit,
     bob,
     setGeneralConfig,
@@ -792,27 +792,56 @@ def test_final_reward_wei_that_rounds_out_of_every_bucket_is_terminal(
         voter_points=1,
     )
 
+    # the final wei rounds out of both 50% buckets: nothing is credited, so
+    # nothing is reserved and the budget cannot exhaust into thin air
     boa.env.time_travel(blocks=1)
     latest = lootbox.getLatestGlobalRipeRewards()
-    assert latest.newRipeRewards == 1
+    assert latest.newRipeRewards == 0
     assert latest.stakers == 0
     assert latest.voters == 0
     assert lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token) == 0
     assert teller.claimLoot(bob, False, sender=bob) == 0
     assert ripe_token.balanceOf(bob) == 0
-    assert ledger.ripeAvailForRewards() == 0
-    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+
+    # the ticket defers and the wei stays available for later rewards
+    assert ledger.ripeAvailForRewards() == 1
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
     asset_after = ledger.assetDepositPoints(vault_id, alpha_token)
-    assert asset_after.ripeStakerPoints == 0
-    assert asset_after.ripeVotePoints == 0
-    assert (
-        simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
-        is (not should_exit)
+    assert asset_after.ripeStakerPoints == 1
+    assert asset_after.ripeVotePoints == 1
+    assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+    assert ledger.isParticipatingInVault(bob, vault_id)
+
+    # concentrating the allocation lets the preserved wei flow to a bucket
+    setRipeRewardsConfig(
+        _arePointsEnabled=False,
+        _ripePerBlock=1,
+        _borrowersAlloc=0,
+        _stakersAlloc=100_00,
+        _votersAlloc=0,
+        _genDepositorsAlloc=0,
     )
-    assert ledger.isParticipatingInVault(bob, vault_id) is (not should_exit)
+    boa.env.time_travel(blocks=1)
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    if should_exit:
+        # exited funded dust now resolves terminally with the one-wei payout
+        assert claimed == 1
+        assert ripe_token.balanceOf(bob) == 1
+        assert ledger.ripeAvailForRewards() == 0
+        assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+        assert not simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+        assert not ledger.isParticipatingInVault(bob, vault_id)
+    else:
+        # live funded dust keeps deferring; the credited wei is reserved once
+        assert claimed == 0
+        assert ripe_token.balanceOf(bob) == 0
+        assert ledger.ripeAvailForRewards() == 0
+        assert ledger.ripeRewards().stakers == 1
+        assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
+        assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
 
 
-def test_rounding_zero_allocation_defers_only_until_finite_budget_is_exhausted(
+def test_rounding_zero_allocation_defers_without_burning_finite_budget(
     bob,
     setGeneralConfig,
     setAssetConfig,
@@ -858,9 +887,11 @@ def test_rounding_zero_allocation_defers_only_until_finite_budget_is_exhausted(
         staker_points=1,
     )
 
+    # each block's wei rounds out of every bucket, so the budget is untouched
+    # and the ticket defers instead of resolving against a vanishing budget
     boa.env.time_travel(blocks=1)
     assert teller.claimLoot(bob, False, sender=bob) == 0
-    assert ledger.ripeAvailForRewards() == 1
+    assert ledger.ripeAvailForRewards() == 2
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
     assert ledger.assetDepositPoints(vault_id, alpha_token).ripeStakerPoints == 1
     assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
@@ -868,7 +899,24 @@ def test_rounding_zero_allocation_defers_only_until_finite_budget_is_exhausted(
     boa.env.time_travel(blocks=1)
     assert teller.claimLoot(bob, False, sender=bob) == 0
     assert ripe_token.balanceOf(bob) == 0
-    assert ledger.ripeAvailForRewards() == 0
+    assert ledger.ripeAvailForRewards() == 2
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeStakerPoints == 1
+    assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+
+    # once the allocation lets rewards actually flow, the exited dust resolves
+    setRipeRewardsConfig(
+        _arePointsEnabled=False,
+        _ripePerBlock=1,
+        _borrowersAlloc=0,
+        _stakersAlloc=100_00,
+        _votersAlloc=0,
+        _genDepositorsAlloc=0,
+    )
+    boa.env.time_travel(blocks=1)
+    assert teller.claimLoot(bob, False, sender=bob) == 1
+    assert ripe_token.balanceOf(bob) == 1
+    assert ledger.ripeAvailForRewards() == 1
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
     assert ledger.assetDepositPoints(vault_id, alpha_token).ripeStakerPoints == 0
     assert not simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)

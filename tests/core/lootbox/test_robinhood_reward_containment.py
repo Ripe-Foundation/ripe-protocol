@@ -57,7 +57,9 @@ def test_lootbox_unpause_before_zero_backfills_paused_interval(
 
     assert switchboard_charlie.pause(lootbox, False, sender=governance.address)
     backfilled = lootbox.updateRipeRewards(sender=teller.address)
-    assert backfilled.newRipeRewards == rate * 16
+    # gross 144 at 10/90 floors to 14 + 129; only the credited 143 is reserved
+    gross = rate * 16
+    assert backfilled.newRipeRewards == (gross * 10_00 // 100_00) + (gross * 90_00 // 100_00)
 
 
 def test_ordered_pause_to_zero_keeps_lootbox_paused_until_both_actions_confirm(
