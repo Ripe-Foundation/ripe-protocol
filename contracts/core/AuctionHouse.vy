@@ -14,7 +14,7 @@
 #     ╚══════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -311,10 +311,7 @@ def _liquidateUser(
     if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return 0
 
-    # An outstanding auction owns the current liquidation pass. A user that is
-    # still unhealthy but has no auction must remain globally frozen while
-    # allowing a later pass to retry non-auction settlement or queue newly
-    # eligible collateral.
+    # an outstanding auction owns the current liquidation pass
     if staticcall Ledger(_a.ledger).hasFungibleAuctions(_liqUser):
         return 0
 
@@ -327,16 +324,14 @@ def _liquidateUser(
     if bt.collateralVal > collateralLiqThreshold:
         return 0
 
-    # A liquidation episode charges fees once. Retry passes leave both fees at
-    # zero so their repayment ceiling and spread are fixed before collateral moves.
+    # liquidation episode charges fees once. Retry passes leave both fees at zero
     baseLiqFee: uint256 = 0
     keeperFee: uint256 = 0
     if not userDebt.inLiquidation:
         baseLiqFee, keeperFee = self._calcLiqFees(userDebt.amount, bt.debtTerms.liqFee, bt.collateralVal, _config)
 
     # liqFee is the legacy Stability discount rate, not an exact additive fee.
-    # Gross-up spread can exceed baseLiqFee; settlement only credits at most the
-    # nominal base fee as paid.
+    # gross-up spread can exceed baseLiqFee; settlement only credits at most the nominal base fee as paid.
     liqFeeRatio: uint256 = baseLiqFee * HUNDRED_PERCENT // userDebt.amount
 
     targetLtv: uint256 = bt.lowestLtv
@@ -348,8 +343,7 @@ def _liquidateUser(
     repayValueIn: uint256 = 0
     collateralValueOut: uint256 = 0
 
-    # Only the nominal base fee can be spread-paid, so full-repayment GREEN
-    # consumption cannot exceed live debt plus the keeper fee.
+    # only nominal base fee can be spread-paid, so full-repayment GREEN consumption cannot exceed live debt plus the keeper fee.
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, min(targetRepayAmount, userDebt.amount + keeperFee), liqFeeRatio, _config, _a)
 
     # A first pass with neither repayment nor an auction is economically inert.
@@ -357,20 +351,17 @@ def _liquidateUser(
         baseLiqFee = 0
         keeperFee = 0
 
-    # Reaching the liquidation threshold freezes the whole account until debt
-    # health is restored. This also locks protocol-held zero-LTV assets and
-    # positive-LTV assets that policy does not permit the AuctionHouse to sell.
-    # repayFromDept clears the flag below if this pass restores debt health.
+    # reaching the liquidation threshold freezes the whole account until debt health is restored.
     userDebt.inLiquidation = True
 
-    # Stability pool collateral spread covers only the base liquidation fee.
+    # stability pool collateral spread covers only the base liquidation fee.
     paidBaseFee: uint256 = 0
     if collateralValueOut > repayValueIn:
         paidBaseFee = min(collateralValueOut - repayValueIn, baseLiqFee)
     unpaidBaseFee: uint256 = baseLiqFee - paidBaseFee
     liqFeesUnpaid: uint256 = unpaidBaseFee + keeperFee
 
-    # repayValueIn may be zero, but need to update debt
+    # repayValueIn may be zero, so need to update debt
     userDebt.amount += liqFeesUnpaid
     assert repayValueIn <= userDebt.amount # dev: repayment exceeds creditable debt
     didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_liqUser, userDebt, repayValueIn, newInterest, 0, _a)
@@ -730,8 +721,7 @@ def _swapAssetsWithStabPool(
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
 
-    # Callers enter only with both min inputs positive.
-    # It lets the spread's floor reach, but not exceed, creditable repayment.
+    # callers enter only with both min inputs positive. lets the spread's floor reach, but not exceed, creditable repayment.
     maxCollateralUsdValue: uint256 = (min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT - 1) // (HUNDRED_PERCENT - _liqFeeRatio) + 1
     if maxCollateralUsdValue <= ONE_CENT:
         return remainingToRepay, collateralValueOut, False, False # return if it's too small amount
@@ -1027,7 +1017,7 @@ def removeExpiredFungibleAuction(
     )
 
     # isActive is governance status, not whether the purchase window is open.
-    # Keep missing/paused auctions and auctions that have not yet expired.
+    # keep missing/paused auctions and auctions that have not yet expired.
     if not auc.isActive or block.number < auc.endBlock:
         return False
 
@@ -1165,22 +1155,14 @@ def _buyFungibleAuction(
     if greenAmount == 0:
         return 0
 
-    # Progress spans first..last purchasable block (end-1), not the expired endBlock.
-    # Duration 1 (endBlock == startBlock + 1) is config-valid and has only that
-    # purchasable block, so it uses maxDiscount. A zero-length window
-    # (endBlock <= startBlock) is unpurchasable because of the half-open
-    # time-boundary check above; this guard never sees it. The +1 is required
-    # so a duration-one-only check (endBlock > startBlock) cannot divide by
-    # zero on a one-block auction.
+    # Discount ramps over first..last purchasable block (endBlock-1; expired endBlock excluded above).
+    # The +1 guard means a duration-1 auction uses maxDiscount and avoids a divide-by-zero below.
     discount: uint256 = auc.maxDiscount
     if auc.endBlock > auc.startBlock + 1:
         deltaBlocks: uint256 = block.number - auc.startBlock
         deltaDisc: uint256 = auc.maxDiscount - auc.startDiscount
-        # Switchboard caps duration so this multiply cannot overflow for
-        # newly configured auctions. A stored overflowing window is
-        # unreachable (deltaBlocks > ~1e73). Keep maxDiscount — same
-        # value as duration-1 — rather than spend the 8-byte AH margin
-        # on a startDiscount branch.
+        # Switchboard caps duration, so this multiply can't overflow for valid auctions
+        # (an overflowing window is unreachable); we keep maxDiscount on that path.
         if deltaDisc == 0 or deltaBlocks <= max_value(uint256) // deltaDisc:
             discount = auc.startDiscount + deltaBlocks * deltaDisc // (auc.endBlock - auc.startBlock - 1)
 
@@ -1249,9 +1231,8 @@ def withdrawTokensFromVault(
     if totalAmount == 0:
         return 0, False
     if _preflightSafeConversion:
-        # Mirror BasicVault's user-ledger and token-balance clamps before it
-        # mutates either state. Deleverage retains a post-withdraw consistency
-        # assertion for any vault or asset behavior outside these known bounds.
+        # Mirror BasicVault's user-ledger and token-balance clamps up front; Deleverage
+        # still asserts post-withdraw consistency for anything outside these bounds.
         withdrawableAmount: uint256 = min(_amount, totalAmount)
         withdrawableAmount = min(withdrawableAmount, staticcall IERC20(_asset).balanceOf(_vaultAddr))
         if staticcall UnderscoreVault(_asset).convertToAssetsSafe(withdrawableAmount) == 0:
@@ -1291,9 +1272,8 @@ def _transferCollateral(
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
-    # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
-    # Post-mutation: sender first so lastBalance writes the live share
-    # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
+    # Bytecode: range(2)+break beats two unrolled checkpoints. Post-mutation, sender
+    # first so lastBalance writes the live share (else stale), then in-vault recipient.
     if amountSent != 0:
         assert usdValue != 0 # dev: amounts do not match up
         for i: uint256 in range(2):
@@ -1397,9 +1377,8 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
     if config.ltvPaybackBuffer != 0:
         targetLtv = targetLtv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
     
-    # This is a hypothetical fee-bearing risk target, not an executable quote.
-    # Per-pass events use current episode eligibility; execution also applies
-    # the pre-transfer conservation ceiling.
+    # Hypothetical fee-bearing risk target, not an executable quote: per-pass events use current
+    # episode eligibility, and execution also applies the pre-transfer conservation ceiling.
     return self._calcTargetRepayAmount(userDebt.amount + totalLiqFees, bt.collateralVal, targetLtv)
 
 
@@ -1436,9 +1415,8 @@ def _calcLiqFees(
 @view
 @internal
 def _calcTargetRepayAmount(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
-    # goal here is to only reduce the debt necessary to get LTV back to safe position
-    # it will never be perfectly precise because depending on what assets are taken
-    # to ensure maximum protocol solvency, we will target the user's lowest LTV
+    # goal is to reduce only the debt needed to get LTV back to a safe position; it's never
+    # perfectly precise, so to ensure max protocol solvency we target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
     # collateral value too low, need to pay off ALL debt

@@ -16,7 +16,7 @@
 #     ╚════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -44,6 +44,7 @@ from ethereum.ercs import IERC721
 interface CurvePool:
     def remove_liquidity_imbalance(_amounts: DynArray[uint256, 2], _maxLpBurnAmount: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
     def add_liquidity(_amounts: DynArray[uint256, 2], _minLpAmountOut: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
+    def calc_token_amount(_amounts: DynArray[uint256, 2], _is_deposit: bool) -> uint256: view
     def get_virtual_price() -> uint256: view
 
 interface EndaomentFunds:
@@ -75,11 +76,11 @@ interface UnderscoreRegistry:
 interface MissionControl:
     def underscoreRegistry() -> address: view
 
-interface EndaomentPSM:
-    def USDC() -> address: view
-
 interface RipeHq:
     def governance() -> address: view
+
+interface EndaomentPSM:
+    def USDC() -> address: view
 
 struct StabilizerConfig:
     pool: address
@@ -165,9 +166,9 @@ def __init__(_ripeHq: address, _weth: address, _eth: address):
     ETH = _eth
 
 
-######################
+#######################
 # Department Controls #
-######################
+#######################
 
 
 @nonreentrant
@@ -924,10 +925,8 @@ def _removeStabilizerGreenLiquidity(
 
     # remove liquidity
     assert extcall IERC20(_data.lpToken).approve(_data.pool, _lpBalance, default_return_value=True) # dev: approval failed
-    didQuote: bool = False
-    lpQuote: uint256 = 0
-    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, greenAmount)
-    if not didQuote or lpQuote >= _lpBalance:
+    lpQuote: uint256 = self._quoteGreenRemoval(_data.pool, _data.greenIndex, greenAmount)
+    if lpQuote >= _lpBalance:
         assert extcall IERC20(_data.lpToken).approve(_data.pool, 0, default_return_value=True) # dev: approval failed
         return False
     amounts: DynArray[uint256, 2] = [0, 0]
@@ -976,10 +975,8 @@ def _getGreenAmountToRemove(
     if requestedGreen == 0:
         return 0
 
-    didQuote: bool = False
-    lpQuote: uint256 = 0
-    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, requestedGreen)
-    if didQuote and lpQuote < _lpBalance:
+    lpQuote: uint256 = self._quoteGreenRemoval(_data.pool, _data.greenIndex, requestedGreen)
+    if lpQuote < _lpBalance:
         return requestedGreen
 
     # StableSwap-NG burns calc_token_amount(amounts, False) + 1 LP token for
@@ -990,8 +987,7 @@ def _getGreenAmountToRemove(
         if low >= high:
             break
         midpoint: uint256 = high - (high - low) // 2
-        didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint)
-        if didQuote and lpQuote < _lpBalance:
+        if self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint) < _lpBalance:
             low = midpoint
         else:
             high = midpoint - 1
@@ -1001,23 +997,10 @@ def _getGreenAmountToRemove(
 
 @view
 @internal
-def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint256) -> (bool, uint256):
+def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint256) -> uint256:
     amounts: DynArray[uint256, 2] = [0, 0]
     amounts[_greenIndex] = _greenAmount
-    success: bool = False
-    response: Bytes[64] = b""
-    # The supported StableSwap-NG pool must expose this exact selector.
-    # Missing, reverting, short, or oversized quote surfaces fail closed.
-    success, response = raw_call(
-        _pool,
-        abi_encode(amounts, False, method_id=method_id("calc_token_amount(uint256[],bool)")),
-        max_outsize=64,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return False, 0
-    return True, abi_decode(response, uint256)
+    return staticcall CurvePool(_pool).calc_token_amount(amounts, False)
 
 
 @view
@@ -1152,9 +1135,8 @@ def addPartnerLiquidity(
     lpAfter: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
     assert lpAfter - lpBefore == lpAmountReceived # dev: lp amount mismatch
 
-    # Qualified Legos report net venue contributions. Match those reports to
-    # the protocol's custody decrease so downstream fees or inventory top-ups
-    # cannot be attributed to this partner action. Partial fills remain valid.
+    # Qualified Legos report net venue contributions. Match those reports to the protocol's custody decrease
+    # so downstream fees or inventory top-ups cannot be attributed to this partner action. Partial fills remain valid.
     partnerCustodyAfter: uint256 = self._getCombinedBalance(_asset, endaoFunds)
     greenCustodyAfter: uint256 = self._getCombinedBalance(a.greenToken, endaoFunds)
     assert partnerCustodyBefore - liqAmountA == partnerCustodyAfter # dev: partner asset accounting

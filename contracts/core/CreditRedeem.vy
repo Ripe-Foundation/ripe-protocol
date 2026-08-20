@@ -11,7 +11,7 @@
 #     ╚══════════════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -216,8 +216,7 @@ def _redeemCollateral(
         return 0
 
     # get latest debt terms without propagating price-source failures
-    # CreditEngine marks the terms quarantined if any debt-bearing collateral
-    # has a positive balance but no usable price.
+    # CreditEngine quarantines the terms if any debt-bearing collateral has a positive balance but no usable price.
     bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, False, 0, empty(address), _a)
     if bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
@@ -245,6 +244,7 @@ def _redeemCollateral(
     # Skip expected zero-credit positions before vault mutation. A later
     # post-transfer zero repayment is an unexpected under-send and reverts.
     previewAmount: uint256 = min(userAmount, maxAssetAmount)
+
     # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
     if maxAssetAmount == 0 or previewAmount <= (maxAssetAmount - 1) // maxRedeemValue:
         return 0
@@ -255,9 +255,8 @@ def _redeemCollateral(
     if amountSent == 0:
         return 0
 
-    # Expected zero-credit positions are skipped before transfer. A
-    # post-transfer zero repayment means the vault sent less than previewed
-    # and must revert atomically.
+    # Expected zero-credit positions are skipped before transfer.
+    # A post-transfer zero repayment means the vault sent less than previewed and must revert atomically.
     repayValue: uint256 = min(amountSent * maxRedeemValue // maxAssetAmount, userDebt.amount)
     assert repayValue != 0 # dev: zero repayment value (vault under-send)
     assert extcall GreenToken(_a.greenToken).burn(repayValue) # dev: could not burn green
@@ -346,9 +345,8 @@ def getMaxRedeemValue(_user: address) -> uint256:
 @view
 @internal
 def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
-    # goal here is to only reduce the debt necessary to get LTV back to safe position
-    # it will never be perfectly precise because depending on what assets are taken
-    # to ensure maximum protocol solvency, we will target the user's lowest LTV
+    # only reduce the debt necessary to get LTV back to a safe position — never perfectly precise depending on which assets are taken
+    # to ensure maximum protocol solvency, we target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
     # collateral value too low

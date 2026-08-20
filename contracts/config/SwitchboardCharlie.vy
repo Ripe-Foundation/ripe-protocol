@@ -8,7 +8,7 @@
 #                                                    ┗┛┛┗┗┻┛ ┗┗┗ 
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 
@@ -57,6 +57,13 @@ interface AuctionHouse:
     def startAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
 
+interface StabilityPool:
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def vaultAssets(_index: uint256) -> address: view
+    def isPaused() -> bool: view
+
 interface RipeEcoContract:
     def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]): nonpayable
     def recoverFunds(_recipient: address, _asset: address): nonpayable
@@ -65,13 +72,6 @@ interface RipeEcoContract:
 interface CreditEngine:
     def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-
-interface StabilityPool:
-    def vaultAssets(_index: uint256) -> address: view
-    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
-    def totalClaimableBalances(_asset: address) -> uint256: view
-    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
-    def isPaused() -> bool: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -538,10 +538,7 @@ def _getLedgerAddr() -> address:
 
 
 @external
-def setCoreRipeGovVaultId(
-    _newVaultId: uint256,
-    _missionControl: address = empty(address),
-) -> uint256:
+def setCoreRipeGovVaultId(_newVaultId: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     mc: address = self._resolveMissionControl(_missionControl)
@@ -586,10 +583,7 @@ def _validateCoreRipeGovVaultId(_vaultId: uint256, _missionControl: address) -> 
 
 
 @external
-def setPreferredStabVaultId(
-    _newVaultId: uint256,
-    _missionControl: address = empty(address),
-) -> uint256:
+def setPreferredStabVaultId(_newVaultId: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     mc: address = self._resolveMissionControl(_missionControl)
@@ -625,13 +619,14 @@ def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -
 
     savingsGreen: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SAVINGS_GREEN_ID)
     assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, savingsGreen) # dev: unsupported asset
-    # A preferred deposit target may validly be empty before its first deposit.
-    # Probe every runtime read selector without requiring a populated first slot.
+
+    # verify has correct interface
     naStabAsset: address = staticcall StabilityPool(vaultAddr).vaultAssets(1)
     naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(savingsGreen, savingsGreen)
     naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(savingsGreen, savingsGreen)
     na: uint256 = staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen)
     assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
+
     return vaultAddr, previousVaultId
 
 

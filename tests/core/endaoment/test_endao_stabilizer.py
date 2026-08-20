@@ -479,36 +479,6 @@ def remove_liquidity_imbalance(
 """
 
 
-STABILIZER_QUOTE_SHAPE_SOURCE = """
-# @version 0.4.3
-
-MODE: immutable(uint256)
-
-@deploy
-def __init__(_mode: uint256):
-    MODE = _mode
-
-@view
-@external
-@raw_return
-def calc_token_amount(
-    _amounts: DynArray[uint256, 2],
-    _isDeposit: bool,
-) -> Bytes[96]:
-    assert not _isDeposit
-    response: bytes32 = convert(7, bytes32)
-    if MODE == 0:
-        return b""
-    if MODE == 1:
-        return slice(response, 0, 31)
-    if MODE == 2:
-        return slice(response, 0, 32)
-    if MODE == 3:
-        return concat(response, convert(9, bytes32))
-    return concat(response, convert(9, bytes32), convert(11, bytes32))
-"""
-
-
 def _signed_lp_position(lp_balance, green_balance, pool_debt, virtual_price):
     if pool_debt > green_balance:
         lp_debt = (pool_debt - green_balance) * EIGHTEEN_DECIMALS // virtual_price
@@ -960,49 +930,6 @@ def test_green_amount_to_add_invalid_index_is_external_noop(
         ) == before
 
 
-@pytest.mark.parametrize(
-    ("mode", "expected"),
-    [
-        (0, 0),
-        (1, 0),
-        (2, 3_000 * EIGHTEEN_DECIMALS),
-        (3, 0),
-        (4, 0),
-    ],
-    ids=["empty", "short", "exact-32", "oversized-64", "oversized-96"],
-)
-def test_sc19_quote_return_shape_is_exactly_one_word(
-    endaoment,
-    endaoment_funds,
-    curve_prices,
-    mode,
-    expected,
-):
-    with boa.env.anchor():
-        quote_pool = boa.loads(
-            STABILIZER_QUOTE_SHAPE_SOURCE,
-            mode,
-            name=f"stabilizer quote shape {mode}",
-        )
-        _, lp_token, lp_balance = _install_stabilizer_view_mocks(
-            curve_prices,
-            1_000 * EIGHTEEN_DECIMALS,
-            green_index=0,
-            pool=quote_pool.address,
-        )
-        before = (
-            lp_token.balanceOf(endaoment_funds),
-            lp_token.totalSupply(),
-        )
-
-        assert lp_balance == 200 * EIGHTEEN_DECIMALS
-        assert endaoment.getGreenAmountToRemoveInStabilizer() == expected
-        assert (
-            lp_token.balanceOf(endaoment_funds),
-            lp_token.totalSupply(),
-        ) == before
-
-
 def test_sc19_proportional_policy_allowance_preserves_exact_value(
     endaoment,
     endaoment_funds,
@@ -1073,12 +1000,11 @@ def test_sc19_full_request_fast_path_matches_full_search(
         assert quote_calls == [requested]
 
 
-def test_sc19_reverting_full_request_falls_through_to_search(
+def test_sc19_reverting_full_request_reverts(
     endaoment,
     endaoment_funds,
     curve_prices,
     green_token,
-    switchboard_delta,
 ):
     lp_balance = 200 * EIGHTEEN_DECIMALS
     lp_total_supply = 1_000 * EIGHTEEN_DECIMALS
@@ -1104,34 +1030,11 @@ def test_sc19_reverting_full_request_falls_through_to_search(
         assert full_request == 200 * EIGHTEEN_DECIMALS
         with boa.reverts("quote exceeds pool green"):
             pool.calc_token_amount([full_request, 0], False)
-
-        full_search_result = _max_executable_green(
-            pool,
-            0,
-            full_request,
-            lp_balance,
-        )
-        requested = endaoment.getGreenAmountToRemoveInStabilizer()
-        quote_calls = _quoted_green_amounts(endaoment._computation)
-
-        assert full_search_result == quoteable_pool_green
-        assert requested == full_search_result
-        assert quote_calls[0] == full_request
-        assert requested in quote_calls
-        assert len(quote_calls) > 1
-        requested_quote = pool.calc_token_amount([requested, 0], False)
-        assert requested_quote < lp_balance
         with boa.reverts("quote exceeds pool green"):
-            pool.calc_token_amount([requested + 1, 0], False)
-        assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
-
-        log = filter_logs(endaoment, "StabilizerPoolLiqRemoved")[0]
-        assert log.greenAmountRemoved == quoteable_pool_green
-        assert log.lpBurned == quoteable_pool_green + 1
-        assert log.debtRepaid == 0
+            endaoment.getGreenAmountToRemoveInStabilizer()
 
 
-def test_sc19_reverting_quote_is_external_noop_with_no_state_change(
+def test_sc19_reverting_quote_reverts(
     endaoment,
     endaoment_funds,
     curve_prices,
@@ -1170,8 +1073,10 @@ def test_sc19_reverting_quote_is_external_noop_with_no_state_change(
             ledger.greenPoolDebt(pool.address),
         )
 
-        assert endaoment.getGreenAmountToRemoveInStabilizer() == 0
-        assert not endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+        with boa.reverts("quote reverts"):
+            endaoment.getGreenAmountToRemoveInStabilizer()
+        with boa.reverts("quote reverts"):
+            endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
         assert not filter_logs(endaoment, "StabilizerPoolLiqRemoved")
         assert (
             pool.balanceOf(endaoment_funds),
@@ -1238,9 +1143,13 @@ def test_sc19_execution_requote_failure_or_unsafe_quote_is_atomic_noop(
             ledger.greenPoolDebt(pool.address),
         )
 
-        assert not endaoment.stabilizeGreenRefPool(
-            sender=switchboard_delta.address
-        )
+        if execution_quote_mode == 1:
+            with boa.reverts():
+                endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+        else:
+            assert not endaoment.stabilizeGreenRefPool(
+                sender=switchboard_delta.address
+            )
         assert not filter_logs(endaoment, "StabilizerPoolLiqRemoved")
         assert (
             pool.balanceOf(endaoment_funds),
@@ -1257,7 +1166,7 @@ def test_sc19_execution_requote_failure_or_unsafe_quote_is_atomic_noop(
         ) == before
 
 
-def test_sc19_missing_ng_quote_selector_is_external_noop(
+def test_sc19_missing_ng_quote_selector_reverts(
     endaoment,
     endaoment_funds,
     curve_prices,
@@ -1292,8 +1201,10 @@ def test_sc19_missing_ng_quote_selector_is_external_noop(
             ledger.greenPoolDebt(pool.address),
         )
 
-        assert endaoment.getGreenAmountToRemoveInStabilizer() == 0
-        assert not endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+        with boa.reverts():
+            endaoment.getGreenAmountToRemoveInStabilizer()
+        with boa.reverts():
+            endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
         assert not filter_logs(endaoment, "StabilizerPoolLiqRemoved")
         assert (
             pool.balanceOf(endaoment_funds),

@@ -8,7 +8,7 @@
 #                                                     ┗┻┗ ┗┗┗┻
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -66,22 +66,19 @@ interface Ledger:
     def setRipeAvailForHr(_amount: uint256): nonpayable
     def setBadDebt(_amount: uint256): nonpayable
 
-interface Teller:
-    def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
-    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256: nonpayable
-
 interface Lootbox:
     def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256): nonpayable
     def resetAssetPoints(_asset: address, _vaultId: uint256): nonpayable
     def resetUserBorrowPoints(_user: address): nonpayable
 
+interface Teller:
+    def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
+    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256: nonpayable
+
 interface BondRoom:
     def startBondEpochAtBlock(_block: uint256): nonpayable
     def setBondBooster(_bondBooster: address): nonpayable
     def bondBooster() -> address: view
-
-interface UnderscoreLedger:
-    def isUserWallet(_addr: address) -> bool: view
 
 interface UnderscoreRegistry:
     def getAddr(_addyId: uint256) -> address: view
@@ -89,6 +86,9 @@ interface UnderscoreRegistry:
 
 interface VaultRegistry:
     def isEarnVault(_vaultAddr: address) -> bool: view
+
+interface UnderscoreLedger:
+    def isUserWallet(_addr: address) -> bool: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view

@@ -8,7 +8,7 @@
 #                                                   ┻┛┛ ┗┻┗┛┗┛
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -47,6 +47,10 @@ interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 
+interface PriceDesk:
+    def tokenScale(_asset: address) -> uint256: view
+    def syncTokenScale(_asset: address): nonpayable
+
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
@@ -55,10 +59,6 @@ interface Whitelist:
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
-
-interface PriceDesk:
-    def tokenScale(_asset: address) -> uint256: view
-    def syncTokenScale(_asset: address): nonpayable
 
 flag ActionType:
     ASSET_ADD_NEW
@@ -70,9 +70,6 @@ flag ActionType:
 struct AssetUpdate:
     asset: address
     config: cs.AssetConfig
-
-# Must track StabVault.MAX_ACTIVE_CLAIM_ASSETS; this validator mirrors its capacity gate.
-MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 
 event NewAssetPending:
     asset: indexed(address)
@@ -190,6 +187,7 @@ actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingAssetConfig: public(HashMap[uint256, AssetUpdate]) # aid -> asset
 pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control
 
+MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 
@@ -506,8 +504,7 @@ def _isValidAssetLiqConfig(
         if _debtTermsLtv == 0:
             return False
 
-    # A valid VaultBook id is not sufficient: prove the target implements the
-    # minimum Stability Pool read interface on every proposal/revalidation.
+    # verify has correct interface
     if _specialStabPoolId != 0:
         if not staticcall VaultBook(vaultBook).isValidRegId(_specialStabPoolId):
             return False
@@ -521,9 +518,8 @@ def _isValidAssetLiqConfig(
             stabAsset = staticcall StabilityPool(stabPool).vaultAssets(1)
             if stabAsset == empty(address):
                 return False
-        # Configuration validity is structural. Transient oracle/NAV/custody
-        # health is enforced by canAcceptLiquidationAsset at liquidation time,
-        # where the mandatory ordinary-auction path provides the fallback.
+
+        # configuration validity is structural
         claimAssetIndex: uint256 = staticcall StabilityPool(stabPool).indexOfAsset(_asset)
         claimIndex: uint256 = staticcall StabilityPool(stabPool).indexOfClaimableAsset(stabAsset, _asset)
         activeClaimCount: uint256 = staticcall StabilityPool(stabPool).getNumActiveClaimAssets(stabAsset)
@@ -532,6 +528,8 @@ def _isValidAssetLiqConfig(
             or (claimIndex == 0 and activeClaimCount >= MAX_ACTIVE_CLAIM_ASSETS)
         ):
             return False
+
+        # verify has correct interface
         naPair: uint256 = staticcall StabilityPool(stabPool).claimableBalances(stabAsset, _asset)
         na: uint256 = staticcall StabilityPool(stabPool).totalClaimableBalances(savingsGreen)
         naPaused: bool = staticcall StabilityPool(stabPool).isPaused()
@@ -610,14 +608,6 @@ def _isValidDebtTerms(_debtTerms: cs.DebtTerms) -> bool:
 
 @view
 @internal
-def _isWithinMaxStepDown(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
-    if _prev == 0 or _maxDeviation == 0:
-        return True
-    return _new >= _prev or _prev - _new <= _maxDeviation
-
-
-@view
-@internal
 def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation: uint256) -> bool:
 
     # cannot set ltv to 0 after already non-zero
@@ -636,6 +626,14 @@ def _assertDebtTermsWithinMaxStep(_new: cs.DebtTerms, _prev: cs.DebtTerms, _maxD
     assert self._isWithinMaxStepDown(_new.redemptionThreshold, _prev.redemptionThreshold, _maxDeviation) # dev: redemption threshold is outside max deviation
     assert self._isWithinMaxStepDown(_new.liqThreshold, _prev.liqThreshold, _maxDeviation) # dev: liq threshold is outside max deviation
     assert _prev.borrowRate == 0 or _maxDeviation == 0 or _new.borrowRate <= _prev.borrowRate or _new.borrowRate - _prev.borrowRate <= _maxDeviation # dev: borrow rate is outside max deviation
+
+
+@view
+@internal
+def _isWithinMaxStepDown(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
+    if _prev == 0 or _maxDeviation == 0:
+        return True
+    return _new >= _prev or _prev - _new <= _maxDeviation
 
 
 #####################

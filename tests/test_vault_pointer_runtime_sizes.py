@@ -30,7 +30,7 @@ EXPECTED_RUNTIME_BYTES = {
     "AuctionHouse": 24566,
     "CreditEngine": 24502,
     "CreditRedeem": 8415,
-    "Endaoment": 23693,
+    "Endaoment": 23114,
     "PriceDesk": 17698,
     "Deleverage": 24459,
     "StabilityPool": 24269,

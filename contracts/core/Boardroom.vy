@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -35,4 +35,3 @@ def govPowerDidChangeForUser(_user: address, _userGovPoints: uint256, _totalGovP
     vaultId: uint256 = staticcall VaultBook(addys._getVaultBookAddr()).getRegId(msg.sender)
     assert vaultId != 0 # dev: no perms
     assert staticcall MissionControl(addys._getMissionControlAddr()).isRipeGovVaultId(vaultId) # dev: no perms
-    pass

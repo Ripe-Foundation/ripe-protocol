@@ -8,7 +8,7 @@
 #                                                  ┛┗┗┣┛┛┗┗┻
 #                                                     ┛     
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -402,9 +402,6 @@ pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
 
-MIN_STALE_TIME: public(immutable(uint256))
-MAX_STALE_TIME: public(immutable(uint256))
-
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 PRIORITY_LIQ_EXECUTION: constant(uint256) = 0
@@ -413,15 +410,16 @@ PRIORITY_STAB_EXECUTION: constant(uint256) = 2
 PRIORITY_STAB_PROPOSAL: constant(uint256) = 3
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
-# Auction delay is in blocks. uint32 (~272y at 2s) keeps
-# block.number + delay + duration from overflowing.
-MAX_AUCTION_DELAY: constant(uint256) = 2**32 - 1
+MAX_AUCTION_DELAY: constant(uint256) = 2**32 - 1 # protect overflow
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
 PYTH_PRICES_ID: constant(uint256) = 4
 CREDIT_ENGINE_ID: constant(uint256) = 13
+
+MIN_STALE_TIME: public(immutable(uint256))
+MAX_STALE_TIME: public(immutable(uint256))
 
 
 @deploy
@@ -878,11 +876,9 @@ def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
         return False
     if _params.startDiscount >= _params.maxDiscount:
         return False
-    # Cap so (duration-1)*(maxDiscount-startDiscount) cannot overflow.
-    if _params.duration == 0 or _params.duration > max_value(uint256) // HUNDRED_PERCENT:
+    if _params.duration == 0 or _params.duration > max_value(uint256) // HUNDRED_PERCENT: # overflow protection
         return False
-    # Also keeps AuctionHouse `block.number + delay` from overflowing.
-    if _params.delay > MAX_AUCTION_DELAY:
+    if _params.delay > MAX_AUCTION_DELAY: # overflow protection
         return False
     return True
 
@@ -1287,9 +1283,7 @@ def _validatePriorityVaults(
             if not vaultAddr.is_contract:
                 return 2
 
-            # Capability probes only: zero is deliberately not asserted as a live
-            # claim asset. AuctionHouse calls both selectors before either pool
-            # mutation, so a legacy/partial implementation must fail here instead.
+            # capability probes only
             naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(vault.asset, empty(address))
             naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(vault.asset, empty(address))
             if staticcall StabilityPool(vaultAddr).isPaused():

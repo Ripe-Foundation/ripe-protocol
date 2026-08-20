@@ -8,7 +8,7 @@
 #                                                    ┗━┛┗┗┛┗┗┛
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025
+#      Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -64,9 +64,9 @@ interface RipeGovVault:
     def disableGovPointAccrualGlobally(): nonpayable
 
 interface VaultMigrator:
-    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
-    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
     def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -1360,7 +1360,6 @@ def executePendingAction(_aid: uint256) -> bool:
         assert self._isValidRipeGovPointAccrualDisable(p.vaultId, empty(address)) # dev: invalid disable
         vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
         assert vaultAddr == p.vaultAddr # dev: vault binding changed
-
         extcall RipeGovVault(vaultAddr).disableGovPointAccrualGlobally()
         log RipeGovPointAccrualGlobalDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr)
 
@@ -1370,7 +1369,6 @@ def executePendingAction(_aid: uint256) -> bool:
         assert self._isValidRipeGovPointAccrualDisable(p.vaultId, p.user) # dev: invalid disable
         vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
         assert vaultAddr == p.vaultAddr # dev: vault binding changed
-
         extcall RipeGovVault(vaultAddr).disableGovPointAccrualForUser(p.user)
         log RipeGovPointAccrualUserDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr, user=p.user)
 
