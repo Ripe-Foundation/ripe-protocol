@@ -16,7 +16,12 @@ def ensure_token_scale(price_desk, asset, sender):
     if asset_addr in (ZERO_ADDRESS, price_desk.ETH()):
         return
     if price_desk.tokenScale(asset_addr) == 0:
-        price_desk.syncTokenScale(asset_addr, sender=sender)
+        try:
+            price_desk.syncTokenScale(asset_addr, sender=sender)
+        except boa.BoaError:
+            # EOAs and mocks without decimals() cannot be synchronized.
+            # Production admission still requires a successful sync.
+            return
 
 
 _SCALE_BIND = {}
