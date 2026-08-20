@@ -1188,13 +1188,6 @@
     ]
   },
   {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "resetVvvPrice",
-    "inputs": [],
-    "outputs": []
-  },
-  {
     "stateMutability": "view",
     "type": "function",
     "name": "SUPER_OETH",
@@ -1239,18 +1232,6 @@
       {
         "name": "",
         "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "vvvPrice",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
       }
     ]
   },

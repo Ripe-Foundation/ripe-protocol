@@ -8,7 +8,7 @@ the StabilityPool receipt/list boundary; it is not a Group 1 liquidation proof.
 import boa
 import pytest
 
-from conf_utils import claim_from_stability_pool, filter_logs
+from conf_utils import claim_from_stability_pool, filter_logs, sync_deployed_token
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
@@ -93,6 +93,7 @@ def _deploy_claim_token(governance, holder, suffix, amount):
         name=f"group10_claim_{suffix}",
     )
     token.mint(holder, amount, sender=governance.address)
+    sync_deployed_token(token)
     return token
 
 

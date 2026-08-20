@@ -4,7 +4,7 @@ Fixtures and helper functions for Deleverage.vy tests
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
 
 
 @pytest.fixture
@@ -24,6 +24,7 @@ def setupDeleverage(
         # IMPORTANT: Set initial price BEFORE deposit/borrow
         original_price = 1 * EIGHTEEN_DECIMALS
         mock_price_source.setPrice(collateral_token, original_price)
+        sync_deployed_token(collateral_token)
 
         # Deposit collateral
         performDeposit(user, deposit_amount, collateral_token, collateral_whale)

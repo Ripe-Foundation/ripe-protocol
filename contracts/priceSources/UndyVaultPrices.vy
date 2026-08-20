@@ -132,6 +132,7 @@ pendingPriceConfigs: public(HashMap[address, PendingPriceConfig]) # asset -> pen
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 MAX_SNAPSHOTS: constant(uint256) = 25
+MAX_SAFE_DECIMALS: constant(uint256) = 77
 
 
 @deploy
@@ -373,6 +374,8 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig, _requireValidSnaps
     if _config.maxUpsideDeviation > HUNDRED_PERCENT:
         return False
     if 0 in [_config.underlyingDecimals, _config.vaultTokenDecimals]:
+        return False
+    if _config.underlyingDecimals > MAX_SAFE_DECIMALS or _config.vaultTokenDecimals > MAX_SAFE_DECIMALS:
         return False
 
     # verify underlying asset has a price feed
@@ -834,7 +837,10 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
 @view
 @external
 def getLatestSnapshot(_asset: address) -> PriceSnapshot:
-    return self._getLatestSnapshot(_asset, self.priceConfigs[_asset])
+    config: PriceConfig = self.priceConfigs[_asset]
+    if config.underlyingAsset == empty(address):
+        return empty(PriceSnapshot)
+    return self._getLatestSnapshot(_asset, config)
 
 
 @view

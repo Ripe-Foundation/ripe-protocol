@@ -789,8 +789,7 @@ def stabilizeGreenRefPool() -> bool:
     a: addys.Addys = addys._getAddys()
     endaoFunds: address = addys._getEndaomentFundsAddr()
 
-    curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    data: StabilizerConfig = self._getGreenStabilizerConfig(a.priceDesk)
     if data.pool == empty(address) or data.greenBalance == 0:
         return False
 
@@ -900,8 +899,7 @@ def _getGreenAmountToAdd(
 @view
 @external
 def getGreenAmountToAddInStabilizer() -> uint256:
-    curvePrices: address = staticcall PriceDesk(addys._getPriceDeskAddr()).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    data: StabilizerConfig = self._getGreenStabilizerConfig(addys._getPriceDeskAddr())
     if data.pool == empty(address) or data.greenBalance == 0:
         return 0
     poolDebt: uint256 = staticcall Ledger(addys._getLedgerAddr()).greenPoolDebt(data.pool)
@@ -1025,8 +1023,7 @@ def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint2
 @view
 @external
 def getGreenAmountToRemoveInStabilizer() -> uint256:
-    curvePrices: address = staticcall PriceDesk(addys._getPriceDeskAddr()).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    data: StabilizerConfig = self._getGreenStabilizerConfig(addys._getPriceDeskAddr())
     if data.pool == empty(address) or data.greenBalance == 0:
         return 0
     lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(addys._getEndaomentFundsAddr())
@@ -1038,12 +1035,22 @@ def getGreenAmountToRemoveInStabilizer() -> uint256:
 
 
 @view
+@internal
+def _getGreenStabilizerConfig(_priceDesk: address) -> StabilizerConfig:
+    curvePrices: address = staticcall PriceDesk(_priceDesk).getAddr(CURVE_PRICES_ID)
+    if curvePrices == empty(address):
+        return empty(StabilizerConfig)
+    return staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+
+
+@view
 @external
 def calcProfitForStabilizer() -> uint256:
     a: addys.Addys = addys._getAddys()
     endaoFunds: address = addys._getEndaomentFundsAddr()
-    curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    data: StabilizerConfig = self._getGreenStabilizerConfig(a.priceDesk)
+    if data.pool == empty(address):
+        return 0
     lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(endaoFunds)
     leftoverGreen: uint256 = staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
     poolDebt: uint256 = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)

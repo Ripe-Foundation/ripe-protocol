@@ -8,6 +8,12 @@ from conf_utils import filter_logs
 DEBT_TERMS_RAIL_BASELINE = (30_00, 50_00, 80_00, 10_00, 10_00, 2_00)
 
 
+@pytest.fixture(autouse=True)
+def _register_price_desk_for_bravo_admission(ripe_hq):
+    # Fungible ADD_NEW now resolves the target MissionControl PriceDesk.
+    return ripe_hq
+
+
 def _add_asset(
     switchboard_bravo,
     governance,

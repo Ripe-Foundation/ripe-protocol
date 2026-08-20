@@ -51,6 +51,11 @@ def balanceOf(_owner: address) -> uint256:
 
 @view
 @external
+def decimals() -> uint8:
+    return 18
+
+@view
+@external
 def allowance(_owner: address, _spender: address) -> uint256:
     return self.allowances[_owner][_spender]
 

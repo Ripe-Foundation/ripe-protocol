@@ -1,5 +1,7 @@
 # @version 0.4.3
 
+MAX_PRICE_UPDATES: constant(uint256) = 20
+
 struct Price:
     price: int64
     conf: uint64
@@ -59,21 +61,22 @@ def priceFeedExists(_priceFeedId: bytes32) -> bool:
 
 @view
 @external
-def getUpdateFee(_payLoad: Bytes[2048]) -> uint256:
+def getUpdateFee(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256:
     return len(_payLoad)
 
 
 @payable
 @external
-def updatePriceFeeds(_payLoad: Bytes[2048]):
+def updatePriceFeeds(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]):
     updateFee: uint256 = len(_payLoad)
     assert msg.value >= updateFee, "not enough eth"
 
-    price_feed: PriceFeed = abi_decode(_payLoad, PriceFeed)
-    lastPublishTime: uint64 = self.priceFeeds[price_feed.id].price.publishTime
-    if lastPublishTime < price_feed.price.publishTime:
-        self.priceFeeds[price_feed.id] = price_feed
-        self.feedExists[price_feed.id] = True
+    for raw: Bytes[2048] in _payLoad:
+        price_feed: PriceFeed = abi_decode(raw, PriceFeed)
+        lastPublishTime: uint64 = self.priceFeeds[price_feed.id].price.publishTime
+        if lastPublishTime < price_feed.price.publishTime:
+            self.priceFeeds[price_feed.id] = price_feed
+            self.feedExists[price_feed.id] = True
 
 
 @pure

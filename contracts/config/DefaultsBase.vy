@@ -1262,7 +1262,7 @@ def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
 @view
 @external
 def priorityPriceSourceIds() -> DynArray[uint256, 10]:
-    return [1, 8, 2, 9, 4, 5]
+    return [1, 8, 2, 4, 5]
 
 # lite signers
 

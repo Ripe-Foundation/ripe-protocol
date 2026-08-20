@@ -21,6 +21,40 @@ from config.robinhood_launch import (
 )
 
 
+def _as_address(value) -> str:
+    return str(getattr(value, "address", value)).lower()
+
+
+def _asset_is_nft(config) -> bool:
+    if hasattr(config, "isNft"):
+        return bool(config.isNft)
+    if isinstance(config, (tuple, list)):
+        return bool(config[-1])
+    return bool(config["isNft"])
+
+
+def sync_existing_token_scales(execute, price_desk, mission_control, eth_sentinel):
+    """Populate PriceDesk scales from MissionControl's live asset list."""
+    eth = _as_address(eth_sentinel)
+    num_assets = int(mission_control.numAssets())
+    for index in range(1, num_assets):
+        asset = mission_control.assets(index)
+        asset_addr = _as_address(asset)
+        if asset_addr in (_as_address(ZERO_ADDRESS), eth):
+            continue
+        if _asset_is_nft(mission_control.assetConfig(asset)):
+            continue
+        execute(price_desk.syncTokenScale, asset)
+        assert int(price_desk.tokenScale(asset)) != 0, (
+            f"token scale unset after sync for asset {asset_addr}"
+        )
+
+
+def sync_usdg_token_scale(execute, price_desk, usdg):
+    execute(price_desk.syncTokenScale, usdg)
+    assert int(price_desk.tokenScale(usdg)) != 0
+
+
 def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq")
     green_token = migration.get_contract("GreenToken")
@@ -84,6 +118,21 @@ def migrate(migration: Migration):
     )
     migration.execute(price_desk.startAddNewAddressToRegistry, curve_prices, "CurvePrices")
     assert int(migration.execute(price_desk.confirmNewAddressToRegistry, curve_prices)) == 2
+
+    # MissionControl already loaded DefaultsRobinhood assets. Populate and
+    # verify token scales from that live list before PriceDesk promotion.
+    log.h1("Synchronizing PriceDesk token scales")
+    sync_existing_token_scales(
+        migration.execute,
+        price_desk,
+        migration.get_contract("MissionControl"),
+        address("NATIVE_ETH_SENTINEL"),
+    )
+    sync_usdg_token_scale(
+        migration.execute,
+        price_desk,
+        usdg,
+    )
 
     # PriceDesk must be registered in RipeHq before any feed is added: the price
     # sources resolve PriceDesk through RipeHq when validating a new feed.

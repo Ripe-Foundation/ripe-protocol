@@ -8,7 +8,7 @@ import pytest
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
 from config.BluePrint import CORE_TOKENS, CURVE_PARAMS, ADDYS, WHALES
 from conf_env import FORKS
-from conf_utils import filter_logs
+from conf_utils import ensure_token_scale, filter_logs
 
 
 CURVE_STABLE_FACTORY_ABI = """
@@ -709,13 +709,14 @@ def _install_stabilizer_removal_harness(
 
 
 @pytest.fixture(scope="module")
-def usdc_token(fork, chainlink, governance):
+def usdc_token(fork, chainlink, governance, price_desk, switchboard_bravo):
     usdc = boa.load_abi("scripts/abis/Erc20Token.json", name="usdc").at(
         CORE_TOKENS[fork]["USDC"]
     )
     assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", sender=governance.address)
     boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
     assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
+    ensure_token_scale(price_desk, usdc, switchboard_bravo.address)
     return usdc
 
 

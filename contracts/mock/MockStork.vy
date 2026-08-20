@@ -1,8 +1,10 @@
 # @version 0.4.3
 
+MAX_PRICE_UPDATES: constant(uint256) = 20
+
 struct TemporalNumericValue:
     timestampNs: uint64
-    quantizedValue: uint256
+    quantizedValue: int192
 
 struct TemporalNumericValueInput:
     temporalNumericValue: TemporalNumericValue
@@ -31,33 +33,36 @@ def __init__():
 @view
 @external
 def getTemporalNumericValueUnsafeV1(_priceFeedId: bytes32) -> TemporalNumericValue:
-    return  self.priceFeeds[_priceFeedId]
+    value: TemporalNumericValue = self.priceFeeds[_priceFeedId]
+    if value.timestampNs == 0:
+        raw_revert(method_id("NotFound()"))
+    return value
 
 
 @view
 @external
-def getUpdateFeeV1(_payLoad: Bytes[2048]) -> uint256:
+def getUpdateFeeV1(_payLoad: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> uint256:
     return len(_payLoad)
 
 
 @payable
 @external
-def updateTemporalNumericValuesV1(_payLoad: Bytes[2048]):
+def updateTemporalNumericValuesV1(_payLoad: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]):
     updateFee: uint256 = len(_payLoad)
     assert msg.value >= updateFee, "not enough eth"
 
-    inputData: TemporalNumericValueInput = abi_decode(_payLoad, TemporalNumericValueInput)
-    self.priceFeeds[inputData.id] = inputData.temporalNumericValue
+    for inputData: TemporalNumericValueInput in _payLoad:
+        self.priceFeeds[inputData.id] = inputData.temporalNumericValue
 
 
 @pure
 @external
 def createPriceFeedUpdateData(
     _id: bytes32,
-    _price: uint256,
+    _price: int192,
     _publishTime: uint256
-) -> Bytes[2048]:
-    inputData: TemporalNumericValueInput = TemporalNumericValueInput(
+) -> TemporalNumericValueInput:
+    return TemporalNumericValueInput(
         temporalNumericValue=TemporalNumericValue(
             timestampNs=convert(_publishTime * 1_000_000_000, uint64),
             quantizedValue=_price,
@@ -69,7 +74,3 @@ def createPriceFeedUpdateData(
         s=empty(bytes32),
         v=0,
     )
-    return abi_encode(inputData)
-
-
-

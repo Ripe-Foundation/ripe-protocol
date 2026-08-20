@@ -27,7 +27,7 @@ interface ChainlinkInterface:
     def decimals() -> uint8: view 
 
 interface PriceDesk:
-    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
+    def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256: view
 
 interface MissionControl:
     def getPriceStaleTime() -> uint256: view
@@ -184,7 +184,7 @@ def _getPrice(
         priceDesk: address = _priceDesk
         if _priceDesk == empty(address):
             priceDesk = addys._getPriceDeskAddr()
-        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True)
+        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True, _staleTime)
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
@@ -224,6 +224,8 @@ def getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0)
 @view
 @internal
 def _getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
+    if _feed == empty(address):
+        return 0
     oracle: ChainlinkRound = staticcall ChainlinkInterface(_feed).latestRoundData()
 
     # oracle has no price

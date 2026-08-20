@@ -7,6 +7,20 @@ from conf_utils import filter_logs
 from utils.clock_profiles import clock_profile
 
 
+def _load_local_curve_prices(ripe_hq, green, savings_green):
+    # ripe_hq is the mock registry; it is also the Curve address provider.
+    return boa.load(
+        "contracts/priceSources/CurvePrices.vy",
+        ripe_hq,
+        ZERO_ADDRESS,
+        ripe_hq,
+        green,
+        savings_green,
+        1,
+        100,
+    )
+
+
 # Module-scoped: every contract below is deployed by this fixture and none is
 # registered in RipeHq or any shared registry, so building the set per test only
 # re-paid the deployments. Titanoboa anchors every test call, so storage a test
@@ -44,16 +58,7 @@ def local_curve_ref_system(governance, bob, sally, alice):
     )
     registry.setPool(pool, alt, green)
     registry.setValidRipeAddr(bob, True)
-    curve = boa.load(
-        "contracts/priceSources/CurvePrices.vy",
-        registry,
-        ZERO_ADDRESS,
-        registry,
-        green,
-        sally,
-        1,
-        100,
-    )
+    curve = _load_local_curve_prices(registry, green, sally)
     assert curve.setActionTimeLockAfterSetup(sender=governance.address)
     pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 10_000 * EIGHTEEN_DECIMALS)
     return curve, pool, registry, governance.address, bob
@@ -240,6 +245,7 @@ def test_reference_pool_basic(
 
     # setup
     aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
+    pending = curve_prices.pendingGreenRefPoolConfig(aid)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -252,6 +258,16 @@ def test_reference_pool_basic(
 
     # verify config
     config = curve_prices.greenRefPoolConfig()
+    assert config.pool == pending.pool
+    assert config.lpToken == pending.lpToken
+    assert config.greenIndex == pending.greenIndex
+    assert config.altAsset == pending.altAsset
+    assert config.altAssetDecimals == pending.altAssetDecimals
+    assert config.maxNumSnapshots == pending.maxNumSnapshots
+    assert config.dangerTrigger == pending.dangerTrigger
+    assert config.staleBlocks == pending.staleBlocks
+    assert config.stabilizerAdjustWeight == pending.stabilizerAdjustWeight
+    assert config.stabilizerMaxPoolDebt == pending.stabilizerMaxPoolDebt
     assert config.pool == deployed_green_pool
     assert config.greenIndex == 1
     assert config.altAsset == usdc_token.address
@@ -1840,25 +1856,137 @@ def test_reset_seed_failure_reverts_confirmation_atomically(local_curve_ref_syst
     assert curve.hasPendingAction(aid)
 
 
+TOGGLE_DECIMALS = """
+# @version 0.4.3
+
+_decimals: uint8
+live: public(bool)
+
+@deploy
+def __init__():
+    self._decimals = 18
+    self.live = True
+
+@external
+def setLive(_live: bool):
+    self.live = _live
+
+@view
+@external
+def decimals() -> uint8:
+    assert self.live
+    return self._decimals
+"""
+
+
 @pytest.mark.fork("local", "base")
-def test_confirmation_revalidates_pending_pool(local_curve_ref_system):
+def test_confirmation_succeeds_after_registry_unregistration(local_curve_ref_system):
     curve, pool, registry, governance, _ = local_curve_ref_system
-    _confirm_local_ref_config(curve, pool, governance, capacity=3)
-    aid = curve.setGreenRefPoolConfig(
-        pool,
-        4,
-        60_00,
-        0,
-        10_00,
-        100_000 * EIGHTEEN_DECIMALS,
-        sender=governance,
-    )
-    registry.setPoolRegistered(pool, False)
-    boa.env.time_travel(blocks=curve.actionTimeLock())
-    with boa.reverts("invalid ref pool config"):
-        curve.confirmGreenRefPoolConfig(aid, sender=governance)
-    assert curve.greenRefPoolConfig().maxNumSnapshots == 3
-    assert curve.pendingGreenRefPoolConfig(aid).pool == pool.address
+    with boa.env.anchor():
+        registry.setPoolRegistered(pool, True)
+        pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 10_000 * EIGHTEEN_DECIMALS)
+        _confirm_local_ref_config(curve, pool, governance, capacity=3)
+        aid = curve.setGreenRefPoolConfig(
+            pool,
+            4,
+            60_00,
+            0,
+            10_00,
+            100_000 * EIGHTEEN_DECIMALS,
+            sender=governance,
+        )
+        pending = curve.pendingGreenRefPoolConfig(aid)
+        assert pending.altAssetDecimals == 18
+        registry.setPoolRegistered(pool, False)
+        boa.env.time_travel(blocks=curve.actionTimeLock())
+        assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        config = curve.greenRefPoolConfig()
+        assert config.pool == pool.address
+        assert config.maxNumSnapshots == 4
+        assert config.altAssetDecimals == 18
+        assert curve.pendingGreenRefPoolConfig(aid).pool == ZERO_ADDRESS
+
+
+@pytest.mark.fork("local", "base")
+def test_confirmation_succeeds_after_alt_decimals_unavailable(local_curve_ref_system):
+    curve, pool, registry, governance, _ = local_curve_ref_system
+    with boa.env.anchor():
+        alt = boa.loads(TOGGLE_DECIMALS)
+        registry.setPool(pool, alt, registry.green())
+        registry.setPoolRegistered(pool, True)
+        pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 10_000 * EIGHTEEN_DECIMALS)
+        aid = curve.setGreenRefPoolConfig(
+            pool,
+            10,
+            60_00,
+            0,
+            10_00,
+            100_000 * EIGHTEEN_DECIMALS,
+            sender=governance,
+        )
+        pending = curve.pendingGreenRefPoolConfig(aid)
+        assert pending.altAsset == alt.address
+        assert pending.altAssetDecimals == 18
+        alt.setLive(False)
+        with boa.reverts():
+            alt.decimals()
+        boa.env.time_travel(blocks=curve.actionTimeLock())
+        assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        config = curve.greenRefPoolConfig()
+        assert config.pool == pool.address
+        assert config.altAsset == alt.address
+        assert config.altAssetDecimals == 18
+
+
+@pytest.mark.fork("local", "base")
+def test_confirmation_rejects_invalid_pending_parameters(local_curve_ref_system):
+    curve, pool, registry, governance, _ = local_curve_ref_system
+    with boa.env.anchor():
+        registry.setPoolRegistered(pool, True)
+        pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 10_000 * EIGHTEEN_DECIMALS)
+        aid = curve.setGreenRefPoolConfig(
+            pool,
+            10,
+            60_00,
+            0,
+            10_00,
+            100_000 * EIGHTEEN_DECIMALS,
+            sender=governance,
+        )
+        before = curve.greenRefPoolConfig()
+        boa.env.time_travel(blocks=curve.actionTimeLock())
+        # Proposal already rejects this bound. Confirm-time rejection is
+        # only reachable by injecting a corrupted pending record.
+        curve.eval(f"self.pendingGreenRefPoolConfig[{aid}].dangerTrigger = 49_99")
+        with boa.reverts("invalid ref pool config"):
+            curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        assert curve.pendingGreenRefPoolConfig(aid).pool == pool.address
+        assert curve.greenRefPoolConfig() == before
+
+
+@pytest.mark.fork("local", "base")
+def test_confirmation_rejects_unusable_pool_observation(local_curve_ref_system):
+    curve, pool, registry, governance, _ = local_curve_ref_system
+    with boa.env.anchor():
+        registry.setPoolRegistered(pool, True)
+        pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 10_000 * EIGHTEEN_DECIMALS)
+        aid = curve.setGreenRefPoolConfig(
+            pool,
+            10,
+            60_00,
+            0,
+            10_00,
+            100_000 * EIGHTEEN_DECIMALS,
+            sender=governance,
+        )
+        before = curve.greenRefPoolConfig()
+        # greenIndex is 1 in this fixture; zero GREEN with nonzero alt makes ratio 0
+        pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 0)
+        boa.env.time_travel(blocks=curve.actionTimeLock())
+        with boa.reverts("invalid ref pool config"):
+            curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        assert curve.pendingGreenRefPoolConfig(aid).pool == pool.address
+        assert curve.greenRefPoolConfig() == before
 
 
 @pytest.mark.fork("local", "base")

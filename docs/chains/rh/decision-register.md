@@ -1409,6 +1409,119 @@ Clock decision and separate activation checklist:
 `config/contract-artifact-expectations.json`, and
 `tests/priceSources/curve/test_green_ref_pool.py`.
 
+**18 August 2026 — price-source Curve edit reopens qualification.** The owner
+accepted `CurvePrices.vy` changes for 4-of-8 confirm, same-pool recursion,
+GREEN/sGREEN canonicalization, and direct-sGREEN admission guard. Those edits
+change the reviewed source, so
+RH-D043 qualification is reopened. The owner did **not** close RH-D043, did
+not change the clock domain (`block.number` / ancestor semantics), did not
+move `staleBlocks=7,200` or the 720-write cadence into the constructor
+(those remain governed config and an ops target), and did not grant
+deployment, registration, GREEN-reference activation, or release authority.
+
+**19 August 2026 — PR #193 local wrap-up.** AuctionHouse and CreditRedeem
+skip transfers that preview to zero creditable USD or credit. The accepted
+consequence is expiry-removable, potentially recurring dust auctions. That
+is not poison-price protection. Earlier AuctionHouse strict gates still
+revert the whole liquidation if any of the liquidated user's debt-bearing
+collateral has a registered feed that returns zero:
+`getLatestUserDebtAndTerms(..., True)` on liquidate and
+`calcAmountOfDebtToRepayDuringLiq`, and `getUsdValue(..., True)` for the
+stability-pool asset.
+
+MissionControl stores priority source-id lists exactly. SwitchboardAlpha
+sanitizes those lists using the target MissionControl’s live PriceDesk at
+execution (invalid ids, ids whose PriceDesk address is empty, and
+duplicates dropped). If sanitization drops every id, execution reverts
+and the pending action survives until cancel or expiry. Other registered
+switchboards may write raw or empty lists directly. The execution event
+reports the sanitized count only; it does not emit the id list.
+
+PriceDesk must precede the new RedStone selector during deployment.
+
+Metadata captured through typed calls at governance admission is
+authoritative until governance updates or disables the configuration.
+Chainlink and RedStone cache feed decimals at proposal (and Chainlink
+constructor capture on deploy). Price scaling uses that cached value.
+They do not re-read live decimals on confirm or price. Decimal drift
+during the pending timelock is inside the accepted risk: confirmation
+admits the cached decimals and can mis-scale immediately. After
+admission, a later feed-decimal change can mis-scale prices by
+`10 ** abs(oldDecimals - newDecimals)` until governance acts. Curve
+ordinary and GREEN-reference feeds keep proposal-time MetaRegistry
+metadata and alternative-token decimals; confirmation still validates
+pending parameter bounds, live prices, timestamps, rounds, pool
+observations, snapshots, recursion, permissions, and timelocks, but
+does not reconstruct MetaRegistry metadata. Governance must update or
+disable a configuration if identity or decimals change.
+
+Registered Underscore Earn Vaults and their underlyings are trusted not
+to change asset() or decimals. If an upgrade changes either, governance
+must disable and re-register the feed. This reverses PR #193's
+live-identity checks; a changed identity serves mis-scaled prices until
+disabled. When `maxUpsideDeviation` is nonzero, newly snapshotted upside
+is throttled; when it is zero, upside passes through unthrottled.
+Downside is accepted immediately. Undy ignores the PriceDesk-forwarded
+stale bound and uses only the per-feed config stale time.
+
+StabVault local-EVM claim ceilings after PriceDesk streamlining:
+`claim_many` measured 7,210,169 against 7,250,000 (0.55% headroom);
+`single_claim` measured 506,381 and was rebaselined 500,000 → 520,000.
+Those close the 08-18 gas-ceiling findings; they are not production
+chain gas limits.
+
+Pyth `Bytes[2048]` is conditionally qualified for this head. Durable
+record: `/Users/wigglez/dev/ripe-pr193-pyth-evidence` and PR #193
+comment
+https://github.com/Ripe-Foundation/ripe-protocol/pull/193#issuecomment-5351468833.
+Hermes samples measure 963 + 348·n bytes (at most 3 feeds per element,
+41 bytes of headroom). 41 B is less than one Wormhole guardian signature
+(66 B); 2007 + 66 = 2073 overflows, so keepers fetch per-feed and never
+merge. Samples do not prove future Hermes payloads stay under 2,048 B.
+The packet records the future-publishTime zero-read (run 3b). Verdict
+CONDITIONAL. This grants no Pyth registration or activation.
+
+PriceDesk stores admission-time token scale as trusted metadata.
+`getUsdValue` and `getAssetAmount` never call token `decimals()`.
+Scale `0` means unset; scale `1` is a valid zero-decimal token; the
+ETH sentinel always uses `10**18` without storage or token calls.
+Missing scale returns `0` on soft telemetry and reverts
+`missing token scale` on strict paths before any price source is
+contacted. Strict Endaoment partner-liquidity valuation hard-reverts.
+Decimal-drift error magnitude is
+`10 ** abs(oldDecimals - newDecimals)`; direction depends on the
+drift. SwitchboardBravo synchronizes unset fungible scales on
+`ASSET_ADD_NEW` against the target MissionControl’s PriceDesk
+(`MissionControl.getRipeHq()` → `RipeHq.getAddr(7)`). A
+governance-preseeded scale wins and skips `decimals()`. Pausing
+PriceDesk currently blocks Bravo ADD_NEW because scale
+synchronization reverts. `setTokenScale` is governance-only and
+supports trusted tokens with unusual `decimals()` behavior and
+PriceDesk redeployment. Migration 0003 seeds MissionControl live
+assets and explicitly seeds USDG, which is not a MissionControl
+asset. Every priced non-MissionControl Deleverage underlying or
+claim asset needs an explicit cached scale before strict valuation.
+Cached scale remains after MissionControl asset removal so residual
+positions can still be valued. NFT admission, configuration updates,
+and SwitchboardCharlie actions do not synchronize scale. Debt-terms
+assert consolidation offset ADD_NEW hook growth and kept Bravo under
+EIP-170. Bravo grew net 177 bytes, 24,364 to 24,541 (35 bytes
+headroom). PriceDesk is 17,698 bytes. Focused side-by-side Boa
+probe compared parent
+`6a4a0f2fed38f3ea7653c1a2c12fb6131fa32cf4`
+to the PriceDesk implementation at
+`a85ac39e1f7fe6ab92f45dd7b7e176d36f4b1b34`:
+`getUsdValue` 7,819 → 7,223 (Δ −596);
+`getAssetAmount` 7,733 → 7,183 (Δ −550).
+The deltas, not fixture-dependent absolute totals, are the durable
+comparison evidence. Deployment and activation
+authority are unchanged.
+
+Batch 3, AUD-FLOW-11, RH-D043, Pyth registration and activation,
+full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and
+GREEN-reference activation remain open. This wrap-up grants no
+deployment or activation authority.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

@@ -11,6 +11,7 @@ from conf_utils import (
     clear_transient_storage,
     filter_logs,
     redeem_from_stability_pool,
+    sync_deployed_token,
 )
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
@@ -142,10 +143,10 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     # monotonic matrix proves the cap bounds the linear NAV traversal.
     assert all(a < b for a, b in zip(deposit_gas, deposit_gas[1:]))
     assert all(a < b for a, b in zip(withdrawal_gas, withdrawal_gas[1:]))
-    # At the exact focused parent, the ceiling cases were 508,587 deposit and
-    # 446,932 withdrawal. PriceDesk's guarded raw-call boundary adds 4,893 gas
-    # to each (513,480 and 451,825). These deliberate ceilings retain 3.2% and
-    # 4.0% local-EVM headroom without weakening the traversal checks.
+    # These are not production chain gas limits. Starting head (458235d):
+    # deposit=523,770, withdrawal=462,115. After the PriceDesk scale helper:
+    # deposit=521,145, withdrawal=459,490. Existing 530,000 and 470,000
+    # ceilings remain (1.699% and 2.287% headroom).
     assert deposit_gas[-1] < 530_000
     assert withdrawal_gas[-1] < 470_000
 
@@ -281,6 +282,7 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
         "STABILITY_ACTIVE_CLAIM_CEILING_GAS",
         f"deposit={deposit_gas[-1]}",
         f"withdrawal={withdrawal_gas[-1]}",
+        f"single_claim={single_claim_gas}",
         f"claim_many={claim_many_gas}",
         f"prune={prune_gas}",
         f"activation={activation_gas}",
@@ -293,11 +295,15 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     assert existing_receipt_gas < 50_000
     assert prune_gas < 500_000
     assert activation_gas < 1_200_000
-    assert single_claim_gas < 500_000
-    # PR142 separately rebaselined its measured 7,013,069 parent value from the
-    # obsolete 7,000,000 cap to 7,200,000. PriceDesk head is 7,089,959; this
-    # final ceiling keeps ~2.3% local-EVM headroom and must not be conflated
-    # with the 4,893-gas single deposit/withdrawal call delta.
+    # Starting head (458235d): single_claim=509,138 against 500,000;
+    # claim_many=7,251,524 against 7,250,000. After the PriceDesk scale
+    # helper and inlined stale-time resolver: single_claim=506,381,
+    # claim_many=7,210,169. claim_many now fits 7,250,000 (0.552%
+    # headroom). single_claim still exceeds 500,000 because the bounded
+    # decimals raw_call and 30,000-gas stipend remain; the 2,757-gas
+    # recovery is not enough. Rebaseline only single_claim to 520,000
+    # (2.689% headroom over 506,381).
+    assert single_claim_gas < 520_000
     assert claim_many_gas < 7_250_000
     # Preflight and iteration each traverse the bounded claim set once. The
     # iterator must not repeat the strict NAV traversal after readiness passes.
@@ -335,6 +341,7 @@ def _seed_stability_asset(
     amount=100 * EIGHTEEN_DECIMALS,
 ):
     mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    sync_deployed_token(asset)
     asset.transfer(stability_pool, amount, sender=whale)
     assert stability_pool.depositTokensInVault(
         user,
@@ -379,6 +386,7 @@ def _deposit_and_get_shares(
     amount,
 ):
     mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    sync_deployed_token(asset)
     asset.transfer(stability_pool, amount, sender=whale)
     stability_pool.depositTokensInVault(
         user,
@@ -558,6 +566,7 @@ def _deploy_claim_token(governance, holder, index, amount=EIGHTEEN_DECIMALS):
         name=f"hard_claim_{index}",
     )
     token.mint(holder, amount, sender=governance.address)
+    sync_deployed_token(token)
     return token
 
 
@@ -3187,6 +3196,7 @@ def test_inbound_fee_on_transfer_settlement_reverts_atomically(
         override_address=boa.env.generate_address(),
     )
     mock_price_source.setPrice(fee_token, EIGHTEEN_DECIMALS)
+    sync_deployed_token(fee_token)
 
     declared = 10 * EIGHTEEN_DECIMALS
     fee_token.transfer(stability_pool, declared, sender=governance.address)

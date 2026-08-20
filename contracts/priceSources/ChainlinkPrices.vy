@@ -271,6 +271,9 @@ def getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0
 @view
 @internal
 def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
+    if _feed == empty(address):
+        return 0
+
     oracle: ChainlinkRound = staticcall ChainlinkFeed(_feed).latestRoundData()
 
     # oracle has no price

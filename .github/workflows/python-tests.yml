@@ -176,6 +176,7 @@ jobs:
                 tests/core/humanResources
                 tests/core/bondRoom
                 tests/core/auctionHouse
+                tests/core/creditRedeem
                 tests/core/boardroom
                 tests/core/test_stale_vault_replacement.py
                 tests/core/test_sc24_gas_matrix.py

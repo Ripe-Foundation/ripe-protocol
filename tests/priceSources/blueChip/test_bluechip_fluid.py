@@ -3,7 +3,7 @@ import boa
 
 from constants import BLUE_CHIP_PROTOCOL_FLUID, EIGHTEEN_DECIMALS
 from config.BluePrint import YIELD_TOKENS, CORE_TOKENS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, advance_timelock_blocks
 
 
 @pytest.fixture(scope="module")
@@ -12,7 +12,7 @@ def usdc_token(fork, chainlink, governance):
     if not chainlink.hasPriceFeed(usdc):
         # Use staleTime=0 for forked tests since historical Chainlink data may be stale
         assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", 0, False, False, sender=governance.address)
-        boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+        advance_timelock_blocks(chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
 
@@ -43,7 +43,7 @@ def test_add_fluid_vault_token_usdc(
 
     # add new price feed
     assert blue_chip_prices.addNewPriceFeed(fluid_usdc, BLUE_CHIP_PROTOCOL_FLUID, 3600, 20, 20_00, 0, sender=governance.address)
-    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(blue_chip_prices.actionTimeLock() + 1)
     assert blue_chip_prices.confirmNewPriceFeed(fluid_usdc, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]
@@ -92,7 +92,7 @@ def test_add_fluid_vault_token_weth(
 
     # add new price feed
     assert blue_chip_prices.addNewPriceFeed(fluid_weth, BLUE_CHIP_PROTOCOL_FLUID, 3600, 20, 20_00, 0, sender=governance.address)
-    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(blue_chip_prices.actionTimeLock() + 1)
     assert blue_chip_prices.confirmNewPriceFeed(fluid_weth, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]
