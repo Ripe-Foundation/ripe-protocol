@@ -1022,6 +1022,29 @@ the one the previous check only appeared to give. Backdating and post-dating
 each get their own test, since `issuedAt` is signed and therefore only as good
 as the checks around it.
 
+**What this fix is worth against a compromised key: nothing, and that is not
+fixable here.** `issuedAt` is supplied by the party being validated. A
+compromised signer stamps `issuedAt = block.timestamp` and every check above
+passes. The backdating and post-dating tests bound malformed values, not
+dishonest ones, and it would be a misreading to take "order age is now bounded"
+as hardening against key compromise.
+
+That is the same shape as the symbol-based route discriminator corrected in
+`relay-fast-lane.md` at `f85ca873` — a rule whose reference point is the thing
+it is validating — with one difference that decides whether it is a defect. For
+route discrimination there *was* a better reference: `(chainId, address)`
+against Ripe's own configured endpoints. For order age there is none. The chain
+cannot know when an off-chain order was priced, so no on-chain check can
+establish it against an adversary. `issuedAt` is the irreducible floor rather
+than a lazy choice, and it is correct precisely because M-8's threat model is
+the buggy solver — where the stamp is honest and staleness is accidental — and
+not the malicious one, which `fill`'s `msg.sender == solverSigner` gate already
+places outside what any order field can reach.
+
+Stated because the distinction is invisible from the code: the two rules look
+identical at the assert, and only the availability of an alternative reference
+separates them.
+
 **Carried into the canonical port.** Whatever `OrderV1` normalization lands must
 bound age the same way. If the canonical Relay order carries no issuance field,
 freshness cannot be derived from it at all and the lane needs one from
