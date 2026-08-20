@@ -40,7 +40,7 @@ EXPECTED_RUNTIME_BYTES = {
     "PythPrices": 14811,
     "RedStone": 13864,
     "StorkPrices": 13832,
-    "UndyVaultPrices": 18806,
+    "UndyVaultPrices": 17689,
     "wsuperOETHbPrices": 8336,
 }
 

@@ -133,12 +133,6 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 MAX_SNAPSHOTS: constant(uint256) = 25
 MAX_SAFE_DECIMALS: constant(uint256) = 77
-# Owner decision 2026-08-18: keep TOKEN_DECIMALS_GAS = 30_000, matching
-# PriceDesk. Identity views (asset/decimals) are stipend-capped. A
-# costlier vault proxy is unusable (price 0), not an unbounded burn.
-# This is availability policy, not only returndata bounding.
-TOKEN_DECIMALS_GAS: constant(uint256) = 30_000
-MAX_UINT160: constant(uint256) = 2 ** 160 - 1
 
 
 @deploy
@@ -191,8 +185,6 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: PriceConfig = self.priceConfigs[_asset]
     if config.underlyingAsset == empty(address):
         return 0
-    if not self._liveVaultIdentityMatches(_asset, config):
-        return 0
     return self._getPrice(_asset, config, _priceDesk)
 
 
@@ -202,8 +194,6 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: PriceConfig = self.priceConfigs[_asset]
     if config.underlyingAsset == empty(address):
         return 0, False
-    if not self._liveVaultIdentityMatches(_asset, config):
-        return 0, True
     return self._getPrice(_asset, config, _priceDesk), True
 
 
@@ -228,53 +218,6 @@ def _getPrice(
 
 
 # utilities
-
-
-@view
-@internal
-def _readRawCall32(_target: address, _calldata: Bytes[4]) -> (bool, Bytes[33]):
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        _target,
-        _calldata,
-        max_outsize=33,
-        gas=TOKEN_DECIMALS_GAS,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    return success and len(response) == 32, response
-
-
-@view
-@internal
-def _decodeAddressWord(_raw: Bytes[33]) -> (bool, address):
-    word: uint256 = abi_decode(_raw, uint256)
-    if word > MAX_UINT160:
-        return False, empty(address)
-    return True, convert(word, address)
-
-
-@view
-@internal
-def _liveVaultIdentityMatches(_asset: address, _config: PriceConfig) -> bool:
-    ok: bool = False
-    raw: Bytes[33] = b""
-    ok, raw = self._readRawCall32(_asset, method_id("asset()"))
-    if not ok:
-        return False
-    decodedOk: bool = False
-    liveAsset: address = empty(address)
-    decodedOk, liveAsset = self._decodeAddressWord(raw)
-    if not decodedOk or liveAsset != _config.underlyingAsset:
-        return False
-    ok, raw = self._readRawCall32(_asset, method_id("decimals()"))
-    if not ok or abi_decode(raw, uint256) != _config.vaultTokenDecimals:
-        return False
-    ok, raw = self._readRawCall32(_config.underlyingAsset, method_id("decimals()"))
-    if not ok or abi_decode(raw, uint256) != _config.underlyingDecimals:
-        return False
-    return True
 
 
 @view
@@ -433,8 +376,6 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig, _requireValidSnaps
     if 0 in [_config.underlyingDecimals, _config.vaultTokenDecimals]:
         return False
     if _config.underlyingDecimals > MAX_SAFE_DECIMALS or _config.vaultTokenDecimals > MAX_SAFE_DECIMALS:
-        return False
-    if not self._liveVaultIdentityMatches(_asset, _config):
         return False
 
     # verify underlying asset has a price feed
@@ -724,7 +665,6 @@ def _clearSnapshots(_asset: address):
 @internal
 def _resetSnapshots(_asset: address, _config: PriceConfig) -> PriceConfig:
     config: PriceConfig = _config
-    assert self._liveVaultIdentityMatches(_asset, config) # dev: vault identity mismatch
     newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
     assert newSnapshot.pricePerShare != 0 # dev: invalid snapshot
 
@@ -866,8 +806,6 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
     # check if snapshot is too recent
     if config.lastSnapshot.lastUpdate + config.minSnapshotDelay > block.timestamp:
         return False
-    if not self._liveVaultIdentityMatches(_asset, config):
-        return False
 
     # create and store new snapshot
     newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
@@ -901,8 +839,6 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
 def getLatestSnapshot(_asset: address) -> PriceSnapshot:
     config: PriceConfig = self.priceConfigs[_asset]
     if config.underlyingAsset == empty(address):
-        return empty(PriceSnapshot)
-    if not self._liveVaultIdentityMatches(_asset, config):
         return empty(PriceSnapshot)
     return self._getLatestSnapshot(_asset, config)
 
