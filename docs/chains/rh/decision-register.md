@@ -1422,22 +1422,58 @@ deployment, registration, GREEN-reference activation, or release authority.
 **19 August 2026 — PR #193 local wrap-up.** AuctionHouse and CreditRedeem
 skip transfers that preview to zero creditable USD or credit. The accepted
 consequence is expiry-removable, potentially recurring dust auctions. That
-is not poison-price protection.
+is not poison-price protection. Earlier AuctionHouse strict gates still
+revert the whole liquidation if any of the liquidated user's debt-bearing
+collateral has a registered feed that returns zero:
+`getLatestUserDebtAndTerms(..., True)` on liquidate and
+`calcAmountOfDebtToRepayDuringLiq`, and `getUsdValue(..., True)` for the
+stability-pool asset.
 
 MissionControl stores priority source-id lists exactly. SwitchboardAlpha
 sanitizes those lists using the target MissionControl’s live PriceDesk at
-execution. Other registered switchboards may write raw or empty lists
-directly. The execution event reports the actual sanitized count.
+execution (invalid ids, ids whose PriceDesk address is empty, and
+duplicates dropped). If sanitization drops every id, execution reverts
+and the pending action survives until cancel or expiry. Other registered
+switchboards may write raw or empty lists directly. The execution event
+reports the sanitized count only; it does not emit the id list.
 
 PriceDesk must precede the new RedStone selector during deployment.
+
+Chainlink and RedStone cache feed decimals at proposal (and Chainlink
+constructor capture on deploy). Price scaling uses that cached value.
+Confirm and read re-check live `decimals()` as fail-closed equality
+guards: mismatch returns 0 and failed confirmation auto-cancels. A later
+feed-decimal change does not mis-scale on this head. A later change that
+removes those guards must replace this sentence; keeping both would make
+the register self-contradictory.
 
 Registered Underscore Earn Vaults and their underlyings are trusted not
 to change asset() or decimals. If an upgrade changes either, governance
 must disable and re-register the feed. This reverses PR #193's
 live-identity checks; a changed identity serves mis-scaled prices until
-disabled (upside bounded by maxUpsideDeviation).
+disabled. When `maxUpsideDeviation` is nonzero, newly snapshotted upside
+is throttled; when it is zero, upside passes through unthrottled.
+Downside is accepted immediately. Undy ignores the PriceDesk-forwarded
+stale bound and uses only the per-feed config stale time.
 
-Batch 3, AUD-FLOW-11, RH-D043, Pyth real-payload qualification,
+StabVault local-EVM claim ceilings after PriceDesk streamlining:
+`claim_many` measured 7,210,169 against 7,250,000 (0.55% headroom);
+`single_claim` measured 506,381 and was rebaselined 500,000 → 520,000.
+Those close the 08-18 gas-ceiling findings; they are not production
+chain gas limits.
+
+Pyth `Bytes[2048]` is conditionally qualified for this head. Durable
+record: `/Users/wigglez/dev/ripe-pr193-pyth-evidence` and PR #193
+comment
+https://github.com/Ripe-Foundation/ripe-protocol/pull/193#issuecomment-5351468833.
+Hermes samples measure 963 + 348·n bytes (at most 3 feeds per element,
+41 bytes of headroom). 41 B is less than one Wormhole guardian signature
+(66 B); 2007 + 66 = 2073 overflows, so keepers fetch per-feed and never
+merge. Samples do not prove future Hermes payloads stay under 2,048 B.
+The packet records the future-publishTime zero-read (run 3b). Verdict
+CONDITIONAL. This grants no Pyth registration or activation.
+
+Batch 3, AUD-FLOW-11, RH-D043, Pyth registration and activation,
 full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and
 GREEN-reference activation remain open. This wrap-up grants no
 deployment or activation authority.
