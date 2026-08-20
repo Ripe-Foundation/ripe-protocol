@@ -8,6 +8,7 @@ MAX_FILL = 1_000 * EIGHTEEN_DECIMALS
 MAX_EXPOSURE = 5_000 * EIGHTEEN_DECIMALS
 MAX_ENTRIES = 5
 MAX_AGE = 3_600
+FLOOR = 1_000 * EIGHTEEN_DECIMALS
 FLOAT = 100_000 * EIGHTEEN_DECIMALS
 
 
@@ -35,6 +36,7 @@ def flf(ripe_hq_deploy, ripe_token, float_recipient, charlie, whale, solver):
         MAX_EXPOSURE,
         MAX_ENTRIES,
         MAX_AGE,
+        FLOOR,
         name="fast_lane_float",
     )
     ripe_token.transfer(c.address, FLOAT, sender=whale)
@@ -114,7 +116,7 @@ def test_signature_from_another_instance_is_rejected(flf, solver, bob, ripe_hq_d
     other = boa.load(
         "contracts/core/FastLaneFloat.vy",
         ripe_hq_deploy.address, ripe_token.address, float_recipient, charlie,
-        10, 1_000, MAX_FILL, MAX_EXPOSURE, MAX_ENTRIES, MAX_AGE, name="flf_other",
+        10, 1_000, MAX_FILL, MAX_EXPOSURE, MAX_ENTRIES, MAX_AGE, FLOOR, name="flf_other",
     )
     order = _order(bob, 100 * EIGHTEEN_DECIMALS)
     foreign_sig = bytes(Account._sign_hash(other.getDigest(order), solver.key).signature)
@@ -395,3 +397,50 @@ def test_no_arbitrary_call_surface(flf):
             assert inp["type"] != "bytes" or fn["name"] == "fill", (
                 f"{fn['name']} accepts arbitrary bytes"
             )
+
+
+# ---------- the drain floor: cause-agnostic ----------
+
+
+def test_drain_halts_at_the_floor_not_at_zero(flf, solver, bob, ripe_token, charlie):
+    """H-6 gates the fill on mintEnabled, but that is one of six conditions that
+    block the CCIP refill. Three of them this contract cannot observe at all.
+    So the floor must close on the consequence they share -- the float stops
+    being replenished -- with every gate the contract CAN see satisfied."""
+    flf.raiseFloatFloor(99_000 * EIGHTEEN_DECIMALS, sender=charlie)
+    aid = flf.initiateCapRaise(MAX_FILL, MAX_EXPOSURE * 100, MAX_ENTRIES, MAX_AGE, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)
+
+    filled = 0
+    for i in range(1, MAX_ENTRIES + 1):
+        try:
+            _fill(flf, solver, _order(bob, MAX_FILL, salt=bytes([i]) * 32))
+            filled += 1
+        except Exception:
+            break
+
+    # halted with float still on hand, and nothing else was the cause
+    assert ripe_token.balanceOf(flf.address) >= 99_000 * EIGHTEEN_DECIMALS
+    assert flf.lanePaused() is False
+    with boa.reverts("float floor"):
+        _fill(flf, solver, _order(bob, MAX_FILL, salt=b"\xee" * 32))
+
+
+def test_floor_raises_immediately_but_lowers_only_through_the_timelock(flf, charlie):
+    flf.raiseFloatFloor(FLOOR * 2, sender=charlie)
+    assert flf.minFloatBalance() == FLOOR * 2
+    with boa.reverts("not a raise"):
+        flf.raiseFloatFloor(FLOOR, sender=charlie)
+    aid = flf.initiateChange(5, ZERO_ADDRESS, FLOOR, sender=charlie)
+    with boa.reverts("time lock not reached"):
+        flf.confirmChange(aid, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)
+    assert flf.minFloatBalance() == FLOOR
+
+
+def test_can_fill_reflects_the_floor(flf, charlie):
+    assert flf.canFill(10 * EIGHTEEN_DECIMALS)
+    flf.raiseFloatFloor(FLOAT, sender=charlie)
+    assert not flf.canFill(10 * EIGHTEEN_DECIMALS)

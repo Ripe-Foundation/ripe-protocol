@@ -107,6 +107,10 @@ event ChangeConfirmed:
     actionId: indexed(uint256)
     actionType: uint8
 
+event FloatFloorSet:
+    newFloor: uint256
+    caller: indexed(address)
+
 event FloatFunded:
     funder: indexed(address)
     amount: uint256
@@ -124,6 +128,19 @@ maxEntryAge: public(uint256)
 
 # advisory only: read by the quoting layer, never enforced here
 quoteThreshold: public(uint256)
+
+# Cause-agnostic drain floor. H-6 gates the fill on mintEnabled because that
+# blocks the CCIP refill leg, but mintEnabled is only ONE of six destination
+# conditions that block `releaseOrMint` (H-5). This contract can observe three
+# of them - mintEnabled, token isPaused, and its own blacklisting, which is
+# symmetric so it closes the fill too. It cannot see an RMN curse, an exhausted
+# inbound rate limit, or the pool losing canMintRipe.
+#
+# Enumerating causes is what let the gate decay in the first place, so this
+# gates on the consequence they share: replenishment stops, so the balance falls
+# while exposure persists. The drain then halts at a chosen floor rather than at
+# zero, whatever the cause.
+minFloatBalance: public(uint256)
 
 # ledger
 entries: public(HashMap[bytes32, Entry])
@@ -156,6 +173,7 @@ ACTION_SET_SOLVER: constant(uint8) = 1
 ACTION_RAISE_CAPS: constant(uint8) = 2
 ACTION_UNPAUSE: constant(uint8) = 3
 ACTION_WITHDRAW: constant(uint8) = 4
+ACTION_LOWER_FLOOR: constant(uint8) = 5
 
 MAX_BATCH: constant(uint256) = 50
 ENTRY_CEILING: constant(uint256) = 1000
@@ -179,6 +197,7 @@ def __init__(
     _maxAggregateExposure: uint256,
     _maxOutstandingEntries: uint256,
     _maxEntryAge: uint256,
+    _minFloatBalance: uint256,
 ):
     assert empty(address) not in [_ripeHq, _token, _floatRecipient] # dev: invalid addr
     assert _maxOutstandingEntries != 0 and _maxOutstandingEntries <= ENTRY_CEILING # dev: invalid entry cap
@@ -198,6 +217,7 @@ def __init__(
     self.maxAggregateExposure = _maxAggregateExposure
     self.maxOutstandingEntries = _maxOutstandingEntries
     self.maxEntryAge = _maxEntryAge
+    self.minFloatBalance = _minFloatBalance
 
     # starts halted: no fill can occur before governance sets a solver and unpauses
     self.lanePaused = True
@@ -259,6 +279,11 @@ def fill(_order: FillOrder, _signature: Bytes[65]) -> bytes32:
     assert newNotional <= self.maxAggregateExposure # dev: exposure cap
     assert newEntries <= self.maxOutstandingEntries # dev: entry cap
     self._assertOldestWithinAge()
+
+    # drain floor - cause-agnostic, see minFloatBalance
+    balance: uint256 = staticcall IERC20(TOKEN).balanceOf(self)
+    assert balance >= _order.outputAmount # dev: insufficient float
+    assert balance - _order.outputAmount >= self.minFloatBalance # dev: float floor
 
     # effects - exposure is reserved before the transfer, never after
     self.isFilled[orderId] = True
@@ -487,6 +512,9 @@ def canFill(_inputAmount: uint256) -> bool:
         return False
     if self.outstandingEntries + 1 > self.maxOutstandingEntries:
         return False
+    balance: uint256 = staticcall IERC20(TOKEN).balanceOf(self)
+    if balance < _inputAmount or balance - _inputAmount < self.minFloatBalance:
+        return False
     oldest: bytes32 = self.oldestEntry
     if oldest != empty(bytes32) and block.timestamp - self.entries[oldest].paidAt > self.maxEntryAge:
         return False
@@ -550,6 +578,20 @@ def lowerCaps(_maxFill: uint256, _maxExposure: uint256, _maxEntries: uint256, _m
 
 
 @external
+def raiseFloatFloor(_newFloor: uint256):
+    """
+    @notice Raise the drain floor immediately. Governance only.
+    @dev Raising halts the lane sooner, so it is the safe direction and is not
+         timelocked. Lowering the floor allows more of the float to drain and
+         goes through `initiateChange(ACTION_LOWER_FLOOR, ...)`.
+    """
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _newFloor > self.minFloatBalance # dev: not a raise
+    self.minFloatBalance = _newFloor
+    log FloatFloorSet(newFloor=_newFloor, caller=msg.sender)
+
+
+@external
 def setQuoteThreshold(_threshold: uint256):
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _threshold <= self.maxAggregateExposure # dev: above hard cap
@@ -583,12 +625,14 @@ def fundFloat(_amount: uint256):
 @external
 def initiateChange(_actionType: uint8, _addrVal: address, _numVal: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert _actionType in [ACTION_SET_SOLVER, ACTION_RAISE_CAPS, ACTION_UNPAUSE, ACTION_WITHDRAW] # dev: invalid action
+    assert _actionType in [ACTION_SET_SOLVER, ACTION_RAISE_CAPS, ACTION_UNPAUSE, ACTION_WITHDRAW, ACTION_LOWER_FLOOR] # dev: invalid action
 
     if _actionType == ACTION_SET_SOLVER:
         assert _addrVal != empty(address) and not _addrVal.is_contract # dev: solver must be eoa
     elif _actionType == ACTION_WITHDRAW:
         assert _numVal != 0 # dev: zero amount
+    elif _actionType == ACTION_LOWER_FLOOR:
+        assert _numVal < self.minFloatBalance # dev: not a reduction
 
     assert _actionType != ACTION_RAISE_CAPS # dev: use initiateCapRaise
 
@@ -642,6 +686,9 @@ def confirmChange(_actionId: uint256) -> bool:
     elif p.actionType == ACTION_UNPAUSE:
         self.lanePaused = False
         log LanePauseSet(isPaused=False, caller=msg.sender)
+    elif p.actionType == ACTION_LOWER_FLOOR:
+        self.minFloatBalance = p.numVal
+        log FloatFloorSet(newFloor=p.numVal, caller=msg.sender)
     elif p.actionType == ACTION_WITHDRAW:
         # float only ever leaves to a fixed address chosen at deploy - no
         # caller-supplied recipient and no arbitrary calldata anywhere in this
