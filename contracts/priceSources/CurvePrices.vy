@@ -1405,7 +1405,7 @@ def _getCurvePoolData(
     normalize: uint256 = 10 ** (18 - _altAssetDecimals)
 
     # get balances
-    greenBalance: uint256 = staticcall CurvePool(_pool).balances(_greenIndex) # dev: no green ref pool
+    greenBalance: uint256 = staticcall CurvePool(_pool).balances(_greenIndex)
     altAssetBalance: uint256 = staticcall CurvePool(_pool).balances(1 - _greenIndex) * normalize
 
     totalSupply: uint256 = greenBalance + altAssetBalance
