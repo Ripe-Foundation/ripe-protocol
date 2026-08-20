@@ -110,16 +110,6 @@ ETH: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
 
 
-@pure
-@internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
-
-
 @deploy
 def __init__(
     _ripeHq: address,
@@ -208,6 +198,16 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
     return False
+
+
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
 
 
 #################

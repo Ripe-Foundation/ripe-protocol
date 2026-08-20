@@ -148,29 +148,6 @@ def __init__(
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
 
-######################
-# Checked Arithmetic #
-######################
-
-
-@pure
-@internal
-def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a > max_value(uint256) - _b:
-        return False, 0
-    return True, unsafe_add(_a, _b)
-
-
-@pure
-@internal
-def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a == 0 or _b == 0:
-        return True, 0
-    if _a > max_value(uint256) // _b:
-        return False, 0
-    return True, unsafe_mul(_a, _b)
-
-
 ###############
 # Core Prices #
 ###############
@@ -702,7 +679,7 @@ def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
     if _config.nextIndex >= _config.maxNumSnapshots:
         return 0
 
-    # Traverse the circular ring from its next write position, which is the
+    # traverse the circular ring from its next write position, which is the
     # oldest slot once full and precedes empty slots while partially filled.
     numerator: uint256 = 0
     denominator: uint256 = 0
@@ -895,3 +872,26 @@ def _getUnderscoreVaultPrice(
 @internal
 def _getCurrentVaultPricePerShare(_asset: address, _decimals: uint256) -> uint256:
     return staticcall UnderscoreVault(_asset).convertToAssets(10 ** _decimals)
+
+
+######################
+# Checked Arithmetic #
+######################
+
+
+@pure
+@internal
+def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a > max_value(uint256) - _b:
+        return False, 0
+    return True, unsafe_add(_a, _b)
+
+
+@pure
+@internal
+def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a == 0 or _b == 0:
+        return True, 0
+    if _a > max_value(uint256) // _b:
+        return False, 0
+    return True, unsafe_mul(_a, _b)

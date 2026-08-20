@@ -22,7 +22,22 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 
-MAX_PRICE_UPDATES: constant(uint256) = 20
+interface StorkNetwork:
+    def updateTemporalNumericValuesV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]): payable
+    def getUpdateFeeV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> uint256: view
+    def getTemporalNumericValueUnsafeV1(_feedId: bytes32) -> TemporalNumericValue: view
+
+interface MissionControl:
+    def canPerformLiteAction(_user: address) -> bool: view
+    def getPriceStaleTime() -> uint256: view
+
+struct StorkFeedConfig:
+    feedId: bytes32
+    staleTime: uint256
+
+struct PendingStorkFeed:
+    actionId: uint256
+    config: StorkFeedConfig
 
 struct TemporalNumericValue:
     timestampNs: uint64
@@ -36,23 +51,6 @@ struct TemporalNumericValueInput:
     r: bytes32
     s: bytes32
     v: uint8
-
-interface StorkNetwork:
-    def getTemporalNumericValueUnsafeV1(_feedId: bytes32) -> TemporalNumericValue: view
-    def updateTemporalNumericValuesV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]): payable
-    def getUpdateFeeV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> uint256: view
-
-interface MissionControl:
-    def canPerformLiteAction(_user: address) -> bool: view
-    def getPriceStaleTime() -> uint256: view
-
-struct StorkFeedConfig:
-    feedId: bytes32
-    staleTime: uint256
-
-struct PendingStorkFeed:
-    actionId: uint256
-    config: StorkFeedConfig
 
 event NewStorkFeedPending:
     asset: indexed(address)
@@ -117,16 +115,7 @@ feedConfig: public(HashMap[address, StorkFeedConfig]) # asset -> feed
 pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
 STORK: public(immutable(address))
-
-
-@pure
-@internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
+MAX_PRICE_UPDATES: constant(uint256) = 20
 
 
 @deploy
@@ -212,6 +201,16 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
     return False
+
+
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
 
 
 ################

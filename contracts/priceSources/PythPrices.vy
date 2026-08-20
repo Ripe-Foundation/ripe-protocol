@@ -22,17 +22,15 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 
-MAX_PRICE_UPDATES: constant(uint256) = 20
-
 interface PythNetwork:
-    def getPriceUnsafe(_priceFeedId: bytes32) -> PythPrice: view
-    def priceFeedExists(_priceFeedId: bytes32) -> bool: view
     def getUpdateFee(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256: view
     def updatePriceFeeds(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]): payable
+    def getPriceUnsafe(_priceFeedId: bytes32) -> PythPrice: view
+    def priceFeedExists(_priceFeedId: bytes32) -> bool: view
 
 interface MissionControl:
-    def getPriceStaleTime() -> uint256: view
     def canPerformLiteAction(_user: address) -> bool: view
+    def getPriceStaleTime() -> uint256: view
 
 struct PythPrice:
     price: int64
@@ -118,16 +116,7 @@ PYTH: public(immutable(address))
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
-
-
-@pure
-@internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
+MAX_PRICE_UPDATES: constant(uint256) = 20
 
 
 @deploy
@@ -259,6 +248,16 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
     return False
+
+
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
 
 
 ################
