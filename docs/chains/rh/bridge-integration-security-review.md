@@ -13,7 +13,8 @@ rev 9 — added H-6 refill/drain asymmetry and M-4 age-cap liveness trap;
 rev 10 — corrected Relay order authorization, reconciliation, and cap semantics;
 rev 11 — M-5 routing evidence pinned and claim narrowed; added H-7, H-8, M-6, M-7
 against the implemented `FastLaneFloat`;
-rev 12 — H-7, M-6, M-7 verified resolved; H-8 corrected down to Medium)
+rev 12 — H-7, M-6, M-7 verified resolved; H-8 corrected down to Medium;
+rev 13 — M-8 verified resolved)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -929,6 +930,17 @@ cancelling is a tightening operation and belongs with the other fast levers.
 
 ### H-8 — *Downgraded to M-8 in rev 12.* Solver-order lifetime
 
+**Resolved in `71e8781` (verified rev 13).** `MAX_ORDER_HORIZON = 15 min`,
+enforced at admission (`:313`), and `clearSolverSigner` writes
+`isBurnedSigner[prev] = True` (`:623`) with `ACTION_SET_SOLVER` refusing a
+burned address (`:746`). The denylist is one-way — no clearing path exists —
+and it burns only the *currently configured* signer, so a guardian cannot burn
+an arbitrary address. Note the two new controls compose correctly on the point
+H-7 was about: the burn is checked at initiation only, which would ordinarily be
+the H-7 defect, but `clearSolverSigner` also bumps `configEpoch`, so an action
+staged before a burn is void at confirmation regardless. Both suites green at 50.
+
+
 **Severity: Medium, corrected down from High. Added rev 11, corrected rev 12.
 Reproduced by `tests/core/test_fast_lane_float_audit.py`.**
 
@@ -1138,8 +1150,16 @@ Whatever design lands, these must be red-before-green:
 
 ## Sign-off
 
-Not signed off. **Six highs open, eight mediums** (rev 12: H-7, M-6 and M-7
-verified resolved against `9cbd967`; H-8 corrected down to M-8).
+Not signed off. **Six highs open, seven mediums** (rev 13: H-7, M-6, M-7 and
+M-8 all verified resolved against `71e8781`; H-8 corrected down to M-8 first).
+
+**No open finding in this review is a `FastLaneFloat` control defect.** Every
+one raised against the implemented contract is closed and re-tested. What
+remains blocking is not code quality: the order format is a local placeholder
+no genuine Relay signature will verify, and restoration is a balance proof
+rather than an authenticated CCIP receipt. Both are gated on vendor answers
+rather than on engineering, and both are correctly labelled in the contract
+itself. It remains unaudited and unsafe for real funds.
 
 `FastLaneFloat` (`contracts/core/FastLaneFloat.vy`, head `80e15c8`) is code now,
 not a specification, and the four findings added in rev 11 are against the
