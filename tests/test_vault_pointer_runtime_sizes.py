@@ -7,9 +7,10 @@ EIP170_LIMIT = 24_576
 # are load-bearing for these numbers — bumping either is a deploy event.
 # RipeGov headroom is ~846 bytes after removing areKeyTermsSame. Any RipeGov
 # edit must remeasure this pin before merge.
-# Lootbox headroom is exactly 120 bytes at this candidate head. Any Lootbox
-# edit, however small, must recompile and remeasure this pin before merge;
-# its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
+# Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
+# runtime. Any Lootbox edit, however small, must recompile and remeasure this
+# pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
+# load-bearing.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
     "SwitchboardAlpha": 24521,

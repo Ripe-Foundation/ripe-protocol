@@ -1,17 +1,13 @@
 import boa
 
 from conf_utils import clear_transient_storage
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 MODE_PASSIVE = 0
 MODE_REENTER_CLAIM = 1
 MODE_REENTER_DISTRIBUTE = 2
 MODE_FAIL = 3
 MODE_STAB_CLAIM = 4
-
-# Lootbox resolves its distributor at underscore registry id 6
-# (Lootbox.UNDERSCORE_LOOT_DISTRIBUTOR_ID).
-UNDERSCORE_LOOT_DISTRIBUTOR_ID = 6
 
 # Test-only distributor that doubles as the underscore registry: getAddr
 # answers only UNDERSCORE_LOOT_DISTRIBUTOR_ID with itself so every other
@@ -339,6 +335,8 @@ def test_charlie_dedicated_deposit_route_respects_claim_switch(
     assert switchboard_alpha.setCanClaimLoot(False, sender=governance.address)
 
     points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    asset_points_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    global_points_before = ledger.globalDepositPoints()
     rewards_before = ledger.ripeRewards()
     avail_before = ledger.ripeAvailForRewards()
     balance_before = ripe_token.balanceOf(bob)
@@ -350,6 +348,8 @@ def test_charlie_dedicated_deposit_route_respects_claim_switch(
     points_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
     assert points_after.balancePoints == points_before.balancePoints
     assert points_after.lastUpdate == points_before.lastUpdate
+    assert ledger.assetDepositPoints(vault_id, alpha_token) == asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
     assert ledger.ripeRewards() == rewards_before
     assert ledger.ripeAvailForRewards() == avail_before
     assert ripe_token.balanceOf(bob) == balance_before
@@ -619,9 +619,15 @@ def test_underscore_callback_real_stability_claim_sees_reserved_budget(
 
     # flush pending accrual, then budget exactly gross drip + undy + margin
     lootbox.updateRipeRewards(sender=teller.address)
+    # the fixture's send interval is 43_200 blocks; travelling one block past
+    # it (elapsed = 43_201) satisfies the send gate and defines the drip window
     interval = lootbox.underscoreSendInterval()
     elapsed = interval + 1
     gross_drip = elapsed * 1  # ripePerBlock = 1
+    borrower_credit = gross_drip * 10_00 // 100_00
+    staker_credit = gross_drip * 90_00 // 100_00
+    # the floored credits (4_320 + 38_880) leave exactly one wei of gross terminal dust
+    assert gross_drip - borrower_credit - staker_credit == 1
     undy_total = lootbox.undyDepositRewardsAmount() + lootbox.undyYieldBonusAmount()
     stability_margin = 7 * EIGHTEEN_DECIMALS
     stab_entitlement = deposit_amount * ripe_per_dollar // EIGHTEEN_DECIMALS
@@ -648,11 +654,10 @@ def test_underscore_callback_real_stability_claim_sees_reserved_budget(
     assert mock.observedLastSend() == current_block
 
     # gross reservation persisted before the callback: buckets hold the
-    # floored credits (4_320 + 38_880 at interval 43_200) while the full
-    # 43_201 gross was charged
+    # floored credits while the full gross (credits + one wei of dust) was charged
     stored = ledger.ripeRewards()
-    assert stored.borrowers == rewards_before.borrowers + (gross_drip * 10_00 // 100_00)
-    assert stored.stakers == rewards_before.stakers + (gross_drip * 90_00 // 100_00)
+    assert stored.borrowers == rewards_before.borrowers + borrower_credit
+    assert stored.stakers == rewards_before.stakers + staker_credit
 
     # the real Stability claim was capped at the margin despite a larger
     # entitlement, and its reward landed in the claimer's RipeGov position
@@ -791,7 +796,11 @@ def test_teller_default_stake_zero_vault_borrow_claim(
     mock_price_source,
 ):
     # Teller-level route with the default _shouldStake=True: the delivered
-    # borrow loot lands in the core RipeGov vault, not the wallet
+    # borrow loot lands in the core RipeGov vault, not the wallet.
+    # This exercises a synthetic defense-in-depth state (positive current debt
+    # with a raw vault count of zero, seeded through the Ledger test route),
+    # not an ordinary borrower lifecycle -- normal borrowing requires
+    # deposited collateral, which registers a vault.
     setGeneralConfig()
     setRipeRewardsConfig(True)
     mission_control.setRipeGovVaultConfig(
