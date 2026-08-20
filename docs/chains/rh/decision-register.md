@@ -1419,6 +1419,23 @@ move `staleBlocks=7,200` or the 720-write cadence into the constructor
 (those remain governed config and an ops target), and did not grant
 deployment, registration, GREEN-reference activation, or release authority.
 
+**19 August 2026 — PR #193 local wrap-up.** AuctionHouse and CreditRedeem
+skip transfers that preview to zero creditable USD or credit. The accepted
+consequence is expiry-removable, potentially recurring dust auctions. That
+is not poison-price protection.
+
+MissionControl stores priority source-id lists exactly. SwitchboardAlpha
+sanitizes those lists using the target MissionControl’s live PriceDesk at
+execution. Other registered switchboards may write raw or empty lists
+directly. The execution event reports the actual sanitized count.
+
+PriceDesk must precede the new RedStone selector during deployment.
+
+Batch 3, AUD-FLOW-11, RH-D043, Pyth real-payload qualification,
+full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and
+GREEN-reference activation remain open. This wrap-up grants no
+deployment or activation authority.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

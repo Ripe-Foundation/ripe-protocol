@@ -264,7 +264,7 @@ def test_redstone_eth_leg_uses_resolved_stale_on_pricedesk(
         assert price_desk.getPrice(eth) == 2_500 * EIGHTEEN_DECIMALS
         assert price_desk.getPrice(eth, False) == 2_500 * EIGHTEEN_DECIMALS
         assert price_desk.getPrice(eth, False, 10) == 0
-        with boa.reverts():
+        with boa.reverts("has price config, no price"):
             redstone.getPrice(alpha_token, 0, price_desk)
-        with boa.reverts():
+        with boa.reverts("has price config, no price"):
             redstone.getPrice(alpha_token, 10, price_desk)

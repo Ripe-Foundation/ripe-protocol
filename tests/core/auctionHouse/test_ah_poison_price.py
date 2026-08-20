@@ -1,8 +1,46 @@
 import boa
 import pytest
+from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs, redeem_from_stability_pool
+
+
+def _frame_reasons(frame):
+    if isinstance(frame, str):
+        return [frame]
+    found = []
+    detail = getattr(frame, "error_detail", None)
+    if detail:
+        found.append(detail)
+    reason = getattr(getattr(frame, "dev_reason", None), "reason_str", None)
+    if reason:
+        found.append(reason)
+    try:
+        vm_reason = getattr(frame, "pretty_vm_reason", None)
+    except Exception:
+        vm_reason = None
+    if vm_reason:
+        found.append(str(vm_reason))
+    return found
+
+
+def _boa_error_has_reason(error, expected_reason):
+    # Nested Teller → AuctionHouse → token/PriceDesk reverts lose the last-frame
+    # # dev: label when titanoboa cannot format the trace. Walk every frame.
+    return any(
+        expected_reason == reason or expected_reason in reason
+        for frame in error.stack_trace
+        for reason in _frame_reasons(frame)
+    )
+
+
+def _boa_error_reasons(error):
+    return [
+        reason
+        for frame in error.stack_trace
+        for reason in _frame_reasons(frame)
+    ]
 
 
 def _auction_flags(createDebtTerms):
@@ -585,7 +623,7 @@ def test_auction_house_discounted_one_token_reverts_on_zero_green_transfer(
     assert collateral_usd == 1
     assert collateral_usd * 9999 // 10000 == 0
     _fund_alice(green_token, whale, teller, alice, 100 * EIGHTEEN_DECIMALS)
-    with boa.reverts():
+    with pytest.raises(BoaError) as exc_info:
         teller.buyManyFungibleAuctions(
             [(bob, vault_id, bravo_token, MAX_UINT256)],
             100 * EIGHTEEN_DECIMALS,
@@ -595,6 +633,11 @@ def test_auction_house_discounted_one_token_reverts_on_zero_green_transfer(
             alice,
             sender=alice,
         )
+    # Requested CreditEngine "cannot repay with 0 green" is not reached:
+    # greenSpent floors to 0 and Erc20Token rejects the zero transfer first.
+    assert _boa_error_has_reason(exc_info.value, "cannot transfer 0 amount"), (
+        _boa_error_reasons(exc_info.value)
+    )
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == bravo_amount
     assert bravo_token.balanceOf(alice) == 0
 
@@ -762,7 +805,7 @@ def test_wsuper_price_desk_auction_house_tx(
     assert price_desk.getPrice(bravo_token) == 0
     _fund_alice(green_token, whale, teller, alice, 100 * EIGHTEEN_DECIMALS)
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    with boa.reverts():
+    with pytest.raises(BoaError) as exc_info:
         teller.buyManyFungibleAuctions(
             [(bob, vault_id, bravo_token, MAX_UINT256)],
             100 * EIGHTEEN_DECIMALS,
@@ -772,6 +815,11 @@ def test_wsuper_price_desk_auction_house_tx(
             alice,
             sender=alice,
         )
+    # Requested AuctionHouse "no green spent" is not reached: getAssetAmount
+    # is fail-closed, so PriceDesk raises before the no-progress assert.
+    assert _boa_error_has_reason(exc_info.value, "has price config, no price"), (
+        _boa_error_reasons(exc_info.value)
+    )
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == EIGHTEEN_DECIMALS
     assert bravo_token.balanceOf(alice) == 0
 

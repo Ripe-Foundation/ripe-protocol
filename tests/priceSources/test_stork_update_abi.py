@@ -1,5 +1,6 @@
 import pytest
 from eth_hash.auto import keccak
+from boa.contracts.base_evm_contract import BoaError
 
 import boa
 
@@ -82,7 +83,7 @@ def test_stork_update_empty_one_twenty_and_reject_twenty_one(
     assert mock_stork.getUpdateFeeV1([one]) == 1
     twenty = [_payload(mock_stork, i + 1) for i in range(20)]
     assert mock_stork.getUpdateFeeV1(twenty) == 20
-    with pytest.raises((ValueError, OverflowError, Exception)):
+    with pytest.raises((ValueError, OverflowError, BoaError)):
         mock_stork.getUpdateFeeV1(twenty + [_payload(mock_stork, 21)])
 
     boa.env.set_balance(authorized_caller, 100)
@@ -103,7 +104,7 @@ def test_stork_update_empty_one_twenty_and_reject_twenty_one(
     assert len(log.payload) == 20
     assert log.feeAmount == 20
 
-    with pytest.raises((ValueError, OverflowError, Exception)):
+    with pytest.raises((ValueError, OverflowError, BoaError)):
         stork_prices.updateStorkPrice(twenty + [one], sender=authorized_caller, value=40)
 
 

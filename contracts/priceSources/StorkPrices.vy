@@ -179,7 +179,7 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
 
-    # official 1e18 as-is; reject non-positive int192 (CAND-PS-011)
+    # official 1e18 as-is; reject non-positive int192
     if data.quantizedValue <= 0:
         return 0
 

@@ -6,14 +6,15 @@ EIP170_LIMIT = 24_576
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
 # RipeGov headroom is ~846 bytes after removing areKeyTermsSame. Any RipeGov
-# edit must remeasure this pin before merge.
+# edit must remeasure this pin before merge. Composed SwitchboardAlpha
+# headroom is 5 bytes (rh zero max-lock check plus execution sanitization).
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
-    "SwitchboardAlpha": 24556,
+    "SwitchboardAlpha": 24571,
     "SwitchboardBravo": 24364,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23192,
@@ -29,6 +30,7 @@ EXPECTED_RUNTIME_BYTES = {
     "AuctionHouse": 24566,
     "CreditEngine": 24502,
     "CreditRedeem": 8415,
+    "Endaoment": 23693,
     "PriceDesk": 17305,
     "Deleverage": 24459,
     "StabilityPool": 24269,
@@ -61,6 +63,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     auction_house,
     credit_engine,
     credit_redeem,
+    endaoment,
     price_desk,
     deleverage,
     stability_pool,
@@ -103,6 +106,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "AuctionHouse": len(auction_house.env.get_code(auction_house.address)),
         "CreditEngine": len(credit_engine.env.get_code(credit_engine.address)),
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
+        "Endaoment": len(endaoment.env.get_code(endaoment.address)),
         "PriceDesk": len(price_desk.env.get_code(price_desk.address)),
         "Deleverage": len(deleverage.env.get_code(deleverage.address)),
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),

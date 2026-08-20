@@ -733,7 +733,7 @@ def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
         if self._lpUnderlyingCanonicalEquals(_asset, _config):
             return False
 
-    # same-pool nested alt (CAND-PS-HYP-001); both admission orders
+    # same-pool nested alt; both admission orders
     elif _config.numUnderlying == 2:
         alt: address = _config.underlying[0]
         if alt == _asset:

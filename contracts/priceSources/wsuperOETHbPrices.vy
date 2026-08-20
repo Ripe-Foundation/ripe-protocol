@@ -50,7 +50,7 @@ def __init__(
     WRAPPED_SUPER_OETH = _wrappedSuperOETH
     priceData._addPricedAsset(_wrappedSuperOETH)
 
-    # MCBETH / VVV are not priceable from this source (CAND-PS-013).
+    # MCBETH / VVV are not priceable from this source.
     MCBETH = _mcbeth
     VVV = _vvv
 

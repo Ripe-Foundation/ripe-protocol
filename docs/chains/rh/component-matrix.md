@@ -21,6 +21,17 @@
 > live creation source/compiler/constructor identity remains unresolved. See
 > [`ccip-live-state.md`](ccip-live-state.md). No non-CCIP launch deployment,
 > migration, activation, or release is established by this matrix.
+>
+> **19 August 2026 PR #193 currentness overlay:** the canonical shared sources
+> changed by PR #193 are `SwitchboardAlpha`, `AuctionHouse`, `CreditRedeem`,
+> `Endaoment`, `PriceDesk`, `DefaultsBase` / `DefaultsBaseLive`,
+> `ChainlinkPrices`, `CurvePrices`, `PythPrices`, `RedStone`, `StorkPrices`,
+> `UndyVaultPrices`, and `wsuperOETHbPrices`. Optional price sources remain
+> disabled/unregistered on Robinhood as in the historical rows below (CM-017
+> Curve is still GREEN-only at PriceDesk ID 2; CM-018/019/020/039/040/041
+> stay omitted). Deploy and register PriceDesk before the new RedStone
+> selector. This overlay does not rewrite the historical matrix and does not
+> close RH-D043.
 
 **Status:** Complete analysis; S3, S4, S5, and Stock Token launch-scope
 decisions are recorded; remaining recommendations and owner decisions are
