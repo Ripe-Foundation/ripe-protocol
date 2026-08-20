@@ -164,6 +164,8 @@ jobs:
                 tests/core/boardroom
                 tests/core/test_stale_vault_replacement.py
                 tests/core/test_sc24_gas_matrix.py
+                tests/core/test_fast_lane_float.py
+                tests/core/test_fast_lane_float_audit.py
               )
               ;;
             vaults)
