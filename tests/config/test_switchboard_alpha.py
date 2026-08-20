@@ -928,7 +928,7 @@ def test_priority_stab_vault_rejects_legacy_partial_interface(
         [1, vault_id],
     )
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_alpha.setPriorityStabVaults(
             [(vault_id, savings_green.address)],
             sender=governance.address,
@@ -973,7 +973,7 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
     current_block = boa.env.evm.patch.block_number
     if current_block < confirmation_block:
         boa.env.time_travel(blocks=confirmation_block - current_block)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_alpha.executePendingAction(
             action_id,
             sender=governance.address,

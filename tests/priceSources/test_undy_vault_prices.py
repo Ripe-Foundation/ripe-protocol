@@ -1732,9 +1732,9 @@ def test_undy_typed_live_pps_revert_is_not_suppressed(
     supply = alpha_token_vault.totalSupply()
     alpha_token_vault.setShouldRevertConvertToAssets(True)
     assert alpha_token_vault.totalSupply() == supply
-    with boa.reverts():
+    with boa.reverts("convertToAssets reverted"):
         alpha_token_vault.convertToAssets(EIGHTEEN_DECIMALS)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         undy_vault_prices.getPrice(alpha_token_vault)
 
 

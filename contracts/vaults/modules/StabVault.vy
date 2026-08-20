@@ -1138,7 +1138,7 @@ def _handleAssetForUser(
 def _transferAssetExact(_asset: address, _amount: uint256, _recipient: address):
     recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
     assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: transfer failed
-    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == _amount
+    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == _amount # dev: invalid recipient delivery
 
 
 @view

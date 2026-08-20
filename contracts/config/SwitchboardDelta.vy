@@ -1152,6 +1152,8 @@ def setUnderscoreRegistry(_underscoreRegistry: address, _missionControl: address
 def _isValidUnderscoreAddr(_addr: address) -> bool:
     if _addr == empty(address):
         return True # allowing setting to empty address
+    if not _addr.is_contract:
+        return False
 
     undyLedger: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEDGER_ID)
     if undyLedger == empty(address):

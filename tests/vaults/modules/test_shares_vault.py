@@ -1210,7 +1210,7 @@ def test_teller_shares_vault_inexact_withdrawal_reverts_atomically(
         lootbox.undyYieldBonusAmount(),
     )
 
-    with boa.reverts():
+    with boa.reverts("invalid recipient delivery"):
         teller.withdraw(
             fee_token,
             withdrawal_amount,

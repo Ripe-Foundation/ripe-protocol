@@ -451,9 +451,9 @@ def calc_token_amount(
     _amounts: DynArray[uint256, 2],
     _isDeposit: bool,
 ) -> uint256:
-    assert not _isDeposit
-    assert not QUOTE_REVERTS
-    assert _amounts[0] <= staticcall IERC20(GREEN).balanceOf(self)
+    assert not _isDeposit # dev: withdraw quote only
+    assert not QUOTE_REVERTS # dev: quote reverts
+    assert _amounts[0] <= staticcall IERC20(GREEN).balanceOf(self) # dev: quote exceeds pool green
     approved: uint256 = self.allowances[msg.sender][self]
     if approved != 0:
         assert self.executionQuoteMode != 1
@@ -1102,7 +1102,7 @@ def test_sc19_reverting_full_request_falls_through_to_search(
 
         full_request = reported_pool_green * lp_balance // lp_total_supply
         assert full_request == 200 * EIGHTEEN_DECIMALS
-        with boa.reverts():
+        with boa.reverts("quote exceeds pool green"):
             pool.calc_token_amount([full_request, 0], False)
 
         full_search_result = _max_executable_green(
@@ -1121,7 +1121,7 @@ def test_sc19_reverting_full_request_falls_through_to_search(
         assert len(quote_calls) > 1
         requested_quote = pool.calc_token_amount([requested, 0], False)
         assert requested_quote < lp_balance
-        with boa.reverts():
+        with boa.reverts("quote exceeds pool green"):
             pool.calc_token_amount([requested + 1, 0], False)
         assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
@@ -1461,7 +1461,7 @@ def test_sc19_execution_quote_bound_reverts_on_quote_execution_mismatch(
             ledger.greenPoolDebt(pool.address),
         )
 
-        with boa.reverts():
+        with boa.reverts("external call failed"):
             endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
         assert (
@@ -3918,9 +3918,9 @@ def test_stabilizer_zero_virtual_price_fails_closed_in_view_and_internal_path(
         # closed in both the external report and the internal safety snapshot.
         # Vyper 0.4.3 implements the nonzero division denominator as this
         # compiler clamp, so pin it instead of accepting an arbitrary revert.
-        with boa.reverts(compiler="clamp gt 0"):
+        with boa.reverts("clamp gt 0"):
             endaoment.calcProfitForStabilizer()
-        with boa.reverts(compiler="clamp gt 0"):
+        with boa.reverts("clamp gt 0"):
             endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
         assert ledger.greenPoolDebt(pool) == pool_debt

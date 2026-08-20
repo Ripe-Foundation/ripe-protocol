@@ -433,7 +433,7 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
 
     if health_failure == "unpriced_claim":
         mock_price_source.disablePriceFeed(charlie_token)
-        with boa.reverts():
+        with boa.reverts("no price for claim asset"):
             stability_pool.getTotalValue(bravo_token)
     else:
         # Current deposits prevent this overlap, but migrated/legacy state can

@@ -1158,7 +1158,7 @@ def test_partial_auction_repay_remains_strict_and_atomic_during_price_outage(
 
     supply_before = green_token.totalSupply()
     engine_green_before = green_token.balanceOf(credit_engine)
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         credit_engine.repayDuringAuctionPurchase(
             bob,
             repay_amount,
@@ -1211,7 +1211,7 @@ def test_partial_department_repay_remains_strict_and_atomic_during_price_outage(
     supply_before = green_token.totalSupply()
     debtor_green_before = green_token.balanceOf(bob)
     engine_green_before = green_token.balanceOf(credit_engine)
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         credit_engine.repayFromDept(
             bob,
             debt_before,

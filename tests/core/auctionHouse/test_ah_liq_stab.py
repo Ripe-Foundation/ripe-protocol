@@ -395,7 +395,7 @@ def test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault(
         ledger.userDebt(bob).inLiquidation,
     )
 
-    with boa.reverts():
+    with boa.reverts("invalid recipient delivery"):
         teller.liquidateUser(bob, False, sender=sally)
 
     assert (

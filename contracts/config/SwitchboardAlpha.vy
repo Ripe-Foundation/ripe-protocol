@@ -732,7 +732,7 @@ def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerI
         return False
     if max_value(uint256) in [_maxBorrowPerInterval, _numBlocksPerInterval]:
         return False
-    config: cs.GenDebtConfig = staticcall MissionControl(_missionControl).genDebtConfig()
+    config: cs.GenDebtConfig = staticcall MissionControl(_missionControl).genDebtConfig() # dev: invalid borrow interval config
     if _maxBorrowPerInterval < config.minDebtAmount:
         return False
     return True

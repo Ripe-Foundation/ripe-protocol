@@ -958,7 +958,7 @@ def test_sc18_dual_role_switchboard_token_cannot_reenter(
         token.allowance(bob, ctx.endaoment.address),
         ctx.green.totalSupply(),
     )
-    with boa.reverts():
+    with boa.reverts("transfer failed"):
         ctx.endaoment.mintPartnerLiquidity(
             alice,
             token.address,
@@ -1068,7 +1068,7 @@ def test_sc18_dual_role_lego_cross_entry_reverts_atomically_and_is_mutation_sens
         )
 
     before = _cross_entry_state(ctx, alice, venue, lego, debt_pool)
-    with boa.reverts():
+    with boa.reverts("contract paused"):
         ctx.endaoment.addPartnerLiquidity(
             LEGO_ID,
             ctx.lp.address,

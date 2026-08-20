@@ -532,7 +532,7 @@ def test_enabled_user_point_update_calls_boardroom_once_with_final_points(
     recorder.setShouldRevert(True)
     boa.env.time_travel(blocks=1)
     data_before = ripe_gov_vault.userGovData(bob, ripe_token)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         ripe_gov_vault.updateUserGovPoints(
             bob,
             custom_addys,
@@ -1515,7 +1515,7 @@ def test_direct_export_rejects_invalid_migration_context_atomically(
         (ripe_gov_vault.address, "invalid target vault"),
     )
     for invalid_target, expected_dev in invalid_targets:
-        with boa.reverts(dev=expected_dev):
+        with boa.reverts(expected_dev):
             ripe_gov_vault.exportPositionForMigration(
                 bob,
                 ripe_token,
@@ -1700,7 +1700,7 @@ def test_direct_import_rejects_invalid_migration_context_atomically(
         (target.address, "invalid source vault"),
     )
     for source, expected_dev in invalid_sources:
-        with boa.reverts(dev=expected_dev):
+        with boa.reverts(expected_dev):
             target.importPositionForMigration(
                 bob,
                 ripe_token,
@@ -1758,7 +1758,7 @@ def test_direct_import_rejects_partially_nonempty_target_position(
     ripe_token.transfer(target, existing, sender=whale)
     custody_before = ripe_token.balanceOf(target)
 
-    with boa.reverts(dev="target balance exists"):
+    with boa.reverts("target balance exists"):
         target.importPositionForMigration(
             bob,
             ripe_token,
@@ -1805,7 +1805,7 @@ def test_direct_import_rejects_position_already_migrated_out(
     assert target.positionMigratedOut(bob, ripe_token)
     custody_before = ripe_token.balanceOf(target)
 
-    with boa.reverts(dev="position already migrated out"):
+    with boa.reverts("position already migrated out"):
         target.importPositionForMigration(
             bob,
             ripe_token,
@@ -1836,7 +1836,7 @@ def test_direct_import_rejects_zero_share_result_atomically(
     ripe_token.transfer(target, donation + migration_amount, sender=whale)
     custody_before = ripe_token.balanceOf(target)
 
-    with boa.reverts(dev="invalid target shares"):
+    with boa.reverts("invalid target shares"):
         target.importPositionForMigration(
             bob,
             ripe_token,
@@ -2998,7 +2998,7 @@ def test_echo_disable_validator_reverts_for_wrong_vault_interface(
     assert ripe_gov_id == SOURCE_VAULT_ID
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(0, bob) is False
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(999, bob) is False
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_echo.isValidRipeGovPointAccrualDisable(simple_vault_id, bob)
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(ripe_gov_id, bob) is True
 
@@ -3126,7 +3126,7 @@ def test_disable_rejects_when_vault_binding_changed_before_execution(
     )
     boa.env.time_travel(blocks=switchboard_echo.actionTimeLock())
 
-    with boa.reverts(dev="vault binding changed"):
+    with boa.reverts("vault binding changed"):
         switchboard_echo.executePendingAction(action_id, sender=governance.address)
     assert switchboard_echo.hasPendingAction(action_id)
     assert switchboard_echo.pendingRipeGovPointAccrualDisableActions(action_id) == pending_before
@@ -3642,7 +3642,7 @@ def test_registered_non_teller_cannot_mint_gov_shares_from_existing_custody(
     caller = registered_non_teller_callers[caller_name]
     before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob, alice])
 
-    with boa.reverts():
+    with boa.reverts("only Teller allowed"):
         ripe_gov_vault.depositTokensWithLockDuration(
             alice, ripe_token, MAX_UINT256, 1_000, sender=caller.address
         )
@@ -3669,7 +3669,7 @@ def test_registered_non_teller_cannot_adjust_another_users_lock(
     caller = registered_non_teller_callers[caller_name]
     before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
 
-    with boa.reverts():
+    with boa.reverts("only Teller allowed"):
         ripe_gov_vault.adjustLock(bob, ripe_token, 1_000, sender=caller.address)
     assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
 
@@ -3694,7 +3694,7 @@ def test_registered_non_teller_cannot_release_another_users_lock(
     caller = registered_non_teller_callers[caller_name]
     before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
 
-    with boa.reverts():
+    with boa.reverts("only Teller allowed"):
         ripe_gov_vault.releaseLock(bob, ripe_token, sender=caller.address)
     assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
 

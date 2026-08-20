@@ -2086,7 +2086,7 @@ def test_special_stab_pool_rejects_valid_non_stability_vault_ids(
     alpha_token,
     mission_control,
 ):
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_bravo.addAsset(
             alpha_token,
             [1],
@@ -2154,7 +2154,7 @@ def isPaused() -> bool:
         legacy_pool, sender=governance.address
     )
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_bravo.addAsset(
             alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
             (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),

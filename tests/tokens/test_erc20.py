@@ -93,7 +93,7 @@ def test_ccip_admin_pre_setup_behavior_is_explicit(deploy3r, fork):
     tokens = _deploy_unset_ccip_tokens(deploy3r, fork)
     for token in tokens:
         assert token.ripeHq() == ZERO_ADDRESS
-        with boa.reverts():
+        with boa.reverts("bad calldatasize or callvalue"):
             token.getCCIPAdmin()
 
     hq = _finish_ccip_setup(tokens, deploy3r, fork)
@@ -129,7 +129,7 @@ def test_ccip_admin_reverts_before_setup_and_resolves_only_hq_governance(
     )
 
     assert fresh_green.ripeHq() == ZERO_ADDRESS
-    with boa.reverts():
+    with boa.reverts("bad calldatasize or callvalue"):
         fresh_green.getCCIPAdmin()
 
     # All three production token types share Erc20Token.getCCIPAdmin(). Their

@@ -425,7 +425,7 @@ def test_missing_uninitialized_and_incompatible_pool_responses_fail_closed(
 
     route.curve_system.setRegistered(True)
     route.curve_system.setRegisteredPool(mock_rando_contract)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         uninitialized.isValidNewFeed(route.green, mock_rando_contract)
     assert uninitialized.getPriceAndHasFeed(route.green) == (0, False)
 

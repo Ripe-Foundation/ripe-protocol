@@ -343,5 +343,5 @@ def test_moonwell_typed_live_pps_revert_is_not_suppressed(
     )
     assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) > 0
     local_moonwell_token.setShouldRevert(True)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         local_moonwell_prices.getPrice(local_moonwell_token)

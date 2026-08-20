@@ -1613,7 +1613,10 @@ def test_m1_direct_nonexact_receipts_revert_atomically(
     token.approve(teller, amount, sender=bob)
     token.configure_transfer(transfer_mode)
 
-    with boa.reverts():
+    expected = (
+        "token transfer failed" if transfer_mode in (6, 7) else "custody mismatch"
+    )
+    with boa.reverts(expected):
         teller.deposit(token, amount, bob, simple_erc20_vault, sender=bob)
 
     _m1_assert_no_deposit_effects(
@@ -1644,7 +1647,7 @@ def test_m1_custody_decrease_reverts_atomically(
     token.approve(teller, amount, sender=bob)
     token.configure_transfer(5)
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.deposit(token, amount, bob, simple_erc20_vault, sender=bob)
 
     assert token.balanceValue(bob) == amount
@@ -1685,7 +1688,13 @@ def test_m1_balance_observation_failures_are_atomic(
     else:
         token.configure_balance(simple_erc20_vault, 0, balance_mode, True)
 
-    with boa.reverts():
+    if phase == "post" or balance_mode == 6:
+        expected = "custody mismatch"
+    elif balance_mode == 1:
+        expected = "external call failed"
+    else:
+        expected = "returndatasize too small"
+    with boa.reverts(expected):
         teller.deposit(token, amount, bob, simple_erc20_vault, sender=bob)
 
     _m1_assert_no_deposit_effects(
@@ -1767,7 +1776,7 @@ def test_deposit_reverts_when_vault_reports_result_different_from_receipt(
     token.mint(bob, amount)
     token.approve(teller, amount, sender=bob)
 
-    with boa.reverts():
+    with boa.reverts("deposit failed"):
         teller.deposit(token, amount, bob, vault, sender=bob)
 
     _m1_assert_no_deposit_effects(teller, ledger, vault, token, bob, amount)
@@ -1894,7 +1903,7 @@ def test_t6_vault_receipt_equality_mutant_silently_accepts_short_report(
         token, vault, vault_id, amount = setup(teller)
         # Teller's equality assert has no dev reason. The succeeding SHA-pinned
         # mutant branch below isolates this bare revert to that exact guard.
-        with boa.reverts():
+        with boa.reverts("deposit failed"):
             teller.depositFromTrusted(
                 bob,
                 vault_id,
@@ -1966,7 +1975,7 @@ def test_t6_real_basic_vault_blocks_short_report_without_teller_equality(
     token.approve(mutant, amount, sender=credit_engine.address)
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
-    with boa.reverts(dev="insufficient vault backing"):
+    with boa.reverts("insufficient vault backing"):
         mutant.depositFromTrusted(
             bob,
             vault_id,
@@ -2006,7 +2015,7 @@ def test_m1_lock_duration_vault_mismatch_reverts_atomically(
     token.mint(credit_engine, amount)
     token.approve(teller, amount, sender=credit_engine.address)
 
-    with boa.reverts():
+    with boa.reverts("deposit failed"):
         teller.depositFromTrusted(
             bob,
             vault_id,
@@ -2051,7 +2060,7 @@ def test_m1_deposit_many_rolls_back_all_elements_on_nonexact_receipt(
         for token in ordered
     ]
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.depositMany(bob, deposits, sender=bob)
 
     for token in (exact, hostile):
@@ -2106,7 +2115,7 @@ def test_m1_named_trusted_producer_custody_exact_and_short_atomicity(
 
     token.configure_transfer(2)
     user_claim_before = simple_erc20_vault.getTotalAmountForUser(bob, token)
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.depositFromTrusted(
             bob,
             vault_id,
@@ -2147,7 +2156,7 @@ def test_m1_transfer_callback_reentrancy_reverts_and_mutex_recovers(
     token.configure_callback(teller, callback, True)
     token.configure_transfer(8)
 
-    with boa.reverts():
+    with boa.reverts("token transfer failed"):
         teller.deposit(token, amount, bob, simple_erc20_vault, sender=bob)
 
     assert token.balanceValue(bob) == 2 * amount
@@ -2198,7 +2207,7 @@ def test_t1_trusted_callback_is_blocked_by_receipt_measurement_mutex(
         vault_book,
     )
 
-    with boa.reverts():
+    with boa.reverts("token transfer failed"):
         teller.depositFromTrusted(
             bob,
             vault_id,
@@ -2261,7 +2270,7 @@ def test_t1_mutex_removal_mutant_exposes_offsetting_nested_receipt(
     # S2 baseline: the exact named scenario rejects with the reviewed source.
     with boa.env.anchor():
         token, _, vault_id, amount, _ = setup(teller)
-        with boa.reverts():
+        with boa.reverts("token transfer failed"):
             teller.depositFromTrusted(
                 bob,
                 vault_id,
@@ -2402,7 +2411,7 @@ def test_t2_vault_callback_mode_five_is_blocked_after_custody_read(
     )
     callback_vault.configure(5, teller, nested)
 
-    with boa.reverts():
+    with boa.reverts("deposit failed"):
         teller.depositFromTrusted(
             bob,
             callback_vault_id,
@@ -2698,7 +2707,7 @@ def test_m1_gov_vault_receipt_failure_is_atomic(
     else:
         token.configure_balance(ripe_gov_vault, 0, 4, True)
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.depositIntoGovVault(
             token,
             amount,
@@ -2746,7 +2755,7 @@ def test_m1_fixed_sgreen_failure_is_inducible_and_atomic(
 
     bob_green_before = green_token.balanceOf(bob)
     bob_allowance_before = green_token.allowance(bob, teller)
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.convertToSavingsGreenAndDepositIntoStabPool(
             bob,
             amount,
@@ -2981,7 +2990,7 @@ def test_nonreentrant_deposit_blocks_nested_ordinary_deposit(
     token.configure_callback_rejection_policy(False)
     token.configure_transfer(0)
 
-    with boa.reverts():
+    with boa.reverts("token transfer failed"):
         teller.deposit(token, amount, bob, simple_erc20_vault, sender=bob)
     assert token.balanceValue(bob) == amount
     assert token.balanceValue(token) == nested_amount
@@ -3179,7 +3188,7 @@ def test_predeployment_legacy_clamp_is_closed_by_teller_equality_and_rollback(
 
     token.mint(bob, amount)
     token.approve(teller, amount, sender=bob)
-    with boa.reverts():
+    with boa.reverts("deposit failed"):
         teller.deposit(token, amount, bob, vault, sender=bob)
 
     assert token.balanceValue(bob) == amount
@@ -3271,7 +3280,7 @@ def test_predeployment_eoa_asset_fails_at_typed_source_cap_without_effects(
     setGeneralConfig()
     setAssetConfig(alice)
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         teller.deposit(
             alice,
             1,
@@ -3433,7 +3442,17 @@ def test_predeployment_withdrawal_responsibility_matrix(
     should_revert = custody_delta_is_rejected or universally_rejected
 
     if should_revert:
-        with boa.reverts():
+        if vault_kind == "stability":
+            expected = (
+                "transfer failed"
+                if transfer_mode in (6, 7, 10)
+                else "external call failed"
+            )
+        elif transfer_mode in (6, 7, 10):
+            expected = "token transfer failed"
+        else:
+            expected = "invalid recipient delivery"
+        with boa.reverts(expected):
             teller.withdraw(
                 token,
                 amount,

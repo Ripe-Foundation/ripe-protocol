@@ -755,7 +755,7 @@ def test_no_config_scenarios(
 
     # Test getCurvePoolData with no config - should fail gracefully
     # Since there's no pool address configured, calling pool functions should revert
-    with boa.reverts():
+    with boa.reverts("no green ref pool"):
         curve_prices.getCurvePoolData()
 
 

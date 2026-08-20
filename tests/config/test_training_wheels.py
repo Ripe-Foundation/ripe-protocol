@@ -91,7 +91,7 @@ def test_training_wheels_init_over_max_limit(ripe_hq):
     # Try to create 21 users (exceeding MAX_INITIAL = 20)
     initial_list = [f"0x{i:040x}" for i in range(1, 22)]
     
-    with boa.reverts():  # Should fail due to Vyper array size validation
+    with boa.reverts("DynArray[address, 20] bounds check"):  # Vyper array size validation
         boa.load("contracts/config/TrainingWheels.vy", ripe_hq.address, initial_list)
 
 

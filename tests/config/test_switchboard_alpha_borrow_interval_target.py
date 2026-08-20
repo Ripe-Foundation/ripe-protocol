@@ -563,7 +563,7 @@ def test_nonconforming_explicit_target_fails_before_queue(
     nonconforming_target = boa.env.generate_address()
     next_action_id = switchboard_alpha.actionId()
 
-    with boa.reverts():
+    with boa.reverts("invalid borrow interval config"):
         switchboard_alpha.setBorrowIntervalConfig(
             500,
             50,

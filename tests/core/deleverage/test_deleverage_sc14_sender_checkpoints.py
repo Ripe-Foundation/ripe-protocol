@@ -243,7 +243,7 @@ def test_sc14_swap_collateral_sender_checkpoint_revert_is_atomic(
         "bravo_vault": simple_erc20_vault.userBalances(bob, bravo_token),
     }
     _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         deleverage.swapCollateral(
             bob,
             vault_id,
@@ -332,7 +332,7 @@ def test_sc14_endaoment_sender_checkpoint_revert_is_atomic(
         "endaoment_tokens": alpha_token.balanceOf(endaoment_funds),
     }
     _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         teller.deleverageManyUsers([(bob, 0)], sender=switchboard_alpha.address)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["user_balance"]
     assert alpha_token.balanceOf(simple_erc20_vault) == state["vault_tokens"]

@@ -388,7 +388,7 @@ def test_sc14_redeem_checkpoint_revert_rolls_back_state(
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
     _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         _redeem(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
     assert simple_erc20_vault.userBalances(alice, alpha_token) == state["alice_vault"]
@@ -460,7 +460,7 @@ def test_sc14_redeem_recipient_checkpoint_revert_rolls_back_registration(
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
     _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, alice)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         _redeem(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
     assert simple_erc20_vault.userBalances(alice, alpha_token) == state["alice_vault"]
@@ -529,7 +529,7 @@ def test_sc14_redeem_withdrawal_checkpoint_revert_rolls_back_tokens(
     debt_before = ledger.userDebt(bob).amount
     green_before = green_token.balanceOf(alice)
     green_allowance = green_token.allowance(alice, teller)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         _redeem(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, False)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == bob_vault
     assert alpha_token.balanceOf(alice) == alice_wallet
