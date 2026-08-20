@@ -58,6 +58,9 @@ class _PriceDesk:
     def tokenScale(self, asset):
         return self.scales.get(str(asset).lower(), 0)
 
+    def hasPriceFeed(self, asset):
+        return True
+
 
 def _execute(fn, *args):
     return fn(*args)

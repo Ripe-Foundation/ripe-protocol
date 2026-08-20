@@ -44,6 +44,8 @@ def sync_existing_token_scales(execute, price_desk, mission_control, eth_sentine
             continue
         if _asset_is_nft(mission_control.assetConfig(asset)):
             continue
+        if int(price_desk.tokenScale(asset)) != 0:
+            continue
         execute(price_desk.syncTokenScale, asset)
         assert int(price_desk.tokenScale(asset)) != 0, (
             f"token scale unset after sync for asset {asset_addr}"
@@ -51,6 +53,8 @@ def sync_existing_token_scales(execute, price_desk, mission_control, eth_sentine
 
 
 def sync_usdg_token_scale(execute, price_desk, usdg):
+    if int(price_desk.tokenScale(usdg)) != 0:
+        return
     execute(price_desk.syncTokenScale, usdg)
     assert int(price_desk.tokenScale(usdg)) != 0
 

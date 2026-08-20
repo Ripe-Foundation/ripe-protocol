@@ -1,7 +1,7 @@
 import boa
 import pytest
 
-from constants import ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
@@ -128,6 +128,10 @@ def _execute(switchboard_bravo, governance, action_id):
     return switchboard_bravo.executePendingAction(action_id, sender=governance.address)
 
 
+def _feed(mock_price_source, token):
+    mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+
 def test_fungible_add_new_stores_config_and_scale(
     switchboard_bravo,
     mission_control,
@@ -143,6 +147,20 @@ def test_fungible_add_new_stores_config_and_scale(
     assert price_desk.tokenScale(token) == 10**8
 
 
+def test_fungible_add_new_does_not_need_a_feed(
+    switchboard_bravo,
+    mission_control,
+    governance,
+    price_desk,
+    ripe_hq,
+):
+    token = _token(18)
+    action_id = _add_fungible(switchboard_bravo, governance, token)
+    assert _execute(switchboard_bravo, governance, action_id)
+    assert mission_control.isSupportedAsset(token.address)
+    assert price_desk.tokenScale(token) == EIGHTEEN_DECIMALS
+
+
 def test_preseeded_scale_skips_decimals_and_succeeds(
     switchboard_bravo,
     mission_control,
@@ -151,12 +169,12 @@ def test_preseeded_scale_skips_decimals_and_succeeds(
     ripe_hq,
 ):
     token = _token(8)
-    price_desk.setTokenScale(token, 6, sender=governance.address)
+    price_desk.syncTokenScale(token, sender=governance.address)
     token.setShouldRevert(True)
     action_id = _add_fungible(switchboard_bravo, governance, token)
     assert _execute(switchboard_bravo, governance, action_id)
     assert mission_control.isSupportedAsset(token.address)
-    assert price_desk.tokenScale(token) == 10**6
+    assert price_desk.tokenScale(token) == 10**8
 
 
 def test_nft_admission_does_not_require_scale(
@@ -179,9 +197,11 @@ def test_sync_failure_rolls_back_mission_control(
     mission_control,
     governance,
     price_desk,
+    mock_price_source,
     ripe_hq,
 ):
     token = _token(18)
+    _feed(mock_price_source, token)
     token.setShouldRevert(True)
     action_id = _add_fungible(switchboard_bravo, governance, token)
     pending_before = switchboard_bravo.pendingAssetConfig(action_id)
