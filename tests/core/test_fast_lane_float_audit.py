@@ -103,7 +103,9 @@ def test_f2_stale_set_solver_cannot_revive_presigned_orders(flf, solver, bob, al
     with boa.reverts("not solver"):
         flf.fill(backlog[0], sigs[0], sender=solver.address)
 
-    # the staged rotation is void, so the backlog stays dead
+    # the staged rotation is void. Note what this does and does not prove: the
+    # *stale* path is closed, not the backlog. See
+    # test_h8_reinstating_a_burned_signer_revives_the_backlog for the rest.
     with boa.reverts("stale action"):
         flf.confirmChange(stale, sender=charlie)
     assert flf.solverSigner() == ZERO_ADDRESS
@@ -162,3 +164,55 @@ def test_f1c_stale_cap_raise_cannot_undo_emergency_lower_caps(flf, charlie):
         flf.confirmChange(stale, sender=charlie)
     assert flf.maxAggregateExposure() == 1 * EIGHTEEN_DECIMALS
     assert flf.maxFillAmount() == 1 * EIGHTEEN_DECIMALS
+
+
+# ---------- H-8 residual: what configEpoch does not reach ----------
+
+
+def test_h8_reinstating_a_burned_signer_revives_the_backlog(flf, solver, bob, alice, charlie):
+    """A *fresh* rotation back to a burned address - no stale action, full
+    timelock served, configEpoch current - revives every unfilled order that key
+    ever signed. `configEpoch` guards pending actions, not signed orders.
+
+    Bounded in practice by `fill`'s `msg.sender == solverSigner` gate: an
+    attacker who cannot submit as the solver cannot use the backlog, and one who
+    can does not need it. Recorded because the contract keeps no durable mark
+    that an address was ever burned, so reinstating one is indistinguishable
+    from any other rotation.
+    """
+    flf.setGuardian(alice, True, sender=charlie)
+
+    backlog = [_order(bob, MAX_FILL, salt=bytes([i]) * 32, deadline=boa.env.timestamp + 10**9)
+               for i in range(3)]
+    sigs = [_sign(flf, solver, o) for o in backlog]
+
+    flf.clearSolverSigner(sender=alice)
+    epoch_after_clear = flf.configEpoch()
+    with boa.reverts("not solver"):
+        flf.fill(backlog[0], sigs[0], sender=solver.address)
+
+    aid = flf.initiateChange(ACTION_SET_SOLVER, solver.address, 0, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)          # not stale: queued after the clear
+    assert flf.configEpoch() == epoch_after_clear   # nothing invalidated the orders
+    assert flf.solverSigner() == solver.address
+
+    before = flf.outstandingNotional()
+    for o, s in zip(backlog, sigs):
+        flf.fill(o, s, sender=solver.address)
+    assert flf.outstandingNotional() == before + 3 * MAX_FILL
+
+
+def test_h8_deadline_is_unbounded_so_a_stale_order_still_fills(flf, solver, bob):
+    """`deadline` is checked but not bounded, so the contract accepts an order
+    whose terms were priced arbitrarily long ago. A fast lane quotes in seconds;
+    this one fills a century later. The stated purpose of
+    `outputAmount <= inputAmount` is to catch a *buggy* solver overpaying against
+    a real deposit, and a dropped-then-replayed order is exactly that bug.
+    """
+    o = _order(bob, MAX_FILL, deadline=2**255, salt=b"\xaa" * 32)
+    sig = _sign(flf, solver, o)
+
+    boa.env.time_travel(seconds=100 * 365 * 24 * 3600)
+    flf.fill(o, sig, sender=solver.address)
+    assert flf.outstandingNotional() == MAX_FILL

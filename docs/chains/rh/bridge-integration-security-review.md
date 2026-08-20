@@ -12,7 +12,8 @@ rev 8 — added H-5, destination-side stranding on the live CCIP burn/mint path;
 rev 9 — added H-6 refill/drain asymmetry and M-4 age-cap liveness trap;
 rev 10 — corrected Relay order authorization, reconciliation, and cap semantics;
 rev 11 — M-5 routing evidence pinned and claim narrowed; added H-7, H-8, M-6, M-7
-against the implemented `FastLaneFloat`)
+against the implemented `FastLaneFloat`;
+rev 12 — H-7, M-6, M-7 verified resolved; H-8 corrected down to Medium)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -866,6 +867,12 @@ Ripe's contracts' point of view.
 
 ### H-7 — Every immediate emergency lever in `FastLaneFloat` is undone in one transaction by a pre-staged timelock action
 
+**Resolved in `3eaa159` (verified rev 12).** Every timelocked action records
+`configEpoch`; `pauseLane`, `clearSolverSigner`, `lowerCaps`, `raiseFloatFloor`
+and `retire` all bump it, and `confirmChange` asserts `p.epoch ==
+self.configEpoch`. The fix is state-bound rather than action-enumerated, which
+is the form that does not decay. All three instances now revert `stale action`.
+
 **Severity: High (defeats the incident-response model; no key compromise
 required beyond the one the levers exist to answer). Added rev 11. Reproduced
 by `tests/core/test_fast_lane_float_audit.py`.**
@@ -920,44 +927,64 @@ action loosens what — the enumeration is precisely what has decayed twice
 already in this review. Additionally, let guardians call `cancelChange`;
 cancelling is a tightening operation and belongs with the other fast levers.
 
-### H-8 — Reinstating a cleared solver signer revives its entire unfilled pre-signed backlog
+### H-8 — *Downgraded to M-8 in rev 12.* Solver-order lifetime
 
-**Severity: High (direct fund-loss path, bounded only by the caps). Added
-rev 11. Reproduced by `tests/core/test_fast_lane_float_audit.py`.**
+**Severity: Medium, corrected down from High. Added rev 11, corrected rev 12.
+Reproduced by `tests/core/test_fast_lane_float_audit.py`.**
 
-Independent of H-7, and it survives a fully-elapsed timelock.
+**Correction.** Rev 11 rated this High on the basis that clearing
+`solverSigner` does not invalidate outstanding signatures, so reinstating the
+address revives the signer's unfilled pre-signed backlog. The mechanism is real
+and still present — a *fresh* rotation back to a burned address serves the full
+timelock, carries a current `configEpoch`, and revives the backlog
+(`test_h8_reinstating_a_burned_signer_revives_the_backlog`). The severity was
+wrong. `fill` requires `msg.sender == self.solverSigner`
+(`contracts/core/FastLaneFloat.vy:278`), so a signature confers no authority to
+anyone who does not already control the solver key: an attacker holding the
+backlog and not the key cannot submit, and one holding the key does not need the
+backlog. Signer versioning therefore buys nothing against key compromise, and
+rev 11's recommendation 1 should not be built for that reason.
 
-`fill` protects against replay with `isFilled[orderId]`, which records only
-orders that were **filled**. An order that was signed and never submitted
-leaves no trace. Two other properties make that permanent: `_order.deadline` is
-checked (`block.timestamp <= _order.deadline`) but **not bounded**, so a signer
-can mint orders valid for centuries; and clearing `solverSigner` invalidates
-nothing at order level, because validity is recomputed against whatever address
-is configured at fill time.
+Two residuals survive the correction, both Medium or below.
 
-So the response to a solver-key compromise is incomplete by construction.
-`clearSolverSigner` stops the bleeding while the address is unset. The moment
-governance restores that same address — after remediation, believing the
-incident closed, or via a stale H-7 action — every order the attacker signed
-during the compromise becomes live again, and can be drained straight into the
-caps.
-`test_poc_f2_stale_set_solver_revives_presigned_orders` walks it: three
-max-size orders signed up front, the signer cleared, fills reverting, then a
-single `confirmChange` followed by all three filling for `3 x maxFillAmount`.
+**The `deadline` field is load-bearing in the design and inert in the
+contract.** It is checked (`block.timestamp <= _order.deadline`) and not
+bounded, so an order priced arbitrarily long ago is still admissible. A fast
+lane quotes in seconds; `test_h8_deadline_is_unbounded_so_a_stale_order_still_fills`
+signs an order and fills it a century later against a key that was never
+compromised or rotated. This matters in the contract's *own* stated threat
+model rather than the adversarial one: the comment on `outputAmount <=
+inputAmount` says that check exists to catch a buggy solver overpaying against a
+real deposit, and an order built, signed, dropped by a retry queue and replayed
+much later against a deposit that no longer corresponds is precisely that bug.
+The contract cannot distinguish it. **Fix:** reject
+`_order.deadline > block.timestamp + MAX_ORDER_HORIZON` with a horizon in
+minutes. One line, and it makes the field mean what the design says it means.
 
-**Recommendation.** Two changes, both small:
+**Clearing a signer leaves no durable record that the address was burned.**
+After `clearSolverSigner`, `initiateChange(ACTION_SET_SOLVER, sameAddr)` is
+indistinguishable in contract state from any other rotation, so the one control
+whose whole purpose is to answer a key compromise is silently reversible by an
+operator who has forgotten why it fired. **Fix (Low):** keep
+`wasCleared[address]` and require an explicitly-named action to reinstate a
+previously-cleared signer, so reinstatement is a decision rather than a default.
 
-1. **Version the signer.** Keep `signerEpoch`, increment it in
-   `clearSolverSigner` and on every `ACTION_SET_SOLVER` confirmation, and
-   include it in `ORDER_TYPEHASH`. Clearing the signer then invalidates every
-   outstanding signature by that key permanently, and reinstating the address
-   does not revive them.
-2. **Bound the deadline.** Reject `_order.deadline > block.timestamp +
-   MAX_ORDER_HORIZON`. A fast lane quotes in seconds; an order valid for more
-   than a few minutes has no legitimate use and is only ever a bearer
-   instrument someone can stockpile.
+**Note on the regression test.** `test_f2_stale_set_solver_cannot_revive_presigned_orders`
+inverted the rev-11 PoC and concluded "the backlog stays dead". It proved the
+*stale-action* path is closed, which is H-7, not that the backlog is dead. The
+comment is corrected and the residual is now covered by its own test. Worth
+recording as an instance of the pattern this review keeps hitting: the finding
+was closed against the delivery path it happened to be demonstrated through,
+rather than against its root cause — and here it was the demonstration, not the
+gate, that was too narrow.
 
 ### M-6 — `pauseLane` does not stop value leaving, and `ACTION_WITHDRAW` ignores the drain floor
+
+**Resolved in `3eaa159` (verified rev 12).** `ACTION_WITHDRAW` now requires a
+one-way `retire()`, a 7-day delay, `outstandingEntries == 0` and an exact
+balance delta, checked at initiation *and* revalidated at confirmation. It
+deliberately does not check the floor, which is correct: the floor protects a
+live lane, and a retired quiesced instance should be fully sweepable.
 
 **Severity: Medium. Added rev 11. Reproduced by
 `tests/core/test_fast_lane_float_audit.py`.**
@@ -986,6 +1013,10 @@ ordinary one; require `outstandingEntries == 0` for a full sweep; and refuse
 lane halts every outflow rather than one of them.
 
 ### M-7 — The drain floor is the one cap that can be deployed inert
+
+**Resolved in `9cbd967` (verified rev 12).** `assert _minFloatBalance != 0` in
+the constructor (`:236`) and `assert _numVal != 0` on `ACTION_LOWER_FLOOR`
+(`:745`). Both paths revert.
 
 **Severity: Medium. Added rev 11. Reproduced by
 `tests/core/test_fast_lane_float_audit.py`.**
@@ -1107,7 +1138,8 @@ Whatever design lands, these must be red-before-green:
 
 ## Sign-off
 
-Not signed off. **Eight highs open, seven mediums.**
+Not signed off. **Six highs open, eight mediums** (rev 12: H-7, M-6 and M-7
+verified resolved against `9cbd967`; H-8 corrected down to M-8).
 
 `FastLaneFloat` (`contracts/core/FastLaneFloat.vy`, head `80e15c8`) is code now,
 not a specification, and the four findings added in rev 11 are against the
@@ -1117,11 +1149,18 @@ H-7 and H-8 are both cases where that model is the thing at fault, so a green
 suite is not evidence against them. Each is reproduced in
 `tests/core/test_fast_lane_float_audit.py`, red against the current contract.
 
-H-7 and H-8 together mean the contract's incident response does not currently
-work: the fast levers can be reversed in one transaction (H-7) and clearing a
-compromised signer is not durable (H-8). Both are cheap to fix — one epoch
-counter each — and both must land before the contract holds value, because
-neither is detectable after the fact from the contract's own state.
+H-7 is fixed and the fix is the right shape — `configEpoch` binds a queued
+action to the configuration it was queued under, without enumerating which
+action loosens what. H-8's rating was mine and it was wrong: `fill`'s
+`msg.sender == solverSigner` gate means order signatures carry no authority
+beyond key control, so the finding is M-8 and its remaining content is an
+unbounded `deadline` and an unrecorded signer burn.
+
+What that leaves against `FastLaneFloat` is not a control defect. The order
+format is a local placeholder that a genuine Relay signature will not verify,
+and restoration is a balance proof rather than an authenticated receipt — both
+correctly labelled, both blocking. The caps, ledger, levers and retirement are
+the part that is real, and rev 12 finds them sound.
 
 Not signed off. H-1, H-2, and H-4 remain unresolved owner decisions. H-3's
 rev-4 rationale was wrong and is retracted; the required answer is now the
