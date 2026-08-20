@@ -806,7 +806,7 @@ def releaseLock(_asset: address, _user: address = msg.sender):
     vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
-    self._performHousekeeping(False, _user, True, True, a)
+    self._performHousekeeping(True, _user, True, True, a)
 
 
 ##################

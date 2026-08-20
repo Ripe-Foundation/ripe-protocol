@@ -442,6 +442,244 @@ def test_hr_refund_after_cancel_paycheck_with_burn_with_position(
     assert final_contributor_balance == initial_hr_ripe_balance == 0
 
 
+def test_hr_refund_burn_reverts_atomically_when_contributor_debt_becomes_unhealthy(
+    human_resources,
+    ripe_gov_vault,
+    ripe_token,
+    ledger,
+    bob,
+    teller,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    switchboard_charlie,
+    setupRipeGovVaultConfig,
+    setGeneralDebtConfig,
+    mock_price_source,
+    deployedContributor,
+):
+    setupRipeGovVaultConfig()
+    setGeneralDebtConfig()
+    mission_control.setShouldCheckLastTouch(False, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+    contributor_addr = deployedContributor()
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    human_resources.cashRipeCheck(
+        deposit_amount,
+        500,
+        sender=contributor_addr,
+    )
+
+    mission_control.setUserDelegation(
+        contributor_addr,
+        bob,
+        (False, True, False, False),
+        sender=switchboard_charlie.address,
+    )
+    max_debt = credit_engine.getUserBorrowTerms(
+        contributor_addr,
+        False,
+    ).totalMaxDebt
+    assert max_debt > 0
+    teller.borrow(max_debt, contributor_addr, False, sender=bob)
+
+    debt_before = ledger.userDebt(contributor_addr).amount
+    terms_before = credit_engine.getUserBorrowTerms(contributor_addr, False)
+    assert debt_before == max_debt
+    assert debt_before <= terms_before.totalMaxDebt
+
+    refund_amount = 25_000 * EIGHTEEN_DECIMALS
+    position_before = ripe_gov_vault.getTotalAmountForUser(
+        contributor_addr,
+        ripe_token,
+    )
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
+    supply_before = ripe_token.totalSupply()
+    budget_before = ledger.ripeAvailForHr()
+    with boa.reverts("bad debt health"):
+        human_resources.refundAfterCancelPaycheck(
+            refund_amount,
+            True,
+            sender=contributor_addr,
+        )
+
+    assert ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token) == position_before
+    assert ripe_gov_vault.totalBalances(ripe_token) == total_shares_before
+    assert ripe_token.balanceOf(ripe_gov_vault) == custody_before
+    assert ripe_token.balanceOf(human_resources) == 0
+    assert ripe_token.totalSupply() == supply_before
+    assert ledger.ripeAvailForHr() == budget_before
+    assert ledger.userDebt(contributor_addr).amount == debt_before
+
+
+@pytest.mark.parametrize(
+    ("debt_delta", "should_revert"),
+    (
+        pytest.param(0, False, id="exact-post-burn-capacity"),
+        pytest.param(1, True, id="one-wei-over-post-burn-capacity"),
+    ),
+)
+def test_hr_refund_burn_enforces_other_collateral_health_boundary(
+    debt_delta,
+    should_revert,
+    human_resources,
+    ripe_gov_vault,
+    simple_erc20_vault,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    ledger,
+    bob,
+    teller,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    switchboard_charlie,
+    setupRipeGovVaultConfig,
+    setAssetConfig,
+    createDebtTerms,
+    setGeneralDebtConfig,
+    mock_price_source,
+    deployedContributor,
+):
+    setupRipeGovVaultConfig()
+    alpha_ltv = 50_00
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=createDebtTerms(_ltv=alpha_ltv, _borrowRate=0),
+    )
+    setGeneralDebtConfig()
+    mission_control.setShouldCheckLastTouch(False, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    contributor_addr = deployedContributor()
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    human_resources.cashRipeCheck(
+        deposit_amount,
+        500,
+        sender=contributor_addr,
+    )
+
+    alpha_token.transfer(human_resources, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, deposit_amount, sender=human_resources.address)
+    teller.depositFromTrusted(
+        contributor_addr,
+        3,
+        alpha_token,
+        deposit_amount,
+        0,
+        sender=human_resources.address,
+    )
+    assert simple_erc20_vault.getTotalAmountForUser(contributor_addr, alpha_token) == deposit_amount
+
+    mission_control.setUserDelegation(
+        contributor_addr,
+        bob,
+        (False, True, False, False),
+        sender=switchboard_charlie.address,
+    )
+    post_burn_max_debt = deposit_amount * alpha_ltv // 100_00
+    borrow_amount = post_burn_max_debt + debt_delta
+    pre_burn_terms = credit_engine.getUserBorrowTerms(contributor_addr, False)
+    assert borrow_amount <= pre_burn_terms.totalMaxDebt
+    teller.borrow(borrow_amount, contributor_addr, False, sender=bob)
+
+    refund_amount = 25_000 * EIGHTEEN_DECIMALS
+    budget_before = ledger.ripeAvailForHr()
+    supply_before = ripe_token.totalSupply()
+    ripe_position_before = ripe_gov_vault.getTotalAmountForUser(
+        contributor_addr,
+        ripe_token,
+    )
+    ripe_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    alpha_position_before = simple_erc20_vault.getTotalAmountForUser(
+        contributor_addr,
+        alpha_token,
+    )
+    debt_before = ledger.userDebt(contributor_addr).amount
+    assert debt_before == borrow_amount
+
+    if should_revert:
+        with boa.reverts("bad debt health"):
+            human_resources.refundAfterCancelPaycheck(
+                refund_amount,
+                True,
+                sender=contributor_addr,
+            )
+
+        assert ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token) == ripe_position_before
+        assert ripe_gov_vault.totalBalances(ripe_token) == ripe_shares_before
+        assert simple_erc20_vault.getTotalAmountForUser(contributor_addr, alpha_token) == alpha_position_before
+        assert ripe_token.totalSupply() == supply_before
+        assert ledger.ripeAvailForHr() == budget_before
+        assert ledger.userDebt(contributor_addr).amount == debt_before
+        return
+
+    human_resources.refundAfterCancelPaycheck(refund_amount, True, sender=contributor_addr)
+
+    assert ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token) == 0
+    assert simple_erc20_vault.getTotalAmountForUser(contributor_addr, alpha_token) == alpha_position_before
+    assert ripe_token.totalSupply() == supply_before - deposit_amount
+    assert ledger.ripeAvailForHr() == budget_before + refund_amount
+    debt = ledger.userDebt(contributor_addr).amount
+    terms = credit_engine.getUserBorrowTerms(contributor_addr, False)
+    assert debt == borrow_amount == terms.totalMaxDebt == post_burn_max_debt
+
+
+def test_hr_refund_burn_honors_same_block_higher_risk_guard(
+    human_resources,
+    ripe_gov_vault,
+    ripe_token,
+    ledger,
+    bob,
+    teller,
+    mission_control,
+    switchboard_alpha,
+    switchboard_charlie,
+    setupRipeGovVaultConfig,
+    setGeneralDebtConfig,
+    mock_price_source,
+    deployedContributor,
+):
+    setupRipeGovVaultConfig()
+    setGeneralDebtConfig()
+    mission_control.setShouldCheckLastTouch(True, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+    contributor_addr = deployedContributor()
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    human_resources.cashRipeCheck(deposit_amount, 500, sender=contributor_addr)
+    mission_control.setUserDelegation(
+        contributor_addr,
+        bob,
+        (False, True, False, False),
+        sender=switchboard_charlie.address,
+    )
+    teller.borrow(1, contributor_addr, False, sender=bob)
+    assert ledger.lastTouch(contributor_addr) == boa.env.evm.patch.block_number
+
+    refund_amount = 25_000 * EIGHTEEN_DECIMALS
+    position_before = ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token)
+    supply_before = ripe_token.totalSupply()
+    budget_before = ledger.ripeAvailForHr()
+    debt_before = ledger.userDebt(contributor_addr).amount
+
+    with boa.reverts("one action per block"):
+        human_resources.refundAfterCancelPaycheck(
+            refund_amount,
+            True,
+            sender=contributor_addr,
+        )
+
+    assert ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token) == position_before
+    assert ripe_token.totalSupply() == supply_before
+    assert ledger.ripeAvailForHr() == budget_before
+    assert ledger.userDebt(contributor_addr).amount == debt_before
+
+
 def test_hr_refund_after_cancel_paycheck_not_contributor(
     human_resources,
     alice

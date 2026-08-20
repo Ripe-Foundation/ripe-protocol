@@ -70,6 +70,7 @@ interface HrContributor:
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
@@ -506,6 +507,7 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
     if burnAmount != 0:
         assert extcall RipeToken(a.ripeToken).burn(burnAmount)  # dev: ripe burn failed
+    extcall Teller(a.teller).performHousekeeping(True, msg.sender, True, a)
 
 
 #########
