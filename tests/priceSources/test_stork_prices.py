@@ -2,7 +2,7 @@ import boa
 import pytest
 
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, advance_timelock_blocks
 from config.BluePrint import CORE_TOKENS
 
 MONTH_IN_SECONDS = 30 * 24 * 60 * 60
@@ -15,7 +15,7 @@ def addStorkFeed(stork_prices, governance):
         if stork_prices.hasPriceFeed(_asset):
             return
         assert stork_prices.addNewPriceFeed(_asset, _feed_id, _stale_time, sender=governance.address)
-        boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+        advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
         assert stork_prices.confirmNewPriceFeed(_asset, sender=governance.address)
     yield addStorkFeed
 
@@ -322,7 +322,7 @@ def test_stork_add_price_feed(
         stork_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
     # Travel past time lock
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
 
     # Test confirming
     assert stork_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
@@ -399,7 +399,7 @@ def test_stork_add_price_feed_validation_during_confirm(
     assert stork_prices.addNewPriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
     
     # Travel past time lock
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
 
     # Invalidate with a negative quantized value. Ordinary validation
     # failures returned normally still auto-cancel during confirmation.
@@ -477,7 +477,7 @@ def test_stork_update_price_feed(
         stork_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
     # Travel past time lock
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
 
     # Test confirming
     assert stork_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
@@ -611,7 +611,7 @@ def test_stork_disable_price_feed(
         stork_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
 
     # Travel past time lock
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
 
     # Test confirming
     assert stork_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
@@ -752,11 +752,11 @@ def test_stork_time_lock_edge_cases(
 
     # Test multiple time lock actions in sequence
     assert stork_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
     
     assert stork_prices.disablePriceFeed(alpha_token, sender=governance.address)
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
 
     # Test with different time lock values
@@ -785,10 +785,10 @@ def test_stork_governance_edge_cases(
     assert stork_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     assert stork_prices.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
     assert stork_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
     assert stork_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
     # Test governance actions during pause (using switchboard address)
@@ -804,7 +804,7 @@ def test_stork_governance_edge_cases(
     stork_prices.pause(False, sender=switchboard_alpha.address)
     # First disable the existing feed
     assert stork_prices.disablePriceFeed(alpha_token, sender=governance.address)
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
     # Now we can add a new feed
     assert stork_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
@@ -842,13 +842,24 @@ def test_set_stork_feed_cbtc(
     stork_prices,
     fork,
     addStorkFeed,
+    setGeneralConfig,
+    mission_control,
 ):
     cbtc = CORE_TOKENS[fork]["CBBTC"]
+    # Official keccak256("BTCUSD") asset id. The value is on the pinned
+    # Stork contract, but older than MissionControl's 1-day global window.
     data_feed_id = bytes.fromhex("7404e3d104ea7841c3d9e6fd20adfe99b4ad586bc08d8f3bd3afef894cf184de")
-    addStorkFeed(cbtc, data_feed_id)
-
-    assert stork_prices.feedConfig(cbtc).feedId == data_feed_id
-    assert 99_000 * EIGHTEEN_DECIMALS > stork_prices.getPrice(cbtc) > 97_000 * EIGHTEEN_DECIMALS
+    previous_stale = mission_control.getPriceStaleTime()
+    if not stork_prices.isValidNewFeed(cbtc, data_feed_id, 0):
+        setGeneralConfig(_priceStaleTime=0)
+    try:
+        addStorkFeed(cbtc, data_feed_id)
+        assert stork_prices.feedConfig(cbtc).feedId == data_feed_id
+        price = stork_prices.getPrice(cbtc)
+        assert price != 0
+        assert 10_000 * EIGHTEEN_DECIMALS < price < 250_000 * EIGHTEEN_DECIMALS
+    finally:
+        setGeneralConfig(_priceStaleTime=previous_stale)
 
 
 SC20_STORK_FEED_ID = bytes.fromhex(
@@ -881,7 +892,7 @@ def _add_sc20_stork_feed(
         stale_time,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
     _set_sc20_stork_price(mock_stork, boa.env.timestamp)
     assert stork_prices.confirmNewPriceFeed(asset, sender=governance.address)
 

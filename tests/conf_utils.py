@@ -3,6 +3,11 @@ import boa
 from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS, EIGHTEEN_DECIMALS
 
 
+def advance_timelock_blocks(blocks):
+    """Advance governance block number without aging historical fork oracles."""
+    boa.env.evm.patch.block_number += blocks
+
+
 def clear_transient_storage():
     """Emulate a real EVM transaction boundary under titanoboa 0.2.7."""
     boa.env.evm.vm.state.clear_transient_storage()
