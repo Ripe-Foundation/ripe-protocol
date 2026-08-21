@@ -36,7 +36,7 @@ EXPECTED_RUNTIME_BYTES = {
     "StabilityPool": 24269,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 14272,
-    "CurvePrices": 24004,
+    "CurvePrices": 23966,
     "PythPrices": 14811,
     "RedStone": 13657,
     "StorkPrices": 13832,

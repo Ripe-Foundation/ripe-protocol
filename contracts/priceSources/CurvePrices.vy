@@ -201,13 +201,9 @@ greenRefPoolData: public(GreenRefPoolData)
 snapShots: public(HashMap[uint256, RefPoolSnapshot]) # index -> snapshot
 pendingGreenRefPoolConfig: public(HashMap[uint256, GreenRefPoolConfig]) # actionId -> config
 
-# Legacy continuity anchors are retained in place for storage compatibility.
-greenRecoveryStartBlock: uint256
-greenRecoveryLastSafeBlock: uint256
-greenDangerLastBlock: uint256
-# Endpoint-based state is appended so an upgrade cannot interpret a historical
-# block-number anchor as an accumulated interval duration.
+# Confirmed policy-boundary endpoint state.
 greenPolicyBoundaryBlock: uint256
+greenPolicyBoundaryClassification: uint256 # 0 unavailable, 1 safe, 2 dangerous
 greenRecoveryBlocks: uint256
 
 # curve
@@ -218,6 +214,8 @@ CURVE_REGISTRIES: public(immutable(CurveRegistries))
 METAPOOL_FACTORY_ID: constant(uint256) = 3
 TWO_CRYPTO_FACTORY_ID: constant(uint256) = 6
 META_REGISTRY_ID: constant(uint256) = 7
+POLICY_BOUNDARY_SAFE: constant(uint256) = 1
+POLICY_BOUNDARY_DANGEROUS: constant(uint256) = 2
 TRICRYPTO_NG_FACTORY_ID: constant(uint256) = 11
 STABLESWAP_NG_FACTORY_ID: constant(uint256) = 12
 TWO_CRYPTO_NG_FACTORY_ID: constant(uint256) = 13
@@ -1016,10 +1014,8 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     if meaningChanged or capacityChanged:
         self._clearGreenRefPoolSnapshots()
         self.greenRefPoolData = empty(GreenRefPoolData)
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
-        self.greenDangerLastBlock = 0
         self.greenPolicyBoundaryBlock = 0
+        self.greenPolicyBoundaryClassification = 0
         self.greenRecoveryBlocks = 0
 
     # save new ref pool config before the reset seed helper re-reads it
@@ -1042,19 +1038,17 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     # retained rollup establishes the confirmation classification; the first
     # later observation closes an interval from this explicit boundary.
     elif classificationChanged:
-        self.greenDangerLastBlock = 0
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
         self.greenPolicyBoundaryBlock = block.number
+        self.greenPolicyBoundaryClassification = 0
         self.greenRecoveryBlocks = 0
 
         categoryData: GreenRefPoolData = self.greenRefPoolData
         categoryRatio: uint256 = self._getWeightedGreenRatio(d, categoryData)
         if categoryRatio != 0:
             if categoryRatio >= d.dangerTrigger:
-                self.greenDangerLastBlock = block.number
-            elif categoryData.numBlocksInDanger != 0:
-                self.greenRecoveryLastSafeBlock = block.number
+                self.greenPolicyBoundaryClassification = POLICY_BOUNDARY_DANGEROUS
+            else:
+                self.greenPolicyBoundaryClassification = POLICY_BOUNDARY_SAFE
 
     return True
 
@@ -1336,10 +1330,8 @@ def _updateGreenDangerState(
     policyBoundary: uint256 = self.greenPolicyBoundaryBlock
     if policyBoundary != 0:
         self.greenPolicyBoundaryBlock = 0
-        dangerAnchor: uint256 = self.greenDangerLastBlock
-        recoveryAnchor: uint256 = self.greenRecoveryLastSafeBlock
-        self.greenDangerLastBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
+        boundaryClassification: uint256 = self.greenPolicyBoundaryClassification
+        self.greenPolicyBoundaryClassification = 0
         if policyBoundary >= _current.update:
             return data
 
@@ -1348,11 +1340,18 @@ def _updateGreenDangerState(
             return data
 
         currentDangerAtBoundary: bool = _current.ratio >= _config.dangerTrigger
-        if dangerAnchor != 0 and currentDangerAtBoundary:
+        if (
+            boundaryClassification == POLICY_BOUNDARY_DANGEROUS
+            and currentDangerAtBoundary
+        ):
             if data.numBlocksInDanger <= max_value(uint256) - boundaryDuration:
                 data.numBlocksInDanger += boundaryDuration
             self.greenRecoveryBlocks = 0
-        elif recoveryAnchor != 0 and not currentDangerAtBoundary and data.numBlocksInDanger != 0:
+        elif (
+            boundaryClassification == POLICY_BOUNDARY_SAFE
+            and not currentDangerAtBoundary
+            and data.numBlocksInDanger != 0
+        ):
             if boundaryDuration >= _config.staleBlocks:
                 data.numBlocksInDanger = 0
                 self.greenRecoveryBlocks = 0
@@ -1369,7 +1368,6 @@ def _updateGreenDangerState(
 
     if previousDanger and currentDanger:
         self.greenRecoveryBlocks = 0
-        self.greenRecoveryLastSafeBlock = 0
         if data.numBlocksInDanger <= max_value(uint256) - duration:
             data.numBlocksInDanger += duration
         return data
@@ -1383,7 +1381,6 @@ def _updateGreenDangerState(
     if recoveryBlocks >= _config.staleBlocks or duration >= _config.staleBlocks - recoveryBlocks:
         data.numBlocksInDanger = 0
         self.greenRecoveryBlocks = 0
-        self.greenRecoveryLastSafeBlock = 0
     else:
         self.greenRecoveryBlocks = recoveryBlocks + duration
     return data

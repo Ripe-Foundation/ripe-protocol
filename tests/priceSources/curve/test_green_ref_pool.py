@@ -1682,46 +1682,12 @@ def test_danger_counter_overflow_guard_preserves_state(local_curve_ref_system):
     current = boa.env.evm.patch.block_number
     preserved = 2**256 - 2
     curve.eval(f"self.greenRefPoolData.numBlocksInDanger = {preserved}")
-    curve.eval(f"self.greenDangerLastBlock = {current}")
     boa.env.time_travel(blocks=2)
     assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
 
     data = curve.greenRefPoolData()
     assert data.numBlocksInDanger == preserved
     assert data.lastSnapshot.update == current + 2
-
-
-@pytest.mark.fork("local", "base")
-def test_legacy_continuity_slots_are_not_recovery_duration(
-    local_curve_ref_system,
-):
-    curve, pool, _, governance, snapshotter = local_curve_ref_system
-    _establish_local_rolling_danger(
-        curve,
-        pool,
-        governance,
-        snapshotter,
-        stale_blocks=5,
-    )
-    preserved = curve.greenRefPoolData().numBlocksInDanger
-
-    _set_local_green_ratio(pool, 20)
-    boa.env.time_travel(blocks=1)
-    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)  # mixed
-
-    # Simulate legacy block-number anchors surviving an in-place upgrade. The
-    # endpoint implementation must use only the appended recovery accumulator.
-    max_value = 2**256 - 1
-    curve.eval(f"self.greenRecoveryStartBlock = {max_value}")
-    curve.eval(f"self.greenRecoveryLastSafeBlock = {max_value}")
-    curve.eval(f"self.greenDangerLastBlock = {max_value}")
-    boa.env.time_travel(blocks=1)
-    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
-    assert curve.greenRefPoolData().numBlocksInDanger == preserved
-
-    boa.env.time_travel(blocks=4)
-    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
-    assert curve.greenRefPoolData().numBlocksInDanger == 0
 
 
 @pytest.mark.fork("local", "base")
