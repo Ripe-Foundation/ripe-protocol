@@ -1649,6 +1649,27 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "inheritUserGovPointAccrualDisableForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_disabledBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "exportPositionForMigration",
     "inputs": [
       {

@@ -4118,6 +4118,18 @@ def test_historical_ripe_gov_lock_routes_survive_core_pointer_rotation(
         teller.adjustLock(ripe_token, 800, whale, 2, sender=alice)
     with boa.reverts("invalid vault id"):
         teller.adjustLock(ripe_token, 800, whale, 3, sender=whale)
+    unregistered_historical_id = 999
+    mission_control.setCoreRipeGovVaultId(
+        unregistered_historical_id, sender=switchboard_alpha.address
+    )
+    with boa.reverts("invalid vault id"):
+        teller.adjustLock(
+            ripe_token,
+            800,
+            whale,
+            unregistered_historical_id,
+            sender=whale,
+        )
 
     teller.adjustLock(ripe_token, 800, whale, 2, sender=whale)
     assert (

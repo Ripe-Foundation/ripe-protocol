@@ -983,7 +983,9 @@ def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _a: addys.Addys) -> 
     if _vaultId != 0:
         vaultId = _vaultId
         assert staticcall MissionControl(_a.missionControl).isRipeGovVaultId(vaultId) # dev: invalid vault id
-    return staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
+    vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
+    assert vaultAddr != empty(address) # dev: invalid vault id
+    return vaultAddr
 
 
 # housekeeping

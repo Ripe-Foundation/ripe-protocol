@@ -5,11 +5,11 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# RipeGov headroom is 445 bytes after the migration, SharesVault, and
+# RipeGov headroom is 460 bytes after the migration, SharesVault, and
 # governance-remediation changes. Any RipeGov edit must remeasure this pin.
 # Composed SwitchboardAlpha headroom is 5 bytes (rh zero max-lock check plus
 # execution sanitization).
-# Teller headroom is 85 bytes after the SharesVault and historical RipeGov
+# Teller headroom is 68 bytes after the SharesVault and historical RipeGov
 # routing changes.
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
@@ -20,21 +20,21 @@ EIP170_LIMIT = 24_576
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16223,
+    "MissionControl": 16183,
     "SwitchboardAlpha": 24571,
     "SwitchboardBravo": 24541,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 13560,
-    "Teller": 24491,
+    "Teller": 24508,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
     "Lootbox": 24456,
     "RebaseErc20": 11602,
-    "RipeGov": 24131,
-    "HumanResources": 13812,
+    "RipeGov": 24116,
+    "HumanResources": 14777,
     "AuctionHouse": 24566,
     "CreditEngine": 24502,
     "CreditRedeem": 8415,

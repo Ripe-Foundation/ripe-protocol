@@ -161,6 +161,8 @@ def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
 
     missionControl: address = addys._getMissionControlAddr()
     if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
+        # Zero-share governance points cannot be migrated; clear them before
+        # retiring or repointing a historical RipeGov vault.
         return staticcall RipeGovVault(vaultAddr).totalGovPoints() != 0
     return False
 

@@ -458,16 +458,16 @@ def test_g11_lock_matrix_cash_clamped_transfer_raw(
 
     travel_to_block(c.pendingRipeTransfer().confirmBlock)
     confirm_block = boa.env.evm.patch.block_number
+    prev_owner_shares = ripe_gov_vault.userBalances(alice, ripe_token)
+    incoming_shares = ripe_gov_vault.userBalances(c, ripe_token)
+    prev_owner_unlock = owner_unlock(ripe_gov_vault, ripe_token, alice)
+    prev_duration = max(prev_owner_unlock - confirm_block, 1)
+    expected_duration = (
+        prev_owner_shares * prev_duration + incoming_shares * duration
+    ) // (prev_owner_shares + incoming_shares)
     c.confirmRipeTransfer(False, sender=alice)
     ev = filter_logs(c, "RipeTransferConfirmed")[0]
     assert ev.recipient == alice
     assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == 0
     unlock = owner_unlock(ripe_gov_vault, ripe_token, alice)
-    if branch == "below_precision":
-        # prev owner shares may still be < PRECISION after the transfer if
-        # the incoming position is absorbed into the weighted branch.
-        # Seed was < PRECISION; transfer uses raw block+duration when
-        # prevShares < PRECISION at handle time.
-        assert unlock == confirm_block + duration
-    else:
-        assert unlock >= confirm_block
+    assert unlock == confirm_block + expected_duration
