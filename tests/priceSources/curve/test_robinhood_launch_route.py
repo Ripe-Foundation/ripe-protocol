@@ -235,7 +235,7 @@ def test_green_config_transition_with_normal_block_and_timestamp_progression(
         sender=route.governance.address,
     )
 
-    assert route.curve.getCurrentGreenPoolStatus().weightedRatio == 50_00
+    assert route.curve.getCurrentGreenPoolStatus().weightedRatio == 0
     assert route.price_desk.getPrice(route.usdg, True) == EIGHTEEN_DECIMALS
     assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
 
@@ -246,8 +246,8 @@ def test_final_curve_nested_price_desk_route_gas(robinhood_curve_launch_route):
     assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
     gas_used = route.price_desk._computation.get_gas_used()
     print(f"CURVE_NESTED_PRICEDESK_GAS={gas_used}")
-    # The final-route baseline is 25,558 gas. The 50k ceiling leaves about
-    # 96% headroom for deterministic compiler/runtime drift while remaining a
+    # The final-route baseline is 26,283 gas. The 50k ceiling is about 90%
+    # above it for deterministic compiler/runtime drift while remaining a
     # meaningful regression budget.
     assert gas_used <= 50_000
 
@@ -321,8 +321,8 @@ def test_final_curve_worst_case_honest_nested_price_desk_gas(
     assert desk.getPrice(curve_system, True, gas=2_000_000) == EIGHTEEN_DECIMALS
     gas_used = desk._computation.get_gas_used()
     print(f"CURVE_WORST_HONEST_NESTED_PRICEDESK_GAS={gas_used}")
-    # The final worst-honest baseline is 126,181 gas. The 200k ceiling leaves
-    # about 58% headroom and is intentionally independent of the call stipend.
+    # The final worst-honest baseline is 133,699 gas. The 200k ceiling is about
+    # 50% above it and is intentionally independent of the call stipend.
     assert gas_used <= 200_000
 
 
@@ -339,7 +339,7 @@ def test_full_capacity_ten_green_ring_teller_housekeeping_gas(
         route.curve_system,
         10,
         60_00,
-        0,
+        100,
         10_00,
         100_000 * EIGHTEEN_DECIMALS,
         sender=route.governance.address,
@@ -365,8 +365,8 @@ def test_full_capacity_ten_green_ring_teller_housekeeping_gas(
     gas_used = teller._computation.get_gas_used()
     print(f"CURVE_FULL_CAPACITY_TEN_TELLER_HOUSEKEEPING_GAS={gas_used}")
     assert route.curve.greenRefPoolData().nextIndex == 1
-    # Initial deterministic in-process measurement is 86,602 gas. The 150k
-    # ceiling retains about 73% margin and is independent of the call stipend.
+    # The deterministic in-process measurement is 69,103 gas. The 150k ceiling
+    # is more than 100% above it and is independent of the call stipend.
     assert gas_used <= 150_000
 
 

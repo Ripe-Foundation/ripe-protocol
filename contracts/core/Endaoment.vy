@@ -90,6 +90,7 @@ struct StabilizerConfig:
     greenIndex: uint256
     stabilizerAdjustWeight: uint256
     stabilizerMaxPoolDebt: uint256
+    altBalance: uint256
 
 event WalletAction:
     op: uint8 
@@ -791,7 +792,9 @@ def stabilizeGreenRefPool() -> bool:
     endaoFunds: address = addys._getEndaomentFundsAddr()
 
     data: StabilizerConfig = self._getGreenStabilizerConfig(a.priceDesk)
-    if data.pool == empty(address) or data.greenBalance == 0:
+    if data.pool == empty(address) or (data.greenBalance == 0 and data.altBalance == 0):
+        return False
+    if data.greenBalance == data.altBalance:
         return False
 
     # pull LP and Green from vault
@@ -806,11 +809,11 @@ def stabilizeGreenRefPool() -> bool:
     initialPosition: uint256 = 0
     initialIsDeficit, initialPosition = self._calcNetPositionForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
 
-    # add/remove Green to pool (50% ratio is fully balanced)
+    # add/remove Green until the normalized pool balances converge
     didAdjust: bool = False
-    if data.greenRatio < FIFTY_PERCENT:
+    if data.altBalance > data.greenBalance:
         didAdjust = self._addStabilizerGreenLiquidity(poolDebt, leftoverGreen, data, a.greenToken, a.ledger)
-    else:
+    elif data.greenBalance > data.altBalance:
         didAdjust = self._removeStabilizerGreenLiquidity(lpBalance, poolDebt, data, a.greenToken, a.ledger)
 
     # calc new position
@@ -874,20 +877,13 @@ def _getGreenAmountToAdd(
     _leftoverGreen: uint256,
     _data: StabilizerConfig,
 ) -> uint256:
-    # only add green when green ratio < 50% (pool has excess other asset)
-    if _data.greenRatio == 0 or _data.greenRatio >= FIFTY_PERCENT:
+    # only add Green when the normalized alternate-asset balance is larger
+    if _data.altBalance <= _data.greenBalance:
         return 0
     if _data.greenIndex >= 2:
         return 0
     
-    totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
-    targetBalance: uint256 = totalPoolBalance // 2
-    
-    # safe subtraction: only proceed if targetBalance > greenBalance
-    if targetBalance <= _data.greenBalance:
-        return 0
-    
-    greenAdjustFull: uint256 = (targetBalance - _data.greenBalance) * 2
+    greenAdjustFull: uint256 = _data.altBalance - _data.greenBalance
     greenAdjustWeighted: uint256 = greenAdjustFull * _data.stabilizerAdjustWeight // HUNDRED_PERCENT
 
     debtAvail: uint256 = 0 
@@ -901,7 +897,7 @@ def _getGreenAmountToAdd(
 @external
 def getGreenAmountToAddInStabilizer() -> uint256:
     data: StabilizerConfig = self._getGreenStabilizerConfig(addys._getPriceDeskAddr())
-    if data.pool == empty(address) or data.greenBalance == 0:
+    if data.pool == empty(address) or (data.greenBalance == 0 and data.altBalance == 0):
         return 0
     poolDebt: uint256 = staticcall Ledger(addys._getLedgerAddr()).greenPoolDebt(data.pool)
     leftoverGreen: uint256 = staticcall IERC20(addys._getGreenToken()).balanceOf(addys._getEndaomentFundsAddr())
@@ -951,20 +947,13 @@ def _getGreenAmountToRemove(
     _poolDebt: uint256,
     _data: StabilizerConfig,
 ) -> uint256:
-    # only remove green when green ratio > 50% (pool has excess green)
-    if _data.greenRatio <= FIFTY_PERCENT:
+    # only remove Green when its normalized balance is larger
+    if _data.greenBalance <= _data.altBalance:
         return 0
-    if _lpBalance == 0 or _data.greenIndex >= 2:
-        return 0
-    
-    totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
-    targetBalance: uint256 = totalPoolBalance // 2
-    
-    # safe subtraction: only proceed if greenBalance > targetBalance
-    if _data.greenBalance <= targetBalance:
+    if _lpBalance == 0 or _data.greenIndex >= 2 or not _data.pool.is_contract:
         return 0
     
-    greenAdjustFull: uint256 = (_data.greenBalance - targetBalance) * 2
+    greenAdjustFull: uint256 = _data.greenBalance - _data.altBalance
     greenAdjustWeighted: uint256 = greenAdjustFull * _data.stabilizerAdjustWeight // HUNDRED_PERCENT
     lpTotalSupply: uint256 = staticcall IERC20(_data.lpToken).totalSupply()
     if lpTotalSupply == 0:

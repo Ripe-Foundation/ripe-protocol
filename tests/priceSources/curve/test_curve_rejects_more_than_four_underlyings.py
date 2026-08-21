@@ -103,6 +103,36 @@ def totalSupply() -> uint256:
     return 10 ** 18
 """
 
+CURVE_POOL_WITH_SUPPLY = """
+# @version 0.4.3
+
+supply: public(uint256)
+
+@external
+def setSupply(_supply: uint256):
+    self.supply = _supply
+
+@view
+@external
+def get_virtual_price() -> uint256:
+    return 10 ** 18
+
+@view
+@external
+def lp_price() -> uint256:
+    return 10 ** 18
+
+@view
+@external
+def price_oracle(_i: uint256 = 0) -> uint256:
+    return 10 ** 18
+
+@view
+@external
+def totalSupply() -> uint256:
+    return self.supply
+"""
+
 
 def _desk_params(fork):
     return (
@@ -149,7 +179,8 @@ def _setup_system(alpha_token, bravo_token, charlie_token, delta_token, n, coins
     ap = boa.loads(CURVE_AP, mr.address, factory)
     pool = boa.loads(CURVE_POOL)
     if lp is None:
-        lp = boa.env.generate_address("lp")
+        lp = boa.loads(CURVE_POOL_WITH_SUPPLY)
+        lp.setSupply(EIGHTEEN_DECIMALS)
     mr.setup(coins8, lp, factory, n)
     return mr, ap, pool, lp, extra
 
@@ -234,6 +265,146 @@ def test_exactly_four_accepted(
     assert curve.curveConfig(lp).numUnderlying == 4
 
 
+def test_empty_ecosystem_lp_confirmation_is_atomic_and_retryable(
+    ripe_hq,
+    governance,
+    green_token,
+    ripe_token,
+    savings_green,
+    mock_price_source,
+    price_desk,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
+    fork,
+):
+    coins = [
+        ripe_token.address,
+        alpha_token.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+    ]
+    factory = boa.env.generate_address("empty eco curve factory")
+    mr = boa.loads(CURVE_MR)
+    ap = boa.loads(CURVE_AP, mr.address, factory)
+    # Model Curve's two-contract topology: the pool prices the LP, while the
+    # distinct LP token owns totalSupply().
+    pool = boa.loads(CURVE_POOL)
+    lp = boa.loads(CURVE_POOL_WITH_SUPPLY)
+    mr.setup(coins, lp, factory, 2)
+    curve = _load_curve(ripe_hq, green_token, savings_green, fork, ap)
+    assert price_desk.address != ZERO_ADDRESS
+    mission_control.setPriorityPriceSourceIds(
+        [6],
+        sender=switchboard_alpha.address,
+    )
+
+    # Empty ecosystem LPs remain proposal-compatible for launch sequencing.
+    assert curve.addNewPriceFeed(lp, pool, sender=governance.address)
+    pending_action = curve.pendingUpdates(lp).actionId
+    boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+
+    with boa.reverts("empty pool"):
+        curve.confirmNewPriceFeed(lp, sender=governance.address)
+    assert curve.pendingUpdates(lp).actionId == pending_action
+    assert curve.curveConfig(lp).pool == ZERO_ADDRESS
+
+    # A seeded LP with an unavailable underlying still fails atomically under
+    # the exact source stipend instead of consuming or cancelling the action.
+    lp.setSupply(EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    with boa.reverts("price source not executable"):
+        curve.confirmNewPriceFeed(lp, sender=governance.address)
+    assert curve.pendingUpdates(lp).actionId == pending_action
+    assert not curve.hasPriceFeed(lp)
+
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+    assert price_desk.getPrice(ripe_token) == EIGHTEEN_DECIMALS
+    assert curve.indexOfAsset(lp) == 0
+    assert curve.canConfirmAction(pending_action)
+    assert curve.confirmNewPriceFeed(lp, sender=governance.address)
+    assert curve.pendingUpdates(lp).actionId == 0
+    assert curve.hasPriceFeed(lp)
+
+
+def test_empty_ecosystem_lp_update_confirmation_is_atomic_and_retryable(
+    ripe_hq,
+    governance,
+    green_token,
+    ripe_token,
+    savings_green,
+    mock_price_source,
+    price_desk,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    fork,
+):
+    coins = [
+        ripe_token.address,
+        alpha_token.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+    ]
+    factory = boa.env.generate_address("update eco curve factory")
+    mr = boa.loads(CURVE_MR)
+    ap = boa.loads(CURVE_AP, mr.address, factory)
+    old_pool = boa.loads(CURVE_POOL)
+    new_pool = boa.loads(CURVE_POOL)
+    lp = boa.loads(CURVE_POOL_WITH_SUPPLY)
+    lp.setSupply(EIGHTEEN_DECIMALS)
+    mr.setup(coins, lp, factory, 2)
+    curve = _load_curve(ripe_hq, green_token, savings_green, fork, ap)
+    assert price_desk.address != ZERO_ADDRESS
+    mission_control.setPriorityPriceSourceIds(
+        [6],
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    assert curve.addNewPriceFeed(lp, old_pool, sender=governance.address)
+    boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+    assert curve.confirmNewPriceFeed(lp, sender=governance.address)
+    previous = curve.curveConfig(lp)
+
+    # The proposal remains valid while the LP is empty, but confirmation reads
+    # supply from the distinct LP token and preserves the old active route.
+    lp.setSupply(0)
+    assert curve.updatePriceFeed(lp, new_pool, sender=governance.address)
+    pending_action = curve.pendingUpdates(lp).actionId
+    boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+    with boa.reverts("empty pool"):
+        curve.confirmPriceFeedUpdate(lp, sender=governance.address)
+    assert curve.pendingUpdates(lp).actionId == pending_action
+    assert curve.curveConfig(lp) == previous
+
+    # A seeded LP with an unavailable underlying also reverts atomically.
+    lp.setSupply(EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, 0)
+    mock_price_source.disablePriceFeed(alpha_token)
+    with boa.reverts("price source not executable"):
+        curve.confirmPriceFeedUpdate(lp, sender=governance.address)
+    assert curve.pendingUpdates(lp).actionId == pending_action
+    assert curve.curveConfig(lp) == previous
+
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    assert curve.confirmPriceFeedUpdate(lp, sender=governance.address)
+    assert curve.pendingUpdates(lp).actionId == 0
+    assert curve.curveConfig(lp).pool == new_pool.address
+
+
 def test_new_and_update_confirm_store_pending_four_coin_config_after_registry_drift(
     ripe_hq,
     governance,
@@ -274,7 +445,7 @@ def test_new_and_update_confirm_store_pending_four_coin_config_after_registry_dr
     assert curve.confirmNewPriceFeed(lp, sender=governance.address)
     stored = curve.curveConfig(lp)
     assert stored.pool == pool.address
-    assert stored.lpToken == lp
+    assert stored.lpToken == lp.address
     assert stored.numUnderlying == 4
     assert [str(a).lower() for a in stored.underlying] == [
         str(alpha_token.address).lower(),
@@ -346,7 +517,7 @@ def test_stored_num_underlying_over_four_prices_zero(
     assert curve.confirmNewPriceFeed(lp, sender=governance.address)
     assert curve.getPrice(lp) != 0
 
-    curve.eval(f"self.curveConfig[{lp}].numUnderlying = 5")
+    curve.eval(f"self.curveConfig[{lp.address}].numUnderlying = 5")
     assert curve.curveConfig(lp).numUnderlying == 5
     assert curve.getPrice(lp) == 0
     assert curve.getPriceAndHasFeed(lp) == (0, True)

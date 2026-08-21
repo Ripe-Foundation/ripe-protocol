@@ -73,7 +73,7 @@ def test_paused_curve_get_green_stabilizer_config_still_serves_configured_pool(
         pool,
         10,
         60_00,
-        0,
+        100,
         10_00,
         100_000 * EIGHTEEN_DECIMALS,
         sender=governance.address,

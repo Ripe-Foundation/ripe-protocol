@@ -176,6 +176,54 @@ def test_add_curve_price_green_lp(
 
 
 @pytest.base
+def test_empty_green_lp_confirmation_is_atomic_and_retryable(
+    deployed_green_pool,
+    curve_prices,
+    governance,
+    addSeedGreenLiq,
+    mock_price_source,
+    green_token,
+):
+    # Governance may stage the launch LP before liquidity exists.
+    assert curve_prices.addNewPriceFeed(
+        deployed_green_pool,
+        deployed_green_pool,
+        sender=governance.address,
+    )
+    pending_action = curve_prices.pendingUpdates(deployed_green_pool).actionId
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
+
+    with boa.reverts("empty pool"):
+        curve_prices.confirmNewPriceFeed(
+            deployed_green_pool,
+            sender=governance.address,
+        )
+    assert curve_prices.pendingUpdates(deployed_green_pool).actionId == pending_action
+    assert curve_prices.hasPendingPriceFeedUpdate(deployed_green_pool)
+    assert not curve_prices.hasPriceFeed(deployed_green_pool)
+    assert curve_prices.curveConfig(deployed_green_pool).pool == ZERO_ADDRESS
+
+    # Seeding alone is insufficient while an underlying is unpriced. The live
+    # PriceDesk-stipend check reverts without consuming the pending action.
+    addSeedGreenLiq()
+    with boa.reverts("price source not executable"):
+        curve_prices.confirmNewPriceFeed(
+            deployed_green_pool,
+            sender=governance.address,
+        )
+    assert curve_prices.pendingUpdates(deployed_green_pool).actionId == pending_action
+    assert not curve_prices.hasPriceFeed(deployed_green_pool)
+
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    assert curve_prices.confirmNewPriceFeed(
+        deployed_green_pool,
+        sender=governance.address,
+    )
+    assert not curve_prices.hasPendingPriceFeedUpdate(deployed_green_pool)
+    assert curve_prices.hasPriceFeed(deployed_green_pool)
+
+
+@pytest.base
 def test_get_price_green_lp(
     usdc_token, # load alt price
     deployed_green_pool,

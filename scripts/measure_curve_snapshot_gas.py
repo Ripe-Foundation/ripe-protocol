@@ -88,7 +88,7 @@ def _reset_access_counters() -> None:
 def measure(source: Path) -> dict[str, int]:
     result: dict[str, int] = {}
 
-    curve, _, _, snapshotter = _deploy(source, 100, 0)
+    curve, _, _, snapshotter = _deploy(source, 100, 100)
     _fill(curve, snapshotter, 10)
     _reset_access_counters()
     curve.getCurrentGreenPoolStatus()
@@ -96,7 +96,7 @@ def measure(source: Path) -> dict[str, int]:
         curve._computation.get_gas_used()
     )
 
-    curve, pool, governance, snapshotter = _deploy(source, 10, 0)
+    curve, pool, governance, snapshotter = _deploy(source, 10, 100)
     _fill(curve, snapshotter, 10)
     _reset_access_counters()
     curve.getCurrentGreenPoolStatus()
@@ -111,7 +111,7 @@ def measure(source: Path) -> dict[str, int]:
         pool,
         9,
         60_00,
-        0,
+        100,
         10_00,
         100_000 * E18,
         sender=governance,
@@ -123,7 +123,7 @@ def measure(source: Path) -> dict[str, int]:
         curve._computation.get_gas_used()
     )
 
-    curve, pool, governance, snapshotter = _deploy(source, 100, 0)
+    curve, pool, governance, snapshotter = _deploy(source, 100, 100)
     _fill(curve, snapshotter, 100)
     _reset_access_counters()
     curve.getCurrentGreenPoolStatus()
@@ -145,7 +145,7 @@ def measure(source: Path) -> dict[str, int]:
         pool,
         99,
         60_00,
-        0,
+        100,
         10_00,
         100_000 * E18,
         sender=governance,
@@ -160,7 +160,7 @@ def measure(source: Path) -> dict[str, int]:
     boa.env.time_travel(blocks=8)
     _reset_access_counters()
     curve.getCurrentGreenPoolStatus()
-    result["view_full_100_mostly_stale"] = curve._computation.get_gas_used()
+    result["view_full_100_after_live_head_advance"] = curve._computation.get_gas_used()
     return result
 
 
