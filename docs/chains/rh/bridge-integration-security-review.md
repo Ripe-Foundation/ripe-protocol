@@ -16,7 +16,8 @@ against the implemented `FastLaneFloat`;
 rev 12 — H-7, M-6, M-7 verified resolved; H-8 corrected down to Medium;
 rev 13 — M-8 verified resolved;
 rev 14 — M-8 reopened: the rev-12 horizon check bounded time-to-expiry, not
-order age; closed with a signed `issuedAt`)
+order age; closed with a signed `issuedAt`;
+rev 15 — V-1, independent re-trace of the Relay attestor's ERC-20 path)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -1124,6 +1125,68 @@ the floor at all.
 the other caps, require `ACTION_LOWER_FLOOR` to keep it non-zero, and include
 `balance >= minFloatBalance` in `isHealthy()` so an inert or breached floor is
 externally observable.
+
+### V-1 (rev 15) — Independent verification: `fillContract` is inert on the ERC-20 attestation path
+
+**Not a finding. An independent re-trace of a claim whose author asked for one,
+recorded because it removes a blocker and replaces it with a dependency.**
+Source: `relay-protocol-oracle` at `55b22de` ("chore: publish v0.0.6"),
+`src/services/attestation/vm/ethereum-vm/index.ts`.
+
+**Confirmed, and the gap the claimant flagged is now closed.** `fillContract`
+is read in exactly two places in the EVM attestor:
+
+- `getSolverPaidAmount:480` — inside the **native-currency** branch only.
+- `verifySolverCalls:548` — requires a `SolverCallExecuted` log emitted by
+  `fillContract` for each entry of `calls`. The loop is over `calls`, so for an
+  order with **empty calls it returns `true` having never used `fillContract`**.
+  This is the path the original claim had not traced, and it does not overturn
+  it.
+
+The ERC-20 branch (`:495-508`) sums `Transfer` logs filtered on
+`log.address == payment.currency` and `log.args.to == payment.recipient`. It
+never decodes `extraData`. So `output.extraData.fillContract == address(this)`
+was a self-imposed requirement, not one Relay enforces on this path.
+
+**A stricter deadline was specifically looked for and is not there.**
+`getSolverPaidAmount:446` throws when `timestamp > payment.deadline`, and
+`timestamp` comes from `_ensureTxFinalization` → `_measureFinality`, which
+returns `getBlock(tx.blockNumber).timestamp` — the fill block's own timestamp,
+the same quantity `FastLaneFloat` asserts. Had it been the finalization or
+observation time, a fill executed near the deadline would finalize past it and
+be paid-but-never-attested, which is a High. It is not.
+
+**What actually binds, read off the source:** receipt success; finalization
+(defaults 10 blocks / 60s); `txTimestamp <= deadline`;
+`transaction.input.endsWith(orderId.slice(2))`, checked *before* the currency
+branch so it applies to ERC-20; and an ERC-20 `Transfer` of the payment currency
+to the payment recipient.
+
+**Two properties to preserve, neither previously stated.**
+
+1. **The `Transfer` filter has no sender constraint and sums every match.** Any
+   transfer of the right token to the right recipient in that transaction counts
+   toward the payment, whoever sent it. Harmless in the current design and
+   another reason the excluded `execute(to, data)` was excluded correctly — but
+   it means fills to the same recipient must never be batched into one
+   transaction, because the attestor would credit one order with both.
+2. **`getSolverPaidAmount` constrains `transaction.from` not at all.** There is
+   no solver allowlist on this path. That absence is what makes a self-relay
+   lane possible, so the design depends on it rather than being defended by it.
+
+**The blocker does not disappear; it changes type.** This is an off-chain,
+Relay-operated, versioned service, and the reading above is of one published
+version. Removing question 1 from the vendor list on this basis converts a
+"needs a vendor answer" into "depends on an internal service not changing",
+which is a weaker position that merely looks stronger because nothing is
+pending. It should be written down as a dependency and confirmed with Relay in
+the same conversation, not dropped from it.
+
+**Independent of the port:** the order-id calldata suffix is required whatever
+the order schema, so `fill`'s ABI must tolerate 32 trailing bytes after its
+encoded arguments. Whether Vyper's decoder accepts trailing calldata on a
+signature with a dynamic member is an open implementation question and wants a
+test before it is assumed either way.
 
 ## Test obligations
 
