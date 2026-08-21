@@ -300,10 +300,21 @@ def fill(_order: FillOrder, _signature: Bytes[65]) -> bytes32:
     assert staticcall RipeHq(RIPE_HQ).mintEnabled() # dev: minting disabled
     assert not staticcall RipeErc20(TOKEN).isPaused() # dev: token paused
 
-    # 3. derive the order id from canonical fields, then verify the signature
-    orderId: bytes32 = self._orderId(_order)
+    # 3. verify the signature over the local authorization, then replay-guard on
+    #    the SETTLEMENT identity.
+    #
+    #    These are two different hashes and the distinction is load-bearing. The
+    #    authorization hash covers salt and issuedAt, so one origin deposit can
+    #    be authorized many times over. Relay settles per canonical order id and
+    #    is idempotent on it, so a second authorization carrying the same
+    #    relayOrderId would pay again against a deposit that only ever funded one
+    #    fill. v1 therefore allows exactly ONE fill per canonical order;
+    #    duplicate deposits sharing an order id are an off-chain refund, never a
+    #    second payout.
+    authHash: bytes32 = self._orderId(_order)
+    self._validateSignature(authHash, _signature, signer)
+    orderId: bytes32 = _order.relayOrderId
     assert not self.isFilled[orderId] # dev: already filled
-    self._validateSignature(orderId, _signature, signer)
 
     # 4. order terms
     # Freshness is bounded against a SIGNED issuance time, not against the

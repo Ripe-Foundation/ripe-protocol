@@ -96,6 +96,7 @@ def test_fill_pays_recipient_and_records_exposure(flf, solver, bob, ripe_token):
     before = ripe_token.balanceOf(bob)
     order_id = _fill(flf, solver, order)
 
+    assert order_id == order[0]
     assert ripe_token.balanceOf(bob) == before + 100 * EIGHTEEN_DECIMALS
     assert flf.isFilled(order_id)
     assert flf.outstandingNotional() == 100 * EIGHTEEN_DECIMALS
@@ -165,7 +166,7 @@ def test_mint_disabled_blocks_fill_and_reenabling_restores_it(flf, solver, bob, 
 
     # paired assertion: the mint gate is the ONLY thing that closed it
     ripe_hq_deploy.setMintingEnabled(True, sender=governance.address)
-    assert _fill(flf, solver, order) == flf.getOrderId(order)
+    assert _fill(flf, solver, order) == order[0]
 
 
 # ---------- order terms ----------
@@ -642,15 +643,37 @@ def test_fill_with_a_wrong_order_id_suffix_is_refused(flf, solver, bob):
 
 
 def test_suffix_must_equal_the_signed_relay_order_id(flf, solver, bob):
-    """The suffix is bound to a value the solver signed, so it cannot be chosen
-    at submission time even by the key holder."""
+    """The suffix is bound to a value inside the signature, so it cannot be
+    swapped after signing. It does NOT constrain the key holder, who is
+    msg.sender and can always sign a fresh authorization carrying any id."""
     order = _order(bob, 1 * EIGHTEEN_DECIMALS, relay_id=b"\x5a" * 32)
     with boa.reverts("order id suffix"):
         _fill(flf, solver, order, suffix=b"\x5b" * 32)
-    assert _fill(flf, solver, order, suffix=b"\x5a" * 32) == flf.getOrderId(order)
+    assert _fill(flf, solver, order, suffix=b"\x5a" * 32) == order[0]
 
 
 def test_zero_relay_order_id_is_refused(flf, solver, bob):
     order = _order(bob, 1 * EIGHTEEN_DECIMALS, relay_id=b"\x00" * 32)
     with boa.reverts("no relay order id"):
         _fill(flf, solver, order)
+
+
+def test_one_origin_deposit_cannot_produce_two_payouts(flf, solver, bob, ripe_token):
+    """The replay key is the SETTLEMENT identity, not the local authorization
+    hash. Two signed authorizations differing in salt and issuedAt carry the
+    same relayOrderId and the same suffix -- and Relay settles idempotently per
+    canonical order, so the second payout would have no second deposit behind
+    it."""
+    relay_id = b"\x77" * 32
+    first = _order(bob, 100 * EIGHTEEN_DECIMALS, salt=b"\x01" * 32, relay_id=relay_id)
+    assert _fill(flf, solver, first) == relay_id
+    paid = ripe_token.balanceOf(bob)
+
+    boa.env.time_travel(seconds=30)
+    second = _order(bob, 100 * EIGHTEEN_DECIMALS, salt=b"\x02" * 32, relay_id=relay_id)
+    assert flf.getOrderId(second) != flf.getOrderId(first)   # different authorization
+    with boa.reverts("already filled"):
+        _fill(flf, solver, second)
+
+    assert ripe_token.balanceOf(bob) == paid
+    assert flf.outstandingEntries() == 1
