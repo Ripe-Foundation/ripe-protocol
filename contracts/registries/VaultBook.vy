@@ -49,6 +49,10 @@ interface RipeToken:
 
 interface MissionControl:
     def isStabVaultId(_vaultId: uint256) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+
+interface RipeGovVault:
+    def totalGovPoints() -> uint256: view
 
 @deploy
 def __init__(
@@ -152,7 +156,13 @@ def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
     vaultAddr: address = registry._getAddr(_vaultId)
     if vaultAddr == empty(address):
         return False
-    return staticcall Vault(vaultAddr).doesVaultHaveAnyFunds()
+    if staticcall Vault(vaultAddr).doesVaultHaveAnyFunds():
+        return True
+
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
+        return staticcall RipeGovVault(vaultAddr).totalGovPoints() != 0
+    return False
 
 
 ######################

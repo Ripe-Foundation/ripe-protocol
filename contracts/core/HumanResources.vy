@@ -54,6 +54,7 @@ interface Ledger:
 interface MissionControl:
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
     def coreRipeGovVaultId() -> uint256: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def hrConfig() -> cs.HrConfig: view
 
 interface RipeGovVault:
@@ -436,9 +437,15 @@ def canModifyHrContributor(_addr: address) -> bool:
 
 @view
 @external
-def hasRipeBalance(_contributor: address) -> bool:
+def getRipeGovVaultId(_vaultId: uint256 = 0) -> uint256:
+    return self._getRipeGovVaultId(addys._getMissionControlAddr(), _vaultId)
+
+
+@view
+@external
+def hasRipeBalance(_contributor: address, _vaultId: uint256 = 0) -> bool:
     a: addys.Addys = addys._getAddys()
-    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    vaultId: uint256 = self._getRipeGovVaultId(a.missionControl, _vaultId)
     ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
     return staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(_contributor, a.ripeToken)
 
@@ -447,13 +454,17 @@ def hasRipeBalance(_contributor: address) -> bool:
 
 
 @external
-def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256:
+def transferContributorRipeTokens(
+    _owner: address,
+    _lockDuration: uint256,
+    _vaultId: uint256 = 0,
+) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
     # transfer tokens in ripe gov vault
-    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    vaultId: uint256 = self._getRipeGovVaultId(a.missionControl, _vaultId)
     ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId) 
     amount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).transferContributorRipeTokens(msg.sender, _owner, _lockDuration, a)
 
@@ -521,6 +532,15 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
     vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
     assert vaultId != 0 # dev: invalid vault id
     return vaultId
+
+
+@view
+@internal
+def _getRipeGovVaultId(_missionControl: address, _vaultId: uint256) -> uint256:
+    if _vaultId == 0:
+        return self._getCoreRipeGovVaultId(_missionControl)
+    assert staticcall MissionControl(_missionControl).isRipeGovVaultId(_vaultId) # dev: invalid vault id
+    return _vaultId
 
 
 @view

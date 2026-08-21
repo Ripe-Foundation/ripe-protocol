@@ -442,6 +442,8 @@ def setRipeGovVaultConfig(
     _lockTerms: cs.LockTerms,
 ):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    # maxLockBoost (1000%) is the largest downstream duration multiplier.
+    assert _lockTerms.maxLockDuration <= max_value(uint256) // 1000_00 # dev: unsafe lock duration
     self.ripeGovVaultConfig[_asset] = cs.RipeGovVaultConfig(
         lockTerms=_lockTerms,
         assetWeight=_assetWeight,

@@ -3,11 +3,12 @@
 
 # @version 0.4.3
 interface HumanResources:
-    def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256: nonpayable
+    def transferContributorRipeTokens(_owner: address, _lockDuration: uint256, _vaultId: uint256 = 0) -> uint256: nonpayable
     def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool): nonpayable
     def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool: nonpayable
     def canModifyHrContributor(_addr: address) -> bool: view
-    def hasRipeBalance(_contributor: address) -> bool: view
+    def getRipeGovVaultId(_vaultId: uint256 = 0) -> uint256: view
+    def hasRipeBalance(_contributor: address, _vaultId: uint256 = 0) -> bool: view
 
 interface RipeGovernance:
     def removeDelegationFor(_recipient: address = empty(address)): nonpayable
@@ -112,6 +113,7 @@ isFrozen: public(bool)
 # pending changes
 pendingOwner: public(PendingOwnerChange)
 pendingRipeTransfer: public(PendingRipeTransfer)
+pendingRipeTransferVaultId: public(uint256)
 
 HUMAN_RESOURCES_ID: constant(uint256) = 15
 
@@ -210,7 +212,7 @@ def _cashRipeCheck(
 
 @nonreentrant
 @external
-def initiateRipeTransfer(_shouldCashCheck: bool = True):
+def initiateRipeTransfer(_shouldCashCheck: bool = True, _vaultId: uint256 = 0):
     assert not self.isFrozen # dev: contract frozen
 
     owner: address = self.owner
@@ -224,7 +226,8 @@ def initiateRipeTransfer(_shouldCashCheck: bool = True):
     # important validation
     assert not self._hasPendingOwnerChange() # dev: cannot do with pending ownership change
     assert block.timestamp > self.unlockTime # dev: time not past unlock
-    assert staticcall HumanResources(hr).hasRipeBalance(self) # dev: no balance
+    vaultId: uint256 = staticcall HumanResources(hr).getRipeGovVaultId(_vaultId)
+    assert staticcall HumanResources(hr).hasRipeBalance(self, vaultId) # dev: no balance
 
     # set transfer data
     confirmBlock: uint256 = block.number + self.keyActionDelay
@@ -233,6 +236,7 @@ def initiateRipeTransfer(_shouldCashCheck: bool = True):
         initiatedBlock = block.number,
         confirmBlock = confirmBlock,
     )
+    self.pendingRipeTransferVaultId = vaultId
     log RipeTransferInitiated(owner=owner, confirmBlock=confirmBlock, initiatedBy=msg.sender)
 
 
@@ -255,10 +259,15 @@ def confirmRipeTransfer(_shouldCashCheck: bool = True):
         self._cashRipeCheck(owner, msg.sender, hr)
 
     # transfer Ripe position
-    amount: uint256 = extcall HumanResources(hr).transferContributorRipeTokens(pending.recipient, self.depositLockDuration) # dev: could not transfer
+    amount: uint256 = extcall HumanResources(hr).transferContributorRipeTokens(
+        pending.recipient,
+        self.depositLockDuration,
+        self.pendingRipeTransferVaultId,
+    ) # dev: could not transfer
 
     # reset pending transfer
     self.pendingRipeTransfer = empty(PendingRipeTransfer)
+    self.pendingRipeTransferVaultId = 0
     log RipeTransferConfirmed(recipient=pending.recipient, amount=amount, confirmedBy=msg.sender, initiatedBlock=pending.initiatedBlock)
 
 
@@ -271,6 +280,7 @@ def cancelRipeTransfer():
     pending: PendingRipeTransfer = self.pendingRipeTransfer
     assert pending.confirmBlock != 0 # dev: no pending transfer
     self.pendingRipeTransfer = empty(PendingRipeTransfer)
+    self.pendingRipeTransferVaultId = 0
 
     log RipeTransferCancelled(recipient=pending.recipient, cancelledBy=msg.sender, initiatedBlock=pending.initiatedBlock, confirmBlock=pending.confirmBlock)
 

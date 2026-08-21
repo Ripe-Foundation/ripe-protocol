@@ -61,6 +61,7 @@ interface MissionControl:
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def shouldCheckLastTouch() -> bool: view
 
 interface Ledger:
@@ -777,34 +778,29 @@ def depositIntoGovVault(
 
 @nonreentrant
 @external
-def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.sender):
+def adjustLock(
+    _asset: address,
+    _newLockDuration: uint256,
+    _user: address = msg.sender,
+    _vaultId: uint256 = 0,
+):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
-
-    # validate underscore wallet
-    if _user != msg.sender and not isSwitchboard:
-        assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-
-    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
     self._performHousekeeping(False, _user, True, True, a)
 
 
 @nonreentrant
 @external
-def releaseLock(_asset: address, _user: address = msg.sender):
+def releaseLock(
+    _asset: address,
+    _user: address = msg.sender,
+    _vaultId: uint256 = 0,
+):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
-
-    # validate underscore wallet
-    if _user != msg.sender and not isSwitchboard:
-        assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-
-    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
     self._performHousekeeping(True, _user, True, True, a)
 
@@ -973,6 +969,21 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
     vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
     assert vaultId != 0 # dev: invalid vault id
     return vaultId
+
+
+@view
+@internal
+def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _a: addys.Addys) -> address:
+    assert (
+        _user == msg.sender
+        or addys._isSwitchboardAddr(msg.sender)
+        or staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, _a.missionControl)
+    ) # dev: no perms
+    vaultId: uint256 = self._getCoreRipeGovVaultId(_a.missionControl)
+    if _vaultId != 0:
+        vaultId = _vaultId
+        assert staticcall MissionControl(_a.missionControl).isRipeGovVaultId(vaultId) # dev: invalid vault id
+    return staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
 
 
 # housekeeping
