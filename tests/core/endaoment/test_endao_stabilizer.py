@@ -993,6 +993,7 @@ def test_stabilizer_equal_exact_balances_are_noop(
     endaoment_funds,
     curve_prices,
     green_token,
+    ledger,
     switchboard_delta,
 ):
     balance = 10_000 * EIGHTEEN_DECIMALS
@@ -1020,11 +1021,14 @@ def test_stabilizer_equal_exact_balances_are_noop(
             green_token.totalSupply(),
             green_token.balanceOf(endaoment_funds),
             green_token.balanceOf(endaoment.address),
+            ledger.greenPoolDebt(pool),
         )
 
         assert endaoment.getGreenAmountToAddInStabilizer() == 0
         assert endaoment.getGreenAmountToRemoveInStabilizer() == 0
         assert not endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+        assert not filter_logs(endaoment_funds, "EndaomentFundsMoved")
+        assert not filter_logs(green_token, "Transfer")
         assert not filter_logs(endaoment, "StabilizerPoolLiqAdded")
         assert not filter_logs(endaoment, "StabilizerPoolLiqRemoved")
         assert (
@@ -1034,6 +1038,7 @@ def test_stabilizer_equal_exact_balances_are_noop(
             green_token.totalSupply(),
             green_token.balanceOf(endaoment_funds),
             green_token.balanceOf(endaoment.address),
+            ledger.greenPoolDebt(pool),
         ) == before
 
 

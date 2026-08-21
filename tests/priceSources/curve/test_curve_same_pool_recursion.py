@@ -281,7 +281,7 @@ def test_curve_rejects_direct_sgreen_new_feed(
         assert cfg.numUnderlying == 2
         assert savings_green.address in cfg.underlying
         assert alpha_token.address in cfg.underlying
-        assert cfg.lpToken == lp
+        assert cfg.lpToken == lp.address
         assert cfg.lpToken not in (green_token.address, savings_green.address)
         assert mock_price_source.getPrice(alpha_token) != 0
         # Same reconstructed pool is admissible for the non-sGREEN member.
