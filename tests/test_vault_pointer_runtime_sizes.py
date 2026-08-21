@@ -5,14 +5,18 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# RipeGov headroom is 486 bytes after the migration and SharesVault
-# remediation changes. Any RipeGov edit must remeasure this pin before merge.
-# Composed SwitchboardAlpha headroom is 5 bytes (rh zero max-lock check plus
-# execution sanitization).
+# RipeGov headroom is 501 bytes after the migration, SharesVault, and shared
+# VaultData remediation changes. Any RipeGov edit must remeasure this pin before
+# merge. Composed SwitchboardAlpha headroom is 5 bytes (rh zero max-lock check
+# plus execution sanitization).
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
+# StabilityPool headroom is 12 bytes after the deferred claim checkpoint,
+# exact-payment, and Stability-local claimable-aware retirement remediations.
+# Any StabilityPool or StabVault edit must recompile and remeasure this pin
+# before merge.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
     "SwitchboardAlpha": 24571,
@@ -25,8 +29,8 @@ EXPECTED_RUNTIME_BYTES = {
     "BondRoom": 10927,
     "Ledger": 13306,
     "Lootbox": 24456,
-    "RebaseErc20": 11617,
-    "RipeGov": 24090,
+    "RebaseErc20": 11602,
+    "RipeGov": 24075,
     "HumanResources": 13367,
     "AuctionHouse": 24566,
     "CreditEngine": 24502,
@@ -34,7 +38,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Endaoment": 23351,
     "PriceDesk": 17578,
     "Deleverage": 24459,
-    "StabilityPool": 24269,
+    "StabilityPool": 24564,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 14272,
     "CurvePrices": 23966,

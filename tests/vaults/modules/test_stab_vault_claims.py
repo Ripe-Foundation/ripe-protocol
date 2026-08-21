@@ -110,6 +110,241 @@ def test_stab_vault_claims_full(
     _test(claimable_amount, bravo_token.balanceOf(bob))
 
 
+def test_stability_claim_checkpoints_deposit_points_after_share_burn(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    lootbox,
+    ledger,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+):
+    """A claim accrues through the burn block, then stops at zero shares."""
+    setGeneralConfig()
+    vault_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[vault_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    setAssetConfig(bravo_token)
+    setRipeRewardsConfig(True)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, amount, sender=teller.address
+    )
+    lootbox.updateDepositPoints(
+        bob, vault_id, stability_pool, alpha_token, sender=teller.address
+    )
+    points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    assert points_before.lastBalance > 0
+    assert points_before.balancePoints == 0
+
+    boa.env.time_travel(blocks=10)
+    bravo_token.transfer(stability_pool, amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        amount,
+        bravo_token,
+        amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    assert claim_from_stability_pool(
+        teller, vault_id, alpha_token, bravo_token, sender=bob
+    ) == amount
+
+    points_after_claim = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    elapsed = points_after_claim.lastUpdate - points_before.lastUpdate
+    assert elapsed == 10
+    assert points_after_claim.balancePoints == points_before.lastBalance * elapsed
+    assert points_after_claim.lastBalance == 0
+    assert stability_pool.userBalances(bob, alpha_token) == 0
+
+    boa.env.time_travel(blocks=10)
+    lootbox.updateDepositPoints(
+        bob, vault_id, stability_pool, alpha_token, sender=teller.address
+    )
+    points_after_zero_interval = ledger.userDepositPoints(
+        bob, vault_id, alpha_token
+    )
+    assert points_after_zero_interval.balancePoints == (
+        points_after_claim.balancePoints
+    )
+    assert points_after_zero_interval.lastBalance == 0
+
+
+def test_stability_claim_batch_checkpoints_final_partial_share_once(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    lootbox,
+    ledger,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+):
+    """Duplicate and multi-asset successes checkpoint one final live share."""
+    setGeneralConfig()
+    vault_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[vault_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+    setRipeRewardsConfig(True)
+    for asset in (alpha_token, bravo_token, charlie_token):
+        mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    lootbox.updateDepositPoints(
+        bob, vault_id, stability_pool, alpha_token, sender=teller.address
+    )
+    points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    boa.env.time_travel(blocks=10)
+
+    bravo_amount = 80 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, bravo_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, 40 * EIGHTEEN_DECIMALS, bravo_token, bravo_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address,
+    )
+    charlie_amount = 60 * 10 ** charlie_token.decimals()
+    charlie_token.transfer(
+        stability_pool, charlie_amount, sender=charlie_token_whale
+    )
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, 30 * EIGHTEEN_DECIMALS, charlie_token, charlie_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address,
+    )
+
+    claims = [
+        (alpha_token.address, bravo_token.address, 40 * EIGHTEEN_DECIMALS),
+        (alpha_token.address, bravo_token.address, MAX_UINT256),
+        (alpha_token.address, bravo_token.address, MAX_UINT256),
+        (alpha_token.address, charlie_token.address, MAX_UINT256),
+    ]
+    claimed_value = teller.claimManyFromStabilityPool(
+        vault_id, claims, sender=bob
+    )
+    assert 140 * EIGHTEEN_DECIMALS <= claimed_value
+    assert claimed_value <= 140 * EIGHTEEN_DECIMALS + 10**12
+
+    points_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    assert points_after.balancePoints == points_before.lastBalance * 10
+    precision = ledger.assetDepositPoints(vault_id, alpha_token).precision
+    assert points_after.lastBalance == stability_pool.getUserLootBoxShare(
+        bob, alpha_token
+    ) // precision
+    assert 0 < points_after.lastBalance < points_before.lastBalance
+
+    boa.env.time_travel(blocks=10)
+    lootbox.updateDepositPoints(
+        bob, vault_id, stability_pool, alpha_token, sender=teller.address
+    )
+    final_points = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    assert final_points.balancePoints == (
+        points_after.balancePoints + points_after.lastBalance * 10
+    )
+
+
+def test_stability_claim_checkpoint_failure_rolls_back_batch(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    lootbox,
+    ledger,
+    switchboard_alpha,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+):
+    """A failed deferred checkpoint rolls shares, custody, and points back."""
+    setGeneralConfig()
+    vault_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(alpha_token, _vaultIds=[vault_id])
+    setAssetConfig(bravo_token)
+    setRipeRewardsConfig(True)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, amount, sender=teller.address
+    )
+    bravo_token.transfer(stability_pool, amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, amount, bravo_token, amount, ZERO_ADDRESS, alpha_token,
+        savings_green, sender=auction_house.address,
+    )
+    before = (
+        stability_pool.userBalances(bob, alpha_token),
+        stability_pool.totalBalances(alpha_token),
+        stability_pool.claimableBalances(alpha_token, bravo_token),
+        stability_pool.totalClaimableBalances(bravo_token),
+        bravo_token.balanceOf(stability_pool),
+        bravo_token.balanceOf(bob),
+        ledger.userDepositPoints(bob, vault_id, alpha_token),
+    )
+
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("contract paused"):
+        claim_from_stability_pool(
+            teller, vault_id, alpha_token, bravo_token, sender=bob
+        )
+    assert (
+        stability_pool.userBalances(bob, alpha_token),
+        stability_pool.totalBalances(alpha_token),
+        stability_pool.claimableBalances(alpha_token, bravo_token),
+        stability_pool.totalClaimableBalances(bravo_token),
+        bravo_token.balanceOf(stability_pool),
+        bravo_token.balanceOf(bob),
+        ledger.userDepositPoints(bob, vault_id, alpha_token),
+    ) == before
+
+
 def test_stab_vault_claims_partial(
     stability_pool,
     alpha_token,
