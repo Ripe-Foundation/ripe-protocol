@@ -69,6 +69,7 @@ struct PendingChange:
     maxExposure: uint256
     maxEntries: uint256
     maxAge: uint256
+    shortfallOrderId: bytes32
 
 event FastLaneFilled:
     orderId: indexed(bytes32)
@@ -123,6 +124,11 @@ event FloatFloorSet:
 event FloatFunded:
     funder: indexed(address)
     amount: uint256
+
+event ShortfallRecorded:
+    orderId: indexed(bytes32)
+    amount: uint256
+    caller: indexed(address)
 
 # config
 lanePaused: public(bool)
@@ -209,6 +215,7 @@ ACTION_RAISE_CAPS: constant(uint8) = 2
 ACTION_UNPAUSE: constant(uint8) = 3
 ACTION_WITHDRAW: constant(uint8) = 4
 ACTION_LOWER_FLOOR: constant(uint8) = 5
+ACTION_RECORD_SHORTFALL: constant(uint8) = 6
 
 MAX_ORDER_HORIZON: constant(uint256) = 15 * 60
 RETIREMENT_DELAY: constant(uint256) = 7 * 24 * 3600
@@ -771,7 +778,7 @@ def syncAccountedBalance():
 @external
 def initiateChange(_actionType: uint8, _addrVal: address, _numVal: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert _actionType in [ACTION_SET_SOLVER, ACTION_RAISE_CAPS, ACTION_UNPAUSE, ACTION_WITHDRAW, ACTION_LOWER_FLOOR] # dev: invalid action
+    assert _actionType in [ACTION_SET_SOLVER, ACTION_RAISE_CAPS, ACTION_UNPAUSE, ACTION_WITHDRAW, ACTION_LOWER_FLOOR, ACTION_RECORD_SHORTFALL] # dev: invalid action
 
     # a retired instance may only ever pay its float out; nothing may bring it back
     if self.isRetired:
@@ -798,12 +805,14 @@ def initiateChange(_actionType: uint8, _addrVal: address, _numVal: uint256) -> u
         assert _numVal != 0 # dev: zero floor
 
     assert _actionType != ACTION_RAISE_CAPS # dev: use initiateCapRaise
+    assert _actionType != ACTION_RECORD_SHORTFALL # dev: use initiateRecordShortfall
 
     aid: uint256 = timeLock._initiateAction()
     self.pendingChanges[aid] = PendingChange(
         epoch=self.configEpoch,
         actionType=_actionType, addrVal=_addrVal, numVal=_numVal,
         maxFill=0, maxExposure=0, maxEntries=0, maxAge=0,
+        shortfallOrderId=empty(bytes32),
     )
     log ChangeInitiated(actionId=aid, actionType=_actionType)
     return aid
@@ -830,8 +839,41 @@ def initiateCapRaise(_maxFill: uint256, _maxExposure: uint256, _maxEntries: uint
         epoch=self.configEpoch,
         actionType=ACTION_RAISE_CAPS, addrVal=empty(address), numVal=0,
         maxFill=_maxFill, maxExposure=_maxExposure, maxEntries=_maxEntries, maxAge=_maxAge,
+        shortfallOrderId=empty(bytes32),
     )
     log ChangeInitiated(actionId=aid, actionType=ACTION_RAISE_CAPS)
+    return aid
+
+
+@external
+def initiateRecordShortfall(_orderId: bytes32, _amount: uint256) -> uint256:
+    """
+    @notice Queue a write-off of an entry that has no real inventory behind it -
+            e.g. a phantom entry left over from the pre-fix replay-identity gap,
+            or any entry a governor determines will never be restored. Behind
+            the timelock, since unlike `recordRestored` this clears exposure on
+            assertion alone, with no balance proof possible: there is nothing
+            to prove for a loss that already happened.
+    @dev Deliberately NOT blocked while retired. A stuck phantom entry is
+         exactly what would keep `outstandingEntries` above zero forever,
+         which blocks `ACTION_WITHDRAW` on a retired instance that otherwise
+         has nothing left to reconcile - writing it off is the only way such
+         an instance ever finishes sweeping.
+    """
+    assert gov._canGovern(msg.sender) # dev: no perms
+    entry: Entry = self.entries[_orderId]
+    assert entry.stage != 0 # dev: no such entry
+    assert entry.amount == _amount # dev: amount mismatch
+    assert _amount != 0 # dev: zero amount
+
+    aid: uint256 = timeLock._initiateAction()
+    self.pendingChanges[aid] = PendingChange(
+        epoch=self.configEpoch,
+        actionType=ACTION_RECORD_SHORTFALL, addrVal=empty(address), numVal=_amount,
+        maxFill=0, maxExposure=0, maxEntries=0, maxAge=0,
+        shortfallOrderId=_orderId,
+    )
+    log ChangeInitiated(actionId=aid, actionType=ACTION_RECORD_SHORTFALL)
     return aid
 
 
@@ -873,6 +915,24 @@ def confirmChange(_actionId: uint256) -> bool:
         assert before - after == p.numVal # dev: unexpected balance delta
         accounted: uint256 = self.accountedBalance
         self.accountedBalance = accounted - min(accounted, p.numVal)
+    elif p.actionType == ACTION_RECORD_SHORTFALL:
+        # revalidated here, not just at initiation: a batched recordWithdrawn
+        # /recordRestored covering this same order id in the meantime would
+        # have already cleared it, and this must not double-clear or clear a
+        # now-mismatched amount
+        entry: Entry = self.entries[p.shortfallOrderId]
+        assert entry.stage != 0 # dev: already cleared
+        assert entry.amount == p.numVal # dev: amount mismatch
+        if entry.stage == STAGE_A:
+            self.stageANotional -= entry.amount
+            self.stageAEntries -= 1
+        else:
+            self.stageBNotional -= entry.amount
+            self.stageBEntries -= 1
+        self.outstandingNotional -= entry.amount
+        self.outstandingEntries -= 1
+        self._unlinkEntry(p.shortfallOrderId)
+        log ShortfallRecorded(orderId=p.shortfallOrderId, amount=entry.amount, caller=msg.sender)
 
     log ChangeConfirmed(actionId=_actionId, actionType=p.actionType)
     return True

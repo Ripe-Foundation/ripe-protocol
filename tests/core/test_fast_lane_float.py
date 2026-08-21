@@ -676,4 +676,97 @@ def test_one_origin_deposit_cannot_produce_two_payouts(flf, solver, bob, ripe_to
         _fill(flf, solver, second)
 
     assert ripe_token.balanceOf(bob) == paid
-    assert flf.outstandingEntries() == 1
+
+
+# ---------- M-9: an entry with no real deposit behind it ----------
+
+
+def test_fundfloat_cannot_resolve_a_shortfall(flf, solver, bob, charlie, ripe_token, whale):
+    """fundFloat raises accountedBalance in lockstep with the balance it pulls
+    in, which is what stops funding from being used to recycle the cap -- but
+    it means the designated 'add inventory' function does nothing for the one
+    case an operator would reach for it. However much is funded, the gap
+    recordRestored needs never opens."""
+    order_id = _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS))
+    flf.recordWithdrawn([order_id], sender=charlie)
+
+    ripe_token.approve(flf.address, 10_000 * EIGHTEEN_DECIMALS, sender=whale)
+    flf.fundFloat(10_000 * EIGHTEEN_DECIMALS, sender=whale)
+
+    with boa.reverts("inventory not restored"):
+        flf.recordRestored([order_id], 1, sender=charlie)
+
+
+def test_phantom_entry_halts_the_lane_until_written_off(flf, solver, bob, charlie):
+    """An entry with no deposit behind it can never satisfy recordRestored, so
+    it becomes the permanent oldest entry and ages past maxEntryAge -- halting
+    every subsequent fill. initiateRecordShortfall, behind the timelock, is the
+    only way to clear it without inventory arriving."""
+    order_id = _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS, salt=b"\x01" * 32))
+    boa.env.time_travel(seconds=MAX_AGE + 1)
+    with boa.reverts("exposure too old"):
+        _fill(flf, solver, _order(bob, 1 * EIGHTEEN_DECIMALS, salt=b"\x02" * 32))
+
+    aid = flf.initiateRecordShortfall(order_id, 100 * EIGHTEEN_DECIMALS, sender=charlie)
+    with boa.reverts("time lock not reached"):
+        flf.confirmChange(aid, sender=charlie)
+
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)
+
+    assert flf.outstandingEntries() == 0
+    assert flf.outstandingNotional() == 0
+    assert flf.oldestEntry() == b"\x00" * 32
+
+    # the lane is unblocked -- a fresh fill no longer sees a stale oldest entry
+    assert _fill(flf, solver, _order(bob, 1 * EIGHTEEN_DECIMALS, salt=b"\x03" * 32))
+
+
+def test_record_shortfall_requires_a_matching_entry_and_amount(flf, solver, bob, charlie):
+    order_id = _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS))
+
+    with boa.reverts("no such entry"):
+        flf.initiateRecordShortfall(b"\xff" * 32, 100 * EIGHTEEN_DECIMALS, sender=charlie)
+
+    with boa.reverts("amount mismatch"):
+        flf.initiateRecordShortfall(order_id, 1 * EIGHTEEN_DECIMALS, sender=charlie)
+
+
+def test_record_shortfall_revalidates_at_confirmation(flf, solver, bob, charlie, ripe_token, whale):
+    """The entry was not actually a phantom -- inventory arrived through the
+    normal path before the queued write-off matured. Confirmation must not
+    double-clear it, and must not silently no-op either."""
+    order_id = _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS))
+    aid = flf.initiateRecordShortfall(order_id, 100 * EIGHTEEN_DECIMALS, sender=charlie)
+
+    flf.recordWithdrawn([order_id], sender=charlie)
+    _restore(flf, ripe_token, whale, [order_id], 100 * EIGHTEEN_DECIMALS, charlie)
+    assert flf.outstandingEntries() == 0
+
+    boa.env.time_travel(blocks=11)
+    with boa.reverts("already cleared"):
+        flf.confirmChange(aid, sender=charlie)
+
+
+def test_record_shortfall_works_while_retired_and_unblocks_the_sweep(flf, solver, bob, charlie, float_recipient, ripe_token):
+    """A stuck phantom entry keeps outstandingEntries above zero forever, which
+    blocks ACTION_WITHDRAW on a retired instance with nothing left to
+    reconcile. Writing it off is the only way such an instance finishes
+    sweeping, so this must work even while retired."""
+    order_id = _fill(flf, solver, _order(bob, 100 * EIGHTEEN_DECIMALS))
+    flf.retire(sender=charlie)
+    boa.env.time_travel(seconds=7 * 24 * 3600 + 1)
+
+    with boa.reverts("live exposure"):
+        flf.initiateChange(4, ZERO_ADDRESS, 10 * EIGHTEEN_DECIMALS, sender=charlie)
+
+    aid = flf.initiateRecordShortfall(order_id, 100 * EIGHTEEN_DECIMALS, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    flf.confirmChange(aid, sender=charlie)
+    assert flf.outstandingEntries() == 0
+
+    aid = flf.initiateChange(4, ZERO_ADDRESS, 10 * EIGHTEEN_DECIMALS, sender=charlie)
+    boa.env.time_travel(blocks=11)
+    before = ripe_token.balanceOf(float_recipient)
+    flf.confirmChange(aid, sender=charlie)
+    assert ripe_token.balanceOf(float_recipient) == before + 10 * EIGHTEEN_DECIMALS
