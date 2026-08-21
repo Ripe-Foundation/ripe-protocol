@@ -2,7 +2,7 @@ import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
 
 
 ACTIVATION_THRESHOLD = 25 * 10**16
@@ -353,6 +353,7 @@ def test_ah_liquidation_skips_full_pair_and_uses_next_stab_asset(
         )
         claim_asset.mint(alice, ACTIVATION_THRESHOLD, sender=governance.address)
         mock_price_source.setPrice(claim_asset, EIGHTEEN_DECIMALS)
+        sync_deployed_token(claim_asset)
         claim_asset.transfer(
             stability_pool,
             ACTIVATION_THRESHOLD,

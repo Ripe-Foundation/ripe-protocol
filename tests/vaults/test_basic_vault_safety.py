@@ -323,7 +323,7 @@ def test_deficit_blocks_deposit_without_allocating_new_nominal(
     vault_token.adminBurn(safe_simple_erc20_vault, 1, sender=deploy3r)
     vault_token.mint(safe_simple_erc20_vault, 50, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("insufficient vault backing"):
         safe_simple_erc20_vault.depositTokensInVault(
             alice,
             vault_token,
@@ -354,19 +354,24 @@ def test_invalid_typed_balance_read_reverts_views_and_mutations(
     _credit(safe_simple_erc20_vault, adversarial_token, bob, amount, teller)
     adversarial_token.configure_balance(safe_simple_erc20_vault, balance_mode, 0, False)
 
-    with boa.reverts():
+    expected = (
+        "external call failed"
+        if balance_mode == 1
+        else "returndatasize too small"
+    )
+    with boa.reverts(expected):
         safe_simple_erc20_vault.getTotalAmountForUser(bob, adversarial_token)
-    with boa.reverts():
+    with boa.reverts(expected):
         safe_simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1)
 
-    with boa.reverts():
+    with boa.reverts(expected):
         safe_simple_erc20_vault.depositTokensInVault(
             alice,
             adversarial_token,
             1,
             sender=teller.address,
         )
-    with boa.reverts():
+    with boa.reverts(expected):
         safe_simple_erc20_vault.withdrawTokensFromVault(
             bob,
             adversarial_token,
@@ -374,7 +379,7 @@ def test_invalid_typed_balance_read_reverts_views_and_mutations(
             alice,
             sender=teller.address,
         )
-    with boa.reverts():
+    with boa.reverts("insufficient vault backing"):
         safe_simple_erc20_vault.transferBalanceWithinVault(
             adversarial_token,
             bob,
@@ -625,7 +630,7 @@ def test_internal_failure_on_deficit_or_self_transfer_is_atomic(
         safe_simple_erc20_vault.userBalances(alice, vault_token),
         safe_simple_erc20_vault.totalBalances(vault_token),
     )
-    with boa.reverts():
+    with boa.reverts("insufficient vault backing"):
         safe_simple_erc20_vault.transferBalanceWithinVault(
             vault_token,
             bob,
@@ -640,7 +645,7 @@ def test_internal_failure_on_deficit_or_self_transfer_is_atomic(
     )
 
     vault_token.mint(safe_simple_erc20_vault, 1, sender=deploy3r)
-    with boa.reverts():
+    with boa.reverts("invalid transfer users"):
         safe_simple_erc20_vault.transferBalanceWithinVault(
             vault_token,
             bob,
@@ -964,7 +969,7 @@ def test_rejected_transfer_returndata_rolls_back_every_observable_effect(
     adversarial_token.configure_transfer(transfer_mode)
     before = _state(safe_simple_erc20_vault, adversarial_token, bob, alice)
 
-    with boa.reverts():
+    with boa.reverts("token transfer failed"):
         safe_simple_erc20_vault.withdrawTokensFromVault(
             bob,
             adversarial_token,
@@ -1003,7 +1008,12 @@ def test_nonexact_external_delivery_reverts_all_vault_and_token_state(
     adversarial_token.configure_transfer(transfer_mode)
     before = _state(safe_simple_erc20_vault, adversarial_token, bob, alice)
 
-    with boa.reverts():
+    expected = (
+        "token transfer failed"
+        if transfer_mode in (6, 7)
+        else "invalid recipient delivery"
+    )
+    with boa.reverts(expected):
         safe_simple_erc20_vault.withdrawTokensFromVault(
             bob,
             adversarial_token,
@@ -1031,7 +1041,17 @@ def test_post_transfer_unknown_balance_reverts_atomically(
     adversarial_token.configure_balance(balance_target, 0, post_mode, True)
     before = _state(safe_simple_erc20_vault, adversarial_token, bob, alice)
 
-    with boa.reverts():
+    if post_mode == 1:
+        expected = "external call failed"
+    elif post_mode == 6:
+        expected = (
+            "invalid vault outflow"
+            if target == "vault"
+            else "invalid recipient delivery"
+        )
+    else:
+        expected = "returndatasize too small"
+    with boa.reverts(expected):
         safe_simple_erc20_vault.withdrawTokensFromVault(
             bob,
             adversarial_token,
@@ -1086,7 +1106,7 @@ def test_shared_mutex_rejects_authorized_callback_and_rolls_back_outer_withdrawa
     adversarial_token.configure_callback(router, callback, True)
     before = _state(safe_simple_erc20_vault, adversarial_token, bob, alice)
 
-    with boa.reverts():
+    with boa.reverts("token transfer failed"):
         safe_simple_erc20_vault.withdrawTokensFromVault(
             bob,
             adversarial_token,
@@ -1385,7 +1405,7 @@ def test_roles_pause_and_normal_recipient_behavior_remain_live(
     sally,
 ):
     vault_token.mint(safe_simple_erc20_vault, 100, sender=deploy3r)
-    with boa.reverts():
+    with boa.reverts("only Teller allowed"):
         safe_simple_erc20_vault.depositTokensInVault(
             bob,
             vault_token,
@@ -1399,7 +1419,7 @@ def test_roles_pause_and_normal_recipient_behavior_remain_live(
         sender=teller.address,
     ) == 100
 
-    with boa.reverts():
+    with boa.reverts("not allowed"):
         safe_simple_erc20_vault.transferBalanceWithinVault(
             vault_token,
             bob,
@@ -1416,7 +1436,7 @@ def test_roles_pause_and_normal_recipient_behavior_remain_live(
     ) == (10, False)
 
     safe_simple_erc20_vault.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts():
+    with boa.reverts("contract paused"):
         safe_simple_erc20_vault.withdrawTokensFromVault(
             alice,
             vault_token,
@@ -1462,7 +1482,7 @@ def test_g2_registered_zero_liability_asset_cannot_be_recovered(
     assert safe_simple_erc20_vault.indexOfAsset(vault_token) != 0
 
     vault_token.mint(safe_simple_erc20_vault, 7, sender=deploy3r)
-    with boa.reverts():
+    with boa.reverts("invalid recovery"):
         safe_simple_erc20_vault.recoverFunds(
             alice,
             vault_token,
@@ -1543,7 +1563,7 @@ def test_g2_nonzero_liability_asset_cannot_be_recovered(
         teller,
         deploy3r,
     )
-    with boa.reverts():
+    with boa.reverts("invalid recovery"):
         safe_simple_erc20_vault.recoverFunds(
             alice,
             vault_token,
@@ -1607,7 +1627,7 @@ def test_g2_rejected_recovery_returns_are_atomic(
     adversarial_token.configure_transfer_return(return_mode)
     adversarial_token.configure_transfer(transfer_mode)
 
-    with boa.reverts():
+    with boa.reverts("recovery failed"):
         safe_simple_erc20_vault.recoverFunds(
             alice,
             adversarial_token,
@@ -1662,7 +1682,7 @@ def test_g2_recover_many_rolls_back_prior_unregistered_asset_on_later_rejection(
         deploy3r,
     )
 
-    with boa.reverts():
+    with boa.reverts("invalid recovery"):
         safe_simple_erc20_vault.recoverFundsMany(
             alice,
             [adversarial_token, vault_token],

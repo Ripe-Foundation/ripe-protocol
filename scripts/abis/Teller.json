@@ -3170,6 +3170,30 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "adjustLock",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_newLockDuration",
+        "type": "uint256"
+      },
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "releaseLock",
     "inputs": [
       {
@@ -3191,6 +3215,26 @@
       {
         "name": "_user",
         "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "releaseLock",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
       }
     ],
     "outputs": []

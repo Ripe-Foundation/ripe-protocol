@@ -12,6 +12,15 @@ def _advance_timelock_blocks(blocks):
     boa.env.evm.patch.block_number += blocks
 
 
+def _assert_stored_curve_config_equals_pending(stored, pending):
+    assert stored.pool == pending.pool
+    assert stored.lpToken == pending.lpToken
+    assert stored.numUnderlying == pending.numUnderlying
+    assert stored.underlying == pending.underlying
+    assert stored.poolType == pending.poolType
+    assert stored.hasEcoToken == pending.hasEcoToken
+
+
 ##############
 # Green Pool #
 ##############
@@ -88,6 +97,7 @@ def test_add_curve_price_green_single_asset(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
+    pending = curve_prices.pendingUpdates(green_token).config
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
 
@@ -95,6 +105,7 @@ def test_add_curve_price_green_single_asset(
 
     # verify config
     config = curve_prices.curveConfig(green_token)
+    _assert_stored_curve_config_equals_pending(config, pending)
     assert config.pool == deployed_green_pool
     assert config.lpToken == deployed_green_pool
     assert config.numUnderlying == 2
@@ -142,6 +153,7 @@ def test_add_curve_price_green_lp(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(deployed_green_pool, deployed_green_pool, sender=governance.address)
+    pending = curve_prices.pendingUpdates(deployed_green_pool).config
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(deployed_green_pool, sender=governance.address)
 
@@ -149,6 +161,7 @@ def test_add_curve_price_green_lp(
 
     # verify config
     config = curve_prices.curveConfig(deployed_green_pool)
+    _assert_stored_curve_config_equals_pending(config, pending)
     assert config.pool == deployed_green_pool
     assert config.lpToken == deployed_green_pool
     assert config.numUnderlying == 2
@@ -160,6 +173,54 @@ def test_add_curve_price_green_lp(
     # verify event
     assert log.asset == deployed_green_pool
     assert log.pool == deployed_green_pool
+
+
+@pytest.base
+def test_empty_green_lp_confirmation_is_atomic_and_retryable(
+    deployed_green_pool,
+    curve_prices,
+    governance,
+    addSeedGreenLiq,
+    mock_price_source,
+    green_token,
+):
+    # Governance may stage the launch LP before liquidity exists.
+    assert curve_prices.addNewPriceFeed(
+        deployed_green_pool,
+        deployed_green_pool,
+        sender=governance.address,
+    )
+    pending_action = curve_prices.pendingUpdates(deployed_green_pool).actionId
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
+
+    with boa.reverts("empty pool"):
+        curve_prices.confirmNewPriceFeed(
+            deployed_green_pool,
+            sender=governance.address,
+        )
+    assert curve_prices.pendingUpdates(deployed_green_pool).actionId == pending_action
+    assert curve_prices.hasPendingPriceFeedUpdate(deployed_green_pool)
+    assert not curve_prices.hasPriceFeed(deployed_green_pool)
+    assert curve_prices.curveConfig(deployed_green_pool).pool == ZERO_ADDRESS
+
+    # Seeding alone is insufficient while an underlying is unpriced. The live
+    # PriceDesk-stipend check reverts without consuming the pending action.
+    addSeedGreenLiq()
+    with boa.reverts("price source not executable"):
+        curve_prices.confirmNewPriceFeed(
+            deployed_green_pool,
+            sender=governance.address,
+        )
+    assert curve_prices.pendingUpdates(deployed_green_pool).actionId == pending_action
+    assert not curve_prices.hasPriceFeed(deployed_green_pool)
+
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    assert curve_prices.confirmNewPriceFeed(
+        deployed_green_pool,
+        sender=governance.address,
+    )
+    assert not curve_prices.hasPendingPriceFeedUpdate(deployed_green_pool)
+    assert curve_prices.hasPriceFeed(deployed_green_pool)
 
 
 @pytest.base
@@ -304,6 +365,7 @@ def test_add_curve_price_ripe_single_asset(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(ripe_token, deployed_ripe_pool, sender=governance.address)
+    pending = curve_prices.pendingUpdates(ripe_token).config
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(ripe_token, sender=governance.address)
 
@@ -311,6 +373,7 @@ def test_add_curve_price_ripe_single_asset(
 
     # verify config
     config = curve_prices.curveConfig(ripe_token)
+    _assert_stored_curve_config_equals_pending(config, pending)
     assert config.pool == deployed_ripe_pool
     assert config.lpToken == deployed_ripe_pool
     assert config.numUnderlying == 2
@@ -356,6 +419,7 @@ def test_add_curve_price_ripe_lp(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(deployed_ripe_pool, deployed_ripe_pool, sender=governance.address)
+    pending = curve_prices.pendingUpdates(deployed_ripe_pool).config
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(deployed_ripe_pool, sender=governance.address)
 
@@ -363,6 +427,7 @@ def test_add_curve_price_ripe_lp(
 
     # verify config
     config = curve_prices.curveConfig(deployed_ripe_pool)
+    _assert_stored_curve_config_equals_pending(config, pending)
     assert config.pool == deployed_ripe_pool
     assert config.lpToken == deployed_ripe_pool
     assert config.numUnderlying == 2
@@ -478,6 +543,7 @@ def test_add_curve_price_stable_ng(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(scrvusd_token, base_usdc_scrvusd_pool, sender=governance.address)
+    pending = curve_prices.pendingUpdates(scrvusd_token).config
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(scrvusd_token, sender=governance.address)
 
@@ -485,6 +551,7 @@ def test_add_curve_price_stable_ng(
 
     # verify config
     config = curve_prices.curveConfig(scrvusd_token)
+    _assert_stored_curve_config_equals_pending(config, pending)
     assert config.pool == base_usdc_scrvusd_pool.address
     assert config.lpToken == base_usdc_scrvusd_pool.address
     assert config.numUnderlying == 2
@@ -546,6 +613,7 @@ def test_add_curve_price_two_crypto(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(cbeth_token, base_cbeth_weth_pool, sender=governance.address)
+    pending = curve_prices.pendingUpdates(cbeth_token).config
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(cbeth_token, sender=governance.address)
 
@@ -553,6 +621,7 @@ def test_add_curve_price_two_crypto(
 
     # verify config
     config = curve_prices.curveConfig(cbeth_token)
+    _assert_stored_curve_config_equals_pending(config, pending)
     assert config.pool == base_cbeth_weth_pool.address
     assert config.lpToken == "0x98244d93D42b42aB3E3A4D12A5dc0B3e7f8F32f9"
     assert config.numUnderlying == 2
@@ -614,6 +683,7 @@ def test_add_curve_price_two_crypto_ng(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(frok_token, base_frok_weth_pool, sender=governance.address)
+    pending = curve_prices.pendingUpdates(frok_token).config
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(frok_token, sender=governance.address)
 
@@ -621,6 +691,7 @@ def test_add_curve_price_two_crypto_ng(
 
     # verify config
     config = curve_prices.curveConfig(frok_token)
+    _assert_stored_curve_config_equals_pending(config, pending)
     assert config.pool == base_frok_weth_pool.address
     assert config.lpToken == base_frok_weth_pool.address
     assert config.numUnderlying == 2
@@ -839,6 +910,8 @@ def test_price_desk_integration(
     
     # Should be the same since price desk should be the default
     assert price_with_desk == price_default
+    assert price_default != 0
+    assert price_desk.getPrice(green_token) == price_default
 
 
 @pytest.base
@@ -952,13 +1025,20 @@ def test_savings_green_price(
     addSeedGreenLiq() # need to add liquidity to pool
 
     # setup green price
+    assert curve_prices.isValidNewFeed(green_token, deployed_green_pool)
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
     _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
+    assert curve_prices.hasPriceFeed(green_token)
+    assert curve_prices.hasPriceFeed(savings_green)
+    assert curve_prices.curveConfig(green_token).pool != ZERO_ADDRESS
+    assert curve_prices.curveConfig(savings_green).pool == ZERO_ADDRESS
     
     # initial prices
     green_price = curve_prices.getPrice(green_token)
     initial_sgreen_price = curve_prices.getPrice(savings_green)
+    assert green_price != 0
+    assert initial_sgreen_price != 0
     _test(initial_sgreen_price, green_price)
 
     # deposit into savings green

@@ -1,8 +1,28 @@
+#          ....                           ..               _                                                                    
+#      .xH888888Hx.                 x .d88"               u                                                                     
+#    .H8888888888888:                5888R               88Nu.   u.                .u    .                                      
+#    888*"""?""*88888X        .u     '888R        .u    '88888.o888c      .u     .d88B :@8c        u          uL          .u    
+#   'f     d8x.   ^%88k    ud8888.    888R     ud8888.   ^8888  8888   ud8888.  ="8888f8888r    us888u.   .ue888Nc..   ud8888.  
+#   '>    <88888X   '?8  :888'8888.   888R   :888'8888.   8888  8888 :888'8888.   4888>'88"  .@88 "8888" d88E`"888E` :888'8888. 
+#    `:..:`888888>    8> d888 '88%"   888R   d888 '88%"   8888  8888 d888 '88%"   4888> '    9888  9888  888E  888E  d888 '88%" 
+#           `"*88     X  8888.+"      888R   8888.+"      8888  8888 8888.+"      4888>      9888  9888  888E  888E  8888.+"    
+#      .xHHhx.."      !  8888L        888R   8888L       .8888b.888P 8888L       .d888L .+   9888  9888  888E  888E  8888L      
+#     X88888888hx. ..!   '8888c. .+  .888B . '8888c. .+   ^Y8888*""  '8888c. .+  ^"8888*"    9888  9888  888& .888E  '8888c. .+ 
+#    !   "*888888888"     "88888%    ^*888%   "88888%       `Y"       "88888%       "Y"      "888*""888" *888" 888&   "88888%   
+#           ^"***"`         "YP'       "%       "YP'                    "YP'                  ^Y"   ^Y'   `"   "888E    "YP'    
+#                                                                                                        .dWi   `88E            
+#                                                                                                        4888~  J8%             
+#                                                                                                         ^"===*"`              
+#     ╔═════════════════════════════════════════╗
+#     ║  ** Deleverage **                       ║
+#     ║  Handles deleveraging of user debt      ║
+#     ╚═════════════════════════════════════════╝
+#
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
-#pragma optimize codesize
+# pragma optimize codesize
 
 implements: Department
 
@@ -27,15 +47,14 @@ interface MissionControl:
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def getGenLiqConfig() -> GenLiqConfig: view
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
-    def isStabVaultId(_vaultId: uint256) -> bool: view
 
 interface CreditEngine:
     def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
-    def getUserBorrowTerms(_user: address, _shouldRaise: bool, _skipVaultId: uint256 = 0, _skipAsset: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> UserBorrowTerms: view
 
 interface Ledger:
     def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
@@ -346,10 +365,8 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
         if targetRepayAmount != userDebt.amount:
             targetRepayAmount = unsafe_add(targetRepayAmount, min(unsafe_sub(userDebt.amount, targetRepayAmount), data.targetRepayAmount))
             if targetRepayAmount == userDebt.amount:
-                # Owner-keyed full-payoff classification necessarily depends on
-                # the configured Underscore registry being healthy even when all
-                # payoff extras are zero. Governance can set that registry to
-                # zero to restore Ripe-only operation only while extras stay off.
+                # Owner-keyed full-payoff classification needs a healthy Underscore registry even when all payoff extras are zero.
+                # Governance can set that registry to zero to restore Ripe-only operation only while extras stay off.
                 useFullPayoffExtras = self._getUnderscoreAddrType(_user, a.missionControl, False) != UNDERSCORE_EARN_VAULT_CALLER_TYPE
             if useFullPayoffExtras:
                 # Full-payoff intent lets the buffer exceed this asset's target.
@@ -367,10 +384,8 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     totalRepaidAmount: uint256 = unsafe_sub(unsafe_add(userDebt.amount, effectiveBuffer), maxTargetRepayAmount)
     assert totalRepaidAmount != 0 # dev: no assets processed
 
-    # Settle against the refreshed debt struct and interest. Planning above
-    # (targetRepayAmount, buffer, budget) stays keyed to the pre-interaction
-    # snapshot; the refreshed amount is required to equal it, so the full-payoff
-    # and dust semantics are preserved.
+    # Settle against the refreshed debt struct and interest. Planning (targetRepayAmount, buffer, budget) stays keyed to the pre-interaction snapshot.
+    # The refreshed amount must equal that snapshot so full-payoff and dust semantics are preserved.
     userDebt, newInterest = self._refreshSettlementDebt(_user, userDebt.amount, a)
 
     # Repay debt. This repeats the full-payoff check from the buffer branch above;
@@ -590,9 +605,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     isNearRedemption: bool = False
 
     # cooldown: skip if recently deleveraged, unless near redemption after withdrawal
-    # NOTE: uses strict `>` (not `>=`) so same-block calls are allowed -- this is intentional
-    # to support multi-asset withdrawals that trigger multiple deleverages in a single tx.
-    # tradeoff: same-block spam (e.g. bundled txs) also bypasses cooldown.
+    # NOTE: strict `>` (not `>=`) allows same-block multi-asset withdrawals in one tx; same-block spam also bypasses cooldown.
     cooldown: uint256 = self.deleverageCooldown
     lastBlock: uint256 = self.lastDeleverageBlock[_user]
     if cooldown != 0 and lastBlock != 0 and block.number > lastBlock and block.number < lastBlock + cooldown:
@@ -706,6 +719,8 @@ def _deleverageUser(
 
     # have cap when not trusted (treat similar to redemption)
     if not isTrusted:
+        if userDebt.inLiquidation or bt.collateralVal == 0:
+            return 0
         if not self._canDeleverageUserDebtPosition(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
             return 0
         # SwitchboardBravo rejects ltv > redemptionThreshold. This ordering is
@@ -723,10 +738,8 @@ def _deleverageUser(
     # regardless of which trusted caller initiated the deleverage.
     useFullPayoffExtras: bool = isTrusted and targetRepayAmount == userDebt.amount
     if useFullPayoffExtras:
-        # Owner-keyed full-payoff classification necessarily depends on the
-        # configured Underscore registry being healthy even when all payoff
-        # extras are zero. Governance can set that registry to zero to restore
-        # Ripe-only operation only while extras stay off.
+        # Owner-keyed full-payoff classification needs a healthy Underscore registry even when all payoff extras are zero.
+        # Governance can set that registry to zero to restore Ripe-only operation only while extras stay off.
         useFullPayoffExtras = self._getUnderscoreAddrType(_user, _a.missionControl, False) != UNDERSCORE_EARN_VAULT_CALLER_TYPE
 
     # get extra collateral if buffer params set (either usd value or bps over debt amount)
@@ -742,9 +755,8 @@ def _deleverageUser(
     if collateralValueRepaid == 0:
         return 0
 
-    # Refresh live debt after collateral interactions; revert if the
-    # amount changed. Planning quantities above stay keyed to the pre-interaction
-    # snapshot; settlement uses the refreshed struct + interest.
+    # Refresh live debt after collateral interactions; revert if the amount changed.
+    # Planning quantities stay keyed to the pre-interaction snapshot; settlement uses the refreshed struct + interest.
     userDebt, newInterest = self._refreshSettlementDebt(_user, userDebt.amount, _a)
 
     # repay debt
@@ -767,23 +779,16 @@ def _deleverageUser(
 @view
 @internal
 def _getFullPayoffBuffer(_debtAmount: uint256) -> uint256:
-    # Returns the extra collateral budget for full-payoff intent.
-    # The buffer is capped by both an absolute amount and a debt-relative bps cap
-    # so small debts cannot over-consume disproportionate collateral.
+    # Extra collateral budget for full-payoff intent.
+    # Capped by an absolute amount and a debt-relative bps cap so small debts cannot over-consume disproportionate collateral.
     return min(self.deleverageFullPayoffBuffer, unsafe_mul(_debtAmount, self.deleverageOverageBps) // HUNDRED_PERCENT)
 
 
 @view
 @internal
 def _refreshSettlementDebt(_user: address, _planningDebtAmount: uint256, _a: addys.Addys) -> (UserDebt, uint256):
-    # Re-read live debt after all collateral interactions, immediately
-    # before settlement. block.timestamp is constant within a transaction, so
-    # ordinary interest accrual cannot change the amount between the planning
-    # read and this read; a changed amount means a debt-mutating route (e.g. a
-    # callback-token reentry into Teller.repay/borrow) ran during the interaction
-    # phase. Settlement was planned against the original amount, so adapting here
-    # could over-consume collateral or mis-handle full-payoff/dust; revert
-    # instead and roll the whole transaction back atomically.
+    # Re-read live debt after collateral interactions, immediately before settlement. Timestamp is constant in a tx, so a changed amount means a debt-mutating route (e.g. callback reentry into Teller.repay/borrow) ran during interaction.
+    # Settlement was planned against the original amount; adapting here could over-consume collateral or mis-handle full-payoff/dust — revert and roll the tx back atomically.
     refreshedDebt: UserDebt = empty(UserDebt)
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     refreshedInterest: uint256 = 0
@@ -799,14 +804,12 @@ def _getDebtToClear(_useFullPayoffExtras: bool, _collateralValueRepaid: uint256,
     # collateral to be consumed.
     debtToClear: uint256 = min(_collateralValueRepaid, _debtAmount)
 
-    # Only full-payoff flows may forgive tiny residual debt, and only after
-    # nonzero collateral was actually consumed. This prevents free debt clearing
-    # while still removing floor-rounding dust within the configured caps.
+    # Only full-payoff flows may forgive tiny residual debt, and only after nonzero collateral was consumed.
+    # This prevents free debt clearing while still removing floor-rounding dust within the configured caps.
     if _useFullPayoffExtras and _collateralValueRepaid != 0 and debtToClear < _debtAmount:
         dustRemaining: uint256 = unsafe_sub(_debtAmount, debtToClear)
-        # This is an explicit debt write-off: repayFromDept does not burn GREEN
-        # for the forgiven remainder. Deployment keeps both dust params at zero
-        # until governance approves the accounting policy.
+        # Explicit debt write-off: repayFromDept does not burn GREEN for the forgiven remainder.
+        # Deployment keeps both dust params at zero until governance approves the accounting policy.
         if dustRemaining <= self.deleverageDustThreshold and unsafe_mul(dustRemaining, HUNDRED_PERCENT) <= unsafe_mul(_debtAmount, self.deleverageDustBps):
             debtToClear = _debtAmount
     return debtToClear
@@ -851,11 +854,8 @@ def _performDeleveragePhases(
             if remainingToRepay == 0:
                 break
 
-            # Stability Pool cohorts must never be processed as ordinary
-            # priority liq assets here -- that route would invoke the strict NAV
-            # valuation and re-open the broad-Deleverage revert if governance ever
-            # lists a stab vault in this set. Executable exclusion; the cohort is
-            # still reachable via phase 1 / phase 3 with fail-soft handling.
+            # Never process Stability Pool cohorts as ordinary priority liq assets here — that would use strict NAV and re-open a broad-Deleverage revert if a stab vault is listed.
+            # Executable exclusion; the cohort is still reachable via phase 1 / phase 3 with fail-soft handling.
             if staticcall MissionControl(_a.missionControl).isStabVaultId(pData.vaultId):
                 continue
 
@@ -908,11 +908,8 @@ def _iterateThruAllUserVaults(
         if not isVaultAddrCached:
             self.vaultAddrs[vaultId] = vaultAddr
 
-        # The full user-vault sweep can re-encounter a Stability Pool
-        # cohort (whether or not it was in the priority list). Classify it so the
-        # same fail-soft availability gate applies here. The didHandleVaultId
-        # transient guard inside _iterateThruAssetsWithinVault prevents a second
-        # probe of a cohort already handled in phase 1.
+        # The full user-vault sweep can re-encounter a Stability Pool cohort (whether or not it was in the priority list); classify it so the same fail-soft availability gate applies.
+        # The didHandleVaultId transient guard inside _iterateThruAssetsWithinVault prevents a second probe of a cohort already handled in phase 1.
         isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(vaultId)
         remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, isStabVault, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
 
@@ -1205,12 +1202,11 @@ def getMaxDeleverageAmount(_user: address) -> uint256:
 @view
 @internal
 def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
-    # goal here is to only reduce the debt necessary to get LTV back to safe position
-    # it will never be perfectly precise because depending on what assets are taken
-    # to ensure maximum protocol solvency, we will target the user's lowest LTV
+    # only reduce the debt necessary to get LTV back to a safe position — never perfectly precise depending on which assets are taken
+    # to ensure maximum protocol solvency, we target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
-    # collateral value too low
+    # already at or inside the target LTV, so the untrusted cap is the full debt
     if _debtAmount <= collValueAdjusted:
         return _debtAmount
 
@@ -1238,9 +1234,8 @@ def _checkpointSender(
     _asset: address,
     _lootbox: address,
 ):
-    # Post-mutation only: the wrapper has no vaultId, so checkpoint the
-    # sender against the live share after withdrawTokensFromVault. Callers
-    # omit Addys so Lootbox resolves protocol addresses itself.
+    # Post-mutation only: the wrapper has no vaultId, so checkpoint the sender against the live share after withdrawTokensFromVault.
+    # Callers omit Addys so Lootbox resolves protocol addresses itself.
     extcall LootBox(_lootbox).updateDepositPoints(_user, _vaultId, _vaultAddr, _asset)
 
 
@@ -1292,10 +1287,8 @@ def _transferCollateral(
 
 @internal
 def _getUnderscoreAddrType(_addr: address, _mc: address, _basicEarnVaultOnly: bool) -> uint256:
-    # Normal mode classifies callers/owners: 0 = not Underscore, 1 = lego or
-    # other trusted caller, 2 = earn vault. Basic-vault-only mode classifies an
-    # asset and returns only 0 or 2; it deliberately skips the lego-book lookup.
-    # Writes the underscore vault registry to transient cache, so do not use from @view paths.
+    # Normal mode: 0 = not Underscore, 1 = lego or other trusted caller, 2 = earn vault. Basic-vault-only classifies an asset and returns only 0 or 2 (skips lego-book lookup).
+    # Writes the underscore vault registry to transient cache — do not use from @view paths.
     underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
     if underscore == empty(address):
         # The zero-registry escape hatch cannot identify earn-vault owners, so
@@ -1413,9 +1406,8 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
 
 # deleverage params
 
-# Constructor args are validated above. The four legacy setters remain
-# Switchboard-enforced to preserve runtime bytecode; the new full-payoff params
-# also enforce their unsafe-math ceilings here as defense in depth.
+# Constructor args are validated above. The four legacy setters remain Switchboard-enforced to preserve runtime bytecode.
+# The new full-payoff params also enforce their unsafe-math ceilings here as defense in depth.
 
 
 @external

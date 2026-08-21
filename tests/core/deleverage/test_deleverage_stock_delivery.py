@@ -599,7 +599,7 @@ def test_teller_exact_receipt_is_decisive_after_standard_withdrawal(
         ledger.lastTouch(bob),
     )
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         deleverage.swapCollateral(
             bob,
             vault_id,
@@ -719,7 +719,7 @@ def test_standard_destination_deficit_rolls_back_both_swap_legs(
         safe_simple_erc20_vault.userBalances(alice, bravo_token),
     )
 
-    with boa.reverts():
+    with boa.reverts("deposit failed"):
         deleverage.swapCollateral(
             bob,
             vault_id,

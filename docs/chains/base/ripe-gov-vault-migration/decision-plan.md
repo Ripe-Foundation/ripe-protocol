@@ -658,3 +658,27 @@ unauthorized.
 The correct next action after an explicit implementation dispatch is the Phase 1 contract-only
 candidate—not census, compilation, testing, or a mainnet proposal. If implementation has not been
 explicitly dispatched, remain read-only.
+
+## 9. Post-PR #188 safety deltas; full rebind pending issue #150
+
+The new target loses the `areKeyTermsSame` selector. The immutable Base legacy source retains its
+old classifier. Legacy wind-down remains `minLockDuration: 43,200 → 43,199`.
+
+MissionControl's asset row is shared by source and target. Target import does not read that row; it
+imports the captured original unlock and terms. Keep the target paused until the exact
+pre-wind-down configuration is restored. Ordinary deposit, withdrawal, transfer,
+`updateUserGovPoints`, `adjustLock`, and `releaseLock` paths are pause-gated. Import is
+intentionally callable while paused and writes the preserved migration data directly without
+refreshing it. Qualification must still prove that only the approved migration path is reachable
+during this window.
+
+Do not advance terms as migration closeout; later changes are separate governance actions subject
+to the five courtesy triggers. Capture pending legacy points before withdrawal and do not apply
+F08 disable first.
+
+F10's zero-max rejection exists only in the replacement Alpha. F11 does not make interference safe:
+an AuctionHouse/CreditEngine source transfer during wind-down can permanently overwrite source
+unlock/terms before capture. Qualification must prove isolation/block/reroute; retry is not
+sufficient.
+
+Full merged-artifact rebind and fork qualification remain issue #150 work.

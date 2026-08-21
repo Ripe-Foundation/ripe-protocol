@@ -324,7 +324,7 @@ def test_price_source_data_recover_funds_many(
     
     # Test recovery with too many assets
     too_many_assets = [alpha_token] * 21  # MAX_RECOVER_ASSETS is 20
-    with boa.reverts():
+    with boa.reverts("DynArray[address, 20] bounds check"):
         price_source_mock.recoverFundsMany(bob, too_many_assets, sender=switchboard_alpha.address)
     
     # Test successful recovery of multiple assets

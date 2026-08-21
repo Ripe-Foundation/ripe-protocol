@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -31,6 +31,9 @@ interface PriceDesk:
 interface VaultBook:
     def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool: nonpayable
     def getRegId(_vaultAddr: address) -> uint256: view
+
+interface Lootbox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -109,6 +112,8 @@ totalClaimableBalances: public(HashMap[address, uint256]) # claimable asset -> b
 claimableAssets: public(HashMap[address, HashMap[uint256, address]]) # stab asset -> index -> claimable asset
 indexOfClaimableAsset: public(HashMap[address, HashMap[address, uint256]]) # stab asset -> claimable asset -> index
 numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claimable assets
+numClaimablePairs: HashMap[address, uint256] # stab asset -> nonzero claim pairs
+checkpointSeen: transient(HashMap[address, bool])
 
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
@@ -118,6 +123,12 @@ DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
 RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
+# Live residual delisting is bounded to R <= P // 10**10. This caps omitted
+# membership to one ten-billionth of the prior per-cohort pair. A correctly
+# priced $100M pair implies at most approximately $0.01 of omitted residual.
+# For a 6-decimal asset, one base unit can qualify only when P >= 10**10 raw
+# units, i.e. 10,000 whole tokens.
+LIVE_RESIDUAL_DIVISOR: constant(uint256) = 10 ** 10
 
 CLAIM_ASSET_ABSENT: constant(uint256) = 0
 CLAIM_ASSET_DORMANT: constant(uint256) = 1
@@ -188,6 +199,7 @@ def _depositTokensInVault(
     # calc shares
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     newShares: uint256 = self._valueToShares(newUserValue, vaultData.totalBalances[_asset], prevStabValue + claimableValue, False)
+    assert newShares != 0 # dev: cannot mint 0 shares
 
     # add balance on deposit
     vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)
@@ -568,7 +580,7 @@ def swapForLiquidatedCollateral(
             assert extcall GreenToken(_greenToken).burn(amount) # dev: failed to burn green
 
     else:
-        assert extcall IERC20(_stabAsset).transfer(_recipient, amount, default_return_value=True) # dev: transfer failed
+        self._transferAssetExact(_stabAsset, amount, _recipient)
 
     return amount
 
@@ -686,6 +698,8 @@ def _getValueOfClaimableAssets(
         # future value between cohorts, so valuation must fail closed.  The
         # aggregate custody check also covers this asset's liabilities to every
         # stability-asset cohort, not only the pair currently being valued.
+        # PriceDesk floors a nonzero amount at a nonzero price to one USD-value
+        # unit; an unavailable price still fails closed.
         assert staticcall IERC20(asset).balanceOf(self) >= self.totalClaimableBalances[asset] # dev: claim custody deficit
         claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, True)
         assert claimValue != 0 # dev: no price for claim asset
@@ -745,8 +759,17 @@ def _claimManyFromStabilityPool(
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
         config = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(c.claimAsset, _claimer, _caller, a.ripeToken)
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, _shouldAutoDeposit, config, a)
+        claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, _shouldAutoDeposit, config, a)
+        # Defer the checkpoint until every mutation in the batch is complete.
+        # The transient set deduplicates repeated claims for one stab asset.
+        if claimUsdValue != 0:
+            self.checkpointSeen[c.stabAsset] = True
+        totalUsdValue += claimUsdValue
     assert totalUsdValue != 0 # dev: nothing claimed
+    for c: StabPoolClaim in _claims:
+        if self.checkpointSeen[c.stabAsset]:
+            self.checkpointSeen[c.stabAsset] = False
+            extcall Lootbox(a.lootbox).updateDepositPoints(_claimer, staticcall VaultBook(a.vaultBook).getRegId(self), self, c.stabAsset, a)
     self._handleClaimRewards(_claimer, totalUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
     return totalUsdValue
 
@@ -1033,8 +1056,17 @@ def _redeemFromStabilityPool(
         if claimableBalance == 0:
             continue
 
-        # reduce claimable balances
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
+
+        redeemNumerator: uint256 = claimAmount * maxRedeemValue
+        redeemAmount: uint256 = redeemNumerator // maxClaimableAmount
+        if redeemNumerator % maxClaimableAmount != 0:
+            redeemAmount += 1
+        redeemAmount = min(redeemAmount, remainingRedeemValue)
+
+        if stabAsset == _a.savingsGreen:
+            if staticcall IERC4626(_a.savingsGreen).previewDeposit(redeemAmount) == 0:
+                continue
 
         # compute remaining USD value using price ratio: maxRedeemValue / maxClaimableAmount
         remainingUsdValue: uint256 = 0
@@ -1049,13 +1081,6 @@ def _redeemFromStabilityPool(
         # move tokens to recipient
         self._handleAssetForUser(_asset, claimAmount, _recipient, _shouldAutoDeposit, _a)
         remainingClaimAmount -= claimAmount
-
-        # finalize redeem amount (round up to favor protocol)
-        numerator: uint256 = claimAmount * maxRedeemValue
-        redeemAmount: uint256 = numerator // maxClaimableAmount
-        if numerator % maxClaimableAmount != 0:
-            redeemAmount += 1
-        redeemAmount = min(redeemAmount, remainingRedeemValue)
 
         # if stab asset is sGREEN, just convert directly, no need to make green claimable in this case
         if stabAsset == _a.savingsGreen:
@@ -1127,7 +1152,7 @@ def _handleAssetForUser(
 def _transferAssetExact(_asset: address, _amount: uint256, _recipient: address):
     recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
     assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: transfer failed
-    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == _amount
+    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == _amount # dev: invalid recipient delivery
 
 
 @view
@@ -1202,6 +1227,9 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
 @view
 @external
 def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, uint256, uint256):
+    # pause not modeled; execute still asserts isPaused
+    if vaultData.totalBalances[_stabAsset] != 0:
+        return False, 0, 0
     greenToken: address = empty(address)
     savingsGreen: address = empty(address)
     priceDesk: address = empty(address)
@@ -1209,7 +1237,10 @@ def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, u
     usdValue: uint256 = 0
     capacityRemaining: uint256 = 0
     usdValue, capacityRemaining = self._getClaimAssetActivationData(_stabAsset, _claimAsset, greenToken, savingsGreen, priceDesk)
-    return (usdValue >= ACTIVATION_USD_THRESHOLD and capacityRemaining != 0), usdValue, capacityRemaining
+    return (
+        usdValue >= ACTIVATION_USD_THRESHOLD
+        and capacityRemaining != 0
+    ), usdValue, capacityRemaining
 
 
 @view
@@ -1248,6 +1279,10 @@ def _maintainClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address
 
     for claimAsset: address in _claimAssets:
         if _shouldActivate:
+            # live book: fail-soft quote must not seat a pair onto NAV
+            if vaultData.totalBalances[_stabAsset] != 0:
+                continue
+
             pairBalance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
             if pairBalance == 0 or self.indexOfClaimableAsset[_stabAsset][claimAsset] != 0:
                 continue
@@ -1274,6 +1309,14 @@ def _maintainClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address
             self._removeClaimableAsset(_stabAsset, claimAsset, DEACTIVATION_ZERO)
             continue
 
+        # live book: fail-soft dust quote must not hide a nonzero pile
+        if vaultData.totalBalances[_stabAsset] != 0:
+            continue
+
+        custody: uint256 = staticcall IERC20(claimAsset).balanceOf(self)
+        if custody < self.totalClaimableBalances[claimAsset]:
+            continue
+
         usdValue: uint256 = self._getUsdValue(claimAsset, balance, greenToken, savingsGreen, priceDesk, False)
         if usdValue != 0 and usdValue < RETENTION_USD_THRESHOLD:
             self._removeClaimableAsset(_stabAsset, claimAsset, DEACTIVATION_DUST)
@@ -1288,6 +1331,31 @@ def pruneClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address, MA
 def activateClaimAssets(_stabAsset: address, _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE]):
     assert vaultData.isPaused # dev: contract not paused
     self._maintainClaimableAssets(_stabAsset, _claimAssets, True)
+
+
+# stability-aware vault retirement
+
+
+@external
+def deregisterVaultAsset(_asset: address) -> bool:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+
+    if self.numClaimablePairs[_asset] != 0:
+        return False
+    return vaultData._deregisterVaultAsset(_asset)
+
+
+@view
+@external
+def doesVaultHaveAnyFunds() -> bool:
+    numAssets: uint256 = vaultData.numAssets
+    if numAssets == 0:
+        return False
+    for i: uint256 in range(1, numAssets, bound=max_value(uint256)):
+        asset: address = vaultData.vaultAssets[i]
+        if vaultData.totalBalances[asset] != 0 or self.numClaimablePairs[asset] != 0:
+            return True
+    return False
 
 
 # add claimable
@@ -1311,7 +1379,8 @@ def _addClaimableBalance(
     assert custody >= priorLiability # dev: claim custody deficit
     assert _reportedAmount <= custody - priorLiability # dev: short claim receipt
 
-    newPairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset] + _reportedAmount
+    prevPairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset]
+    newPairBalance: uint256 = prevPairBalance + _reportedAmount
     isActive: bool = self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0
     usdValue: uint256 = 0
     activeCount: uint256 = 0
@@ -1324,6 +1393,8 @@ def _addClaimableBalance(
     # update balances
     self.claimableBalances[_stabAsset][_claimAsset] = newPairBalance
     self.totalClaimableBalances[_claimAsset] = priorLiability + _reportedAmount
+    if prevPairBalance == 0:
+        self.numClaimablePairs[_stabAsset] += 1
 
     # already active
     if isActive:
@@ -1370,12 +1441,28 @@ def _reduceClaimableBalances(
     self.totalClaimableBalances[_claimAsset] -= _claimAmount
 
     if newClaimableBalance == 0:
+        self.numClaimablePairs[_stabAsset] -= 1
         self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_ZERO)
         return
 
-    # remove claimable asset if remaining USD value is dust (< $0.10) - only remove from iterable list
-    if _remainingUsdValue != 0 and _remainingUsdValue < RETENTION_USD_THRESHOLD:
-        self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_DUST)
+    # Dust-delist only when remaining USD is a priced value below RETENTION
+    # $0.05. Zero/unavailable USD is never dust. An empty cohort may
+    # dust-deactivate any such residual; a live cohort may only when the
+    # leftover is microscopic: R <= P // LIVE_RESIDUAL_DIVISOR.
+    if (
+        _remainingUsdValue != 0
+        and _remainingUsdValue < RETENTION_USD_THRESHOLD
+    ):
+        if (
+            vaultData.totalBalances[_stabAsset] == 0
+            or newClaimableBalance
+               <= _prevClaimableBalance // LIVE_RESIDUAL_DIVISOR
+        ):
+            self._removeClaimableAsset(
+                _stabAsset,
+                _claimAsset,
+                DEACTIVATION_DUST,
+            )
 
 
 # deregister claimable asset

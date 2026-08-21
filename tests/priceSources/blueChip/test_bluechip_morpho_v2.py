@@ -117,7 +117,8 @@ def test_selected_launch_identity_binds_constructor_and_fails_closed_offline(
 
     assert prices.MORPHO_V2_ADDR() == ROBINHOOD_MORPHO_V2_FACTORY
     # There is intentionally no RPC/code overlay in this test environment.
-    assert not _is_valid(prices, STEAKHOUSE_USDG_VAULT)
+    with boa.reverts():
+        _is_valid(prices, STEAKHOUSE_USDG_VAULT)
 
 
 def test_supported_morpho_v2_vault_is_recognized_and_priced(
@@ -170,22 +171,25 @@ def test_unlisted_or_incompatible_vaults_fail_closed(
 ):
     assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
 
-    # Even an EOA explicitly listed by a factory cannot satisfy asset().
+    # An EOA listed by the factory still has to implement asset().
     morpho_v2_factory.setVault(deploy3r, True)
-    assert not _is_valid(morpho_v2_prices, deploy3r)
+    with boa.reverts():
+        _is_valid(morpho_v2_prices, deploy3r)
 
 
-def test_zero_or_eoa_factory_fails_closed(
+def test_zero_or_eoa_factory_reverts(
     deploy_blue_chip_morpho_v2,
     morpho_v2_vault,
     deploy3r,
 ):
-    assert not _is_valid(deploy_blue_chip_morpho_v2(ZERO_ADDRESS), morpho_v2_vault)
-    assert not _is_valid(deploy_blue_chip_morpho_v2(deploy3r), morpho_v2_vault)
+    with boa.reverts():
+        _is_valid(deploy_blue_chip_morpho_v2(ZERO_ADDRESS), morpho_v2_vault)
+    with boa.reverts():
+        _is_valid(deploy_blue_chip_morpho_v2(deploy3r), morpho_v2_vault)
 
 
-@pytest.mark.parametrize("mode", [1, 2, 3, 4, 5])
-def test_factory_revert_or_malformed_return_fails_closed(
+@pytest.mark.parametrize("mode", [1, 2, 3, 5])
+def test_factory_revert_or_short_return_reverts(
     mode,
     morpho_v2_prices,
     morpho_v2_factory,
@@ -193,21 +197,11 @@ def test_factory_revert_or_malformed_return_fails_closed(
 ):
     morpho_v2_factory.setVault(morpho_v2_vault, True)
     morpho_v2_factory.setResponseMode(mode)
-    assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
+    with boa.reverts():
+        _is_valid(morpho_v2_prices, morpho_v2_vault)
 
 
-@pytest.mark.parametrize(
-    ("modes", "expected_modes"),
-    [
-        ((1, 0, 0, 0), range(1, 6)),
-        ((0, 1, 0, 0), range(1, 6)),
-        ((0, 0, 1, 0), range(1, 6)),
-        ((0, 0, 0, 1), range(1, 6)),
-    ],
-)
-def test_vault_revert_or_malformed_return_fails_closed(
-    modes,
-    expected_modes,
+def test_overlong_factory_response_uses_abi_prefix(
     morpho_v2_prices,
     morpho_v2_factory,
     morpho_v2_vault,
@@ -216,15 +210,60 @@ def test_vault_revert_or_malformed_return_fails_closed(
 ):
     morpho_v2_factory.setVault(morpho_v2_vault, True)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
-
-    for mode in expected_modes:
-        selected = tuple(mode if value else 0 for value in modes)
-        morpho_v2_vault.setModes(*selected)
-        assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
+    morpho_v2_factory.setResponseMode(4)
+    assert _is_valid(morpho_v2_prices, morpho_v2_vault)
 
 
-@pytest.mark.parametrize("convert_mode", [1, 2, 3, 4, 5])
-def test_registered_vault_malformed_conversion_returns_zero_price(
+@pytest.mark.parametrize("field", ["asset", "decimals"])
+@pytest.mark.parametrize("mode", [1, 2, 3])
+def test_vault_revert_or_short_identity_read_reverts(
+    field,
+    mode,
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+):
+    morpho_v2_factory.setVault(morpho_v2_vault, True)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    if field == "asset":
+        morpho_v2_vault.setModes(mode, 0, 0, 0)
+    else:
+        morpho_v2_vault.setModes(0, mode, 0, 0)
+    with boa.reverts():
+        _is_valid(morpho_v2_prices, morpho_v2_vault)
+
+
+def test_vault_dirty_asset_word_reverts(
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+):
+    morpho_v2_factory.setVault(morpho_v2_vault, True)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    morpho_v2_vault.setModes(5, 0, 0, 0)
+    with boa.reverts():
+        _is_valid(morpho_v2_prices, morpho_v2_vault)
+
+
+def test_vault_oversized_decimals_are_rejected(
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+):
+    morpho_v2_factory.setVault(morpho_v2_vault, True)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    morpho_v2_vault.setModes(0, 5, 0, 0)
+    assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
+
+
+@pytest.mark.parametrize("convert_mode", [1, 2, 3])
+def test_registered_vault_short_or_reverting_conversion_reverts(
     convert_mode,
     morpho_v2_prices,
     morpho_v2_factory,
@@ -233,45 +272,54 @@ def test_registered_vault_malformed_conversion_returns_zero_price(
     mock_price_source,
     governance,
 ):
-    morpho_v2_factory.setVault(morpho_v2_vault, True)
-    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
-    morpho_v2_prices.addNewPriceFeed(
+    _register(
+        morpho_v2_prices,
+        morpho_v2_factory,
         morpho_v2_vault,
-        BLUE_CHIP_PROTOCOL_MORPHO_V2,
-        0,
-        5,
-        0,
-        100,
-        sender=governance.address,
+        alpha_token,
+        mock_price_source,
+        governance,
     )
-    boa.env.time_travel(blocks=morpho_v2_prices.actionTimeLock() + 1)
-    assert morpho_v2_prices.confirmNewPriceFeed(
-        morpho_v2_vault,
-        sender=governance.address,
-    )
-
     morpho_v2_vault.setModes(0, 0, 0, convert_mode)
-    assert morpho_v2_prices.getPrice(morpho_v2_vault) == 0
-    assert morpho_v2_prices.getLatestSnapshot(morpho_v2_vault).pricePerShare == 0
+    with boa.reverts():
+        morpho_v2_prices.getPrice(morpho_v2_vault)
+    with boa.reverts():
+        morpho_v2_prices.getLatestSnapshot(morpho_v2_vault)
 
 
-def test_morpho_v2_zero_supply_fails_closed_at_registration_and_runtime(
+def test_registered_vault_overlong_conversion_uses_abi_prefix(
     morpho_v2_prices,
     morpho_v2_factory,
     morpho_v2_vault,
     alpha_token,
     mock_price_source,
     governance,
-    teller,
+):
+    _register(
+        morpho_v2_prices,
+        morpho_v2_factory,
+        morpho_v2_vault,
+        alpha_token,
+        mock_price_source,
+        governance,
+    )
+    morpho_v2_vault.setModes(0, 0, 0, 4)
+    assert morpho_v2_prices.getPrice(morpho_v2_vault) == 5 * EIGHTEEN_DECIMALS // 4
+
+
+def test_morpho_v2_dust_supply_still_registers_like_other_erc4626_lanes(
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+    governance,
 ):
     morpho_v2_factory.setVault(morpho_v2_vault, True)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
 
     scale = EIGHTEEN_DECIMALS
     morpho_v2_vault.setSupply(scale - 1)
-    assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
-
-    morpho_v2_vault.setSupply(scale)
     assert _is_valid(morpho_v2_prices, morpho_v2_vault)
     _register(
         morpho_v2_prices,
@@ -282,85 +330,42 @@ def test_morpho_v2_zero_supply_fails_closed_at_registration_and_runtime(
         governance,
     )
     stored = morpho_v2_prices.priceConfigs(morpho_v2_vault)
-    assert stored.lastSnapshot.totalSupply == 1
+    assert stored.lastSnapshot.totalSupply == 0
     assert stored.lastSnapshot.pricePerShare != 0
-    assert stored.nextIndex == 1
 
-    morpho_v2_vault.setSupply(scale - 1)
+
+def test_supply_times_price_per_share_overflow_zeroes_snapshot_not_registration(
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+    governance,
+):
+    morpho_v2_factory.setVault(morpho_v2_vault, True)
+    price_per_share = morpho_v2_vault.pricePerShare()
+    max_normalized_supply = MAX_UINT256 // price_per_share
+    morpho_v2_vault.setSupply(max_normalized_supply * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, 1)
+    assert _is_valid(morpho_v2_prices, morpho_v2_vault)
+    _register(
+        morpho_v2_prices,
+        morpho_v2_factory,
+        morpho_v2_vault,
+        alpha_token,
+        mock_price_source,
+        governance,
+        underlying_price=1,
+    )
+    assert morpho_v2_prices.getLatestSnapshot(morpho_v2_vault).pricePerShare == price_per_share
+
+    morpho_v2_vault.setSupply((max_normalized_supply + 1) * EIGHTEEN_DECIMALS)
     latest = morpho_v2_prices.getLatestSnapshot(morpho_v2_vault)
     assert latest.totalSupply == 0
     assert latest.pricePerShare == 0
 
-    boa.env.time_travel(seconds=1)
-    assert not morpho_v2_prices.addPriceSnapshot(
-        morpho_v2_vault,
-        sender=teller.address,
-    )
-    after = morpho_v2_prices.priceConfigs(morpho_v2_vault)
-    assert after.lastSnapshot == stored.lastSnapshot
-    assert after.nextIndex == stored.nextIndex
-    assert morpho_v2_prices.snapShots(morpho_v2_vault, 1) == (0, 0, 0)
 
-
-def test_supply_times_price_per_share_exact_boundary_at_registration(
-    morpho_v2_prices,
-    morpho_v2_factory,
-    morpho_v2_vault,
-    alpha_token,
-    mock_price_source,
-):
-    morpho_v2_factory.setVault(morpho_v2_vault, True)
-    mock_price_source.setPrice(alpha_token, 1)
-
-    price_per_share = morpho_v2_vault.pricePerShare()
-    max_normalized_supply = MAX_UINT256 // price_per_share
-    morpho_v2_vault.setSupply(max_normalized_supply * EIGHTEEN_DECIMALS)
-    assert _is_valid(morpho_v2_prices, morpho_v2_vault)
-
-    morpho_v2_vault.setSupply((max_normalized_supply + 1) * EIGHTEEN_DECIMALS)
-    assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
-
-
-def test_underlying_price_times_price_per_share_exact_boundary_at_registration(
-    morpho_v2_prices,
-    morpho_v2_factory,
-    morpho_v2_vault,
-    alpha_token,
-    mock_price_source,
-):
-    morpho_v2_factory.setVault(morpho_v2_vault, True)
-    price_per_share = morpho_v2_vault.pricePerShare()
-    max_underlying_price = MAX_UINT256 // price_per_share
-
-    mock_price_source.setPrice(alpha_token, max_underlying_price)
-    assert _is_valid(morpho_v2_prices, morpho_v2_vault)
-
-    mock_price_source.setPrice(alpha_token, max_underlying_price + 1)
-    assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
-
-
-@pytest.mark.parametrize(
-    "modes",
-    [
-        (0, 0, 5, 0),
-        (0, 0, 0, 5),
-    ],
-)
-def test_mode_five_numeric_observations_are_rejected_when_incompatible(
-    modes,
-    morpho_v2_prices,
-    morpho_v2_factory,
-    morpho_v2_vault,
-    alpha_token,
-    mock_price_source,
-):
-    morpho_v2_factory.setVault(morpho_v2_vault, True)
-    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
-    morpho_v2_vault.setModes(*modes)
-    assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
-
-
-def test_numeric_dependencies_fail_closed_after_registration_and_recover(
+def test_numeric_overflow_after_registration_zeroes_and_recovers(
     morpho_v2_prices,
     morpho_v2_factory,
     morpho_v2_vault,
@@ -610,15 +615,15 @@ def test_morpho_v2_unchanged_capacity_confirmation_revalidates_live_pps(
     morpho_v2_vault.setPricePerShare(0)
     boa.env.time_travel(blocks=morpho_v2_prices.actionTimeLock() + 1)
 
-    # Unchanged-capacity updates retain the pre-remediation confirm-time
-    # revalidation and cancellation behavior. Resize seed failures instead
-    # revert atomically, as covered separately.
-    assert not morpho_v2_prices.confirmPriceFeedUpdate(
+    # Confirm no longer re-probes live PPS. A zero conversion still prices
+    # to zero after the update lands.
+    assert morpho_v2_prices.confirmPriceFeedUpdate(
         morpho_v2_vault,
         sender=governance.address,
     )
-    assert morpho_v2_prices.priceConfigs(morpho_v2_vault) == before
+    assert morpho_v2_prices.priceConfigs(morpho_v2_vault).staleTime == 99
     assert not morpho_v2_prices.hasPendingPriceFeedUpdate(morpho_v2_vault)
+    assert morpho_v2_prices.getPrice(morpho_v2_vault) == 0
 
 
 def test_morpho_v2_successful_zero_live_pps_control_remains_fail_closed(

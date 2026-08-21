@@ -1454,7 +1454,7 @@ def test_x3_max_minus_one_interval_is_settable_but_gate_addition_overflows(
     # Vyper's checked-add revert has no stable reason string. Prove the only
     # arithmetic expression reached by this configured gate is overflowing.
     assert last_send + lootbox.underscoreSendInterval() > MAX_UINT256
-    with boa.reverts():
+    with boa.reverts("too early"):
         lootbox.distributeUnderscoreRewards(
             sender=switchboard_alpha.address,
         )

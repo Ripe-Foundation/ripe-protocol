@@ -16,7 +16,7 @@
 #     ╚════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -39,11 +39,11 @@ from interfaces import Department
 from interfaces import UndyLego
 
 from ethereum.ercs import IERC20
-from ethereum.ercs import IERC721
 
 interface CurvePool:
     def remove_liquidity_imbalance(_amounts: DynArray[uint256, 2], _maxLpBurnAmount: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
     def add_liquidity(_amounts: DynArray[uint256, 2], _minLpAmountOut: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
+    def calc_token_amount(_amounts: DynArray[uint256, 2], _is_deposit: bool) -> uint256: view
     def get_virtual_price() -> uint256: view
 
 interface EndaomentFunds:
@@ -75,11 +75,11 @@ interface UnderscoreRegistry:
 interface MissionControl:
     def underscoreRegistry() -> address: view
 
-interface EndaomentPSM:
-    def USDC() -> address: view
-
 interface RipeHq:
     def governance() -> address: view
+
+interface EndaomentPSM:
+    def USDC() -> address: view
 
 struct StabilizerConfig:
     pool: address
@@ -89,6 +89,7 @@ struct StabilizerConfig:
     greenIndex: uint256
     stabilizerAdjustWeight: uint256
     stabilizerMaxPoolDebt: uint256
+    altBalance: uint256
 
 event WalletAction:
     op: uint8 
@@ -144,8 +145,6 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_TOKEN_PATH: constant(uint256) = 5
 MAX_ASSETS: constant(uint256) = 10
 MAX_LEGOS: constant(uint256) = 10
-API_VERSION: constant(String[28]) = "0.1.0"
-FIFTY_PERCENT: constant(uint256) = 50_00 # 50.00%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 LEGO_BOOK_ID: constant(uint256) = 3
 CURVE_PRICES_ID: constant(uint256) = 2
@@ -165,9 +164,9 @@ def __init__(_ripeHq: address, _weth: address, _eth: address):
     ETH = _eth
 
 
-######################
+#######################
 # Department Controls #
-######################
+#######################
 
 
 @nonreentrant
@@ -789,9 +788,11 @@ def stabilizeGreenRefPool() -> bool:
     a: addys.Addys = addys._getAddys()
     endaoFunds: address = addys._getEndaomentFundsAddr()
 
-    curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
-    if data.pool == empty(address) or data.greenBalance == 0:
+    data: StabilizerConfig = self._getGreenStabilizerConfig(a.priceDesk)
+    if data.pool == empty(address) or (data.greenBalance == 0 and data.altBalance == 0):
+        return False
+
+    if data.greenBalance == data.altBalance:
         return False
 
     # pull LP and Green from vault
@@ -806,11 +807,11 @@ def stabilizeGreenRefPool() -> bool:
     initialPosition: uint256 = 0
     initialIsDeficit, initialPosition = self._calcNetPositionForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
 
-    # add/remove Green to pool (50% ratio is fully balanced)
+    # add/remove Green until the normalized pool balances converge
     didAdjust: bool = False
-    if data.greenRatio < FIFTY_PERCENT:
+    if data.altBalance > data.greenBalance:
         didAdjust = self._addStabilizerGreenLiquidity(poolDebt, leftoverGreen, data, a.greenToken, a.ledger)
-    else:
+    elif data.greenBalance > data.altBalance:
         didAdjust = self._removeStabilizerGreenLiquidity(lpBalance, poolDebt, data, a.greenToken, a.ledger)
 
     # calc new position
@@ -874,20 +875,13 @@ def _getGreenAmountToAdd(
     _leftoverGreen: uint256,
     _data: StabilizerConfig,
 ) -> uint256:
-    # only add green when green ratio < 50% (pool has excess other asset)
-    if _data.greenRatio == 0 or _data.greenRatio >= FIFTY_PERCENT:
+    # only add Green when the normalized alternate-asset balance is larger
+    if _data.altBalance <= _data.greenBalance:
         return 0
     if _data.greenIndex >= 2:
         return 0
     
-    totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
-    targetBalance: uint256 = totalPoolBalance // 2
-    
-    # safe subtraction: only proceed if targetBalance > greenBalance
-    if targetBalance <= _data.greenBalance:
-        return 0
-    
-    greenAdjustFull: uint256 = (targetBalance - _data.greenBalance) * 2
+    greenAdjustFull: uint256 = _data.altBalance - _data.greenBalance
     greenAdjustWeighted: uint256 = greenAdjustFull * _data.stabilizerAdjustWeight // HUNDRED_PERCENT
 
     debtAvail: uint256 = 0 
@@ -900,9 +894,8 @@ def _getGreenAmountToAdd(
 @view
 @external
 def getGreenAmountToAddInStabilizer() -> uint256:
-    curvePrices: address = staticcall PriceDesk(addys._getPriceDeskAddr()).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
-    if data.pool == empty(address) or data.greenBalance == 0:
+    data: StabilizerConfig = self._getGreenStabilizerConfig(addys._getPriceDeskAddr())
+    if data.pool == empty(address) or (data.greenBalance == 0 and data.altBalance == 0):
         return 0
     poolDebt: uint256 = staticcall Ledger(addys._getLedgerAddr()).greenPoolDebt(data.pool)
     leftoverGreen: uint256 = staticcall IERC20(addys._getGreenToken()).balanceOf(addys._getEndaomentFundsAddr())
@@ -926,10 +919,8 @@ def _removeStabilizerGreenLiquidity(
 
     # remove liquidity
     assert extcall IERC20(_data.lpToken).approve(_data.pool, _lpBalance, default_return_value=True) # dev: approval failed
-    didQuote: bool = False
-    lpQuote: uint256 = 0
-    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, greenAmount)
-    if not didQuote or lpQuote >= _lpBalance:
+    lpQuote: uint256 = self._quoteGreenRemoval(_data.pool, _data.greenIndex, greenAmount)
+    if lpQuote >= _lpBalance:
         assert extcall IERC20(_data.lpToken).approve(_data.pool, 0, default_return_value=True) # dev: approval failed
         return False
     amounts: DynArray[uint256, 2] = [0, 0]
@@ -954,20 +945,14 @@ def _getGreenAmountToRemove(
     _poolDebt: uint256,
     _data: StabilizerConfig,
 ) -> uint256:
-    # only remove green when green ratio > 50% (pool has excess green)
-    if _data.greenRatio <= FIFTY_PERCENT:
+    # only remove Green when its normalized balance is larger
+    if _data.greenBalance <= _data.altBalance:
         return 0
-    if _lpBalance == 0 or _data.greenIndex >= 2:
-        return 0
-    
-    totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
-    targetBalance: uint256 = totalPoolBalance // 2
-    
-    # safe subtraction: only proceed if greenBalance > targetBalance
-    if _data.greenBalance <= targetBalance:
+
+    if _lpBalance == 0 or _data.greenIndex >= 2 or not _data.pool.is_contract:
         return 0
     
-    greenAdjustFull: uint256 = (_data.greenBalance - targetBalance) * 2
+    greenAdjustFull: uint256 = _data.greenBalance - _data.altBalance
     greenAdjustWeighted: uint256 = greenAdjustFull * _data.stabilizerAdjustWeight // HUNDRED_PERCENT
     lpTotalSupply: uint256 = staticcall IERC20(_data.lpToken).totalSupply()
     if lpTotalSupply == 0:
@@ -978,10 +963,8 @@ def _getGreenAmountToRemove(
     if requestedGreen == 0:
         return 0
 
-    didQuote: bool = False
-    lpQuote: uint256 = 0
-    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, requestedGreen)
-    if didQuote and lpQuote < _lpBalance:
+    lpQuote: uint256 = self._quoteGreenRemoval(_data.pool, _data.greenIndex, requestedGreen)
+    if lpQuote < _lpBalance:
         return requestedGreen
 
     # StableSwap-NG burns calc_token_amount(amounts, False) + 1 LP token for
@@ -992,8 +975,7 @@ def _getGreenAmountToRemove(
         if low >= high:
             break
         midpoint: uint256 = high - (high - low) // 2
-        didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint)
-        if didQuote and lpQuote < _lpBalance:
+        if self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint) < _lpBalance:
             low = midpoint
         else:
             high = midpoint - 1
@@ -1003,30 +985,16 @@ def _getGreenAmountToRemove(
 
 @view
 @internal
-def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint256) -> (bool, uint256):
+def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint256) -> uint256:
     amounts: DynArray[uint256, 2] = [0, 0]
     amounts[_greenIndex] = _greenAmount
-    success: bool = False
-    response: Bytes[64] = b""
-    # The supported StableSwap-NG pool must expose this exact selector.
-    # Missing, reverting, short, or oversized quote surfaces fail closed.
-    success, response = raw_call(
-        _pool,
-        abi_encode(amounts, False, method_id=method_id("calc_token_amount(uint256[],bool)")),
-        max_outsize=64,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return False, 0
-    return True, abi_decode(response, uint256)
+    return staticcall CurvePool(_pool).calc_token_amount(amounts, False)
 
 
 @view
 @external
 def getGreenAmountToRemoveInStabilizer() -> uint256:
-    curvePrices: address = staticcall PriceDesk(addys._getPriceDeskAddr()).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    data: StabilizerConfig = self._getGreenStabilizerConfig(addys._getPriceDeskAddr())
     if data.pool == empty(address) or data.greenBalance == 0:
         return 0
     lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(addys._getEndaomentFundsAddr())
@@ -1038,12 +1006,22 @@ def getGreenAmountToRemoveInStabilizer() -> uint256:
 
 
 @view
+@internal
+def _getGreenStabilizerConfig(_priceDesk: address) -> StabilizerConfig:
+    curvePrices: address = staticcall PriceDesk(_priceDesk).getAddr(CURVE_PRICES_ID)
+    if curvePrices == empty(address):
+        return empty(StabilizerConfig)
+    return staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+
+
+@view
 @external
 def calcProfitForStabilizer() -> uint256:
     a: addys.Addys = addys._getAddys()
     endaoFunds: address = addys._getEndaomentFundsAddr()
-    curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
-    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    data: StabilizerConfig = self._getGreenStabilizerConfig(a.priceDesk)
+    if data.pool == empty(address):
+        return 0
     lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(endaoFunds)
     leftoverGreen: uint256 = staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
     poolDebt: uint256 = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)
@@ -1145,9 +1123,8 @@ def addPartnerLiquidity(
     lpAfter: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
     assert lpAfter - lpBefore == lpAmountReceived # dev: lp amount mismatch
 
-    # Qualified Legos report net venue contributions. Match those reports to
-    # the protocol's custody decrease so downstream fees or inventory top-ups
-    # cannot be attributed to this partner action. Partial fills remain valid.
+    # Qualified Legos report net venue contributions. Match those reports to the protocol's custody decrease
+    # so downstream fees or inventory top-ups cannot be attributed to this partner action. Partial fills remain valid.
     partnerCustodyAfter: uint256 = self._getCombinedBalance(_asset, endaoFunds)
     greenCustodyAfter: uint256 = self._getCombinedBalance(a.greenToken, endaoFunds)
     assert partnerCustodyBefore - liqAmountA == partnerCustodyAfter # dev: partner asset accounting

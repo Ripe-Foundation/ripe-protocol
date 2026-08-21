@@ -222,7 +222,7 @@
     "inputs": [
       {
         "name": "payload",
-        "type": "bytes",
+        "type": "bytes[]",
         "indexed": false
       },
       {
@@ -1643,7 +1643,7 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "bytes[]"
       }
     ],
     "outputs": [
@@ -1660,7 +1660,7 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "bytes[]"
       }
     ],
     "outputs": [

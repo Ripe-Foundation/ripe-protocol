@@ -8,7 +8,7 @@
 #                                                    ┗━┛┗┗┛┗┗┛
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025
+#      Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -27,8 +27,8 @@ interface Endaoment:
     def removeLiquidity(_legoId: uint256, _pool: address, _tokenA: address, _tokenB: address, _lpToken: address, _lpAmount: uint256 = max_value(uint256), _minAmountA: uint256 = 0, _minAmountB: uint256 = 0, _extraData: bytes32 = empty(bytes32)) -> (uint256, uint256, uint256, uint256): nonpayable
     def depositForYield(_legoId: uint256, _asset: address, _vaultAddr: address = empty(address), _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def claimIncentives(_user: address, _legoId: uint256, _rewardToken: address = empty(address), _rewardAmount: uint256 = max_value(uint256), _proofs: DynArray[bytes32, MAX_PROOFS] = []) -> (uint256, uint256): nonpayable
-    def withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256, _expectedLpToken: address) -> (uint256, uint256, uint256): nonpayable
+    def withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def swapTokens(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (address, uint256, address, uint256, uint256): nonpayable
     def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256): nonpayable
@@ -57,16 +57,18 @@ interface EndaomentPSM:
     def setCanMint(_canMint: bool): nonpayable
     def setMintFee(_fee: uint256): nonpayable
 
+interface VaultMigrator:
+    def migrateVaultPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
+
 interface RipeGovVault:
     def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
     def disableGovPointAccrualForUser(_user: address): nonpayable
     def govPointAccrualDisabledBlock() -> uint256: view
     def disableGovPointAccrualGlobally(): nonpayable
-
-interface VaultMigrator:
-    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
-    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
-    def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -482,6 +484,7 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
 MAX_MIGRATION_USERS: constant(uint256) = 25
+MAX_MIGRATION_ASSETS: constant(uint256) = 20
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 8
@@ -564,6 +567,19 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
     return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositions(_users, _sourceVaultId)
 
 
+@external
+def migrateRipeGovPositionsForUserByAssets(
+    _user: address,
+    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
+    _sourceVaultId: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert len(_assets) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 # dev: invalid source vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositionsForUserByAssets(_user, _assets, _sourceVaultId)
+
+
 # basic vault migrations
 
 
@@ -579,7 +595,22 @@ def migrateVaultPositions(
     return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositions(_users, _sourceVaultId, _targetVaultId)
 
 
+@external
+def migrateVaultPositionsForUserByAssets(
+    _user: address,
+    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert len(_assets) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositionsForUserByAssets(_user, _assets, _sourceVaultId, _targetVaultId)
+
+
 # legacy ripe gov migrations (Base chain only)
+
 
 @external
 def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256:
@@ -1360,7 +1391,6 @@ def executePendingAction(_aid: uint256) -> bool:
         assert self._isValidRipeGovPointAccrualDisable(p.vaultId, empty(address)) # dev: invalid disable
         vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
         assert vaultAddr == p.vaultAddr # dev: vault binding changed
-
         extcall RipeGovVault(vaultAddr).disableGovPointAccrualGlobally()
         log RipeGovPointAccrualGlobalDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr)
 
@@ -1370,7 +1400,6 @@ def executePendingAction(_aid: uint256) -> bool:
         assert self._isValidRipeGovPointAccrualDisable(p.vaultId, p.user) # dev: invalid disable
         vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
         assert vaultAddr == p.vaultAddr # dev: vault binding changed
-
         extcall RipeGovVault(vaultAddr).disableGovPointAccrualForUser(p.user)
         log RipeGovPointAccrualUserDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr, user=p.user)
 

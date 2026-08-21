@@ -2618,7 +2618,7 @@ def test_liquidation_threshold_zero_protection(
     assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == 0
     
     # Bob cannot borrow with zero-LTV collateral
-    with boa.reverts():
+    with boa.reverts("no debt available"):
         teller.borrow(1 * EIGHTEEN_DECIMALS, sender=bob)
     
     # Even if we try to liquidate Bob, it should fail gracefully

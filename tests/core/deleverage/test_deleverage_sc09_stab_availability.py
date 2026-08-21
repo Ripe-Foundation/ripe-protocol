@@ -12,7 +12,7 @@ Strict paths (direct claims/withdrawals) stay fail-closed.
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
 
 
 @pytest.fixture(scope="module")
@@ -83,6 +83,7 @@ def _seed_custody_deficit(
     availability view reports the cohort unavailable (zero).
     """
     mock_price_source.setPrice(claim_token, 1 * EIGHTEEN_DECIMALS)
+    sync_deployed_token(claim_token)
     claim_token.transfer(stability_pool, claim_amount, sender=claim_token_whale)
     stability_pool.swapForLiquidatedCollateral(
         stab_asset, 1, claim_token, claim_amount, governance,
@@ -129,6 +130,7 @@ def _seed_broken_claim(
     cohort reverts while the fail-soft view reports it unavailable.
     """
     mock_price_source.setPrice(claim_token, 1 * EIGHTEEN_DECIMALS)
+    sync_deployed_token(claim_token)
     # pool must physically custody the claim tokens before they are registered
     claim_token.transfer(stability_pool, claim_amount, sender=claim_token_whale)
     stability_pool.swapForLiquidatedCollateral(
@@ -575,7 +577,12 @@ def test_sc09_withdrawal_preflight_skips_unavailable_stab_cohort(
     assert deleverage.getDeleverageInfo(bob) == (before_alpha, 50_00)
 
     # The same unavailable condition is never softened for a direct withdrawal.
-    with boa.reverts():
+    expected = {
+        "custody": "claim custody deficit",
+        "pause": "contract paused",
+        "price": "has price config, no price",
+    }[unavailable]
+    with boa.reverts(expected):
         teller.withdraw(
             savings_green,
             10 * EIGHTEEN_DECIMALS,
@@ -762,6 +769,7 @@ def test_sc09_processing_failure_after_healthy_probe_reverts_atomically(
         _shouldTransferToEndaoment=True,
     )
     mock_price_source.setPrice(processing_failure_token, 1 * EIGHTEEN_DECIMALS)
+    sync_deployed_token(processing_failure_token)
 
     borrow_amount = 200 * EIGHTEEN_DECIMALS
     performDeposit(bob, 1_000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
@@ -806,7 +814,7 @@ def test_sc09_processing_failure_after_healthy_probe_reverts_atomically(
         bob,
         sender=processing_failure_token.hq(),
     )
-    with boa.reverts():
+    with boa.reverts("transfer failed"):
         _deleverage(teller, bob, switchboard_alpha)
 
     assert _stab_snapshot(
@@ -912,6 +920,7 @@ def test_sc09_multi_cohort_one_unavailable_one_healthy(
     setAssetConfig(savings_green, _vaultIds=[1], _debtTerms=stab_terms, _shouldBurnAsPayment=True)
     setAssetConfig(green_lp_token, _vaultIds=[1], _debtTerms=stab_terms, _shouldTransferToEndaoment=True)
     mock_price_source.setPrice(green_lp_token, 1 * EIGHTEEN_DECIMALS)
+    sync_deployed_token(green_lp_token)
 
     # bob: sGREEN position + green_lp position + debt
     # fund bob with green_lp and deposit into stab pool
@@ -1030,7 +1039,7 @@ def test_sc09_ordinary_asset_price_failure_still_reverts(
     mock_price_source.setShouldRevert(alpha_token, True)
 
     # the ordinary (non-stab) price failure must propagate, not be skipped
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         _deleverage(teller, bob, switchboard_alpha)
 
 
@@ -1060,7 +1069,7 @@ def test_sc09_direct_withdraw_still_reverts_strictly(
 
     # direct user withdrawal from the stab pool must fail closed on the
     # unpriceable claim asset (strict NAV valuation)
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         teller.withdraw(savings_green, 10 * EIGHTEEN_DECIMALS, bob, stability_pool, sender=bob)
 
 
@@ -1087,7 +1096,7 @@ def test_sc09_strict_nav_reverts_but_failsoft_reports_zero(
     )
 
     # strict path reverts
-    with boa.reverts():
+    with boa.reverts("has price config, no price"):
         stability_pool.getTotalAmountForUser(bob, savings_green)
 
     # fail-soft availability view reports 0 for the sGREEN asset index

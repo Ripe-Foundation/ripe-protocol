@@ -139,7 +139,8 @@ def deployedContributor(
     ledger,
     governance,
     alice,
-    bob
+    bob,
+    setupRipeGovVaultConfig,
 ):
     """Deploy a contributor contract for testing"""
     def _deployedContributor(_owner=alice, _manager=bob, _compensation=1000 * EIGHTEEN_DECIMALS):
@@ -160,7 +161,8 @@ def deployedContributor(
         
         # Set available RIPE for HR
         ledger.setRipeAvailForHr(10000 * EIGHTEEN_DECIMALS, sender=switchboard_delta.address)
-        
+        setupRipeGovVaultConfig()
+
         # Initiate new contributor
         aid = human_resources.initiateNewContributor(
             owner,             # _owner
@@ -694,13 +696,14 @@ def test_switchboard_delta_execute_pending_manager_change(
 
 
 def test_switchboard_delta_execute_pending_cancel_paycheck(
-    switchboard_delta, governance, human_resources, setupHrConfig, setupLedgerBalance, alice, bob
+    switchboard_delta, governance, human_resources, setupHrConfig, setupLedgerBalance, setupRipeGovVaultConfig, alice, bob
 ):
     """Test executing pending paycheck cancellation succeeds when switchboard is properly registered"""
     # Set up HR config and ledger balance
     setupHrConfig()
     setupLedgerBalance(1000 * EIGHTEEN_DECIMALS)
-    
+    setupRipeGovVaultConfig()
+
     # Create contributor with long but valid vesting period to allow cancellation
     aid = human_resources.initiateNewContributor(
         alice,                      # _owner
@@ -806,13 +809,14 @@ def test_switchboard_delta_complete_hr_config_workflow(
 
 def test_switchboard_delta_complete_contributor_management_workflow(
     switchboard_delta, mission_control, governance, human_resources, setupHrConfig, setupLedgerBalance,
-    alice, bob
+    setupRipeGovVaultConfig, alice, bob
 ):
     """Test complete workflow for contributor management - SwitchboardDelta has proper permissions"""
     # Set up HR config and ledger balance
     setupHrConfig()
     setupLedgerBalance(1000 * EIGHTEEN_DECIMALS)
-    
+    setupRipeGovVaultConfig()
+
     # Create contributor with long but valid vesting period to allow paycheck cancellation
     aid = human_resources.initiateNewContributor(
         alice,                      # _owner
@@ -1075,7 +1079,7 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
 def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, governance, alice):
     """Test setRipeBondBooster validation for invalid bond booster addresses"""
     # Non-contract address should fail validation (will revert when trying to call getBoostRatio)
-    with boa.reverts():  # This will catch any revert, not a specific message
+    with boa.reverts("returndatasize too small"):  # This will catch any revert, not a specific message
         switchboard_delta.setRipeBondBooster(alice, sender=governance.address)
     
     # Empty address is actually allowed by the validation logic
@@ -1194,19 +1198,19 @@ def test_switchboard_delta_set_booster_min_lock_duration(switchboard_delta, bond
 def test_set_underscore_registry_success(switchboard_delta, governance, mock_rando_contract):
     """Test that setUnderscoreRegistry can be called by governance"""
     # This will fail validation as mock_rando_contract doesn't implement the required interface
-    with boa.reverts():  # Just check it reverts, don't match exact message
+    with boa.reverts("external call failed"):  # Just check it reverts, don't match exact message
         switchboard_delta.setUnderscoreRegistry(mock_rando_contract, sender=governance.address)
 
 
 def test_underscore_registry_validation_comprehensive(switchboard_delta, governance):
     """Test underscore registry validation with various scenarios"""
     # Test with contract that doesn't implement expected interface
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_delta.setUnderscoreRegistry(governance.address, sender=governance.address)
 
     # Test with EOA (not a contract)
     eoa_address = boa.env.generate_address()
-    with boa.reverts():
+    with boa.reverts("invalid underscore registry"):
         switchboard_delta.setUnderscoreRegistry(eoa_address, sender=governance.address)
 
 

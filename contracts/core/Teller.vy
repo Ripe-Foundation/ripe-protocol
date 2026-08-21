@@ -16,7 +16,7 @@
 #     ╚═══════════════════════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -38,6 +38,15 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
+    def shouldCheckLastTouch() -> bool: view
+
 interface TellerUtils:
     def validateOnDeposit(_asset: address, _amount: uint256, _user: address, _vaultId: uint256, _vaultAddr: address, _depositor: address, _didAlreadyValidateSender: bool, _areFundsHereAlready: bool, _d: DepositLedgerData, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def validateOnWithdrawal(_asset: address, _amount: uint256, _user: address, _vaultAddr: address, _vaultId: uint256, _caller: address, _config: TellerWithdrawConfig, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
@@ -52,25 +61,18 @@ interface RipeGovVault:
     def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _migration: RipeGovMigrationData) -> uint256: nonpayable
     def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
-    def getTotalAmountForUser(_user: address, _asset: address) -> uint256: view
-    def doesUserHaveBalance(_user: address, _asset: address) -> bool: view
 
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
-    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
-    def preferredStabVaultId() -> uint256: view
-    def coreRipeGovVaultId() -> uint256: view
-    def shouldCheckLastTouch() -> bool: view
+interface Ledger:
+    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
+    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+    def isLockedAccount(_user: address) -> bool: view
+    def isPaused() -> bool: view
 
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateUser(_liqUser: address, _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-
-interface Deleverage:
-    def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -82,16 +84,13 @@ interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface Ledger:
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
-    def isPaused() -> bool: view
-    def isLockedAccount(_user: address) -> bool: view
-    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
-    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
-
 interface StabVault:
     def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface Deleverage:
+    def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface AddressRegistry:
     def isValidAddr(_addr: address) -> bool: view
@@ -777,36 +776,31 @@ def depositIntoGovVault(
 
 @nonreentrant
 @external
-def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.sender):
+def adjustLock(
+    _asset: address,
+    _newLockDuration: uint256,
+    _user: address = msg.sender,
+    _vaultId: uint256 = 0,
+):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
-
-    # validate underscore wallet
-    if _user != msg.sender and not isSwitchboard:
-        assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-
-    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, msg.sender, a)
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
     self._performHousekeeping(False, _user, True, True, a)
 
 
 @nonreentrant
 @external
-def releaseLock(_asset: address, _user: address = msg.sender):
+def releaseLock(
+    _asset: address,
+    _user: address = msg.sender,
+    _vaultId: uint256 = 0,
+):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
-
-    # validate underscore wallet
-    if _user != msg.sender and not isSwitchboard:
-        assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-
-    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, msg.sender, a)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
-    self._performHousekeeping(False, _user, True, True, a)
+    self._performHousekeeping(True, _user, True, True, a)
 
 
 ##################
@@ -838,18 +832,18 @@ def purchaseRipeBond(
 ##############
 
 
+@nonreentrant
 @external
 def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    return extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(_users, msg.sender, a)
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(_users, msg.sender)
 
 
+@nonreentrant
 @external
 def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    return extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets(_user, _assets, msg.sender, a)
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets(_user, _assets, msg.sender)
 
 
 ###############
@@ -973,6 +967,23 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
     vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
     assert vaultId != 0 # dev: invalid vault id
     return vaultId
+
+
+@view
+@internal
+def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _sender: address, _a: addys.Addys) -> address:
+    assert (
+        _user == _sender
+        or addys._isSwitchboardAddr(_sender)
+        or staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, _sender, _a.missionControl)
+    ) # dev: no perms
+    vaultId: uint256 = self._getCoreRipeGovVaultId(_a.missionControl)
+    if _vaultId != 0:
+        vaultId = _vaultId
+        assert staticcall MissionControl(_a.missionControl).isRipeGovVaultId(vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
+    assert vaultAddr != empty(address) # dev: invalid vault id
+    return vaultAddr
 
 
 # housekeeping

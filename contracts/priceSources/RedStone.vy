@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -27,7 +27,7 @@ interface ChainlinkInterface:
     def decimals() -> uint8: view 
 
 interface PriceDesk:
-    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
+    def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256: view
 
 interface MissionControl:
     def getPriceStaleTime() -> uint256: view
@@ -110,16 +110,6 @@ ETH: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
 
 
-@pure
-@internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
-
-
 @deploy
 def __init__(
     _ripeHq: address,
@@ -184,7 +174,7 @@ def _getPrice(
         priceDesk: address = _priceDesk
         if _priceDesk == empty(address):
             priceDesk = addys._getPriceDeskAddr()
-        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True)
+        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True, _staleTime)
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
@@ -210,6 +200,16 @@ def addPriceSnapshot(_asset: address) -> bool:
     return False
 
 
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
+
+
 #################
 # RedStone Data #
 #################
@@ -224,6 +224,8 @@ def getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0)
 @view
 @internal
 def _getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
+    if _feed == empty(address):
+        return 0
     oracle: ChainlinkRound = staticcall ChainlinkInterface(_feed).latestRoundData()
 
     # oracle has no price

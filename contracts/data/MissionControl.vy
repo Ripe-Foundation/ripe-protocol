@@ -9,7 +9,7 @@
 #     ╚═══════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025    
+#     Ripe Foundation (C) 2026    
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -778,13 +778,15 @@ def getGenLiqConfig() -> GenLiqConfig:
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []
     for pData: cs.VaultLite in self.priorityLiqAssetVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
-        priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
+        if vaultAddr != empty(address):
+            priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     # stability pool vault data
     priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []
     for pData: cs.VaultLite in self.priorityStabVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
-        priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
+        if vaultAddr != empty(address):
+            priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     return GenLiqConfig(
         canLiquidate=self.genConfig.canLiquidate,

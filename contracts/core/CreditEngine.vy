@@ -16,7 +16,7 @@
 #     ╚══════════════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -44,8 +44,8 @@ interface Ledger:
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def getRepayDataBundle(_user: address) -> RepayDataBundle: view
-    def numUserVaults(_user: address) -> uint256: view
     def hasFungibleAuctions(_user: address) -> bool: view
+    def numUserVaults(_user: address) -> uint256: view
     def flushUnrealizedYield() -> uint256: nonpayable
 
 interface MissionControl:
@@ -541,12 +541,8 @@ def _repayDebt(
     _repayValue: uint256,
     _refundAmount: uint256,
     _newInterest: uint256,
-    # `_burnAndRefundRecipient` is dual-purpose: a nonzero address identifies the
-    # standard and auction paths that burn GREEN and names their refund recipient.
-    # `empty(address)` identifies department paths that neither burn nor refund.
-    # Burning paths must always pass a nonzero address; passing zero would silently
-    # skip the burn. This is not asserted here because CreditEngine has effectively
-    # no EIP-170 headroom.
+    # `_burnAndRefundRecipient`: nonzero = standard/auction burn path and refund recipient; `empty(address)` = department path (no burn, no refund).
+    # Burning paths must pass nonzero (zero silently skips the burn). Not asserted here: CreditEngine has no EIP-170 headroom.
     _burnAndRefundRecipient: address,
     _wantsSavingsGreen: bool,
     _repayType: RepayType,
@@ -560,11 +556,8 @@ def _repayDebt(
         isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
         bt = self._getUserBorrowTerms(_user, _numUserVaults, _repayType != RepayType.STANDARD, 0, empty(address), isUndyVault, _repayType == RepayType.STANDARD, _a)
 
-        # A zero highest LTV means traversal found no eligible debt-bearing
-        # collateral record. A max-value highest LTV signals that non-strict
-        # valuation saw a positive amount without a usable price. Keep the
-        # stored terms in both cases; conservative capacity still controls this
-        # repayment's health result.
+        # highestLtv 0 = no eligible debt-bearing collateral; max_value = non-strict valuation saw amount without a usable price.
+        # Keep stored terms in both cases; conservative capacity still controls this repayment's health result.
         if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT:
             userDebt.debtTerms = bt.debtTerms
         hasGoodDebtHealth = userDebt.amount <= bt.totalMaxDebt
@@ -682,28 +675,6 @@ def getBorrowRate(_user: address) -> uint256:
 
 @view
 @internal
-def _userTerms(
-    _user: address,
-    _numUserVaults: uint256,
-    _shouldRaise: bool,
-    _skipVaultId: uint256,
-    _skipAsset: address,
-    _a: addys.Addys,
-) -> UserBorrowTerms:
-    return self._getUserBorrowTerms(
-        _user,
-        _numUserVaults,
-        _shouldRaise,
-        _skipVaultId,
-        _skipAsset,
-        self._isUnderscoreVault(_user, _a.missionControl),
-        False,
-        _a,
-    )
-
-
-@view
-@internal
 def _getUserBorrowTerms(
     _user: address,
     _numUserVaults: uint256,
@@ -767,9 +738,8 @@ def _getUserBorrowTerms(
             hasNominalBalance: bool = False
             if amount == 0:
                 hasNominalBalance = staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset)
-                # Quarantine only when a remaining nominal balance has no
-                # vault-wide usable amount. Share-rounding dust keeps a
-                # nominal balance in a non-empty vault and is not quarantined.
+                # Quarantine only when a remaining nominal balance has no vault-wide usable amount.
+                # Share-rounding dust keeps a nominal balance in a non-empty vault and is not quarantined.
                 if hasNominalBalance:
                     if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
                         bt.hasQuarantinedAsset = True
@@ -795,15 +765,8 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # Meaningful capacity sets the unwind target.
-            # amount == 0 and no remaining balance is a withdrawn-to-zero
-            # registration and keeps the conservative floor. That floor is
-            # BasicVault-specific: SharesVault returns empty(address) when
-            # shares are 0, so a fully withdrawn rebase registration is
-            # skipped entirely and never contributes a floor.
-            # amount == 0 with a remaining balance is share-rounding dust
-            # and must not drag lowestLtv. Positive-amount dust with
-            # maxDebt == 0 also does not participate.
+            # Meaningful capacity sets the unwind target. amount == 0 with no remaining balance is withdrawn-to-zero and keeps the conservative floor (BasicVault-only: SharesVault returns empty(address) at 0 shares, so a fully withdrawn rebase registration is skipped and never floors).
+            # amount == 0 with a remaining balance is share-rounding dust and must not drag lowestLtv. Positive-amount dust with maxDebt == 0 also does not participate.
             if maxDebt != 0 or (amount == 0 and not hasNominalBalance):
                 bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
 
@@ -986,9 +949,8 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     if userDebt.amount == 0:
         return _debtType == 1 # nothing to check
 
-    # The liquidation flag is an account-wide freeze. It blocks ordinary debt
-    # health and redemption checks, but a frozen user with no outstanding
-    # auction remains eligible for another permissionless liquidation pass.
+    # inLiquidation is an account-wide freeze: it blocks ordinary debt-health and redemption checks.
+    # A frozen user with no outstanding auction remains eligible for another permissionless liquidation pass.
     if userDebt.inLiquidation:
         if _debtType != 2 or staticcall Ledger(a.ledger).hasFungibleAuctions(_user):
             return False
@@ -1133,6 +1095,31 @@ def _isUnderscoreVault(_addr: address, _mc: address) -> bool:
 #############
 
 
+# user debt terms
+
+
+@view
+@internal
+def _userTerms(
+    _user: address,
+    _numUserVaults: uint256,
+    _shouldRaise: bool,
+    _skipVaultId: uint256,
+    _skipAsset: address,
+    _a: addys.Addys,
+) -> UserBorrowTerms:
+    return self._getUserBorrowTerms(
+        _user,
+        _numUserVaults,
+        _shouldRaise,
+        _skipVaultId,
+        _skipAsset,
+        self._isUnderscoreVault(_user, _a.missionControl),
+        False,
+        _a,
+    )
+
+
 # update debt
 
 
@@ -1190,8 +1177,7 @@ def transferOrWithdrawViaRedemption(
     else:
         amountSent, na = extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
     # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
-    # Post-mutation: sender first so lastBalance writes the live share
-    # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
+    # Post-mutation: sender first so lastBalance writes the live share (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
     if amountSent != 0:
         for i: uint256 in range(2):
             ptsUser: address = _user
@@ -1296,7 +1282,10 @@ def getMaxWithdrawableForAsset(
     if btExcluding.collateralVal == 0:
 
         # entire debt must be supported by this asset
-        minAssetValueToRemain = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // assetDebtTerms.ltv
+        bufferedDebt: uint256 = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT)
+        minAssetValueToRemain = bufferedDebt // assetDebtTerms.ltv
+        if bufferedDebt % assetDebtTerms.ltv != 0:
+            minAssetValueToRemain += 1
 
     # multi-asset case: use capacity-based calculation
     else:
@@ -1316,6 +1305,8 @@ def getMaxWithdrawableForAsset(
         # Calculate minimum collateral value needed from this asset
         # minCollateral = debtNeeded / assetLTV
         minAssetValueToRemain = debtNeedingAssetSupport * HUNDRED_PERCENT // assetDebtTerms.ltv
+        if debtNeedingAssetSupport * HUNDRED_PERCENT % assetDebtTerms.ltv != 0:
+            minAssetValueToRemain += 1
 
     # cannot withdraw if user has less than the minimum required
     if userUsdValue <= minAssetValueToRemain:

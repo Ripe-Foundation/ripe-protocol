@@ -61,13 +61,11 @@ def _register_vault(vault_book, governance, vault, description):
 ###############
 
 
-@pytest.fixture(scope="function")
-def mock_auction_house():
-    """Mock auction house that can be controlled for testing"""
-    return boa.load("contracts/mock/MockAuctionHouse.vy", name="mock_auction_house")
-
-
-@pytest.fixture(scope="function")
+# These deployments are module-scoped because none of them is registered in
+# RipeHq or any shared registry, so building one per test only re-paid the
+# deployment. Titanoboa anchors every test call, so writes a test makes into
+# these contracts still revert before the next one runs.
+@pytest.fixture(scope="module")
 def new_mission_control(ripe_hq, defaults, switchboard_charlie):
     """Deploy a new MissionControl that is NOT registered in RipeHq.
 
@@ -85,7 +83,7 @@ def new_mission_control(ripe_hq, defaults, switchboard_charlie):
     return mission_control
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def zero_pointer_mission_control(ripe_hq, defaults):
     """Model an older/uninitialized MissionControl with both pointers unset."""
     mission_control = boa.load(
@@ -334,7 +332,7 @@ def test_switchboard_three_parameter_validation(
     
     # Test pause with invalid contract address (zero address) - this will fail during execution, not validation
     # The pause function executes immediately and tries to call the zero address contract
-    with boa.reverts():  # Generic revert due to calling zero address contract
+    with boa.reverts("extcodesize is zero"):  # Generic revert due to calling zero address contract
         switchboard_charlie.pause(ZERO_ADDRESS, True, sender=governance.address)
     
     # Test recoverFunds with invalid parameters
@@ -422,22 +420,22 @@ def test_switchboard_three_array_limits(
     
     # Test MAX_RECOVER_ASSETS limit (20)
     max_assets = [asset_addr] * 21  # Exceed limit
-    with boa.reverts():  # Should fail due to Vyper array size validation
+    with boa.reverts("DynArray[address, 20] bounds check"):  # Should fail due to Vyper array size validation
         switchboard_charlie.recoverFundsMany(contract_addr, user_addr, max_assets, sender=governance.address)
     
     # Test MAX_AUCTIONS limit (20)
     max_auctions = [(user_addr, 1, asset_addr)] * 21  # Exceed limit
-    with boa.reverts():  # Should fail due to Vyper array size validation
+    with boa.reverts("DynArray[FungAuctionConfig, 20] bounds check"):  # Should fail due to Vyper array size validation
         switchboard_charlie.startManyAuctions(max_auctions, sender=governance.address)
     
     # Test MAX_DEBT_UPDATES limit (50)
     max_users = [user_addr] * 51  # Exceed limit
-    with boa.reverts():  # Should fail due to Vyper array size validation
+    with boa.reverts("DynArray[address, 50] bounds check"):  # Should fail due to Vyper array size validation
         switchboard_charlie.updateDebtForManyUsers(max_users, sender=governance.address)
     
     # Test MAX_CLAIM_USERS limit (50)
     max_claim_users = [user_addr] * 51  # Exceed limit
-    with boa.reverts():  # Should fail due to Vyper array size validation
+    with boa.reverts("DynArray[address, 50] bounds check"):  # Should fail due to Vyper array size validation
         switchboard_charlie.claimLootForManyUsers(max_claim_users, False, sender=governance.address)
 
 
@@ -1004,7 +1002,7 @@ def test_switchboard_three_batch_operations_edge_cases(
     
     # Test beyond MAX_CLAIM_USERS limit - should fail bounds check
     users_over_limit = [alice] * 26
-    with boa.reverts():  # DynArray bounds check failure
+    with boa.reverts("external call failed"):  # DynArray bounds check failure
         switchboard_charlie.claimLootForManyUsers(users_over_limit, False, sender=governance.address)
     
     # Test batch with mixed valid/invalid addresses
@@ -1332,7 +1330,7 @@ def test_switchboard_three_execution_failure_scenarios(
     asset_addr = ripe_token.address
     
     # Test immediate action that should fail - invalid contract address
-    with boa.reverts():  # extcodesize is zero error
+    with boa.reverts("extcodesize is zero"):  # extcodesize is zero error
         switchboard_charlie.pause("0x1234567890123456789012345678901234567890", True, sender=governance.address)
     
     # Test timelock action that will fail execution (invalid contract for recover)
@@ -1342,7 +1340,7 @@ def test_switchboard_three_execution_failure_scenarios(
     boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     
     # Execution should fail due to invalid contract (extcodesize is zero)
-    with boa.reverts():  # Generic revert due to calling zero-code address
+    with boa.reverts("extcodesize is zero"):  # Generic revert due to calling zero-code address
         switchboard_charlie.executePendingAction(action_id, sender=governance.address)
 
 
@@ -1570,7 +1568,7 @@ def test_switchboard_three_add_many_training_wheels_parameter_validation(
     
     # Test array limit (MAX_TRAINING_WHEEL_ACCESS = 25)
     max_training_wheels = [(alice, True)] * 26  # Exceed limit
-    with boa.reverts():  # Should fail due to Vyper array size validation
+    with boa.reverts("DynArray[TrainingWheelAccess, 25] bounds check"):  # Should fail due to Vyper array size validation
         switchboard_charlie.setManyTrainingWheelsAccess(training_wheels.address, max_training_wheels, sender=governance.address)
     
     # Test exactly at limit should work (immediate execution)
@@ -3482,9 +3480,9 @@ def test_vault_pointer_actions_reject_contracts_with_wrong_interfaces(
     _support_asset(mission_control, switchboard_bravo, ripe_token.address, [vault_id])
     _support_asset(mission_control, switchboard_bravo, savings_green.address, [vault_id])
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_charlie.setCoreRipeGovVaultId(vault_id, sender=governance.address)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
 
 
@@ -3530,7 +3528,7 @@ def isPaused() -> bool:
         mission_control, switchboard_bravo, savings_green.address, [1, vault_id]
     )
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_charlie.setPreferredStabVaultId(
             vault_id, sender=governance.address
         )
@@ -3566,9 +3564,9 @@ def isPaused() -> bool:
     _support_asset(mission_control, switchboard_bravo, ripe_token.address, [vault_id])
     _support_asset(mission_control, switchboard_bravo, savings_green.address, [vault_id])
 
-    with boa.reverts():
+    with boa.reverts("returndatasize too small"):
         switchboard_charlie.setCoreRipeGovVaultId(vault_id, sender=governance.address)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
 
 
@@ -3942,7 +3940,12 @@ def isPaused() -> bool:
         boa.env.time_travel(
             blocks=confirmation_block - boa.env.evm.patch.block_number
         )
-    with boa.reverts():
+    expected = (
+        "returndatasize too small"
+        if replacement_kind == "malformed_probe" and pointer_kind == "core"
+        else "external call failed"
+    )
+    with boa.reverts(expected):
         switchboard_charlie.executePendingAction(
             action_id,
             sender=governance.address,

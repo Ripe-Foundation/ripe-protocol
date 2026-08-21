@@ -5,34 +5,51 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
+# RipeGov headroom is 460 bytes after the migration, SharesVault, and
+# governance-remediation changes. Any RipeGov edit must remeasure this pin.
+# Composed SwitchboardAlpha headroom is 19 bytes after RipeGov duration
+# validation and the existing execution sanitization.
+# Teller headroom is 68 bytes after the SharesVault and historical RipeGov
+# routing changes.
+# Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
+# runtime. Any Lootbox edit, however small, must recompile and remeasure this
+# pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
+# load-bearing.
+# StabilityPool headroom is 12 bytes after the deferred claim checkpoint,
+# exact-payment, and Stability-local claimable-aware retirement remediations.
+# Any StabilityPool or StabVault edit must recompile and remeasure this pin
+# before merge.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16123,
-    "SwitchboardAlpha": 24506,
-    "SwitchboardBravo": 24364,
+    "MissionControl": 16143,
+    "SwitchboardAlpha": 24557,
+    "SwitchboardBravo": 24541,
     "SwitchboardCharlie": 23873,
-    "SwitchboardEcho": 23192,
-    "VaultMigrator": 12464,
-    "Teller": 24556,
-    "TellerUtils": 9091,
+    "SwitchboardEcho": 23930,
+    "VaultMigrator": 15626,
+    "VaultBook": 13833,
+    "Teller": 24508,
+    "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
-    "Lootbox": 24444,
-    "RebaseErc20": 11037,
-    "RipeGov": 23493,
-    "HumanResources": 12542,
-    "AuctionHouse": 24568,
-    "CreditEngine": 24382,
-    "CreditRedeem": 8290,
-    "Deleverage": 24424,
-    "StabilityPool": 24002,
-    "BlueChipYieldPrices": 22749,
-    "ChainlinkPrices": 14256,
-    "CurvePrices": 23141,
-    "PythPrices": 14282,
-    "RedStone": 13633,
-    "StorkPrices": 13162,
-    "UndyVaultPrices": 17612,
-    "wsuperOETHbPrices": 8763,
+    "Lootbox": 24456,
+    "RebaseErc20": 11602,
+    "RipeGov": 24116,
+    "HumanResources": 14777,
+    "AuctionHouse": 24566,
+    "CreditEngine": 24502,
+    "CreditRedeem": 8415,
+    "Endaoment": 23351,
+    "PriceDesk": 17578,
+    "Deleverage": 24459,
+    "StabilityPool": 24564,
+    "BlueChipYieldPrices": 20857,
+    "ChainlinkPrices": 14272,
+    "CurvePrices": 23966,
+    "PythPrices": 14811,
+    "RedStone": 13657,
+    "StorkPrices": 13832,
+    "UndyVaultPrices": 17689,
+    "wsuperOETHbPrices": 8336,
 }
 
 
@@ -43,6 +60,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     switchboard_charlie,
     switchboard_echo,
     vault_migrator,
+    vault_book,
     teller,
     teller_utils,
     bond_room,
@@ -54,6 +72,8 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     auction_house,
     credit_engine,
     credit_redeem,
+    endaoment,
+    price_desk,
     deleverage,
     stability_pool,
     blue_chip_prices,
@@ -80,6 +100,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
             switchboard_echo.env.get_code(switchboard_echo.address)
         ),
         "VaultMigrator": len(vault_migrator.env.get_code(vault_migrator.address)),
+        "VaultBook": len(vault_book.env.get_code(vault_book.address)),
         "Teller": len(teller.env.get_code(teller.address)),
         "TellerUtils": len(teller_utils.env.get_code(teller_utils.address)),
         "BondRoom": len(bond_room.env.get_code(bond_room.address)),
@@ -95,6 +116,8 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "AuctionHouse": len(auction_house.env.get_code(auction_house.address)),
         "CreditEngine": len(credit_engine.env.get_code(credit_engine.address)),
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
+        "Endaoment": len(endaoment.env.get_code(endaoment.address)),
+        "PriceDesk": len(price_desk.env.get_code(price_desk.address)),
         "Deleverage": len(deleverage.env.get_code(deleverage.address)),
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),
         "BlueChipYieldPrices": len(blue_chip_prices.env.get_code(blue_chip_prices.address)),

@@ -8,7 +8,7 @@
 #                                                  ┛┗┗┣┛┛┗┗┻
 #                                                     ┛     
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -41,6 +41,7 @@ interface MissionControl:
     def genDebtConfig() -> cs.GenDebtConfig: view
     def coreRipeGovVaultId() -> uint256: view
     def genConfig() -> cs.GenConfig: view
+    def getRipeHq() -> address: view
 
 interface StabilityPool:
     def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
@@ -401,9 +402,6 @@ pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
 
-MIN_STALE_TIME: public(immutable(uint256))
-MAX_STALE_TIME: public(immutable(uint256))
-
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 PRIORITY_LIQ_EXECUTION: constant(uint256) = 0
@@ -412,15 +410,16 @@ PRIORITY_STAB_EXECUTION: constant(uint256) = 2
 PRIORITY_STAB_PROPOSAL: constant(uint256) = 3
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
-# Auction delay is in blocks. uint32 (~272y at 2s) keeps
-# block.number + delay + duration from overflowing.
-MAX_AUCTION_DELAY: constant(uint256) = 2**32 - 1
+MAX_AUCTION_DELAY: constant(uint256) = 2**32 - 1 # protect overflow
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
 PYTH_PRICES_ID: constant(uint256) = 4
 CREDIT_ENGINE_ID: constant(uint256) = 13
+
+MIN_STALE_TIME: public(immutable(uint256))
+MAX_STALE_TIME: public(immutable(uint256))
 
 
 @deploy
@@ -458,8 +457,14 @@ def _hasPermsToEnable(_caller: address, _shouldEnable: bool) -> bool:
 
 @view
 @internal
+def _hqAddr(_id: uint256) -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(_id)
+
+
+@view
+@internal
 def _getMissionControlAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
+    return self._hqAddr(MISSION_CONTROL_ID)
 
 
 @view
@@ -474,26 +479,8 @@ def _resolveMissionControl(_missionControl: address) -> address:
 
 @view
 @internal
-def _getPriceDeskAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
-
-
-@view
-@internal
-def _getVaultBookAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
-
-
-@view
-@internal
-def _getCreditEngineAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(CREDIT_ENGINE_ID)
-
-
-@view
-@internal
 def _getPythPricesAddr() -> address:
-    return staticcall PriceDesk(self._getPriceDeskAddr()).getAddr(PYTH_PRICES_ID)
+    return staticcall PriceDesk(self._hqAddr(PRICE_DESK_ID)).getAddr(PYTH_PRICES_ID)
 
 
 ##################
@@ -889,11 +876,9 @@ def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
         return False
     if _params.startDiscount >= _params.maxDiscount:
         return False
-    # Cap so (duration-1)*(maxDiscount-startDiscount) cannot overflow.
-    if _params.duration == 0 or _params.duration > max_value(uint256) // HUNDRED_PERCENT:
+    if _params.duration == 0 or _params.duration > max_value(uint256) // HUNDRED_PERCENT: # overflow protection
         return False
-    # Also keeps AuctionHouse `block.number + delay` from overflowing.
-    if _params.delay > MAX_AUCTION_DELAY:
+    if _params.delay > MAX_AUCTION_DELAY: # overflow protection
         return False
     return True
 
@@ -1279,7 +1264,7 @@ def _validatePriorityVaults(
     _missionControl: address,
     _validationMode: uint256,
 ) -> uint256:
-    vaultBook: address = self._getVaultBookAddr()
+    vaultBook: address = self._hqAddr(VAULT_BOOK_ID)
     isProposal: bool = (_validationMode & 1) != 0
     for vault: cs.VaultLite in _priorityVaults:
         if isProposal and self.vaultDedupe[vault.vaultId][vault.asset]:
@@ -1298,9 +1283,7 @@ def _validatePriorityVaults(
             if not vaultAddr.is_contract:
                 return 2
 
-            # Capability probes only: zero is deliberately not asserted as a live
-            # claim asset. AuctionHouse calls both selectors before either pool
-            # mutation, so a legacy/partial implementation must fail here instead.
+            # capability probes only
             naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(vault.asset, empty(address))
             naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(vault.asset, empty(address))
             if staticcall StabilityPool(vaultAddr).isPaused():
@@ -1318,17 +1301,15 @@ def _validatePriorityVaults(
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES], _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-
-    priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self._sanitizePrioritySources(_priorityIds)
-    assert len(priorityIds) != 0 # dev: invalid priority sources
+    assert len(_priorityIds) != 0 # dev: invalid priority sources
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS
-    self.pendingPriorityPriceSourceIds[aid] = priorityIds
+    self.pendingPriorityPriceSourceIds[aid] = _priorityIds
     self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingPriorityPriceSourceIdsChange(
-        numPriorityPriceSourceIds=len(priorityIds),
+        numPriorityPriceSourceIds=len(_priorityIds),
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -1337,11 +1318,16 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE
 
 @view
 @internal
-def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
+def _sanitizePrioritySources(
+    _priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES],
+    _missionControl: address,
+) -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
     sanitizedIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
-    priceDesk: address = self._getPriceDeskAddr()
+    priceDesk: address = staticcall RipeHq(staticcall MissionControl(_missionControl).getRipeHq()).getAddr(PRICE_DESK_ID)
     for pid: uint256 in _priorityIds:
         if not staticcall PriceDesk(priceDesk).isValidRegId(pid):
+            continue
+        if staticcall PriceDesk(priceDesk).getAddr(pid) == empty(address):
             continue
         if pid in sanitizedIds:
             continue
@@ -1358,7 +1344,7 @@ def addPriceSnapshot(_asset: address, _priceSourceId: uint256) -> bool:
     if not gov._canGovern(msg.sender):
         assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
     
-    priceSourceAddr: address = staticcall PriceDesk(self._getPriceDeskAddr()).getAddr(_priceSourceId)
+    priceSourceAddr: address = staticcall PriceDesk(self._hqAddr(PRICE_DESK_ID)).getAddr(_priceSourceId)
     assert priceSourceAddr != empty(address) # dev: invalid price source id
 
     didUpdate: bool = extcall PriceSource(priceSourceAddr).addPriceSnapshot(_asset) 
@@ -1464,7 +1450,12 @@ def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: 
     if _assetWeight > 500_00: # max 500%
         return False
 
-    if _lockTerms.minLockDuration > _lockTerms.maxLockDuration:
+    # maxLockBoost (1000%) is the largest downstream duration multiplier.
+    if (
+        _lockTerms.maxLockDuration == 0
+        or unsafe_mul(_lockTerms.maxLockDuration, 1000_00) // 1000_00 != _lockTerms.maxLockDuration
+        or _lockTerms.minLockDuration > _lockTerms.maxLockDuration
+    ):
         return False
 
     if _lockTerms.maxLockBoost > 1000_00: # max 1000%
@@ -1473,10 +1464,7 @@ def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: 
     if _lockTerms.exitFee > HUNDRED_PERCENT:
         return False
 
-    if _lockTerms.canExit and _lockTerms.exitFee == 0:
-        return False
-
-    if not _lockTerms.canExit and _lockTerms.exitFee != 0:
+    if _lockTerms.canExit == (_lockTerms.exitFee == 0):
         return False
 
     return True
@@ -1578,12 +1566,12 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.DEBT_UNDY_VAULT_DISCOUNT:
         discount: uint256 = self.pendingUndyVaultDiscount[_aid]
-        extcall CreditEngine(self._getCreditEngineAddr()).setUnderscoreVaultDiscount(discount)
+        extcall CreditEngine(self._hqAddr(CREDIT_ENGINE_ID)).setUnderscoreVaultDiscount(discount)
         log UndyVaultDiscountSet(discount=discount)
 
     elif actionType == ActionType.DEBT_BUYBACK_RATIO:
         ratio: uint256 = self.pendingBuybackRatio[_aid]
-        extcall CreditEngine(self._getCreditEngineAddr()).setBuybackRatio(ratio)
+        extcall CreditEngine(self._hqAddr(CREDIT_ENGINE_ID)).setBuybackRatio(ratio)
         log BuybackRatioSet(ratio=ratio)
 
     elif actionType == ActionType.PYTH_MAX_CONFIDENCE_RATIO:
@@ -1629,7 +1617,8 @@ def executePendingAction(_aid: uint256) -> bool:
         log PriorityStabVaultsSet(numVaults=len(priorityVaults))
 
     elif actionType == ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS:
-        priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self.pendingPriorityPriceSourceIds[_aid]
+        priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self._sanitizePrioritySources(self.pendingPriorityPriceSourceIds[_aid], mc)
+        assert len(priorityIds) != 0 # dev: invalid priority price source ids
         extcall MissionControl(mc).setPriorityPriceSourceIds(priorityIds)
         log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
 

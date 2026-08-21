@@ -84,6 +84,20 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources):
     return desk
 
 
+STALE_TIME_PROBE = """
+# @version 0.4.3
+
+@view
+@external
+def getPriceAndHasFeed(
+    _asset: address,
+    _staleTime: uint256 = 0,
+    _priceDesk: address = empty(address),
+) -> (uint256, bool):
+    return _staleTime, True
+"""
+
+
 def _set_priorities(mission_control, switchboard_alpha, source_ids):
     mission_control.setPriorityPriceSourceIds(
         source_ids,
@@ -118,6 +132,32 @@ def _count_calls(computation, address, selector):
     ) + sum(_count_calls(child, address, selector) for child in computation.children)
 
 
+def test_caller_stale_bound_cannot_loosen_mission_control_bound(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+    setGeneralConfig,
+):
+    # Existing min-bound behavior: callers can tighten MissionControl's stale
+    # bound but cannot loosen it. The probe echoes the forwarded stale time
+    # as its price so a shared source graph cannot make this vacuous.
+    with boa.env.anchor():
+        probe = boa.loads(STALE_TIME_PROBE)
+        desk = _isolated_price_desk(ripe_hq, deploy3r, [probe])
+        _set_priorities(mission_control, switchboard_alpha, [1])
+
+        for mc_bound, caller_bound in (
+            (10, 100),
+            (100, 10),
+            (0, 10),
+            (10, 0),
+        ):
+            setGeneralConfig(_priceStaleTime=mc_bound)
+            assert desk.getPrice(alpha_token, False, caller_bound) == 10
+
+
 def test_reverting_priority_source_falls_through_to_healthy_source(
     ripe_hq,
     deploy3r,
@@ -143,7 +183,7 @@ def test_reverting_non_priority_source_falls_through_to_healthy_source(
     failed = _raw_source(price_mode=1)
     healthy = _raw_source(3 * EIGHTEEN_DECIMALS, True)
     desk = _isolated_price_desk(ripe_hq, deploy3r, [failed, healthy])
-    _set_priorities(mission_control, switchboard_alpha, [])
+    _set_priorities(mission_control, switchboard_alpha, [6])
 
     assert desk.getPrice(alpha_token, True) == 3 * EIGHTEEN_DECIMALS
 
@@ -334,7 +374,7 @@ def test_gas_burning_non_priority_source_falls_through_to_healthy_source(
     )
     healthy = _raw_source(10 * EIGHTEEN_DECIMALS, True)
     desk = _isolated_price_desk(ripe_hq, deploy3r, [burner, healthy])
-    _set_priorities(mission_control, switchboard_alpha, [])
+    _set_priorities(mission_control, switchboard_alpha, [6])
 
     assert desk.getPrice(alpha_token, True, gas=1_000_000) == 10 * EIGHTEEN_DECIMALS
 

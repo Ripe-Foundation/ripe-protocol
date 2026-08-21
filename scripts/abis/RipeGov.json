@@ -1649,6 +1649,27 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "inheritUserGovPointAccrualDisableForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_disabledBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "exportPositionForMigration",
     "inputs": [
       {
@@ -2555,71 +2576,6 @@
       {
         "name": "",
         "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "areKeyTermsSame",
-    "inputs": [
-      {
-        "name": "_newTerms",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "minLockDuration",
-            "type": "uint256"
-          },
-          {
-            "name": "maxLockDuration",
-            "type": "uint256"
-          },
-          {
-            "name": "maxLockBoost",
-            "type": "uint256"
-          },
-          {
-            "name": "canExit",
-            "type": "bool"
-          },
-          {
-            "name": "exitFee",
-            "type": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_prevTerms",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "minLockDuration",
-            "type": "uint256"
-          },
-          {
-            "name": "maxLockDuration",
-            "type": "uint256"
-          },
-          {
-            "name": "maxLockBoost",
-            "type": "uint256"
-          },
-          {
-            "name": "canExit",
-            "type": "bool"
-          },
-          {
-            "name": "exitFee",
-            "type": "uint256"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
       }
     ]
   },

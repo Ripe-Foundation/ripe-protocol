@@ -126,6 +126,33 @@
     "type": "event"
   },
   {
+    "name": "RipeGovUserPointAccrualDisableInherited",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "sourceVault",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "targetVault",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "disabledBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "DepartmentPauseModified",
     "inputs": [
       {
@@ -365,10 +392,64 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "migrateVaultPositionsForUserByAssets",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "migrateRipeGovPositions",
     "inputs": [
       {
         "name": "_users",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateRipeGovPositionsForUserByAssets",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
         "type": "address[]"
       },
       {

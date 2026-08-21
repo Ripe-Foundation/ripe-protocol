@@ -324,6 +324,13 @@ def test_funded_ripe_gov_cannot_be_disabled_at_confirmation(
         canonical_id,
         sender=switchboard_alpha.address,
     )
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (0, 1000, 200_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
     assert vault_book.startAddressDisableInRegistry(
         vault_id,
         sender=governance.address,

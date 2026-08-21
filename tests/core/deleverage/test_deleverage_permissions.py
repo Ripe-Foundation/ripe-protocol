@@ -1,7 +1,7 @@
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
-from conf_utils import filter_logs, set_full_payoff_params
+from conf_utils import filter_logs, set_full_payoff_params, clear_transient_storage
 
 HUNDRED_PERCENT = 100_00
 SIX_DECIMALS = 10**6
@@ -1385,10 +1385,8 @@ def test_user_in_liquidation_can_be_deleveraged(
     mock_price_source,
 ):
     """
-    Test that user in liquidation can still be deleveraged.
-
-    The contract allows deleveraging even for users marked as in liquidation,
-    as deleverage is a debt reduction mechanism that helps the protocol.
+    Untrusted many-users cannot unwind a book flagged inLiquidation.
+    Trusted specific-assets (self) and trusted many-users (Ripe) still can.
     """
     # Setup user in redemption zone
     initial_price, new_price = setup_redemption_zone(
@@ -1411,9 +1409,32 @@ def test_user_in_liquidation_can_be_deleveraged(
     )
     ledger.setUserDebt(bob, debt_tuple, 0, (0, 0), sender=credit_engine.address)
 
-    # Deleverage should work (helps reduce protocol risk)
-    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
-    assert repaid_amount > 0, "Deleverage should work even for users in liquidation"
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 0, sender=alice)
+    assert ledger.userDebt(bob).inLiquidation is True
+
+    # Trusted specific-assets: ordinary self is trusted on this entry.
+    clear_transient_storage()
+    repaid_specific = teller.deleverageWithSpecificAssets(
+        [(3, alpha_token.address, 20 * EIGHTEEN_DECIMALS)],
+        bob,
+        sender=bob,
+    )
+    assert repaid_specific > 0, "trusted specific-assets should still sell a flagged book"
+
+    # Re-flag remaining debt so trusted many-users is still on a flagged book.
+    clear_transient_storage()
+    user_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0]
+    assert user_debt.amount > 0
+    ledger.setUserDebt(
+        bob,
+        (user_debt.amount, user_debt.principal, user_debt.debtTerms, user_debt.lastTimestamp, True),
+        0,
+        (0, 0),
+        sender=credit_engine.address,
+    )
+    repaid_trusted = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
+    assert repaid_trusted > 0, "trusted many-users (Ripe) should still sell a flagged book"
 
 
 def test_zero_collateral_value_reverts_without_price(
@@ -1942,23 +1963,22 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
 
     # The caller is locally trusted, but a full payoff still classifies the
     # position owner so earn-vault owners never pay full-payoff extras.
-    # Boa 0.2.7's revert renderer has a diagnostic-only bug when its sstore trace
-    # contains public HashMap[address, bool] writes. Removing this mock's trace
-    # entry does not change EVM storage; it only lets Boa render and match the
-    # production revert reason below.
-    mock_trace = boa.env.sstore_trace.pop(mock_undy_v2.address, None)
-    try:
-        with boa.reverts("mock underscore vault check"):
-            _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
+    # This used to pop mock_undy_v2 out of boa.env.sstore_trace around the
+    # reverts below, to dodge a diagnostic-only bug in Boa 0.2.7's revert
+    # renderer when the trace holds public HashMap[address, bool] writes.
+    # tests/conftest.py now clears that trace globally, but only at test
+    # boundaries -- setEarnVault above writes _earnVaults and
+    # _basicEarnVaults mid-test, after that clear. The two mechanisms are
+    # therefore not equivalent: if the renderer regresses here, the global
+    # fixture will not prevent it and the local pop has to come back.
+    with boa.reverts("mock underscore vault check"):
+        _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
-        # CreditEngine independently classifies Underscore owners on its read
-        # path, widening the configured registry's failure surface beyond
-        # Deleverage.
-        with boa.reverts("mock underscore vault check"):
-            credit_engine.getLatestUserDebtAndTerms(bob, False)
-    finally:
-        if mock_trace is not None:
-            boa.env.sstore_trace[mock_undy_v2.address] = mock_trace
+    # CreditEngine independently classifies Underscore owners on its read
+    # path, widening the configured registry's failure surface beyond
+    # Deleverage.
+    with boa.reverts("mock underscore vault check"):
+        credit_engine.getLatestUserDebtAndTerms(bob, False)
 
     # Restore the mock before reading the unchanged position.
     mock_undy_v2.setVaultCheckRevertAddress(ZERO_ADDRESS)

@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -132,6 +132,7 @@ pendingPriceConfigs: public(HashMap[address, PendingPriceConfig]) # asset -> pen
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 MAX_SNAPSHOTS: constant(uint256) = 25
+MAX_SAFE_DECIMALS: constant(uint256) = 77
 
 
 @deploy
@@ -145,29 +146,6 @@ def __init__(
     addys.__init__(_ripeHq)
     priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
-
-
-######################
-# Checked Arithmetic #
-######################
-
-
-@pure
-@internal
-def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a > max_value(uint256) - _b:
-        return False, 0
-    return True, unsafe_add(_a, _b)
-
-
-@pure
-@internal
-def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a == 0 or _b == 0:
-        return True, 0
-    if _a > max_value(uint256) // _b:
-        return False, 0
-    return True, unsafe_mul(_a, _b)
 
 
 ###############
@@ -373,6 +351,8 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig, _requireValidSnaps
     if _config.maxUpsideDeviation > HUNDRED_PERCENT:
         return False
     if 0 in [_config.underlyingDecimals, _config.vaultTokenDecimals]:
+        return False
+    if _config.underlyingDecimals > MAX_SAFE_DECIMALS or _config.vaultTokenDecimals > MAX_SAFE_DECIMALS:
         return False
 
     # verify underlying asset has a price feed
@@ -699,7 +679,7 @@ def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
     if _config.nextIndex >= _config.maxNumSnapshots:
         return 0
 
-    # Traverse the circular ring from its next write position, which is the
+    # traverse the circular ring from its next write position, which is the
     # oldest slot once full and precedes empty slots while partially filled.
     numerator: uint256 = 0
     denominator: uint256 = 0
@@ -834,7 +814,10 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
 @view
 @external
 def getLatestSnapshot(_asset: address) -> PriceSnapshot:
-    return self._getLatestSnapshot(_asset, self.priceConfigs[_asset])
+    config: PriceConfig = self.priceConfigs[_asset]
+    if config.underlyingAsset == empty(address):
+        return empty(PriceSnapshot)
+    return self._getLatestSnapshot(_asset, config)
 
 
 @view
@@ -889,3 +872,26 @@ def _getUnderscoreVaultPrice(
 @internal
 def _getCurrentVaultPricePerShare(_asset: address, _decimals: uint256) -> uint256:
     return staticcall UnderscoreVault(_asset).convertToAssets(10 ** _decimals)
+
+
+######################
+# Checked Arithmetic #
+######################
+
+
+@pure
+@internal
+def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a > max_value(uint256) - _b:
+        return False, 0
+    return True, unsafe_add(_a, _b)
+
+
+@pure
+@internal
+def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a == 0 or _b == 0:
+        return True, 0
+    if _a > max_value(uint256) // _b:
+        return False, 0
+    return True, unsafe_mul(_a, _b)

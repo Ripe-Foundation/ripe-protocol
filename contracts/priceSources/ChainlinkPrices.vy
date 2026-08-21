@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -116,16 +116,6 @@ ETH: public(immutable(address))
 BTC: public(immutable(address))
 
 NORMALIZED_DECIMALS: constant(uint256) = 18
-
-
-@pure
-@internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
 
 
 @deploy
@@ -257,6 +247,16 @@ def addPriceSnapshot(_asset: address) -> bool:
     return False
 
 
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
+
+
 ##################
 # Chainlink Data #
 ##################
@@ -271,6 +271,9 @@ def getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0
 @view
 @internal
 def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
+    if _feed == empty(address):
+        return 0
+
     oracle: ChainlinkRound = staticcall ChainlinkFeed(_feed).latestRoundData()
 
     # oracle has no price

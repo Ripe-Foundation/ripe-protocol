@@ -4,7 +4,7 @@
 
 **Integration branch:** `rh-audit-remediation`
 
-**Source snapshot:** `07c3c96cf9f8c0cdac7a78fcb3cdf837f56da9fc`
+**Contract-source snapshot:** `c9ae47e1854e676b5846c98baa40f5d0fdfaf324`
 
 **Checked:** 2026-08-17
 
@@ -41,14 +41,14 @@ being represented as an active exploit.
 | [#153](https://github.com/Ripe-Foundation/ripe-protocol/issues/153) — CreditEngine auction repayment bound | Open — contract hardening | AuctionHouse currently caps repayment before collateral transfer, but `CreditEngine.repayDuringAuctionPurchase` does not independently reject a repayment above live debt. PR #169 changes CreditEngine but does not add this defense-in-depth bound. Reassess against the final post-#169 runtime; implement only if the deployed contract remains below EIP-170, otherwise record a deliberate deferral. |
 | [#150](https://github.com/Ripe-Foundation/ripe-protocol/issues/150) — Base RipeGov migration rebind | Deployment/migration | Rebase and requalify the separate Base migration after SC-12. Not an RH production-contract defect. |
 
-## 2. Original finding dispositions and work still in flight
+## 2. Original finding dispositions
 
 | Finding | Status at this snapshot | Required closure |
 | --- | --- | --- |
 | SC-10 — account-wide quarantine / signal split | Accepted residual | Preserve the current whole-account quarantine when any positive-LTV asset is unsafe. The owner explicitly rejected the experimental asset-local branch for this remediation wave. Reopen only through a separately reviewed product/security decision. |
 | SC-13 — Underscore cross-user authority | Fixed in the remediation branch | PR [#170](https://github.com/Ripe-Foundation/ripe-protocol/pull/170) merged the user-bound TellerUtils/Deleverage remediation and focused adversarial coverage. Issue #161 remains an activation/deployment gate while Underscore is disabled and the aggregate contracts are not deployed. |
-| SC-14 — reward checkpoint sender omission | In PR [#169](https://github.com/Ripe-Foundation/ripe-protocol/pull/169) | PR #169 now covers AuctionHouse, CreditEngine, and Deleverage sender checkpoints, internal-transfer recipient checkpoints, and rollback behavior. Do not treat SC-14 as an independent unassigned task. Merge only after the current branch is contract-reviewed, deployable under EIP-170, and green. |
-| SC-24, SC-25, SC-26, SC-30 | In PR [#169](https://github.com/Ripe-Foundation/ripe-protocol/pull/169) | The rebased implementation remains under review. Resolve all review and CI findings, then re-review the final smart-contract behavior before merge. |
+| SC-14 — reward checkpoint sender omission | Fixed in the remediation branch | PR [#169](https://github.com/Ripe-Foundation/ripe-protocol/pull/169) merged AuctionHouse, CreditEngine, and Deleverage sender checkpoints, internal-transfer recipient checkpoints, and rollback coverage. |
+| SC-24, SC-25, SC-26, SC-30 | Fixed in the remediation branch | PR [#169](https://github.com/Ripe-Foundation/ripe-protocol/pull/169) merged the reward-dust funding correction, bounded price-source enumeration, value-aware `lowestLtv`, and attainable maximum auction discount with focused regressions. |
 | SC-28 — hardcoded `wsuperOETHb` fallbacks | Dormant non-RH integration hazard | Before enabling the source, remove or safely govern the literal MCBETH price of `1` and VVV default of `$2.40`, or enforce an exclusion that prevents them from becoming protocol-consumable fallback prices. |
 
 ## 3. Derived production-contract findings and assessments
@@ -62,9 +62,8 @@ being represented as an active exploit.
 Any registered Ripe address can select `_user`, `_isHigherRisk`,
 `_shouldUpdateDebt`, and an optional `Addys` bundle. This can touch a third-party
 account's `lastTouch`, trigger debt refresh, snapshot Curve state, and alter whether
-the last-touch check is enforced. An isolated assessment worktree exists, but no
-final verdict establishes whether this is exploitable, grief-only, or safe under the
-intended registered-caller trust model.
+the last-touch check is enforced. No final verdict establishes whether this is
+exploitable, grief-only, or safe under the intended registered-caller trust model.
 
 **Next action:** finish the assessment and issue a plain contract verdict. Do not
 start a duplicate implementation before the assessment identifies the missing
@@ -293,16 +292,14 @@ These are retained to prevent stale review notes from being re-filed:
 
 ## 8. Immediate triage order
 
-1. Finish PR #169 for SC-14/24/25/26/30: resolve all review and CI findings, verify
-   all changed runtimes remain deployable, and re-review the final contract behavior.
-2. Reassess issue #153 against the final post-#169 CreditEngine runtime.
-3. Finish DER-01 Teller housekeeping assessment before authorizing a contract edit.
-4. Resolve DER-T01's nested-source activation blocker and repository/live PriceDesk
+1. Reassess issue #153 against the final post-#169 CreditEngine runtime.
+2. Finish DER-01 Teller housekeeping assessment before authorizing a contract edit.
+3. Resolve DER-T01's nested-source activation blocker and repository/live PriceDesk
    topology divergence before enabling the affected source composition.
-5. Decide DER-T03's specialized-oracle staleness policy before changing BlueChip or
+4. Decide DER-T03's specialized-oracle staleness policy before changing BlueChip or
    Undy behavior.
-6. Re-read DER-C01, DER-C02, and DER-T04 live configuration before activation claims.
-7. Retain the ratified DER-02 policy and DER-03 Comet activation gate unless their
+5. Re-read DER-C01, DER-C02, and DER-T04 live configuration before activation claims.
+6. Retain the ratified DER-02 policy and DER-03 Comet activation gate unless their
    documented reopening conditions occur; schedule SC-28 only if its integration is
    enabled.
 
@@ -313,8 +310,7 @@ stale claims—the four empty-batch siblings, the priority-liquidity Stability P
 classification, and the stale-only-vault terms wipe—are not open defects on the
 current source. The material open items are:
 
-- PR #169's SC-14/24/25/26/30 implementation and issue #153's optional independent
-  repayment bound;
+- issue #153's optional independent repayment bound;
 - the unresolved Teller housekeeping assessment;
 - the nested BlueChip/PriceDesk activation blocker and specialized-oracle staleness
   policy question;

@@ -16,7 +16,7 @@
 #     ╚═══════════════════════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -37,21 +37,17 @@ from ethereum.ercs import IERC20
 
 interface MissionControl:
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
+    def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
     def underscoreRegistry() -> address: view
-    def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool: view
 
 interface AddressRegistry:
-    def isValidRegId(_regId: uint256) -> bool: view
     def getRegId(_addr: address) -> uint256: view
     def getAddr(_regId: uint256) -> address: view
     def isValidAddr(_addr: address) -> bool: view
 
 interface CreditEngine:
     def getMaxWithdrawableForAsset(_user: address, _vaultId: uint256, _asset: address, _vaultAddr: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> uint256: view
-
-interface Ledger:
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
 
 interface VaultRegistry:
     def isEarnVault(_vaultAddr: address) -> bool: view
@@ -163,6 +159,9 @@ def validateOnDeposit(
     availGlobalDeposit: uint256 = self._getAvailGlobalDepositLimit(vd.totalBalance, config.globalDepositLimit)
     assert availGlobalDeposit != 0 # dev: cannot deposit, reached global limit
     amount = min(amount, availGlobalDeposit)
+
+    if _areFundsHereAlready:
+        assert amount == _amount # dev: cannot partially deposit held funds
 
     # min balance
     assert amount + vd.userBalance >= config.minDepositBalance # dev: too small a balance
@@ -414,7 +413,7 @@ def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = emp
     if self._isUnderscoreWalletOwner(_user, _caller, underscore):
         return True
 
-    # "Lego" means a currently registered Lego with an explicit user-specific grant.
+    # "lego" means a currently registered Lego with an explicit user-specific grant.
     if not self._isUnderscoreAddr(_caller, underscore):
         return False
     return staticcall MissionControl(missionControl).doesUndyLegoHaveAccess(_user, _caller)

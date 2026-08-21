@@ -12,7 +12,7 @@
 #     ╚═════════════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -34,8 +34,8 @@ exports: (
     vaultData.doesUserHaveBalance,
     vaultData.deregisterUserAsset,
     vaultData.isSupportedVaultAsset,
-    vaultData.deregisterVaultAsset,
-    vaultData.doesVaultHaveAnyFunds,
+    stabVault.deregisterVaultAsset,
+    stabVault.doesVaultHaveAnyFunds,
     vaultData.getNumUserAssets,
     vaultData.getNumVaultAssets,
     vaultData.pause,
@@ -216,9 +216,9 @@ def getTotalAmountForVault(_asset: address) -> uint256:
 
 @external
 def recoverFunds(_recipient: address, _asset: address):
-    raise
+    raise # dev: recovery disabled
 
 
 @external
 def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
-    raise
+    raise # dev: recovery disabled

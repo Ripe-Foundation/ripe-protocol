@@ -3,7 +3,7 @@ import boa
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, ONE_YEAR, ONE_DAY_IN_SECS
 from conf_utils import filter_logs
-from config.BluePrint import PARAMS, ADDYS
+from config.BluePrint import PARAMS, ADDYS, CORE_TOKENS
 
 
 @pytest.fixture(scope="module")
@@ -1346,3 +1346,135 @@ def test_sc21_chainlink_future_timestamp_characterization(
         boa.env.timestamp,
     )
     assert mock_chainlink.getPrice(alpha_token, 1) == 500 * EIGHTEEN_DECIMALS
+
+
+def _advance_timelock_blocks(blocks):
+    """Advance governance NUMBER without aging historical fork oracles."""
+
+    boa.env.evm.patch.block_number += blocks
+
+
+def _load_aggregator(addr, name):
+    return boa.from_etherscan(addr, name=name)
+
+
+def _normalized_aggregator_price(feed):
+    rnd = feed.latestRoundData()
+    answer = int(getattr(rnd, "answer", rnd[1]))
+    decimals = int(feed.decimals())
+    assert answer > 0
+    assert decimals <= 18
+    price = answer
+    if decimals < 18:
+        price *= 10 ** (18 - decimals)
+    return price, decimals
+
+
+def _assert_feed_config(config, feed, decimals, stale_time, needs_eth=False, needs_btc=False):
+    assert config.feed == feed
+    assert config.decimals == decimals
+    assert config.needsEthToUsd is needs_eth
+    assert config.needsBtcToUsd is needs_btc
+    assert config.staleTime == stale_time
+
+
+@pytest.base
+def test_base_constructor_eth_btc_metadata_matches_real_feeds(chainlink, fork):
+    eth = ADDYS[fork]["ETH"]
+    weth = ADDYS[fork]["WETH"]
+    btc = ADDYS[fork]["BTC"]
+    eth_feed_addr = ADDYS[fork]["CHAINLINK_ETH_USD"]
+    btc_feed_addr = ADDYS[fork]["CHAINLINK_BTC_USD"]
+
+    eth_feed = _load_aggregator(eth_feed_addr, "chainlink_eth_usd")
+    btc_feed = _load_aggregator(btc_feed_addr, "chainlink_btc_usd")
+    eth_price, eth_decimals = _normalized_aggregator_price(eth_feed)
+    btc_price, btc_decimals = _normalized_aggregator_price(btc_feed)
+
+    eth_cfg = chainlink.feedConfig(eth)
+    weth_cfg = chainlink.feedConfig(weth)
+    btc_cfg = chainlink.feedConfig(btc)
+
+    _assert_feed_config(eth_cfg, eth_feed_addr, eth_decimals, 0)
+    _assert_feed_config(weth_cfg, eth_feed_addr, eth_decimals, 0)
+    _assert_feed_config(btc_cfg, btc_feed_addr, btc_decimals, 0)
+
+    assert chainlink.getPrice(eth) == eth_price
+    assert chainlink.getPrice(weth) == eth_price
+    assert chainlink.getPrice(btc) == btc_price
+
+
+@pytest.base
+def test_base_eth_weth_btc_direct_and_pricedesk_reads(chainlink, price_desk, fork):
+    eth = ADDYS[fork]["ETH"]
+    weth = ADDYS[fork]["WETH"]
+    btc = ADDYS[fork]["BTC"]
+
+    eth_price = chainlink.getPrice(eth)
+    weth_price = chainlink.getPrice(weth)
+    btc_price = chainlink.getPrice(btc)
+
+    assert eth_price != 0
+    assert weth_price == eth_price
+    assert btc_price != 0
+    assert chainlink.getPriceAndHasFeed(eth) == (eth_price, True)
+    assert chainlink.getPriceAndHasFeed(weth) == (weth_price, True)
+    assert chainlink.getPriceAndHasFeed(btc) == (btc_price, True)
+
+    assert price_desk.getPrice(eth) == eth_price
+    assert price_desk.getPrice(weth) == weth_price
+    assert price_desk.getPrice(btc) == btc_price
+
+
+@pytest.base
+def test_base_usdc_usd_propose_confirm_cached_decimals_and_pricedesk(
+    chainlink,
+    price_desk,
+    governance,
+    fork,
+    charlie_token,
+):
+    usdc = CORE_TOKENS[fork]["USDC"]
+    feed_addr = ADDYS[fork]["CHAINLINK_USDC_USD"]
+    feed = _load_aggregator(feed_addr, "chainlink_usdc_usd")
+    expected_price, expected_decimals = _normalized_aggregator_price(feed)
+
+    # Session chainlink starts without USDC. Curve/green-ref usdc_token
+    # fixtures in the same pytest process may already have admitted it.
+    if not chainlink.hasPriceFeed(usdc):
+        assert chainlink.addNewPriceFeed(
+            usdc, feed_addr, 0, False, False, sender=governance.address
+        )
+        pending_usdc = chainlink.pendingUpdates(usdc).config
+        _assert_feed_config(pending_usdc, feed_addr, expected_decimals, 0)
+        _advance_timelock_blocks(chainlink.actionTimeLock() + 1)
+        assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
+
+    stored = chainlink.feedConfig(usdc)
+    _assert_feed_config(stored, feed_addr, expected_decimals, 0)
+    usdc_price = chainlink.getPrice(usdc)
+    assert usdc_price == expected_price
+    assert usdc_price != 0
+    assert chainlink.getPriceAndHasFeed(usdc) == (expected_price, True)
+    assert price_desk.getPrice(usdc) == expected_price
+
+    # This-file governance path for the USDC/USD aggregator.
+    assert not chainlink.hasPriceFeed(charlie_token)
+    assert chainlink.addNewPriceFeed(
+        charlie_token, feed_addr, 0, False, False, sender=governance.address
+    )
+    pending = chainlink.pendingUpdates(charlie_token).config
+    _assert_feed_config(pending, feed_addr, expected_decimals, 0)
+    _advance_timelock_blocks(chainlink.actionTimeLock() + 1)
+    assert chainlink.confirmNewPriceFeed(charlie_token, sender=governance.address)
+    stored_probe = chainlink.feedConfig(charlie_token)
+    _assert_feed_config(
+        stored_probe,
+        pending.feed,
+        pending.decimals,
+        pending.staleTime,
+        pending.needsEthToUsd,
+        pending.needsBtcToUsd,
+    )
+    assert chainlink.getPrice(charlie_token) == expected_price
+    assert price_desk.getPrice(charlie_token) == expected_price

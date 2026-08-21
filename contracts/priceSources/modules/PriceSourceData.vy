@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -46,8 +46,6 @@ def _addPricedAsset(_asset: address):
     aid: uint256 = self.numAssets
     if aid == 0:
         aid = 1 # not using 0 index
-    # One-based indexing: 50 registered assets have numAssets == 51.
-    # Reject the 51st registration before mutating the enumerable set.
     assert aid <= MAX_ASSETS # dev: too many assets
     self.assets[aid] = _asset
     self.indexOfAsset[_asset] = aid

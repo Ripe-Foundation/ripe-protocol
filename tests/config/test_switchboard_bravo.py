@@ -8,6 +8,12 @@ from conf_utils import filter_logs
 DEBT_TERMS_RAIL_BASELINE = (30_00, 50_00, 80_00, 10_00, 10_00, 2_00)
 
 
+@pytest.fixture(autouse=True)
+def _register_price_desk_for_bravo_admission(ripe_hq):
+    # Fungible ADD_NEW now resolves the target MissionControl PriceDesk.
+    return ripe_hq
+
+
 def _add_asset(
     switchboard_bravo,
     governance,
@@ -2080,7 +2086,7 @@ def test_special_stab_pool_rejects_valid_non_stability_vault_ids(
     alpha_token,
     mission_control,
 ):
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_bravo.addAsset(
             alpha_token,
             [1],
@@ -2148,7 +2154,7 @@ def isPaused() -> bool:
         legacy_pool, sender=governance.address
     )
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_bravo.addAsset(
             alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
             (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),

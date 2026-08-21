@@ -1000,7 +1000,7 @@ def test_public_calc_specific_loot_preserves_legacy_basis_point_semantics(
         assert lootbox.calcSpecificLoot(*case) == _legacy_specific_loot_reference(
             *case
         ), case
-    with boa.reverts():
+    with boa.reverts("safemul"):
         lootbox.calcSpecificLoot(
             10_000,
             MAX_UINT256,
@@ -1456,7 +1456,7 @@ def test_user_points_above_asset_total_reverts_atomically(
     rewards_before = ledger.getRipeRewardsBundle().ripeRewards
     supply_before = ripe_token.totalSupply()
 
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         teller.claimLoot(bob, False, sender=bob)
     assert ledger.getDepositPointsBundle(bob, vault_id, alpha_token) == bundle_before
     assert ledger.getRipeRewardsBundle().ripeRewards == rewards_before
@@ -1598,7 +1598,7 @@ def test_claim_deposit_loot_uses_current_teller_pointer(
     assert points_before > 0
     assert claimable > 0
 
-    with boa.reverts(dev="no perms"):
+    with boa.reverts("no perms"):
         lootbox.claimDepositLootForAsset(
             bob,
             vault_id,
@@ -1659,7 +1659,7 @@ def test_claim_deposit_loot_reverts_atomically_when_teller_pointer_is_unset(
     # readable even though the state-changing claim path is now unavailable.
     assert lootbox.getClaimableLoot(bob) > 0
 
-    with boa.reverts(dev="no perms"):
+    with boa.reverts("no perms"):
         lootbox.claimDepositLootForAsset(
             bob,
             vault_id,
@@ -1710,7 +1710,7 @@ def test_get_claimable_loot_with_position_reverts_when_core_vault_pointer_is_uns
     mission_control.eval("self.coreRipeGovVaultId = 0")
 
     assert lootbox.getClaimableLoot(alice) == 0
-    with boa.reverts(dev="invalid vault id"):
+    with boa.reverts("invalid vault id"):
         lootbox.getClaimableLoot(bob)
 
 

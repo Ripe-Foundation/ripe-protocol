@@ -560,6 +560,102 @@ def test_is_valid_new_feed_comprehensive(
     assert not undy_vault_prices.isValidNewFeed(bravo_token_vault, 0, 5, 0, 20)  # already exists
 
 
+HIGH_DECIMALS_VAULT = """
+# @version 0.4.3
+
+_asset: address
+_decimals: public(uint8)
+
+@deploy
+def __init__(_asset: address):
+    self._asset = _asset
+    self._decimals = 18
+
+@external
+def setDecimals(_decimals: uint8):
+    self._decimals = _decimals
+
+@view
+@external
+def asset() -> address:
+    return self._asset
+
+@view
+@external
+def decimals() -> uint8:
+    return self._decimals
+
+@view
+@external
+def convertToAssets(_shares: uint256) -> uint256:
+    return _shares
+
+@view
+@external
+def totalSupply() -> uint256:
+    return 10 ** 18
+"""
+
+HIGH_DECIMALS_UNDERLYING = """
+# @version 0.4.3
+
+_decimals: public(uint8)
+
+@deploy
+def __init__():
+    self._decimals = 18
+
+@external
+def setDecimals(_decimals: uint8):
+    self._decimals = _decimals
+
+@view
+@external
+def decimals() -> uint8:
+    return self._decimals
+"""
+
+
+def test_undy_rejects_decimals_above_77(
+    governance,
+    switchboard_alpha,
+    mission_control,
+    mock_undy_v2,
+    mock_price_source,
+    alpha_token,
+    undy_vault_prices,
+):
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    vault = boa.loads(HIGH_DECIMALS_VAULT, alpha_token.address)
+    vault.setDecimals(78)
+    with boa.reverts("invalid feed"):
+        undy_vault_prices.addNewPriceFeed(vault, 0, 10, 0, 0, sender=governance.address)
+
+
+def test_undy_rejects_underlying_decimals_above_77(
+    governance,
+    switchboard_alpha,
+    mission_control,
+    mock_undy_v2,
+    mock_price_source,
+    undy_vault_prices,
+):
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    underlying = boa.loads(HIGH_DECIMALS_UNDERLYING)
+    underlying.setDecimals(78)
+    mock_price_source.setPrice(underlying, EIGHTEEN_DECIMALS)
+    vault = boa.loads(HIGH_DECIMALS_VAULT, underlying.address)
+    with boa.reverts("invalid feed"):
+        undy_vault_prices.addNewPriceFeed(vault, 0, 10, 0, 0, sender=governance.address)
+
+
 def test_vault_registry_validation(
     undy_vault_prices,
     bravo_token_vault,
@@ -1636,9 +1732,9 @@ def test_undy_typed_live_pps_revert_is_not_suppressed(
     supply = alpha_token_vault.totalSupply()
     alpha_token_vault.setShouldRevertConvertToAssets(True)
     assert alpha_token_vault.totalSupply() == supply
-    with boa.reverts():
+    with boa.reverts("convertToAssets reverted"):
         alpha_token_vault.convertToAssets(EIGHTEEN_DECIMALS)
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         undy_vault_prices.getPrice(alpha_token_vault)
 
 

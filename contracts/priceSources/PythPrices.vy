@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -23,14 +23,14 @@ import contracts.modules.TimeLock as timeLock
 import interfaces.PriceSource as PriceSource
 
 interface PythNetwork:
+    def getUpdateFee(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256: view
+    def updatePriceFeeds(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]): payable
     def getPriceUnsafe(_priceFeedId: bytes32) -> PythPrice: view
     def priceFeedExists(_priceFeedId: bytes32) -> bool: view
-    def getUpdateFee(_payLoad: Bytes[2048]) -> uint256: view
-    def updatePriceFeeds(_payLoad: Bytes[2048]): payable
 
 interface MissionControl:
-    def getPriceStaleTime() -> uint256: view
     def canPerformLiteAction(_user: address) -> bool: view
+    def getPriceStaleTime() -> uint256: view
 
 struct PythPrice:
     price: int64
@@ -96,7 +96,7 @@ event DisablePythFeedCancelled:
     feedId: bytes32
 
 event PythPriceUpdated:
-    payload: Bytes[2048]
+    payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES]
     feeAmount: uint256
     caller: indexed(address)
 
@@ -117,16 +117,6 @@ PYTH: public(immutable(address))
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICE_UPDATES: constant(uint256) = 20
-
-
-@pure
-@internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
 
 
 @deploy
@@ -258,6 +248,16 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
     return False
+
+
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
 
 
 ################
@@ -562,20 +562,20 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 
 @payable
 @external
-def updatePythPrice(_payload: Bytes[2048]) -> bool:
+def updatePythPrice(_payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     assert msg.value != 0 # dev: payment required
     return self._updatePythPrice(_payload, PYTH, msg.value, True)
 
 
 @external
-def updatePythPriceNoPay(_payload: Bytes[2048]) -> bool:
+def updatePythPriceNoPay(_payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     return self._updatePythPrice(_payload, PYTH, self.balance, False)
 
 
 @internal
-def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address, _payment: uint256, _shouldRefund: bool) -> bool:
+def _updatePythPrice(_payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES], _pythNetwork: address, _payment: uint256, _shouldRefund: bool) -> bool:
     feeAmount: uint256 = staticcall PythNetwork(_pythNetwork).getUpdateFee(_payload)
     assert _payment >= feeAmount # dev: insufficient payment
 

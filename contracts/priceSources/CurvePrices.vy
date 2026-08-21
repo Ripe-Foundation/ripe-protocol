@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -22,6 +22,7 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 from ethereum.ercs import IERC20Detailed
+from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
 interface CurveMetaRegistry:
@@ -36,10 +37,10 @@ interface CurvePool:
     def balances(_index: uint256) -> uint256: view
     def get_virtual_price() -> uint256: view
     def price_oracle() -> uint256: view
-    def totalSupply() -> uint256: view
     def lp_price() -> uint256: view
 
 interface PriceDesk:
+    def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
     def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
 
 interface CurvePoolNg:
@@ -111,6 +112,7 @@ struct StabilizerConfig:
     greenIndex: uint256
     stabilizerAdjustWeight: uint256
     stabilizerMaxPoolDebt: uint256
+    altBalance: uint256
 
 event NewCurvePricePending:
     asset: indexed(address)
@@ -199,10 +201,10 @@ greenRefPoolData: public(GreenRefPoolData)
 snapShots: public(HashMap[uint256, RefPoolSnapshot]) # index -> snapshot
 pendingGreenRefPoolConfig: public(HashMap[uint256, GreenRefPoolConfig]) # actionId -> config
 
-# appended recovery state; existing public storage above remains in place
-greenRecoveryStartBlock: uint256
-greenRecoveryLastSafeBlock: uint256
-greenDangerLastBlock: uint256
+# policy-boundary endpoint state.
+greenPolicyBoundaryBlock: uint256
+greenPolicyBoundaryClassification: uint256 # 0 unavailable, 1 safe, 2 dangerous
+greenRecoveryBlocks: uint256
 
 # curve
 CURVE_META_REGISTRY: public(immutable(address))
@@ -212,11 +214,12 @@ CURVE_REGISTRIES: public(immutable(CurveRegistries))
 METAPOOL_FACTORY_ID: constant(uint256) = 3
 TWO_CRYPTO_FACTORY_ID: constant(uint256) = 6
 META_REGISTRY_ID: constant(uint256) = 7
+POLICY_BOUNDARY_SAFE: constant(uint256) = 1
+POLICY_BOUNDARY_DANGEROUS: constant(uint256) = 2
 TRICRYPTO_NG_FACTORY_ID: constant(uint256) = 11
 STABLESWAP_NG_FACTORY_ID: constant(uint256) = 12
 TWO_CRYPTO_NG_FACTORY_ID: constant(uint256) = 13
 
-MAX_POOLS: constant(uint256) = 50
 MAX_SNAPSHOTS: constant(uint256) = 100
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -255,29 +258,6 @@ def __init__(
         )
 
 
-######################
-# Checked Arithmetic #
-######################
-
-
-@pure
-@internal
-def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a > max_value(uint256) - _b:
-        return False, 0
-    return True, unsafe_add(_a, _b)
-
-
-@pure
-@internal
-def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a == 0 or _b == 0:
-        return True, 0
-    if _a > max_value(uint256) // _b:
-        return False, 0
-    return True, unsafe_mul(_a, _b)
-
-
 ###############
 # Core Prices #
 ###############
@@ -314,6 +294,8 @@ def _getPriceAndHasFeed(_asset: address, _staleTime: uint256, _priceDesk: addres
     config: CurvePriceConfig = self.curveConfig[asset]
     if config.pool == empty(address):
         return 0, False
+    if config.numUnderlying > 4:
+        return 0, True
 
     # get price, adjust if savings green
     assetPrice: uint256 = self._getCurvePrice(asset, config, _priceDesk)
@@ -353,6 +335,27 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 @view
 @internal
+def _canonicalGreen(_asset: address) -> address:
+    if _asset == SGREEN:
+        return GREEN
+    return _asset
+
+
+@view
+@internal
+def _lpUnderlyingCanonicalEquals(_asset: address, _config: CurvePriceConfig) -> bool:
+    canonicalAsset: address = self._canonicalGreen(_asset)
+    for i: uint256 in range(4):
+        u: address = _config.underlying[i]
+        if u == empty(address):
+            break
+        if self._canonicalGreen(u) == canonicalAsset:
+            return True
+    return False
+
+
+@view
+@internal
 def _getCurvePrice(_asset: address, _config: CurvePriceConfig, _priceDesk: address) -> uint256:
     price: uint256 = 0
 
@@ -362,6 +365,10 @@ def _getCurvePrice(_asset: address, _config: CurvePriceConfig, _priceDesk: addre
 
     # lp tokens
     if _asset == _config.lpToken:
+
+        # residual/legacy storage fail-closed; admission also rejects this
+        if self._lpUnderlyingCanonicalEquals(_asset, _config):
+            return 0
 
         # stable lp tokens
         if _config.poolType == PoolType.STABLESWAP_NG or _config.poolType == PoolType.METAPOOL:
@@ -385,10 +392,7 @@ def _getCurvePrice(_asset: address, _config: CurvePriceConfig, _priceDesk: addre
 @internal 
 def _getStableLpPrice(_pool: address, _coins: address[4], _priceDesk: address) -> uint256: 
 
-    # REQUIREMENTS:
-    # all assets must be stable-ish to each other
-    # each underlying asset must have price feed (Price Desk)
-    # Note: see this article: https://news.curve.fi/chainlink-oracles-and-curve-pools/
+    # Stable-ish underlyings, each with a PriceDesk feed. https://news.curve.fi/chainlink-oracles-and-curve-pools/
 
     lowestPrice: uint256 = max_value(uint256)
     for c: address in _coins:
@@ -425,9 +429,7 @@ def getStableLpPrice(_pool: address, _coins: address[4]) -> uint256:
 @internal 
 def _getCryptoLpPrice(_pool: address, _firstAsset: address, _priceDesk: address) -> uint256:
 
-    # REQUIREMENTS:
-    # pool must have `lp_price()`
-    # 0 index asset must have price feed (Price Desk)
+    # Pool `lp_price()`; index-0 asset needs a PriceDesk feed.
 
     lpPrice: uint256 = staticcall CurvePool(_pool).lp_price()
     if lpPrice == 0:
@@ -461,10 +463,7 @@ def _getSingleTokenPrice(
 ) -> uint256:
     price: uint256 = 0
 
-    # REQUIREMENTS:
-    # pool must have `price_oracle()`
-    # can only have 2 assets in pool
-    # alt asset must have price feed (Price Desk)
+    # Pool `price_oracle()`; exactly 2 coins; alt needs a PriceDesk feed.
 
     # curve price oracle
     priceOracle: uint256 = 0
@@ -531,18 +530,28 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again
+    # validate the pending admission-time config; do not reconstruct MetaRegistry
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending new feed
-    if not self._isValidNewFeed(_asset, d.config):
+    if not self._isValidNewFeedStructure(_asset, d.config):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
+
+    # empty eco-token LPs may be proposed before launch; they cannot activate until the route is priceable.
+    if _asset == d.config.lpToken:
+        assert staticcall IERC20(d.config.lpToken).totalSupply() != 0 # dev: empty pool
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
-    # save new feed config
+    # stage the pending config so PriceDesk can qualify this exact source with production stipend/calldata.
+    # any failure reverts staging, timelock confirm, and pending-state mutation atomically.
     self.curveConfig[_asset] = d.config
+    qualifiedPrice: uint256 = 0
+    sourceStatus: uint256 = 0
+    qualifiedPrice, sourceStatus = staticcall PriceDesk(addys._getPriceDeskAddr()).qualifyCallerPriceSource(_asset)
+    assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
+
     self.pendingUpdates[_asset] = empty(PendingCurvePrice)
     priceData._addPricedAsset(_asset)
 
@@ -583,9 +592,17 @@ def isValidNewFeed(_asset: address, _pool: address) -> bool:
 @view
 @internal
 def _isValidNewFeed(_asset: address, _config: CurvePriceConfig) -> bool:
-    if priceData.indexOfAsset[_asset] != 0 or self.curveConfig[_asset].pool != empty(address): # use the `updatePriceFeed` function instead
+    if not self._isValidNewFeedStructure(_asset, _config):
         return False
     return self._isValidFeedConfig(_asset, _config)
+
+
+@view
+@internal
+def _isValidNewFeedStructure(_asset: address, _config: CurvePriceConfig) -> bool:
+    if priceData.indexOfAsset[_asset] != 0 or self.curveConfig[_asset].pool != empty(address): # use the `updatePriceFeed` function instead
+        return False
+    return self._isValidFeedStructure(_asset, _config)
 
 
 ###############
@@ -624,19 +641,27 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again
+    # validate the pending admission-time config; do not reconstruct MetaRegistry
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending update feed
     prevPool: address = self.curveConfig[_asset].pool
-    if not self._isValidUpdateFeed(_asset, d.config, prevPool):
+    if not self._isValidUpdateFeedStructure(_asset, d.config, prevPool):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
+
+    if _asset == d.config.lpToken:
+        assert staticcall IERC20(d.config.lpToken).totalSupply() != 0 # dev: empty pool
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
-    # save new feed config
+    # Stage and qualify the exact updated route under PriceDesk's live stipend.
     self.curveConfig[_asset] = d.config
+    qualifiedPrice: uint256 = 0
+    sourceStatus: uint256 = 0
+    qualifiedPrice, sourceStatus = staticcall PriceDesk(addys._getPriceDeskAddr()).qualifyCallerPriceSource(_asset)
+    assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
+
     self.pendingUpdates[_asset] = empty(PendingCurvePrice)
 
     log CurvePriceConfigUpdated(asset=_asset, pool=d.config.pool, prevPool=prevPool)
@@ -676,27 +701,69 @@ def isValidUpdateFeed(_asset: address, _newPool: address) -> bool:
 @view
 @internal
 def _isValidUpdateFeed(_asset: address, _config: CurvePriceConfig, _prevPool: address) -> bool:
-    if _config.pool == _prevPool:
-        return False
-    if priceData.indexOfAsset[_asset] == 0 or _prevPool == empty(address): # use the `addNewPriceFeed` function instead
+    if not self._isValidUpdateFeedStructure(_asset, _config, _prevPool):
         return False
     return self._isValidFeedConfig(_asset, _config)
 
 
 @view
 @internal
+def _isValidUpdateFeedStructure(_asset: address, _config: CurvePriceConfig, _prevPool: address) -> bool:
+    if _config.pool == _prevPool:
+        return False
+    if priceData.indexOfAsset[_asset] == 0 or _prevPool == empty(address): # use the `addNewPriceFeed` function instead
+        return False
+    return self._isValidFeedStructure(_asset, _config)
+
+
+@view
+@internal
 def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
+    if not self._isValidFeedStructure(_asset, _config):
+        return False
+
+    # initial ecosystem lp deployment may be proposed before liquidity exists.
+    if _config.hasEcoToken and _asset == _config.lpToken and staticcall IERC20(_config.lpToken).totalSupply() == 0:
+        return True
+
+    return self._getCurvePrice(_asset, _config, empty(address)) != 0
+
+
+@view
+@internal
+def _isValidFeedStructure(_asset: address, _config: CurvePriceConfig) -> bool:
     if empty(address) in [_asset, _config.pool, _config.lpToken]:
+        return False
+
+    # sGREEN prices through GREEN; curveConfig[SGREEN] is never used for pricing
+    if _asset == SGREEN:
+        return False
+
+    if _config.numUnderlying > 4:
         return False
 
     if _asset not in _config.underlying and _asset != _config.lpToken:
         return False
 
-    # for initial ripe/green lp deployment, need to skip checking price -- when totalSupply is zero, the `get_virtual_price()` will fail
-    if _config.hasEcoToken and _asset == _config.pool and staticcall CurvePool(_config.pool).totalSupply() == 0:
-        return True
+    canonicalAsset: address = self._canonicalGreen(_asset)
 
-    return self._getCurvePrice(_asset, _config, empty(address)) != 0
+    # LP route: reject if a PriceDesk-queried underlying canonicalizes to this asset
+    if _asset == _config.lpToken:
+        if self._lpUnderlyingCanonicalEquals(_asset, _config):
+            return False
+
+    # same-pool nested alt; both admission orders
+    elif _config.numUnderlying == 2:
+        alt: address = _config.underlying[0]
+        if alt == _asset:
+            alt = _config.underlying[1]
+        canonAlt: address = self._canonicalGreen(alt)
+        if canonAlt == canonicalAsset:
+            return False
+        if alt != empty(address) and (self.curveConfig[alt].pool == _config.pool or self.curveConfig[canonAlt].pool == _config.pool):
+            return False
+
+    return True
 
 
 ################
@@ -877,13 +944,16 @@ def setGreenRefPoolConfig(
     if greenToken == poolConfig.underlying[1]:
         greenIndex = 1
     altAsset: address = poolConfig.underlying[1 - greenIndex]
+    altAssetDecimals: uint256 = 0
+    if altAsset != empty(address):
+        altAssetDecimals = convert(staticcall IERC20Detailed(altAsset).decimals(), uint256)
 
     refConfig: GreenRefPoolConfig = GreenRefPoolConfig(
         pool=_pool,
         lpToken=poolConfig.lpToken,
         greenIndex=greenIndex,
         altAsset=altAsset,
-        altAssetDecimals=convert(staticcall IERC20Detailed(altAsset).decimals(), uint256),
+        altAssetDecimals=altAssetDecimals,
         maxNumSnapshots=_maxNumSnapshots,
         dangerTrigger=_dangerTrigger,
         staleBlocks=_staleBlocks,
@@ -907,12 +977,10 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again against live pool metadata and the current block
+    # validate pending parameter bounds and current pool-observation usability
     d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
     assert d.pool != empty(address) # dev: no pending update
-    poolConfig: CurvePriceConfig = self._getCurvePoolConfig(d.pool)
-    greenToken: address = addys._getGreenToken()
-    assert self._isValidGreenRefPoolConfig(poolConfig, d, d.maxNumSnapshots, d.dangerTrigger, d.staleBlocks, d.stabilizerAdjustWeight, d.stabilizerMaxPoolDebt, greenToken) # dev: invalid ref pool config
+    assert self._isValidPendingGreenRefPoolConfig(d) # dev: invalid ref pool config
 
     # check time lock
     assert timeLock._confirmAction(_aid) # dev: time lock not reached
@@ -932,14 +1000,13 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     )
     preservedDangerBlocks: uint256 = self.greenRefPoolData.numBlocksInDanger
 
-    # Meaning and capacity changes invalidate the physical ring. Persist the
-    # cleared state before seeding so same-block suppression sees update == 0.
+    # meaning/capacity changes invalidate the ring. Persist the clear before seeding so same-block suppression sees update == 0.
     if meaningChanged or capacityChanged:
         self._clearGreenRefPoolSnapshots()
         self.greenRefPoolData = empty(GreenRefPoolData)
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
-        self.greenDangerLastBlock = 0
+        self.greenPolicyBoundaryBlock = 0
+        self.greenPolicyBoundaryClassification = 0
+        self.greenRecoveryBlocks = 0
 
     # save new ref pool config before the reset seed helper re-reads it
     self.greenRefPoolConfig = d
@@ -949,37 +1016,26 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     if meaningChanged or capacityChanged:
         assert self._addGreenRefPoolSnapshot() # dev: invalid snapshot
 
-        # Capacity changes preserve danger history but deliberately restart the
-        # recovery/danger anchor from the newly seeded observation.
+        # capacity change keeps danger history; the new seed has no completed interval, so no recovery credit.
         if not meaningChanged:
             data: GreenRefPoolData = self.greenRefPoolData
             data.numBlocksInDanger = preservedDangerBlocks
             self.greenRefPoolData = data
-            ratio: uint256 = self._getWeightedGreenRatio(d, data)
-            if preservedDangerBlocks != 0 and ratio != 0:
-                if ratio >= d.dangerTrigger:
-                    self.greenDangerLastBlock = block.number
-                else:
-                    self.greenRecoveryStartBlock = block.number
-                    self.greenRecoveryLastSafeBlock = block.number
 
-    # A classification/freshness change preserves the ring and accumulated
-    # counter, but continuity must restart under the new policy. Reclassify at
-    # confirmation so pre-confirmation time is never credited and valid
-    # post-confirmation danger or recovery time is not discarded.
+    # classification/freshness change keeps the ring and danger counter, but no pre-confirm time is credited under the new policy.
+    # the retained rollup sets the confirm classification; the next observation closes an interval from this boundary.
     elif classificationChanged:
-        self.greenDangerLastBlock = 0
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
+        self.greenPolicyBoundaryBlock = block.number
+        self.greenPolicyBoundaryClassification = 0
+        self.greenRecoveryBlocks = 0
 
         categoryData: GreenRefPoolData = self.greenRefPoolData
         categoryRatio: uint256 = self._getWeightedGreenRatio(d, categoryData)
         if categoryRatio != 0:
             if categoryRatio >= d.dangerTrigger:
-                self.greenDangerLastBlock = block.number
-            elif categoryData.numBlocksInDanger != 0:
-                self.greenRecoveryStartBlock = block.number
-                self.greenRecoveryLastSafeBlock = block.number
+                self.greenPolicyBoundaryClassification = POLICY_BOUNDARY_DANGEROUS
+            else:
+                self.greenPolicyBoundaryClassification = POLICY_BOUNDARY_SAFE
 
     return True
 
@@ -1003,6 +1059,61 @@ def cancelGreenRefPoolConfig(_aid: uint256) -> bool:
 
 
 # validation
+
+
+@view
+@internal
+def _isValidPendingGreenRefPoolConfig(_refConfig: GreenRefPoolConfig) -> bool:
+    return self._isValidGreenRefPoolParams(
+        _refConfig,
+        _refConfig.maxNumSnapshots,
+        _refConfig.dangerTrigger,
+        _refConfig.staleBlocks,
+        _refConfig.stabilizerAdjustWeight,
+        _refConfig.stabilizerMaxPoolDebt,
+    )
+
+
+@view
+@internal
+def _isValidGreenRefPoolParams(
+    _refConfig: GreenRefPoolConfig,
+    _maxNumSnapshots: uint256,
+    _dangerTrigger: uint256,
+    _staleBlocks: uint256,
+    _stabilizerAdjustWeight: uint256,
+    _stabilizerMaxPoolDebt: uint256,
+) -> bool:
+    if _refConfig.greenIndex > 1:
+        return False
+
+    if _refConfig.altAssetDecimals > 18:
+        return False
+
+    if _maxNumSnapshots == 0 or _maxNumSnapshots > MAX_SNAPSHOTS:
+        return False
+
+    if _dangerTrigger < 50_00 or _dangerTrigger >= HUNDRED_PERCENT: # 50% - 99.99%
+        return False
+
+    if _staleBlocks == 0 or _staleBlocks > max_value(uint256) - block.number:
+        return False
+
+    if _stabilizerAdjustWeight == 0 or _stabilizerAdjustWeight > HUNDRED_PERCENT:
+        return False
+
+    if _stabilizerMaxPoolDebt == 0 or _stabilizerMaxPoolDebt > 25_000_000 * EIGHTEEN_DECIMALS: # 25 million
+        return False
+
+    # current pool observation must still be usable
+    greenBalance: uint256 = 0
+    greenRatio: uint256 = 0
+    altBalance: uint256 = 0
+    greenBalance, greenRatio, altBalance = self._getCurvePoolData(_refConfig.pool, _refConfig.greenIndex, _refConfig.altAssetDecimals)
+    if greenRatio == 0:
+        return False
+
+    return True
 
 
 @view
@@ -1035,35 +1146,14 @@ def _isValidGreenRefPoolConfig(
     if _poolConfig.underlying[1 - _refConfig.greenIndex] != _refConfig.altAsset:
         return False
 
-    if _refConfig.altAssetDecimals > 18:
-        return False
-
-    if convert(staticcall IERC20Detailed(_refConfig.altAsset).decimals(), uint256) != _refConfig.altAssetDecimals:
-        return False
-
-    if _maxNumSnapshots == 0 or _maxNumSnapshots > MAX_SNAPSHOTS:
-        return False
-
-    if _dangerTrigger < 50_00 or _dangerTrigger >= HUNDRED_PERCENT: # 50% - 99.99%
-        return False
-
-    if _staleBlocks != 0 and _staleBlocks > max_value(uint256) - block.number:
-        return False
-
-    if _stabilizerAdjustWeight == 0 or _stabilizerAdjustWeight > HUNDRED_PERCENT:
-        return False
-
-    if _stabilizerMaxPoolDebt == 0 or _stabilizerMaxPoolDebt > 25_000_000 * EIGHTEEN_DECIMALS: # 25 million
-        return False
-
-    # make sure this curve integration works
-    greenBalance: uint256 = 0
-    greenRatio: uint256 = 0
-    greenBalance, greenRatio = self._getCurvePoolData(_refConfig.pool, _refConfig.greenIndex, _refConfig.altAssetDecimals)
-    if greenRatio == 0:
-        return False
-
-    return True
+    return self._isValidGreenRefPoolParams(
+        _refConfig,
+        _maxNumSnapshots,
+        _dangerTrigger,
+        _staleBlocks,
+        _stabilizerAdjustWeight,
+        _stabilizerMaxPoolDebt,
+    )
 
 
 ########################
@@ -1082,18 +1172,16 @@ def _clearGreenRefPoolSnapshots():
 
 @view
 @internal
-def _isFreshGreenSnapshot(_update: uint256, _staleBlocks: uint256) -> bool:
-    if _update == 0 or _update > block.number:
-        return False
-    return _staleBlocks == 0 or block.number - _update <= _staleBlocks
-
-
-@view
-@internal
 def _getWeightedGreenRatio(_config: GreenRefPoolConfig, _data: GreenRefPoolData) -> uint256:
-    if _config.pool == empty(address) or _config.maxNumSnapshots == 0 or _config.maxNumSnapshots > MAX_SNAPSHOTS:
+    if _config.pool == empty(address) or _config.maxNumSnapshots == 0 or _config.maxNumSnapshots > MAX_SNAPSHOTS or _config.staleBlocks == 0:
         return 0
     if _data.nextIndex >= _config.maxNumSnapshots:
+        return 0
+    if _data.lastSnapshot.update == 0 or _data.lastSnapshot.update > block.number:
+        return 0
+
+    # closed intervals get no live-tail weight; classification still expires when the latest confirmed observation is stale.
+    if block.number - _data.lastSnapshot.update > _config.staleBlocks:
         return 0
 
     numerator: uint256 = 0
@@ -1102,8 +1190,7 @@ def _getWeightedGreenRatio(_config: GreenRefPoolConfig, _data: GreenRefPoolData)
     hasPrevious: bool = False
     lastSeenUpdate: uint256 = 0
 
-    # nextIndex is the oldest slot when full and precedes the live prefix when
-    # partially filled, so this traversal is chronological in both cases.
+    # nextIndex is the oldest slot when full and precedes the live prefix when partial, so this walk is chronological either way.
     for offset: uint256 in range(_config.maxNumSnapshots, bound=MAX_SNAPSHOTS):
         index: uint256 = _data.nextIndex + offset
         if index >= _config.maxNumSnapshots:
@@ -1115,51 +1202,28 @@ def _getWeightedGreenRatio(_config: GreenRefPoolConfig, _data: GreenRefPoolData)
         if snapShot.update > block.number or (lastSeenUpdate != 0 and snapShot.update <= lastSeenUpdate):
             return 0
         lastSeenUpdate = snapShot.update
-        if not self._isFreshGreenSnapshot(snapShot.update, _config.staleBlocks):
-            continue
-
         if hasPrevious:
             duration: uint256 = snapShot.update - previous.update
-            ok: bool = False
-            weightedValue: uint256 = 0
-            ok, weightedValue = self._tryMul(previous.ratio, duration)
-            if not ok:
-                return 0
-            ok, numerator = self._tryAdd(numerator, weightedValue)
-            if not ok:
-                return 0
-            ok, denominator = self._tryAdd(denominator, duration)
-            if not ok:
-                return 0
+            if duration <= _config.staleBlocks:
+                # both endpoints must corroborate a high ratio; the lower endpoint stops an isolated danger tick from raising the borrower rate.
+                intervalRatio: uint256 = min(previous.ratio, snapShot.ratio)
+                ok: bool = False
+                weightedValue: uint256 = 0
+                ok, weightedValue = self._tryMul(intervalRatio, duration)
+                if not ok:
+                    return 0
+                ok, numerator = self._tryAdd(numerator, weightedValue)
+                if not ok:
+                    return 0
+                ok, denominator = self._tryAdd(denominator, duration)
+                if not ok:
+                    return 0
         previous = snapShot
         hasPrevious = True
 
-    if hasPrevious:
-        duration: uint256 = block.number - previous.update
-        if duration != 0:
-            ok: bool = False
-            weightedValue: uint256 = 0
-            ok, weightedValue = self._tryMul(previous.ratio, duration)
-            if not ok:
-                return 0
-            ok, numerator = self._tryAdd(numerator, weightedValue)
-            if not ok:
-                return 0
-            ok, denominator = self._tryAdd(denominator, duration)
-            if not ok:
-                return 0
-
     if denominator != 0:
         return numerator // denominator
-
-    # A lone seed has zero duration in its creation block. It is a valid
-    # fallback only while the actual last snapshot is still fresh.
-    lastSnapshot: RefPoolSnapshot = _data.lastSnapshot
-    if lastSnapshot.greenBalance == 0 or lastSnapshot.ratio == 0:
-        return 0
-    if not self._isFreshGreenSnapshot(lastSnapshot.update, _config.staleBlocks):
-        return 0
-    return lastSnapshot.ratio
+    return 0
 
 
 @view
@@ -1203,12 +1267,13 @@ def _addGreenRefPoolSnapshot() -> bool:
     # curve pool data
     greenBalance: uint256 = 0
     greenRatio: uint256 = 0
-    greenBalance, greenRatio = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
+    altBalance: uint256 = 0
+    greenBalance, greenRatio, altBalance = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
     if greenBalance == 0 or greenRatio == 0:
         return False
 
     inDanger: bool = greenRatio >= config.dangerTrigger
-    previousUpdate: uint256 = data.lastSnapshot.update
+    previousSnapshot: RefPoolSnapshot = data.lastSnapshot
 
     # create and store new snapshot
     newSnapshot: RefPoolSnapshot = RefPoolSnapshot(
@@ -1225,10 +1290,7 @@ def _addGreenRefPoolSnapshot() -> bool:
     if data.nextIndex >= config.maxNumSnapshots:
         data.nextIndex = 0
 
-    # The physical slot is already stored above; pass the updated in-memory
-    # cursor into the one canonical rolling-ratio implementation.
-    weightedRatio: uint256 = self._getWeightedGreenRatio(config, data)
-    data = self._updateGreenDangerState(data, config, weightedRatio, inDanger, previousUpdate)
+    data = self._updateGreenDangerState(data, config, previousSnapshot, newSnapshot)
     self.greenRefPoolData = data
 
     log GreenRefPoolSnapshotAdded(pool=config.pool, greenBalance=greenBalance, greenRatio=greenRatio, inDanger=inDanger)
@@ -1239,65 +1301,70 @@ def _addGreenRefPoolSnapshot() -> bool:
 def _updateGreenDangerState(
     _data: GreenRefPoolData,
     _config: GreenRefPoolConfig,
-    _weightedRatio: uint256,
-    _instantaneousDanger: bool,
-    _previousUpdate: uint256,
+    _previous: RefPoolSnapshot,
+    _current: RefPoolSnapshot,
 ) -> GreenRefPoolData:
     data: GreenRefPoolData = _data
-    unavailableGap: bool = (
-        _previousUpdate == 0
-        or _previousUpdate > block.number
-        or (_config.staleBlocks != 0 and block.number - _previousUpdate > _config.staleBlocks)
-    )
-
-    # Unavailable is not safe or dangerous evidence. It invalidates active
-    # continuity anchors without changing accumulated history.
-    if _weightedRatio == 0:
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
-        self.greenDangerLastBlock = 0
+    if _config.staleBlocks == 0 or _previous.update == 0 or _previous.update >= _current.update:
         return data
 
-    if _weightedRatio >= _config.dangerTrigger:
-        if self.greenRecoveryStartBlock != 0 or unavailableGap:
-            self.greenRecoveryStartBlock = 0
-            self.greenRecoveryLastSafeBlock = 0
-            self.greenDangerLastBlock = block.number
+    # category C confirm is a continuity boundary: use the retained rollup's confirm classification as the prior endpoint.
+    # drop the first interval if retained history is unavailable.
+    policyBoundary: uint256 = self.greenPolicyBoundaryBlock
+    if policyBoundary != 0:
+        self.greenPolicyBoundaryBlock = 0
+        boundaryClassification: uint256 = self.greenPolicyBoundaryClassification
+        self.greenPolicyBoundaryClassification = 0
+        if policyBoundary >= _current.update:
             return data
 
-        dangerLastBlock: uint256 = self.greenDangerLastBlock
-        if dangerLastBlock != 0 and dangerLastBlock <= block.number:
-            elapsedBlocks: uint256 = block.number - dangerLastBlock
-            if data.numBlocksInDanger <= max_value(uint256) - elapsedBlocks:
-                data.numBlocksInDanger += elapsedBlocks
-        self.greenDangerLastBlock = block.number
+        boundaryDuration: uint256 = _current.update - policyBoundary
+        if boundaryDuration > _config.staleBlocks:
+            return data
+
+        currentDangerAtBoundary: bool = _current.ratio >= _config.dangerTrigger
+        if (
+            boundaryClassification == POLICY_BOUNDARY_DANGEROUS
+            and currentDangerAtBoundary
+        ):
+            if data.numBlocksInDanger <= max_value(uint256) - boundaryDuration:
+                data.numBlocksInDanger += boundaryDuration
+            self.greenRecoveryBlocks = 0
+        elif (
+            boundaryClassification == POLICY_BOUNDARY_SAFE
+            and not currentDangerAtBoundary
+            and data.numBlocksInDanger != 0
+        ):
+            if boundaryDuration >= _config.staleBlocks:
+                data.numBlocksInDanger = 0
+                self.greenRecoveryBlocks = 0
+            else:
+                self.greenRecoveryBlocks = boundaryDuration
         return data
 
-    # Rolling safety stops danger accumulation. An instantaneous dangerous spot
-    # may cancel recovery, but cannot add danger blocks or classify the rollup.
-    self.greenDangerLastBlock = 0
-    if data.numBlocksInDanger == 0:
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
-        return data
-    if _instantaneousDanger:
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
+    duration: uint256 = _current.update - _previous.update
+    if duration > _config.staleBlocks:
         return data
 
-    recoveryStart: uint256 = self.greenRecoveryStartBlock
-    lastSafe: uint256 = self.greenRecoveryLastSafeBlock
-    if unavailableGap or recoveryStart == 0 or (_config.staleBlocks != 0 and (lastSafe == 0 or block.number - lastSafe > _config.staleBlocks)):
-        self.greenRecoveryStartBlock = block.number
-        self.greenRecoveryLastSafeBlock = block.number
+    previousDanger: bool = _previous.ratio >= _config.dangerTrigger
+    currentDanger: bool = _current.ratio >= _config.dangerTrigger
+
+    if previousDanger and currentDanger:
+        self.greenRecoveryBlocks = 0
+        if data.numBlocksInDanger <= max_value(uint256) - duration:
+            data.numBlocksInDanger += duration
         return data
 
-    recoveryWindow: uint256 = max(_config.staleBlocks, 1)
-    self.greenRecoveryLastSafeBlock = block.number
-    if block.number - recoveryStart >= recoveryWindow:
+    # recovery also needs matching safe endpoints. Mixed or unavailable intervals neither earn nor erase credit.
+    if previousDanger or currentDanger or data.numBlocksInDanger == 0:
+        return data
+
+    recoveryBlocks: uint256 = self.greenRecoveryBlocks
+    if recoveryBlocks >= _config.staleBlocks or duration >= _config.staleBlocks - recoveryBlocks:
         data.numBlocksInDanger = 0
-        self.greenRecoveryStartBlock = 0
-        self.greenRecoveryLastSafeBlock = 0
+        self.greenRecoveryBlocks = 0
+    else:
+        self.greenRecoveryBlocks = recoveryBlocks + duration
     return data
 
 
@@ -1308,7 +1375,11 @@ def _updateGreenDangerState(
 @external 
 def getCurvePoolData() -> (uint256, uint256):
     config: GreenRefPoolConfig = self.greenRefPoolConfig
-    return self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
+    greenBalance: uint256 = 0
+    greenRatio: uint256 = 0
+    altBalance: uint256 = 0
+    greenBalance, greenRatio, altBalance = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
+    return greenBalance, greenRatio
 
 
 @view
@@ -1317,7 +1388,7 @@ def _getCurvePoolData(
     _pool: address,
     _greenIndex: uint256,
     _altAssetDecimals: uint256,
-) -> (uint256, uint256):
+) -> (uint256, uint256, uint256):
     normalize: uint256 = 10 ** (18 - _altAssetDecimals)
 
     # get balances
@@ -1329,7 +1400,7 @@ def _getCurvePoolData(
     if totalSupply != 0:
         ratio = greenBalance * HUNDRED_PERCENT // totalSupply
 
-    return greenBalance, ratio
+    return greenBalance, ratio, altAssetBalance
 
 
 # stabilizer data / config
@@ -1345,7 +1416,8 @@ def getGreenStabilizerConfig() -> StabilizerConfig:
     # green pool data
     greenBalance: uint256 = 0
     greenRatio: uint256 = 0
-    greenBalance, greenRatio = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
+    altBalance: uint256 = 0
+    greenBalance, greenRatio, altBalance = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
 
     return StabilizerConfig(
         pool=config.pool,
@@ -1355,6 +1427,7 @@ def getGreenStabilizerConfig() -> StabilizerConfig:
         greenIndex=config.greenIndex,
         stabilizerAdjustWeight=config.stabilizerAdjustWeight,
         stabilizerMaxPoolDebt=config.stabilizerMaxPoolDebt,
+        altBalance=altBalance,
     )
 
 
@@ -1368,3 +1441,26 @@ def getGreenStabilizerConfig() -> StabilizerConfig:
 def _getSavingsGreenPrice(_savingsGreen: address, _greenPrice: uint256) -> uint256:
     pricePerShare: uint256 = staticcall IERC4626(_savingsGreen).convertToAssets(EIGHTEEN_DECIMALS)
     return _greenPrice * pricePerShare // EIGHTEEN_DECIMALS
+
+
+######################
+# Checked Arithmetic #
+######################
+
+
+@pure
+@internal
+def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a > max_value(uint256) - _b:
+        return False, 0
+    return True, unsafe_add(_a, _b)
+
+
+@pure
+@internal
+def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a == 0 or _b == 0:
+        return True, 0
+    if _a > max_value(uint256) // _b:
+        return False, 0
+    return True, unsafe_mul(_a, _b)

@@ -7,21 +7,23 @@ implements: PriceSource
 
 import interfaces.PriceSource as PriceSource
 
-
 interface AeroClassicPool:
     def getReserves() -> (uint256, uint256, uint256): view
     def tokens() -> (address, address): view
 
+interface PriceDesk:
+    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
+
+interface RipeHq:
+    def getAddr(_id: uint256) -> address: view
 
 interface TokenDecimals:
     def decimals() -> uint256: view
-
 
 PRICE_DESK_ID: constant(uint256) = 7
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 MAX_UINT112: constant(uint256) = 2 ** 112 - 1
 MAX_UINT32: constant(uint256) = 2 ** 32 - 1
-MAX_ADDRESS: constant(uint256) = 2 ** 160 - 1
 
 RIPE_HQ: public(immutable(address))
 RIPE_WETH_POOL: public(immutable(address))
@@ -73,7 +75,6 @@ def isMonitoringOnly() -> bool:
 @view
 @external
 def getRipePoolState() -> (uint256, uint256, uint256):
-    """Return RIPE reserve, WETH reserve, and the pool's update timestamp."""
     valid: bool = False
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
@@ -87,7 +88,6 @@ def getRipePoolState() -> (uint256, uint256, uint256):
 @view
 @external
 def getRipeWethMonitoringPrice() -> uint256:
-    """Return the manipulable spot WETH-per-RIPE observation, scaled to 1e18."""
     valid: bool = False
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
@@ -101,14 +101,12 @@ def getRipeWethMonitoringPrice() -> uint256:
 @view
 @external
 def getRipeUsdMonitoringPrice() -> uint256:
-    """Return the manipulable spot RIPE/USD observation for monitoring only."""
     return self._getRipeUsdMonitoringPrice()
 
 
 @view
 @external
 def getAeroRipePrice(_asset: address) -> uint256:
-    """Temporary frontend compatibility alias for the RIPE/USD monitor."""
     # Remove after the frontend moves to getRipeUsdMonitoringPrice().
     if _asset != RIPE_TOKEN:
         return 0
@@ -140,22 +138,10 @@ def _getRipeUsdMonitoringPrice() -> uint256:
 @view
 @internal
 def _readPoolState() -> (bool, uint256, uint256, uint256):
-    success: bool = False
-    response: Bytes[97] = b""
-    success, response = raw_call(
-        RIPE_WETH_POOL,
-        method_id("getReserves()"),
-        max_outsize=97,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 96:
-        return False, 0, 0, 0
-
     reserve0: uint256 = 0
     reserve1: uint256 = 0
     lastUpdate: uint256 = 0
-    reserve0, reserve1, lastUpdate = abi_decode(response, (uint256, uint256, uint256))
+    reserve0, reserve1, lastUpdate = staticcall AeroClassicPool(RIPE_WETH_POOL).getReserves()
     # Aerodrome returns full uint256 values. The retained uint112/uint32 limits
     # are conservative monitoring sanity bounds, not pool storage assumptions.
     if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:
@@ -171,34 +157,26 @@ def _readPoolState() -> (bool, uint256, uint256, uint256):
 def _readWethUsdPrice() -> uint256:
     # Resolve PriceDesk dynamically so a registry rotation does not stale this
     # direct monitoring view. Neither this read nor its result is a feed.
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        RIPE_HQ,
-        abi_encode(PRICE_DESK_ID, method_id=method_id("getAddr(uint256)")),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return 0
-    priceDeskValue: uint256 = abi_decode(response, uint256)
-    if priceDeskValue > MAX_ADDRESS:
-        return 0
-    priceDesk: address = convert(priceDeskValue, address)
+    priceDesk: address = staticcall RipeHq(RIPE_HQ).getAddr(PRICE_DESK_ID)
     if priceDesk == empty(address):
         return 0
+    return staticcall PriceDesk(priceDesk).getPrice(WETH_TOKEN, False)
 
-    success, response = raw_call(
-        priceDesk,
-        abi_encode(WETH_TOKEN, False, method_id=method_id("getPrice(address,bool)")),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return 0
-    return abi_decode(response, uint256)
+
+@view
+@internal
+def _mulDivOne(_a: uint256, _b: uint256) -> (bool, uint256):
+    whole: uint256 = _a // EIGHTEEN_DECIMALS
+    remainder: uint256 = _a % EIGHTEEN_DECIMALS
+    if whole != 0 and _b > max_value(uint256) // whole:
+        return False, 0
+    wholeProduct: uint256 = whole * _b
+    if remainder != 0 and _b > max_value(uint256) // remainder:
+        return False, 0
+    remainderProduct: uint256 = remainder * _b // EIGHTEEN_DECIMALS
+    if wholeProduct > max_value(uint256) - remainderProduct:
+        return False, 0
+    return True, wholeProduct + remainderProduct
 
 
 #############################
@@ -323,19 +301,3 @@ def recoverFunds(_recipient: address, _asset: address):
 @external
 def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
     raise "monitoring only"
-
-
-@view
-@internal
-def _mulDivOne(_a: uint256, _b: uint256) -> (bool, uint256):
-    whole: uint256 = _a // EIGHTEEN_DECIMALS
-    remainder: uint256 = _a % EIGHTEEN_DECIMALS
-    if whole != 0 and _b > max_value(uint256) // whole:
-        return False, 0
-    wholeProduct: uint256 = whole * _b
-    if remainder != 0 and _b > max_value(uint256) // remainder:
-        return False, 0
-    remainderProduct: uint256 = remainder * _b // EIGHTEEN_DECIMALS
-    if wholeProduct > max_value(uint256) - remainderProduct:
-        return False, 0
-    return True, wholeProduct + remainderProduct

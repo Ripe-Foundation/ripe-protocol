@@ -8,7 +8,7 @@
 #                                                     ┗┻┗ ┗┗┗┻
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -30,8 +30,6 @@ interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
     def setHrConfig(_config: cs.HrConfig): nonpayable
     def ripeBondConfig() -> cs.RipeBondConfig: view
-    def underscoreRegistry() -> address: view
-    def shouldCheckLastTouch() -> bool: view
     def hrConfig() -> cs.HrConfig: view
 
 interface BondBooster:
@@ -40,7 +38,6 @@ interface BondBooster:
     def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
     def getBoostRatio(_user: address, _units: uint256) -> uint256: view
     def setMinLockDuration(_minLockDuration: uint256): nonpayable
-    def setBondBooster(_config: BoosterConfig): nonpayable
     def removeBondBooster(_user: address): nonpayable
 
 interface HrContributor:
@@ -66,25 +63,29 @@ interface Ledger:
     def setRipeAvailForHr(_amount: uint256): nonpayable
     def setBadDebt(_amount: uint256): nonpayable
 
-interface Teller:
-    def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
-    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256: nonpayable
-
 interface Lootbox:
     def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256): nonpayable
     def resetAssetPoints(_asset: address, _vaultId: uint256): nonpayable
     def resetUserBorrowPoints(_user: address): nonpayable
+
+interface Teller:
+    def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
+    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256: nonpayable
 
 interface BondRoom:
     def startBondEpochAtBlock(_block: uint256): nonpayable
     def setBondBooster(_bondBooster: address): nonpayable
     def bondBooster() -> address: view
 
-interface UnderscoreLedger:
-    def isUserWallet(_addr: address) -> bool: view
-
 interface UnderscoreRegistry:
     def getAddr(_addyId: uint256) -> address: view
+    def isValidAddr(_addr: address) -> bool: view
+
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
+
+interface UnderscoreLedger:
+    def isUserWallet(_addr: address) -> bool: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -132,10 +133,6 @@ struct DeleverageAsset:
 struct PendingManager:
     contributor: address
     pendingManager: address
-
-struct PendingCancelPaycheck:
-    contributor: address
-    pendingShouldCancel: bool
 
 struct BoosterConfig:
     user: address
@@ -474,6 +471,8 @@ TELLER_ID: constant(uint256) = 17
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 UNDERSCORE_LEDGER_ID: constant(uint256) = 1
+UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
+UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 BOND_ROOM_ID: constant(uint256) = 12
 LOOTBOX_ID: constant(uint256) = 16
 DELEVERAGE_ID: constant(uint256) = 18
@@ -1146,13 +1145,32 @@ def setUnderscoreRegistry(_underscoreRegistry: address, _missionControl: address
 def _isValidUnderscoreAddr(_addr: address) -> bool:
     if _addr == empty(address):
         return True # allowing setting to empty address
+    if not _addr.is_contract:
+        return False
 
     undyLedger: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEDGER_ID)
     if undyLedger == empty(address):
         return False
 
     # make sure has interface
-    return not staticcall UnderscoreLedger(undyLedger).isUserWallet(empty(address))
+    if staticcall UnderscoreLedger(undyLedger).isUserWallet(empty(address)):
+        return False
+
+    # root isValidAddr(empty) must be False; missing / revert rejects
+    if staticcall UnderscoreRegistry(_addr).isValidAddr(empty(address)):
+        return False
+
+    vaultRegistry: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry != empty(address):
+        if staticcall VaultRegistry(vaultRegistry).isEarnVault(empty(address)):
+            return False
+
+    legoBook: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEGOBOOK_ID)
+    if legoBook != empty(address):
+        if staticcall UnderscoreRegistry(legoBook).isValidAddr(empty(address)):
+            return False
+
+    return True
 
 
 ###########################
@@ -1366,6 +1384,10 @@ def executePendingAction(_aid: uint256) -> bool:
         config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
         p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.minCliffLength = p.minCliffLength
+        effectiveMaxVestingLength: uint256 = 2 ** 128
+        if config.maxVestingLength != 0 and config.maxVestingLength < effectiveMaxVestingLength:
+            effectiveMaxVestingLength = config.maxVestingLength
+        assert not (config.minCliffLength > effectiveMaxVestingLength) # dev: infeasible hr config
         extcall MissionControl(mc).setHrConfig(config)
         log HrMinCliffLengthSet(minCliffLength=p.minCliffLength)
 
@@ -1381,6 +1403,10 @@ def executePendingAction(_aid: uint256) -> bool:
         p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.minVestingLength = p.minVestingLength
         config.maxVestingLength = p.maxVestingLength
+        effectiveMaxVestingLength: uint256 = 2 ** 128
+        if config.maxVestingLength != 0 and config.maxVestingLength < effectiveMaxVestingLength:
+            effectiveMaxVestingLength = config.maxVestingLength
+        assert not (config.minCliffLength > effectiveMaxVestingLength) # dev: infeasible hr config
         extcall MissionControl(mc).setHrConfig(config)
         log HrVestingLengthBoundariesSet(minVestingLength=p.minVestingLength, maxVestingLength=p.maxVestingLength)
 

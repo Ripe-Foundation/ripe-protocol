@@ -14,7 +14,7 @@
 #     ╚════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -49,12 +49,12 @@ interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
-interface PriceDesk:
-    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
-
 interface MissionControl:
     def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig: view
     def coreRipeGovVaultId() -> uint256: view
+
+interface PriceDesk:
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable

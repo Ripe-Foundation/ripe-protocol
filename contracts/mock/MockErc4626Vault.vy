@@ -55,7 +55,7 @@ def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
 @external
 def convertToAssets(_shares: uint256) -> uint256:
     if self.shouldRevertConvertToAssets:
-        raise
+        raise # dev: convertToAssets reverted
     return self._sharesToAmount(_shares)
 
 

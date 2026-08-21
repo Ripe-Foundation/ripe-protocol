@@ -276,17 +276,33 @@ def test_constructor_rejects_noncanonical_decimals(
         )
 
 
-@pytest.mark.parametrize("response_mode", [1, 2, 3])
-def test_malformed_or_reverting_pool_fails_closed(
+@pytest.mark.parametrize("response_mode", [1, 3])
+def test_short_or_reverting_pool_reverts(
     aero_monitor_builder,
     response_mode,
 ):
     fixture = aero_monitor_builder()
     fixture.pool.setReserveResponseMode(response_mode)
-    assert fixture.source.getRipePoolState() == (0, 0, 0)
-    assert fixture.source.getRipeWethMonitoringPrice() == 0
-    assert fixture.source.getRipeUsdMonitoringPrice() == 0
-    assert fixture.source.getAeroRipePrice(fixture.ripe.address) == 0
+    with boa.reverts():
+        fixture.source.getRipePoolState()
+    with boa.reverts():
+        fixture.source.getRipeWethMonitoringPrice()
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
+    with boa.reverts():
+        fixture.source.getAeroRipePrice(fixture.ripe.address)
+
+
+def test_overlong_pool_response_uses_abi_prefix(aero_monitor_builder):
+    fixture = aero_monitor_builder()
+    fixture.pool.setReserveResponseMode(2)
+    assert fixture.source.getRipePoolState() == (
+        100 * EIGHTEEN_DECIMALS,
+        10 * EIGHTEEN_DECIMALS,
+        1_700_000_000,
+    )
+    assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
+    assert fixture.source.getRipeUsdMonitoringPrice() == 200 * EIGHTEEN_DECIMALS
 
 
 @pytest.mark.parametrize(
@@ -325,8 +341,8 @@ def test_zero_reserve_zeroes_monitoring_prices(
     assert fixture.source.getAeroRipePrice(fixture.ripe.address) == 0
 
 
-@pytest.mark.parametrize("response_mode", [1, 2, 3, 4])
-def test_unavailable_or_malformed_ripe_hq_fails_closed(
+@pytest.mark.parametrize("response_mode", [1, 3, 4])
+def test_unavailable_or_malformed_ripe_hq_reverts_usd_view(
     aero_factories,
     aero_monitor_builder,
     response_mode,
@@ -338,6 +354,18 @@ def test_unavailable_or_malformed_ripe_hq_fails_closed(
         malformed.setResponseMode(response_mode)
         hq = malformed.address
     fixture = aero_monitor_builder(hq_override=hq)
+    assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
+
+
+def test_overlong_hq_zero_address_zeroes_usd_view(
+    aero_factories,
+    aero_monitor_builder,
+):
+    malformed = aero_factories["malformed_hq"].deploy()
+    malformed.setResponseMode(2)
+    fixture = aero_monitor_builder(hq_override=malformed.address)
     assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
     assert fixture.source.getRipeUsdMonitoringPrice() == 0
 
@@ -357,21 +385,30 @@ def test_missing_price_desk_or_weth_price_fails_closed(
     assert fixture.source.getRipeUsdMonitoringPrice() == 0
 
 
-@pytest.mark.parametrize("response_mode", [1, 2, 3])
-def test_malformed_price_desk_response_fails_closed(
+def test_short_price_desk_response_reverts_usd_view(aero_monitor_builder):
+    fixture = aero_monitor_builder()
+    fixture.price_desk.setResponseMode(1)
+    assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
+
+
+@pytest.mark.parametrize("response_mode", [2, 3])
+def test_overlong_price_desk_response_uses_abi_prefix(
     aero_monitor_builder,
     response_mode,
 ):
     fixture = aero_monitor_builder()
     fixture.price_desk.setResponseMode(response_mode)
     assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
-    assert fixture.source.getRipeUsdMonitoringPrice() == 0
+    assert fixture.source.getRipeUsdMonitoringPrice() == 200 * EIGHTEEN_DECIMALS
 
 
-def test_reverting_price_desk_response_fails_closed(aero_monitor_builder):
+def test_reverting_price_desk_response_reverts_usd_view(aero_monitor_builder):
     fixture = aero_monitor_builder()
     fixture.price_desk.setShouldRevert(True)
-    assert fixture.source.getRipeUsdMonitoringPrice() == 0
+    with boa.reverts():
+        fixture.source.getRipeUsdMonitoringPrice()
 
 
 def test_unsafe_price_multiplication_fails_closed(aero_monitor_builder):

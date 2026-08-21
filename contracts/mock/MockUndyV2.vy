@@ -44,6 +44,8 @@ def getAddr(_regId: uint256) -> address:
 @view
 @external
 def isValidAddr(_addr: address) -> bool:
+    if _addr == empty(address):
+        return False
     if self._allAddressesAreValid:
         return True
     return self._validAddresses[_addr]
@@ -95,6 +97,8 @@ def setUseThisLegoId(_legoId: uint256):
 @view
 @external
 def isEarnVault(_vaultAddr: address) -> bool:
+    if _vaultAddr == empty(address):
+        return False
     assert _vaultAddr != self._vaultCheckRevertAddress # dev: mock underscore vault check
     if self._allAddressesAreVaults:
         return True

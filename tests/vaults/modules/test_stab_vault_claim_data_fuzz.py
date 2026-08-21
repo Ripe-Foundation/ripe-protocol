@@ -1,15 +1,18 @@
 import boa
 import pytest
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import HealthCheck, example, given, settings, strategies as st
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
-from conf_utils import redeem_from_stability_pool
+from conf_utils import ensure_token_scale, redeem_from_stability_pool
 from test_stab_vault_hardening import (
     ACTIVATION_THRESHOLD,
+    CLAIM_ASSET_ACTIVE,
+    CLAIM_ASSET_DORMANT,
     MAX_ACTIVE_CLAIM_ASSETS,
     _assert_claim_data_model,
     _asset_address,
     _claim_pair,
+    _exact_activation_price,
     _record_claim,
     _seed_stability_asset,
 )
@@ -19,7 +22,11 @@ pytestmark = pytest.mark.fuzz
 
 
 RETENTION_THRESHOLD = 5 * 10**16
+LIVE_RESIDUAL_DIVISOR = 10**10
 NUM_FUZZ_CLAIM_ASSETS = 4
+PROLOGUE_TOKEN_INDEX = NUM_FUZZ_CLAIM_ASSETS
+PROLOGUE_DORMANT_AMOUNT = ACTIVATION_THRESHOLD - 1
+PROLOGUE_PRUNE_PRICE = 10**15
 
 
 @pytest.fixture(scope="module")
@@ -38,8 +45,22 @@ def fuzz_claim_tokens(governance):
     )
 
 
-def _prepare_claim_token(token, governance, holder, amount):
+def _prepare_claim_token(
+    token,
+    governance,
+    holder,
+    amount,
+    price_desk=None,
+    switchboard_bravo=None,
+):
     token.mint(holder, amount, sender=governance.address)
+    if price_desk is not None:
+        sender = (
+            switchboard_bravo.address
+            if switchboard_bravo is not None
+            else governance.address
+        )
+        ensure_token_scale(price_desk, token, sender)
     return token
 
 
@@ -103,17 +124,22 @@ def claim_reduction_cases(draw):
             ),
         )
     )
+    bound = pair_balance // LIVE_RESIDUAL_DIVISOR
+    consume_at_bound = pair_balance - bound
+    consume_above_bound = pair_balance - bound - 1
+    sampled_claims = [
+        10**15,
+        RETENTION_THRESHOLD - 1,
+        RETENTION_THRESHOLD,
+        ACTIVATION_THRESHOLD,
+        pair_balance,
+        consume_at_bound,
+    ]
+    if consume_above_bound >= 1:
+        sampled_claims.append(consume_above_bound)
     max_claim_value = draw(
         st.one_of(
-            st.sampled_from(
-                [
-                    10**15,
-                    RETENTION_THRESHOLD - 1,
-                    RETENTION_THRESHOLD,
-                    ACTIVATION_THRESHOLD,
-                    pair_balance,
-                ]
-            ).filter(lambda value: value <= pair_balance),
+            st.sampled_from(sampled_claims).filter(lambda value: 1 <= value <= pair_balance),
             st.integers(min_value=10**15, max_value=pair_balance),
         )
     )
@@ -155,6 +181,37 @@ def _swap_pop(active_assets, asset):
     active_assets.pop()
 
 
+def _production_remaining_usd(remaining_balance, claimed_amount, claimed_usd):
+    """Mirror StabVault remainingUsdValue, including the precision-loss floor to 1."""
+    if remaining_balance == 0 or claimed_amount == 0:
+        return 0
+    numerator = remaining_balance * claimed_usd
+    if numerator < claimed_amount:
+        return 1
+    return numerator // claimed_amount
+
+
+def _should_unlist_residual(prev_pair, remaining_balance, remaining_usd, total_balances):
+    if remaining_balance == 0:
+        return True
+    if remaining_usd == 0 or remaining_usd >= RETENTION_THRESHOLD:
+        return False
+    return (
+        total_balances == 0
+        or remaining_balance <= prev_pair // LIVE_RESIDUAL_DIVISOR
+    )
+
+
+def _production_redeem_remaining_usd(remaining_balance, max_redeem_value, max_claimable_amount):
+    """Mirror `_redeemFromStabilityPool` remainingUsdValue at this call's ratio."""
+    if remaining_balance == 0 or max_claimable_amount == 0:
+        return 0
+    numerator = remaining_balance * max_redeem_value
+    if numerator < max_claimable_amount:
+        return 1
+    return numerator // max_claimable_amount
+
+
 @settings(
     max_examples=40,
     deadline=None,
@@ -178,6 +235,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
     green_token,
     savings_green,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     with boa.env.anchor():
         _seed_stability_asset(
@@ -188,24 +247,105 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
             teller,
             mock_price_source,
         )
-        tokens = [
+        sampled_tokens = [
             _prepare_claim_token(
                 fuzz_claim_tokens[index],
                 governance,
                 alice,
                 20 * EIGHTEEN_DECIMALS,
+                price_desk,
+                switchboard_bravo,
             )
             for index in range(NUM_FUZZ_CLAIM_ASSETS)
         ]
+        prologue_token = _prepare_claim_token(
+            fuzz_claim_tokens[PROLOGUE_TOKEN_INDEX],
+            governance,
+            alice,
+            20 * EIGHTEEN_DECIMALS,
+            price_desk,
+            switchboard_bravo,
+        )
+        tokens = sampled_tokens + [prologue_token]
 
         stab_address = _asset_address(alpha_token)
         expected_pairs = {}
         active_assets = []
         expected_num_assets = 0
         is_paused = False
+        prologue_seated = False
+        prologue_delisted = False
+
+        mock_price_source.setPrice(prologue_token, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            prologue_token,
+            alice,
+            PROLOGUE_DORMANT_AMOUNT,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        assert stability_pool.getClaimAssetState(
+            alpha_token, prologue_token,
+        ) == CLAIM_ASSET_DORMANT
+        expected_pairs[_claim_pair(alpha_token, prologue_token)] = (
+            PROLOGUE_DORMANT_AMOUNT
+        )
+
+        withdrawn, _ = stability_pool.withdrawTokensFromVault(
+            bob,
+            alpha_token,
+            MAX_UINT256,
+            bob,
+            sender=teller.address,
+        )
+        assert withdrawn != 0
+        assert stability_pool.totalBalances(alpha_token) == 0
+
+        mock_price_source.setPrice(
+            prologue_token,
+            _exact_activation_price(PROLOGUE_DORMANT_AMOUNT),
+        )
+        count_before_seat = stability_pool.getNumActiveClaimAssets(alpha_token)
+        stability_pool.pause(True, sender=switchboard_alpha.address)
+        stability_pool.activateClaimAssets(
+            alpha_token, [prologue_token], sender=alice,
+        )
+        assert stability_pool.getClaimAssetState(
+            alpha_token, prologue_token,
+        ) == CLAIM_ASSET_ACTIVE
+        count_after_seat = stability_pool.getNumActiveClaimAssets(alpha_token)
+        assert count_after_seat == count_before_seat + 1
+        prologue_seated = True
+        stability_pool.pause(False, sender=switchboard_alpha.address)
+
+        mock_price_source.setPrice(prologue_token, PROLOGUE_PRUNE_PRICE)
+        count_before_delist = stability_pool.getNumActiveClaimAssets(alpha_token)
+        stability_pool.pruneClaimableAssets(
+            alpha_token, [prologue_token], sender=alice,
+        )
+        assert stability_pool.getClaimAssetState(
+            alpha_token, prologue_token,
+        ) == CLAIM_ASSET_DORMANT
+        count_after_delist = stability_pool.getNumActiveClaimAssets(alpha_token)
+        assert count_after_delist == count_before_delist - 1
+        prologue_delisted = True
+        expected_num_assets = 1
+
+        _assert_claim_data_model(
+            stability_pool,
+            [alpha_token],
+            tokens,
+            expected_pairs,
+            {stab_address: list(active_assets)},
+            {stab_address: expected_num_assets},
+        )
 
         for operation, token_index, amount, price in operations:
-            token = tokens[token_index]
+            token = sampled_tokens[token_index]
             token_address = _asset_address(token)
             pair_key = _claim_pair(alpha_token, token)
             mock_price_source.setPrice(token, price)
@@ -217,6 +357,17 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                         sender=switchboard_alpha.address,
                     )
                     is_paused = False
+
+                if (
+                    stability_pool.totalBalances(alpha_token) == 0
+                    and alpha_token.balanceOf(stability_pool)
+                    <= stability_pool.totalClaimableBalances(alpha_token)
+                ):
+                    alpha_token.transfer(
+                        stability_pool,
+                        EIGHTEEN_DECIMALS,
+                        sender=alpha_token_whale,
+                    )
 
                 active_addresses = [_asset_address(asset) for asset in active_assets]
                 is_active = token_address in active_addresses
@@ -262,7 +413,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                 pair_balance = expected_pairs.get(pair_key, 0)
                 usd_value = pair_balance * price // EIGHTEEN_DECIMALS
                 if (
-                    token_address in active_addresses
+                    stability_pool.totalBalances(alpha_token) == 0
+                    and token_address in active_addresses
                     and usd_value != 0
                     and usd_value < RETENTION_THRESHOLD
                 ):
@@ -286,7 +438,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                 pair_balance = expected_pairs.get(pair_key, 0)
                 usd_value = pair_balance * price // EIGHTEEN_DECIMALS
                 if (
-                    pair_balance != 0
+                    stability_pool.totalBalances(alpha_token) == 0
+                    and pair_balance != 0
                     and token_address not in active_addresses
                     and usd_value >= ACTIVATION_THRESHOLD
                 ):
@@ -324,13 +477,14 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                     )
                     is_paused = False
 
-                # Existing holders retain the ability to exit through every
-                # claim-data lifecycle state.
-                with boa.env.anchor():
+                # Persist a real full exit so later prune/activate see an empty
+                # cohort. Replenish unreserved stab custody before a later
+                # liquidation receipt, or that receipt reverts `nothing to transfer`.
+                if stability_pool.userBalances(bob, alpha_token) != 0:
                     withdrawn, _ = stability_pool.withdrawTokensFromVault(
                         bob,
                         alpha_token,
-                        max(amount, 10**15),
+                        MAX_UINT256,
                         bob,
                         sender=teller.address,
                     )
@@ -344,6 +498,14 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                 {stab_address: list(active_assets)},
                 {stab_address: expected_num_assets},
             )
+
+        assert prologue_seated and prologue_delisted
+        assert stability_pool.getClaimAssetState(
+            alpha_token, prologue_token,
+        ) == CLAIM_ASSET_DORMANT
+        assert expected_pairs[_claim_pair(alpha_token, prologue_token)] == (
+            PROLOGUE_DORMANT_AMOUNT
+        )
 
 
 @settings(
@@ -367,11 +529,16 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
     mock_price_source,
     green_token,
     savings_green,
+    setGeneralConfig,
+    setAssetConfig,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     candidate_amount, active_increment = case
 
     with boa.env.anchor():
+        setGeneralConfig()
         _seed_stability_asset(
             stability_pool,
             alpha_token,
@@ -387,6 +554,8 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
                 governance,
                 alice,
                 ACTIVATION_THRESHOLD + (active_increment if index == 0 else 0),
+                price_desk,
+                switchboard_bravo,
             )
             for index in range(MAX_ACTIVE_CLAIM_ASSETS)
         ]
@@ -409,6 +578,8 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             governance,
             alice,
             candidate_amount,
+            price_desk,
+            switchboard_bravo,
         )
         mock_price_source.setPrice(candidate, EIGHTEEN_DECIMALS)
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
@@ -470,12 +641,14 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             MAX_ACTIVE_CLAIM_ASSETS
         )
 
-        # Pruning a different active asset frees one slot for the candidate.
-        mock_price_source.setPrice(active_tokens[1], 2 * 10**17)
-        stability_pool.pruneClaimableAssets(
-            alpha_token,
-            [active_tokens[1]],
-            sender=alice,
+        # Claim an occupant to zero to free one slot for the candidate.
+        setAssetConfig(active_tokens[1])
+        stability_pool.claimManyFromStabilityPool(
+            bob,
+            [(alpha_token.address, active_tokens[1].address, MAX_UINT256)],
+            bob,
+            False,
+            sender=teller.address,
         )
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
             MAX_ACTIVE_CLAIM_ASSETS - 1
@@ -523,6 +696,14 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
 @given(case=claim_reduction_cases())
+@example(case=(
+    EIGHTEEN_DECIMALS,
+    EIGHTEEN_DECIMALS - EIGHTEEN_DECIMALS // LIVE_RESIDUAL_DIVISOR,
+))
+@example(case=(
+    EIGHTEEN_DECIMALS,
+    EIGHTEEN_DECIMALS - EIGHTEEN_DECIMALS // LIVE_RESIDUAL_DIVISOR - 1,
+))
 def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
     case,
     stability_pool,
@@ -541,6 +722,8 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
     setGeneralConfig,
     setAssetConfig,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     pair_balance, max_claim_value = case
 
@@ -569,6 +752,8 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
             governance,
             alice,
             2 * pair_balance,
+            price_desk,
+            switchboard_bravo,
         )
         setAssetConfig(claim)
         mock_price_source.setPrice(claim, EIGHTEEN_DECIMALS)
@@ -614,15 +799,15 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
         assert 0 < claimed_amount <= pair_balance
 
         remaining_balance = pair_balance - claimed_amount
-        remaining_usd_value = 0
-        if remaining_balance != 0:
-            numerator = remaining_balance * claim_usd_value
-            remaining_usd_value = (
-                1 if numerator < claimed_amount else numerator // claimed_amount
-            )
+        remaining_usd_value = _production_remaining_usd(
+            remaining_balance, claimed_amount, claim_usd_value,
+        )
 
-        should_remove = remaining_balance == 0 or (
-            remaining_usd_value != 0 and remaining_usd_value < RETENTION_THRESHOLD
+        should_remove = _should_unlist_residual(
+            pair_balance,
+            remaining_balance,
+            remaining_usd_value,
+            stability_pool.totalBalances(alpha_token),
         )
         expected_pairs[_claim_pair(alpha_token, claim)] = remaining_balance
         if should_remove:
@@ -669,6 +854,18 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
 @given(case=redemption_cases())
+@example(case=(
+    EIGHTEEN_DECIMALS,
+    ACTIVATION_THRESHOLD,
+    EIGHTEEN_DECIMALS - EIGHTEEN_DECIMALS // LIVE_RESIDUAL_DIVISOR,
+    0,
+))
+@example(case=(
+    EIGHTEEN_DECIMALS,
+    ACTIVATION_THRESHOLD,
+    EIGHTEEN_DECIMALS - EIGHTEEN_DECIMALS // LIVE_RESIDUAL_DIVISOR - 1,
+    0,
+))
 def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
     case,
     stability_pool,
@@ -689,6 +886,8 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
     setGeneralConfig,
     setAssetConfig,
     fuzz_claim_tokens,
+    price_desk,
+    switchboard_bravo,
 ):
     alpha_balance, charlie_balance, first_payment, second_payment = case
 
@@ -717,6 +916,8 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
             governance,
             alice,
             alpha_balance + charlie_balance,
+            price_desk,
+            switchboard_bravo,
         )
         setAssetConfig(claim)
         mock_price_source.setPrice(claim, EIGHTEEN_DECIMALS)
@@ -789,20 +990,25 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
                     break
 
                 stab_asset = asset_by_address[stab_address]
-                claim_amount = min(
-                    payment_remaining,
-                    remaining_claims[stab_address],
-                )
+                prev_pair = remaining_claims[stab_address]
+                claim_amount = min(payment_remaining, prev_pair)
                 if claim_amount == 0:
                     continue
 
-                remaining_claims[stab_address] -= claim_amount
+                remaining_claims[stab_address] = prev_pair - claim_amount
                 expected_pairs[_claim_pair(stab_asset, claim)] = remaining_claims[
                     stab_address
                 ]
-                if (
-                    remaining_claims[stab_address] == 0
-                    or remaining_claims[stab_address] < RETENTION_THRESHOLD
+                remaining_usd_value = _production_redeem_remaining_usd(
+                    remaining_claims[stab_address],
+                    payment,
+                    payment,
+                )
+                if _should_unlist_residual(
+                    prev_pair,
+                    remaining_claims[stab_address],
+                    remaining_usd_value,
+                    stability_pool.totalBalances(stab_asset),
                 ):
                     active_addresses = [
                         _asset_address(asset) for asset in expected_active[stab_address]

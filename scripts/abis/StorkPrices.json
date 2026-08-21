@@ -222,7 +222,47 @@
     "inputs": [
       {
         "name": "payload",
-        "type": "bytes",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "temporalNumericValue",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "timestampNs",
+                "type": "uint64"
+              },
+              {
+                "name": "quantizedValue",
+                "type": "int192"
+              }
+            ]
+          },
+          {
+            "name": "id",
+            "type": "bytes32"
+          },
+          {
+            "name": "publisherMerkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "name": "valueComputeAlgHash",
+            "type": "bytes32"
+          },
+          {
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32"
+          },
+          {
+            "name": "v",
+            "type": "uint8"
+          }
+        ],
         "indexed": false
       },
       {
@@ -1610,7 +1650,47 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "temporalNumericValue",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "timestampNs",
+                "type": "uint64"
+              },
+              {
+                "name": "quantizedValue",
+                "type": "int192"
+              }
+            ]
+          },
+          {
+            "name": "id",
+            "type": "bytes32"
+          },
+          {
+            "name": "publisherMerkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "name": "valueComputeAlgHash",
+            "type": "bytes32"
+          },
+          {
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32"
+          },
+          {
+            "name": "v",
+            "type": "uint8"
+          }
+        ]
       }
     ],
     "outputs": [
@@ -1627,7 +1707,47 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "temporalNumericValue",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "timestampNs",
+                "type": "uint64"
+              },
+              {
+                "name": "quantizedValue",
+                "type": "int192"
+              }
+            ]
+          },
+          {
+            "name": "id",
+            "type": "bytes32"
+          },
+          {
+            "name": "publisherMerkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "name": "valueComputeAlgHash",
+            "type": "bytes32"
+          },
+          {
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32"
+          },
+          {
+            "name": "v",
+            "type": "uint8"
+          }
+        ]
       }
     ],
     "outputs": [

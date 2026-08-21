@@ -64,6 +64,10 @@ def ripe_hq(
     green_ccip_pool_placeholder,
     ripe_ccip_pool_placeholder,
     vault_migrator,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -89,6 +93,20 @@ def ripe_hq(
     # 7
     assert ripe_hq_deploy.startAddNewAddressToRegistry(price_desk, "Price Desk", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(price_desk, sender=deploy3r) == 7
+
+    # Common priced test tokens bypass Bravo onboarding. Cache their scales
+    # before governance handoff so valuation never calls token decimals.
+    for token in (
+        green_token,
+        savings_green,
+        ripe_token,
+        alpha_token,
+        bravo_token,
+        charlie_token,
+        delta_token,
+    ):
+        if price_desk.tokenScale(token) == 0:
+            price_desk.syncTokenScale(token, sender=deploy3r)
 
     # 8
     assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_book, "Vault Book", sender=deploy3r)

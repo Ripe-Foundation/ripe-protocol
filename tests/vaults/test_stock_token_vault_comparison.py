@@ -47,22 +47,6 @@ def _boa_error_has_dev_reason(error, expected_reason):
         for frame in error.stack_trace
     )
 
-@pytest.fixture(autouse=True)
-def isolate_boa_storage_diagnostics():
-    """Avoid Boa repr crashes from stale address/type trace metadata."""
-
-    # These are diagnostic dictionaries, not EVM state. Keep the workaround
-    # local because the proper shared fixture in tests/conftest.py is outside
-    # this candidate's explicit authorization.
-    assert isinstance(boa.env.sstore_trace, dict)
-    assert isinstance(boa.env.sha3_trace, dict)
-    boa.env.sstore_trace.clear()
-    boa.env.sha3_trace.clear()
-    yield
-    boa.env.sstore_trace.clear()
-    boa.env.sha3_trace.clear()
-
-
 @pytest.fixture
 def stock_token(deploy3r):
     return boa.load(
@@ -613,7 +597,7 @@ def test_short_received_after_existing_user_backing_reverts_atomically(
     stock_token.approve(teller, requested, sender=alice)
     stock_token.setUpgradeBehavior(3, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.deposit(stock_token, requested, alice, vault, sender=alice)
 
     assert stock_token.balanceOf(alice) == requested
@@ -658,7 +642,7 @@ def test_donation_cannot_mask_short_current_receipt(
     stock_token.approve(teller, requested, sender=bob)
     stock_token.setUpgradeBehavior(3, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("custody mismatch"):
         teller.deposit(stock_token, requested, bob, vault, sender=bob)
 
     assert stock_token.balanceOf(bob) == requested
@@ -756,7 +740,7 @@ def test_external_auction_after_total_issuer_burn_reverts_atomically(
     green_token.approve(teller, payment, sender=alice)
     green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
-    with boa.reverts():
+    with boa.reverts("no green spent"):
         buy_fungible_auction(teller,
             bob,
             vault_id,
@@ -1039,7 +1023,7 @@ def test_transfer_guards_block_deposit_atomically_and_retry(
     else:
         stock_token.setUpgradeBehavior(upgrade_mode, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("token transfer failed"):
         teller.deposit(stock_token, amount, bob, vault, sender=bob)
     assert stock_token.balanceOf(bob) == amount
     assert stock_token.balanceOf(vault) == 0
@@ -1155,9 +1139,12 @@ def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
         bob, vault_id, stock_token, payment, False,
         should_transfer_balance, False, sender=alice,
     )
-    assert green_spent == payment
-    assert green_token.balanceOf(alice) == green_before - payment
-    assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
+    # DV-001 floors internal SharesVault transfers to the represented amount;
+    # the buyer can spend at most the quote and at most one wei less here.
+    assert 0 < green_spent <= payment
+    assert payment - green_spent <= 1
+    assert green_token.balanceOf(alice) == green_before - green_spent
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - green_spent
 
     collateral = 40 * EIGHTEEN_DECIMALS
     if should_transfer_balance:
@@ -1309,7 +1296,7 @@ def test_new_borrow_after_total_issuer_burn(
     teller.deposit(stock_token, amount, bob, vault, sender=bob)
     stock_token.adminBurn(vault, amount, sender=deploy3r)
 
-    with boa.reverts():
+    with boa.reverts("quarantined asset"):
         teller.borrow(borrow_amount, bob, False, sender=bob)
     assert credit_engine.getUserDebtAmount(bob) == 0
 
@@ -1595,17 +1582,21 @@ def test_auction_started_after_partial_issuer_loss_skips_deficient_simple(
     green_token.approve(teller, payment, sender=alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
     live_before = stock_token.balanceOf(vault)
-    assert buy_fungible_auction(teller,
+    green_spent = buy_fungible_auction(teller,
         bob, vault_id, stock_token, payment, False,
         should_transfer_balance, False, sender=alice,
-    ) == payment
-    assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
+    )
+    # Internal SharesVault delivery is floored to its represented collateral;
+    # external delivery remains exact, and neither path can overspend the quote.
+    assert 0 < green_spent <= payment
+    assert payment - green_spent <= 1
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - green_spent
 
     purchase_event = filter_logs(teller, "FungAuctionPurchased")
     assert len(purchase_event) == 1
-    assert purchase_event[0].greenSpent == payment
+    assert purchase_event[0].greenSpent == green_spent
     assert purchase_event[0].collateralAmountSent in (collateral, collateral - 1)
-    assert purchase_event[0].collateralUsdValueSent == 20 * EIGHTEEN_DECIMALS
+    assert purchase_event[0].collateralUsdValueSent == green_spent
     if should_transfer_balance:
         assert stock_token.balanceOf(alice) == 0
         assert collateral - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= collateral

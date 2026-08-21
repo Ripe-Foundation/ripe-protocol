@@ -168,6 +168,14 @@ existing lock. The proposed M3 change is rejected; ordinary paycheck deposits re
 their existing general-bound behavior while the final transfer retains the explicit
 Contributor term and weighted-lock semantics.
 
+**Owner refinement — 2026-08-19 (F-07).** The 2026-08-11 decision did not approve
+transfer-time clamping, and that rejection stands. Creation and confirmation now
+require `0 < depositLockDuration <= live RipeGov maxLockDuration`. Being below the
+live general minimum remains allowed. After confirmation, later min/max changes do
+not amend the stored term; the final transfer still forwards that stored duration
+exactly, even if it is then below the live minimum or above a later-reduced live
+maximum.
+
 **The remaining 7 rows are still unapproved** (DV-04, DV-08, DV-09, DV-10,
 DV-13, DV-14, DV-15) and no production source is edited for them, so §17
 continues to apply to each. Note that DV-10's candidate (M7c, §13) is now
@@ -419,6 +427,9 @@ The reduction is not free, and the owner must weigh it:
 - It breaks the tests that call them, including two added by this branch.
 - **This was one candidate reduction, not an exhaustive search.** Other
   non-ABI-breaking reductions may exist and were not looked for.
+
+**Disposition (2026-08-19):** `areKeyTermsSame` was removed by owner decision as
+an intentional ABI change; other wrapper decisions are unchanged.
 
 **E-3 — any production edit also breaks frozen-artifact gates the plan does not
 list.** `config/contract-artifact-expectations.json` freezes source SHA-256,
