@@ -175,6 +175,11 @@ def _registerVaultAsset(_asset: address):
 @external
 def deregisterVaultAsset(_asset: address) -> bool:
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    return self._deregisterVaultAsset(_asset)
+
+
+@internal
+def _deregisterVaultAsset(_asset: address) -> bool:
 
     if self.totalBalances[_asset] != 0:
         return False

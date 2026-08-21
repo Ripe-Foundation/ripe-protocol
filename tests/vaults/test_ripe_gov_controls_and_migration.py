@@ -1,6 +1,7 @@
 import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
+from boa.dealer import update_storage_slot
 
 from constants import (
     EIGHTEEN_DECIMALS,
@@ -14,6 +15,12 @@ from conf_utils import filter_logs
 SOURCE_VAULT_ID = 2
 ASSET_WEIGHT = 100_00
 LOCK_TERMS = (100, 1_000, 200_00, True, 10_00)
+
+
+def _set_num_user_assets(vault, user, value):
+    update_storage_slot(
+        vault, "numUserAssets", lambda _current: value, (user,)
+    )
 
 
 def _configure_ripe_gov_asset(
@@ -2315,7 +2322,7 @@ def test_migration_accepts_exact_stale_zero_target_asset_registration(
     target.eval(
         f"vaultData.indexOfUserAsset[{bob}][{ripe_token.address}] = 1"
     )
-    target.eval(f"vaultData.numUserAssets[{bob}] = 2")
+    _set_num_user_assets(target, bob, 2)
     target.eval(
         f"self.userGovData[{bob}][{ripe_token.address}] = "
         "GovData(govPoints=0, lastShares=0, lastPointsUpdate=123, unlock=456, "
@@ -3841,9 +3848,7 @@ def test_governance_migration_capacity_and_explicit_asset_fallback(
         bob, sender=switchboard_echo.address
     )
     disabled_block = ripe_gov_vault.userGovPointAccrualDisabledBlock(bob)
-    ripe_gov_vault.eval(
-        f"vaultData.numUserAssets[{bob}] = {registered_slots + 1}"
-    )
+    _set_num_user_assets(ripe_gov_vault, bob, registered_slots + 1)
 
     if registered_slots == 20:
         assert switchboard_echo.migrateRipeGovPositions(
@@ -3902,7 +3907,7 @@ def test_governance_batch_aggregate_slot_cap_reverts_before_movement(
     )
     # Bob contributes one real slot; Alice's twenty registered residue slots
     # push the aggregate to 21 without exceeding the per-user cap.
-    ripe_gov_vault.eval(f"vaultData.numUserAssets[{alice}] = 21")
+    _set_num_user_assets(ripe_gov_vault, alice, 21)
 
     with boa.reverts("too many migration asset slots"):
         switchboard_echo.migrateRipeGovPositions(

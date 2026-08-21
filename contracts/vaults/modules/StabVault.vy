@@ -1340,27 +1340,9 @@ def activateClaimAssets(_stabAsset: address, _claimAssets: DynArray[address, MAX
 def deregisterVaultAsset(_asset: address) -> bool:
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
 
-    if vaultData.totalBalances[_asset] != 0 or self.numClaimablePairs[_asset] != 0:
+    if self.numClaimablePairs[_asset] != 0:
         return False
-
-    numAssets: uint256 = vaultData.numAssets
-    if numAssets == 0:
-        return False
-
-    targetIndex: uint256 = vaultData.indexOfAsset[_asset]
-    if targetIndex == 0:
-        return False
-
-    lastIndex: uint256 = numAssets - 1
-    vaultData.numAssets = lastIndex
-    vaultData.indexOfAsset[_asset] = 0
-
-    if targetIndex != lastIndex:
-        lastItem: address = vaultData.vaultAssets[lastIndex]
-        vaultData.vaultAssets[targetIndex] = lastItem
-        vaultData.indexOfAsset[lastItem] = targetIndex
-
-    return True
+    return vaultData._deregisterVaultAsset(_asset)
 
 
 @view
