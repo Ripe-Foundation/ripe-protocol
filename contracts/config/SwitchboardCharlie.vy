@@ -70,7 +70,6 @@ interface RipeEcoContract:
     def pause(_shouldPause: bool): nonpayable
 
 interface CreditEngine:
-    def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface VaultBook:

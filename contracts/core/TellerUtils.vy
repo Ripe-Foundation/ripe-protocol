@@ -42,16 +42,12 @@ interface MissionControl:
     def underscoreRegistry() -> address: view
 
 interface AddressRegistry:
-    def isValidRegId(_regId: uint256) -> bool: view
     def getRegId(_addr: address) -> uint256: view
     def getAddr(_regId: uint256) -> address: view
     def isValidAddr(_addr: address) -> bool: view
 
 interface CreditEngine:
     def getMaxWithdrawableForAsset(_user: address, _vaultId: uint256, _asset: address, _vaultAddr: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> uint256: view
-
-interface Ledger:
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
 
 interface VaultRegistry:
     def isEarnVault(_vaultAddr: address) -> bool: view

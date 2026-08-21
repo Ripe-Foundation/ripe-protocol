@@ -30,8 +30,6 @@ interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
     def setHrConfig(_config: cs.HrConfig): nonpayable
     def ripeBondConfig() -> cs.RipeBondConfig: view
-    def underscoreRegistry() -> address: view
-    def shouldCheckLastTouch() -> bool: view
     def hrConfig() -> cs.HrConfig: view
 
 interface BondBooster:
@@ -136,10 +134,6 @@ struct DeleverageAsset:
 struct PendingManager:
     contributor: address
     pendingManager: address
-
-struct PendingCancelPaycheck:
-    contributor: address
-    pendingShouldCancel: bool
 
 struct BoosterConfig:
     user: address

@@ -39,7 +39,6 @@ from interfaces import Department
 from interfaces import UndyLego
 
 from ethereum.ercs import IERC20
-from ethereum.ercs import IERC721
 
 interface CurvePool:
     def remove_liquidity_imbalance(_amounts: DynArray[uint256, 2], _maxLpBurnAmount: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
@@ -146,7 +145,6 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_TOKEN_PATH: constant(uint256) = 5
 MAX_ASSETS: constant(uint256) = 10
 MAX_LEGOS: constant(uint256) = 10
-API_VERSION: constant(String[28]) = "0.1.0"
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 LEGO_BOOK_ID: constant(uint256) = 3
 CURVE_PRICES_ID: constant(uint256) = 2
