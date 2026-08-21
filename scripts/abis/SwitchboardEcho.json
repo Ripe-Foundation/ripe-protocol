@@ -1837,10 +1837,64 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "migrateRipeGovPositionsForUserByAssets",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "migrateVaultPositions",
     "inputs": [
       {
         "name": "_users",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateVaultPositionsForUserByAssets",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
         "type": "address[]"
       },
       {

@@ -6,6 +6,9 @@ from constants import MAX_UINT256, ZERO_ADDRESS, EIGHTEEN_DECIMALS
 from conf_utils import assert_reverted_call, filter_logs
 from contracts.modules import Contributor
 
+EIP170_LIMIT = 24_576
+EXPECTED_CONTRIBUTOR_RUNTIME_BYTES = 5_280
+
 
 def _assert_zero_vesting_views(contributor):
     assert contributor.getTotalVested() == 0
@@ -14,6 +17,14 @@ def _assert_zero_vesting_views(contributor):
 
 
 # Test Initialization
+
+
+def test_contributor_deployed_runtime_size_tripwire(contributor_contract):
+    deployed_runtime_bytes = len(
+        contributor_contract.env.get_code(contributor_contract.address)
+    )
+    assert deployed_runtime_bytes < EIP170_LIMIT
+    assert deployed_runtime_bytes == EXPECTED_CONTRIBUTOR_RUNTIME_BYTES
 
 
 def test_contributor_initialization_success(
@@ -451,6 +462,311 @@ def test_contributor_confirm_ripe_transfer_success(
 
     # Should no longer have pending transfer
     assert not contributor_contract.hasPendingRipeTransfer()
+
+
+def test_contributor_pending_ripe_transfer_survives_core_vault_rotation(
+    contributor_contract,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    whale,
+    teller,
+    owner_address,
+    valid_contributor_terms,
+):
+    setupRipeGovVaultConfig()
+    historical_vault_id = mission_control.coreRipeGovVaultId()
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(
+        contributor_contract.address,
+        ripe_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    boa.env.time_travel(
+        seconds=(
+            valid_contributor_terms["startDelay"]
+            + valid_contributor_terms["unlockLength"]
+            + 1
+        )
+    )
+
+    contributor_contract.initiateRipeTransfer(False, sender=owner_address)
+    assert contributor_contract.pendingRipeTransferVaultId() == historical_vault_id
+
+    replacement_vault_id = registerVault(
+        alternate_ripe_gov_vault, "Replacement Core RipeGov"
+    )
+    mission_control.setCoreRipeGovVaultId(
+        replacement_vault_id, sender=switchboard_alpha.address
+    )
+    assert mission_control.coreRipeGovVaultId() == replacement_vault_id
+
+    boa.env.time_travel(blocks=contributor_contract.keyActionDelay())
+    contributor_contract.confirmRipeTransfer(False, sender=owner_address)
+
+    assert (
+        ripe_gov_vault.getTotalAmountForUser(owner_address, ripe_token)
+        == deposit_amount
+    )
+    assert not ripe_gov_vault.doesUserHaveBalance(contributor_contract, ripe_token)
+    assert (
+        alternate_ripe_gov_vault.getTotalAmountForUser(owner_address, ripe_token)
+        == 0
+    )
+    assert contributor_contract.pendingRipeTransferVaultId() == 0
+
+
+def test_contributor_can_select_historical_vault_after_core_rotation(
+    contributor_contract,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    whale,
+    teller,
+    owner_address,
+    valid_contributor_terms,
+):
+    setupRipeGovVaultConfig()
+    historical_vault_id = mission_control.coreRipeGovVaultId()
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(
+        contributor_contract.address,
+        ripe_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    boa.env.time_travel(
+        seconds=(
+            valid_contributor_terms["startDelay"]
+            + valid_contributor_terms["unlockLength"]
+            + 1
+        )
+    )
+
+    replacement_vault_id = registerVault(
+        alternate_ripe_gov_vault, "Replacement Core RipeGov"
+    )
+    mission_control.setCoreRipeGovVaultId(
+        replacement_vault_id, sender=switchboard_alpha.address
+    )
+
+    with boa.reverts("no balance"):
+        contributor_contract.initiateRipeTransfer(False, sender=owner_address)
+    with boa.reverts("invalid vault id"):
+        contributor_contract.initiateRipeTransfer(
+            False, replacement_vault_id + 1, sender=owner_address
+        )
+
+    contributor_contract.initiateRipeTransfer(
+        False, historical_vault_id, sender=owner_address
+    )
+    assert contributor_contract.pendingRipeTransferVaultId() == historical_vault_id
+
+    boa.env.time_travel(blocks=contributor_contract.keyActionDelay())
+    contributor_contract.confirmRipeTransfer(False, sender=owner_address)
+    assert (
+        ripe_gov_vault.getTotalAmountForUser(owner_address, ripe_token)
+        == deposit_amount
+    )
+
+
+def test_pre_rg002_contributor_pending_transfer_survives_core_vault_rotation(
+    deployedContributor,
+    legacy_contributor_contract,
+    legacy_contributor_template,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    human_resources,
+    ripe_token,
+    whale,
+    teller,
+    owner_address,
+    valid_contributor_terms,
+):
+    setupRipeGovVaultConfig()
+    historical_vault_id = mission_control.coreRipeGovVaultId()
+    legacy_contributor = legacy_contributor_contract.at(
+        deployedContributor(_template=legacy_contributor_template.address)
+    )
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(
+        legacy_contributor.address,
+        ripe_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    boa.env.time_travel(
+        seconds=(
+            valid_contributor_terms["startDelay"]
+            + valid_contributor_terms["unlockLength"]
+            + 1
+        )
+    )
+
+    # This clone has the exact pre-RG-002 runtime and can call only the
+    # preserved, vaultless HumanResources selectors.
+    legacy_contributor.initiateRipeTransfer(False, sender=owner_address)
+    replacement_vault_id = registerVault(
+        alternate_ripe_gov_vault, "Replacement Core RipeGov"
+    )
+    mission_control.setCoreRipeGovVaultId(
+        replacement_vault_id, sender=switchboard_alpha.address
+    )
+
+    human_resources.setLegacyContributorRipeGovVaultId(
+        legacy_contributor, historical_vault_id, sender=owner_address
+    )
+    assert (
+        human_resources.legacyContributorRipeGovVaultId(legacy_contributor)
+        == historical_vault_id
+    )
+
+    boa.env.time_travel(blocks=legacy_contributor.keyActionDelay())
+    legacy_contributor.confirmRipeTransfer(False, sender=owner_address)
+
+    assert (
+        ripe_gov_vault.getTotalAmountForUser(owner_address, ripe_token)
+        == deposit_amount
+    )
+    assert not ripe_gov_vault.doesUserHaveBalance(legacy_contributor, ripe_token)
+    assert human_resources.legacyContributorRipeGovVaultId(legacy_contributor) == 0
+
+
+def test_pre_rg002_contributor_can_select_historical_vault_after_rotation(
+    deployedContributor,
+    legacy_contributor_contract,
+    legacy_contributor_template,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    human_resources,
+    ripe_token,
+    whale,
+    teller,
+    owner_address,
+    manager_address,
+    alice,
+    valid_contributor_terms,
+):
+    setupRipeGovVaultConfig()
+    historical_vault_id = mission_control.coreRipeGovVaultId()
+    legacy_contributor = legacy_contributor_contract.at(
+        deployedContributor(_template=legacy_contributor_template.address)
+    )
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(
+        legacy_contributor.address,
+        ripe_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    replacement_vault_id = registerVault(
+        alternate_ripe_gov_vault, "Replacement Core RipeGov"
+    )
+    mission_control.setCoreRipeGovVaultId(
+        replacement_vault_id, sender=switchboard_alpha.address
+    )
+    boa.env.time_travel(
+        seconds=(
+            valid_contributor_terms["startDelay"]
+            + valid_contributor_terms["unlockLength"]
+            + 1
+        )
+    )
+
+    with boa.reverts("no balance"):
+        legacy_contributor.initiateRipeTransfer(False, sender=owner_address)
+    with boa.reverts("no perms"):
+        human_resources.setLegacyContributorRipeGovVaultId(
+            legacy_contributor, historical_vault_id, sender=alice
+        )
+    with boa.reverts("invalid vault id"):
+        human_resources.setLegacyContributorRipeGovVaultId(
+            legacy_contributor, replacement_vault_id + 1, sender=owner_address
+        )
+
+    human_resources.setLegacyContributorRipeGovVaultId(
+        legacy_contributor, historical_vault_id, sender=manager_address
+    )
+    legacy_contributor.initiateRipeTransfer(False, sender=owner_address)
+    boa.env.time_travel(blocks=legacy_contributor.keyActionDelay())
+    legacy_contributor.confirmRipeTransfer(False, sender=owner_address)
+
+    assert (
+        ripe_gov_vault.getTotalAmountForUser(owner_address, ripe_token)
+        == deposit_amount
+    )
+    assert human_resources.legacyContributorRipeGovVaultId(legacy_contributor) == 0
+
+
+def test_pre_rg002_contributor_cancel_burn_uses_historical_vault_override(
+    deployedContributor,
+    legacy_contributor_contract,
+    legacy_contributor_template,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    human_resources,
+    ripe_token,
+    whale,
+    teller,
+    owner_address,
+):
+    setupRipeGovVaultConfig()
+    historical_vault_id = mission_control.coreRipeGovVaultId()
+    legacy_contributor = legacy_contributor_contract.at(
+        deployedContributor(_template=legacy_contributor_template.address)
+    )
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(
+        legacy_contributor.address,
+        ripe_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    replacement_vault_id = registerVault(
+        alternate_ripe_gov_vault, "Replacement Core RipeGov"
+    )
+    mission_control.setCoreRipeGovVaultId(
+        replacement_vault_id, sender=switchboard_alpha.address
+    )
+    human_resources.setLegacyContributorRipeGovVaultId(
+        legacy_contributor, historical_vault_id, sender=owner_address
+    )
+
+    legacy_contributor.cancelPaycheck(sender=switchboard_alpha.address)
+
+    assert not ripe_gov_vault.doesUserHaveBalance(legacy_contributor, ripe_token)
+    assert human_resources.legacyContributorRipeGovVaultId(legacy_contributor) == 0
 
 
 def test_contributor_final_transfer_honors_its_separate_deposit_lock_term(

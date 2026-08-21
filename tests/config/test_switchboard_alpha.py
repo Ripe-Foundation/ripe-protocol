@@ -2555,6 +2555,56 @@ def test_ripe_gov_vault_config_rejects_zero_max_lock_duration(
     assert not live_after.shouldFreezeWhenBadDebt
 
 
+def test_ripe_gov_vault_config_switchboard_rejects_unsafe_lock_duration(
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    setAssetConfig,
+    mission_control,
+):
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+    max_safe_duration = MAX_UINT256 // 1000_00
+
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        max_safe_duration,
+        max_safe_duration,
+        1000_00,
+        0,
+        False,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(
+        action_id, sender=governance.address
+    )
+    assert (
+        mission_control.ripeGovVaultConfig(alpha_token).lockTerms.maxLockDuration
+        == max_safe_duration
+    )
+
+    latest_action_id = switchboard_alpha.actionId()
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            False,
+            max_safe_duration + 1,
+            max_safe_duration + 1,
+            1000_00,
+            0,
+            False,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.actionId() == latest_action_id
+    assert (
+        mission_control.ripeGovVaultConfig(alpha_token).lockTerms.maxLockDuration
+        == max_safe_duration
+    )
+
+
 def test_ripe_gov_vault_config_rejects_unset_target_core_pointer(
     switchboard_alpha,
     switchboard_bravo,

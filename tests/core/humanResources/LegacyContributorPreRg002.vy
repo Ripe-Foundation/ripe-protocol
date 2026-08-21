@@ -1,14 +1,15 @@
+# Test-only exact pre-RG-002 Contributor source from rh@04e854e.
+# It proves compatibility for already-deployed immutable blueprint clones.
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
 # Ripe Foundation (C) 2026
 
 # @version 0.4.3
 interface HumanResources:
-    def transferContributorRipeTokens(_owner: address, _lockDuration: uint256, _vaultId: uint256 = 0) -> uint256: nonpayable
+    def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256: nonpayable
     def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool): nonpayable
     def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool: nonpayable
     def canModifyHrContributor(_addr: address) -> bool: view
-    def getRipeGovVaultId(_vaultId: uint256 = 0) -> uint256: view
-    def hasRipeBalance(_contributor: address, _vaultId: uint256 = 0) -> bool: view
+    def hasRipeBalance(_contributor: address) -> bool: view
 
 interface RipeGovernance:
     def removeDelegationFor(_recipient: address = empty(address)): nonpayable
@@ -113,7 +114,6 @@ isFrozen: public(bool)
 # pending changes
 pendingOwner: public(PendingOwnerChange)
 pendingRipeTransfer: public(PendingRipeTransfer)
-pendingRipeTransferVaultId: public(uint256)
 
 HUMAN_RESOURCES_ID: constant(uint256) = 15
 
@@ -212,7 +212,7 @@ def _cashRipeCheck(
 
 @nonreentrant
 @external
-def initiateRipeTransfer(_shouldCashCheck: bool = True, _vaultId: uint256 = 0):
+def initiateRipeTransfer(_shouldCashCheck: bool = True):
     assert not self.isFrozen # dev: contract frozen
 
     owner: address = self.owner
@@ -226,8 +226,7 @@ def initiateRipeTransfer(_shouldCashCheck: bool = True, _vaultId: uint256 = 0):
     # important validation
     assert not self._hasPendingOwnerChange() # dev: cannot do with pending ownership change
     assert block.timestamp > self.unlockTime # dev: time not past unlock
-    vaultId: uint256 = staticcall HumanResources(hr).getRipeGovVaultId(_vaultId)
-    assert staticcall HumanResources(hr).hasRipeBalance(self, vaultId) # dev: no balance
+    assert staticcall HumanResources(hr).hasRipeBalance(self) # dev: no balance
 
     # set transfer data
     confirmBlock: uint256 = block.number + self.keyActionDelay
@@ -236,7 +235,6 @@ def initiateRipeTransfer(_shouldCashCheck: bool = True, _vaultId: uint256 = 0):
         initiatedBlock = block.number,
         confirmBlock = confirmBlock,
     )
-    self.pendingRipeTransferVaultId = vaultId
     log RipeTransferInitiated(owner=owner, confirmBlock=confirmBlock, initiatedBy=msg.sender)
 
 
@@ -259,15 +257,10 @@ def confirmRipeTransfer(_shouldCashCheck: bool = True):
         self._cashRipeCheck(owner, msg.sender, hr)
 
     # transfer Ripe position
-    amount: uint256 = extcall HumanResources(hr).transferContributorRipeTokens(
-        pending.recipient,
-        self.depositLockDuration,
-        self.pendingRipeTransferVaultId,
-    ) # dev: could not transfer
+    amount: uint256 = extcall HumanResources(hr).transferContributorRipeTokens(pending.recipient, self.depositLockDuration) # dev: could not transfer
 
     # reset pending transfer
     self.pendingRipeTransfer = empty(PendingRipeTransfer)
-    self.pendingRipeTransferVaultId = 0
     log RipeTransferConfirmed(recipient=pending.recipient, amount=amount, confirmedBy=msg.sender, initiatedBlock=pending.initiatedBlock)
 
 
@@ -280,7 +273,6 @@ def cancelRipeTransfer():
     pending: PendingRipeTransfer = self.pendingRipeTransfer
     assert pending.confirmBlock != 0 # dev: no pending transfer
     self.pendingRipeTransfer = empty(PendingRipeTransfer)
-    self.pendingRipeTransferVaultId = 0
 
     log RipeTransferCancelled(recipient=pending.recipient, cancelledBy=msg.sender, initiatedBlock=pending.initiatedBlock, confirmBlock=pending.confirmBlock)
 
@@ -372,7 +364,7 @@ def _hasPendingOwnerChange() -> bool:
 # manager
 
 
-@external 
+@external
 def setManager(_newManager: address):
     if msg.sender != self.owner:
         assert staticcall HumanResources(self._getHrAddr()).canModifyHrContributor(msg.sender) # dev: no perms
@@ -423,7 +415,7 @@ def removeDelegationFor(_govAddr: address, _recipient: address = empty(address))
 # freeze
 
 
-@external 
+@external
 def setIsFrozen(_shouldFreeze: bool) -> bool:
     assert staticcall HumanResources(self._getHrAddr()).canModifyHrContributor(msg.sender) # dev: no perms
     self.isFrozen = _shouldFreeze
@@ -499,7 +491,7 @@ def getTotalVested() -> uint256:
 
 @view
 @internal
-def _getTotalVested() -> uint256:   
+def _getTotalVested() -> uint256:
     startTime: uint256 = self.startTime
     if block.timestamp <= startTime:
         return 0 # has future start time

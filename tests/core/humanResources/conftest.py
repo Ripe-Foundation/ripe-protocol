@@ -51,6 +51,18 @@ def setupHrConfig(mission_control, switchboard_delta, contributor_template):
 
 
 @pytest.fixture(scope="module")
+def legacy_contributor_contract():
+    return boa.load_partial(
+        "tests/core/humanResources/LegacyContributorPreRg002.vy"
+    )
+
+
+@pytest.fixture(scope="module")
+def legacy_contributor_template(legacy_contributor_contract):
+    return legacy_contributor_contract.deploy_as_blueprint()
+
+
+@pytest.fixture(scope="module")
 def setupLedgerBalance(ledger, switchboard_delta):
     """Set the Ledger's RIPE allocation for HR."""
 
@@ -115,9 +127,9 @@ def deployedContributor(
 ):
     """Deploy a Contributor through HumanResources."""
 
-    def deployed_contributor(_terms=None):
+    def deployed_contributor(_terms=None, _template=None):
         terms = _terms if _terms else valid_contributor_terms
-        setupHrConfig()
+        setupHrConfig(_contribTemplate=_template)
         setupLedgerBalance(terms["compensation"])
         action_id = human_resources.initiateNewContributor(
             terms["owner"],

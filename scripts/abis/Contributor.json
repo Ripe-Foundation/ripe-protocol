@@ -309,6 +309,22 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "initiateRipeTransfer",
+    "inputs": [
+      {
+        "name": "_shouldCashCheck",
+        "type": "bool"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "confirmRipeTransfer",
     "inputs": [],
     "outputs": []
@@ -731,6 +747,18 @@
             "type": "uint256"
           }
         ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingRipeTransferVaultId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ]
   },

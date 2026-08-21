@@ -5,10 +5,12 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# RipeGov headroom is 501 bytes after the migration, SharesVault, and shared
-# VaultData remediation changes. Any RipeGov edit must remeasure this pin before
-# merge. Composed SwitchboardAlpha headroom is 5 bytes (rh zero max-lock check
-# plus execution sanitization).
+# RipeGov headroom is 460 bytes after the migration, SharesVault, and
+# governance-remediation changes. Any RipeGov edit must remeasure this pin.
+# Composed SwitchboardAlpha headroom is 19 bytes after RipeGov duration
+# validation and the existing execution sanitization.
+# Teller headroom is 68 bytes after the SharesVault and historical RipeGov
+# routing changes.
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
@@ -19,19 +21,20 @@ EIP170_LIMIT = 24_576
 # before merge.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
-    "SwitchboardAlpha": 24571,
+    "SwitchboardAlpha": 24557,
     "SwitchboardBravo": 24541,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
-    "Teller": 24497,
+    "VaultBook": 13833,
+    "Teller": 24508,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
     "Lootbox": 24456,
     "RebaseErc20": 11602,
-    "RipeGov": 24075,
-    "HumanResources": 13367,
+    "RipeGov": 24116,
+    "HumanResources": 14777,
     "AuctionHouse": 24566,
     "CreditEngine": 24502,
     "CreditRedeem": 8415,
@@ -57,6 +60,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     switchboard_charlie,
     switchboard_echo,
     vault_migrator,
+    vault_book,
     teller,
     teller_utils,
     bond_room,
@@ -96,6 +100,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
             switchboard_echo.env.get_code(switchboard_echo.address)
         ),
         "VaultMigrator": len(vault_migrator.env.get_code(vault_migrator.address)),
+        "VaultBook": len(vault_book.env.get_code(vault_book.address)),
         "Teller": len(teller.env.get_code(teller.address)),
         "TellerUtils": len(teller_utils.env.get_code(teller_utils.address)),
         "BondRoom": len(bond_room.env.get_code(bond_room.address)),

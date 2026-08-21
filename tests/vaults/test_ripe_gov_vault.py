@@ -2,7 +2,7 @@ import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import assert_reverted_call, filter_logs
 from tests.vaults.ripe_gov_exit_fee_model import (
     DECIMAL_OFFSET,
@@ -1691,17 +1691,63 @@ def test_ripe_gov_vault_get_weighted_lock_no_previous_balance(ripe_gov_vault):
     precision = 10**18
     terms = (100, 1000, 200_00, True, 10_00)
     
-    # Test with prevShares below PRECISION
+    # Test with no previous shares
     unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
         1000 * precision,  # newShares
         500,  # newLockDuration
         terms,
-        precision - 1,  # prevShares < PRECISION
+        0,  # prevShares
         current_block + 200  # prevUnlock (irrelevant)
     )
     
     # Should just return current block + new lock duration
     assert unlock == current_block + 500
+
+
+def test_ripe_gov_vault_weighted_lock_uses_exact_sub_precision_shares(
+    ripe_gov_vault,
+):
+    current_block = boa.env.evm.patch.block_number
+    terms = (100, 3_000_000, 200_00, True, 10_00)
+    prev_shares = 10**22
+    new_shares = 10**8
+    prev_duration = 7_200
+    new_duration = 2_599_344
+
+    unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        new_shares,
+        new_duration,
+        terms,
+        prev_shares,
+        current_block + prev_duration,
+    )
+
+    expected_duration = (
+        prev_shares * prev_duration + new_shares * new_duration
+    ) // (prev_shares + new_shares)
+    assert expected_duration == prev_duration
+    assert unlock == current_block + expected_duration
+
+
+def test_ripe_gov_vault_weighted_lock_handles_full_precision_product_overflow(
+    ripe_gov_vault,
+):
+    current_block = boa.env.evm.patch.block_number
+    terms = (1, 2_000, 200_00, True, 10_00)
+    prev_shares = MAX_UINT256 // 2
+    new_shares = MAX_UINT256 - prev_shares
+    assert new_shares * 1_000 > MAX_UINT256
+
+    unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        new_shares,
+        1_001,
+        terms,
+        prev_shares,
+        current_block + 1,
+    )
+
+    expected_duration = 1 + new_shares * 1_000 // MAX_UINT256
+    assert unlock == current_block + expected_duration
 
 
 def test_ripe_gov_vault_get_weighted_lock_equal_shares(ripe_gov_vault):
@@ -4019,6 +4065,86 @@ def test_teller_governance_routes_fail_closed_when_core_pointer_is_unset(
         teller.adjustLock(ripe_token, 500, whale, sender=whale)
     with boa.reverts("invalid vault id"):
         teller.releaseLock(ripe_token, whale, sender=whale)
+
+
+def test_historical_ripe_gov_lock_routes_survive_core_pointer_rotation(
+    teller,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    replacement_id = registerVault(
+        alternate_ripe_gov_vault, "Replacement Core RipeGov"
+    )
+    setupRipeGovVaultConfig()
+    setGeneralConfig()
+    setAssetConfig(ripe_token, _vaultIds=[2, replacement_id])
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.approve(teller, deposit_amount, sender=whale)
+    assert teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        500,
+        whale,
+        sender=whale,
+    ) == deposit_amount
+    _add_remaining_holder(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        deposit_amount,
+        teller,
+    )
+
+    mission_control.setCoreRipeGovVaultId(
+        replacement_id, sender=switchboard_alpha.address
+    )
+    assert mission_control.isRipeGovVaultId(2)
+
+    with boa.reverts("no lock terms"):
+        teller.adjustLock(ripe_token, 800, whale, sender=whale)
+    with boa.reverts("no perms"):
+        teller.adjustLock(ripe_token, 800, whale, 2, sender=alice)
+    with boa.reverts("invalid vault id"):
+        teller.adjustLock(ripe_token, 800, whale, 3, sender=whale)
+    unregistered_historical_id = 999
+    mission_control.setCoreRipeGovVaultId(
+        unregistered_historical_id, sender=switchboard_alpha.address
+    )
+    with boa.reverts("invalid vault id"):
+        teller.adjustLock(
+            ripe_token,
+            800,
+            whale,
+            unregistered_historical_id,
+            sender=whale,
+        )
+
+    teller.adjustLock(ripe_token, 800, whale, 2, sender=whale)
+    assert (
+        ripe_gov_vault.userGovData(whale, ripe_token).unlock
+        == boa.env.evm.patch.block_number + 800
+    )
+
+    teller.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("contract paused"):
+        teller.releaseLock(ripe_token, whale, 2, sender=whale)
+    teller.pause(False, sender=switchboard_alpha.address)
+
+    teller.releaseLock(ripe_token, whale, 2, sender=whale)
+    released = ripe_gov_vault.userGovData(whale, ripe_token)
+    assert released.unlock == 0
 
 
 def test_core_pointer_rotation_preserves_legacy_position_points_and_explicit_exit(

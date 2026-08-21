@@ -49,6 +49,10 @@ interface RipeToken:
 
 interface MissionControl:
     def isStabVaultId(_vaultId: uint256) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+
+interface RipeGovVault:
+    def totalGovPoints() -> uint256: view
 
 @deploy
 def __init__(
@@ -103,6 +107,7 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
     assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
 
     assert self._canPerformAction(msg.sender) # dev: no perms
+    self._assertValidRipeGovVaultReplacement(_regId, _newAddr)
     return registry._startAddressUpdateToRegistry(_regId, _newAddr)
 
 
@@ -110,7 +115,10 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
     assert self._canPerformAction(msg.sender) # dev: no perms
     assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
-    return registry._confirmAddressUpdateToRegistry(_regId)
+    didUpdate: bool = registry._confirmAddressUpdateToRegistry(_regId)
+    if didUpdate:
+        self._assertValidRipeGovVaultReplacement(_regId, registry._getAddr(_regId))
+    return didUpdate
 
 
 @external
@@ -148,11 +156,29 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 @view
 @internal
+def _assertValidRipeGovVaultReplacement(_vaultId: uint256, _vaultAddr: address):
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
+        # Historical IDs remain routable forever, so replacements must retain
+        # the RipeGov points interface used by future maintenance checks.
+        points: uint256 = staticcall RipeGovVault(_vaultAddr).totalGovPoints()
+
+
+@view
+@internal
 def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
     vaultAddr: address = registry._getAddr(_vaultId)
     if vaultAddr == empty(address):
         return False
-    return staticcall Vault(vaultAddr).doesVaultHaveAnyFunds()
+    if staticcall Vault(vaultAddr).doesVaultHaveAnyFunds():
+        return True
+
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
+        # Zero-share governance points cannot be migrated; clear them before
+        # retiring or repointing a historical RipeGov vault.
+        return staticcall RipeGovVault(vaultAddr).totalGovPoints() != 0
+    return False
 
 
 ######################

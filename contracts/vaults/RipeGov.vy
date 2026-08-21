@@ -1017,24 +1017,26 @@ def _getWeightedLockOnTokenDeposit(
     _prevShares: uint256,
     _prevUnlock: uint256,
 ) -> uint256:
-    # nothing to do here (no previous balance)
-    if _prevShares < PRECISION:
+    # nothing to weight when there is no previous balance
+    if _prevShares == 0:
         return block.number + _newLockDuration
-    prevNormalized: uint256 = _prevShares // PRECISION 
 
     # previous lock duration
     prevDuration: uint256 = 1
     if _prevUnlock > block.number:
         prevDuration = _prevUnlock - block.number
 
-    # not allowing zero on `newNormalized` or `newLockDuration` -- or else new deposit won't get any weight
-    newNormalized: uint256 = 1
-    if _newShares > PRECISION:
-        newNormalized = _newShares // PRECISION
     newLockDuration: uint256 = max(_newLockDuration, 1)
+    totalShares: uint256 = _prevShares + _newShares
 
-    # take weighted average, blending the unlock durations
-    newWeightedDuration: uint256 = ((prevNormalized * prevDuration) + (newNormalized * newLockDuration)) // (prevNormalized + newNormalized)
+    # Blend with the exact share ratio. Expressing the average as the lower
+    # duration plus one full-precision weighted delta avoids both products and
+    # their sum overflowing while preserving floor rounding.
+    newWeightedDuration: uint256 = prevDuration
+    if newLockDuration > prevDuration:
+        newWeightedDuration += sharesVault._mulDiv(_newShares, newLockDuration - prevDuration, totalShares)
+    elif prevDuration > newLockDuration:
+        newWeightedDuration = newLockDuration + sharesVault._mulDiv(_prevShares, prevDuration - newLockDuration, totalShares)
     return block.number + newWeightedDuration
 
 
