@@ -838,18 +838,18 @@ def purchaseRipeBond(
 ##############
 
 
+@nonreentrant
 @external
 def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    return extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(_users, msg.sender, a)
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(_users, msg.sender)
 
 
+@nonreentrant
 @external
 def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    return extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets(_user, _assets, msg.sender, a)
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets(_user, _assets, msg.sender)
 
 
 ###############

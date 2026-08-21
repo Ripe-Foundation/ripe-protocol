@@ -5,8 +5,9 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# RipeGov headroom is 698 bytes after the migration-remediation changes. Any
-# RipeGov edit must remeasure this pin before merge. Composed SwitchboardAlpha
+# RipeGov headroom is 486 bytes after the migration and SharesVault
+# remediation changes. Any RipeGov edit must remeasure this pin before merge.
+# Composed SwitchboardAlpha
 # headroom is 5 bytes (rh zero max-lock check plus execution sanitization).
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
@@ -19,13 +20,13 @@ EXPECTED_RUNTIME_BYTES = {
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
-    "Teller": 24557,
+    "Teller": 24497,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
     "Lootbox": 24456,
-    "RebaseErc20": 11411,
-    "RipeGov": 23878,
+    "RebaseErc20": 11617,
+    "RipeGov": 24090,
     "HumanResources": 13367,
     "AuctionHouse": 24566,
     "CreditEngine": 24502,

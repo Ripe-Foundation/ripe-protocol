@@ -61,7 +61,7 @@ def _withdrawTokensFromVault(
 
     requestedShares: uint256 = 0
     requestedAmount: uint256 = 0
-    requestedShares, requestedAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount)
+    requestedShares, requestedAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount, True)
 
     totalSharesBefore: uint256 = vaultData.totalBalances[_asset]
     userSharesBefore: uint256 = vaultData.userBalances[_user][_asset]
@@ -79,6 +79,9 @@ def _withdrawTokensFromVault(
     actualDelivery: uint256 = recipientAfter - recipientBefore
     assert self._isWithinTransferDelta(actualOutflow, requestedAmount) # dev: invalid vault outflow
     assert self._isWithinTransferDelta(actualDelivery, requestedAmount) # dev: invalid recipient delivery
+
+    creditedAmount: uint256 = min(requestedAmount, min(actualOutflow, actualDelivery))
+    assert creditedAmount != 0 # dev: no credited withdrawal amount
 
     withdrawalShares: uint256 = requestedShares
     if actualOutflow != requestedAmount:
@@ -101,7 +104,7 @@ def _withdrawTokensFromVault(
         True,
     )
 
-    return actualOutflow, withdrawalShares, isDepleted
+    return creditedAmount, withdrawalShares, isDepleted
 
 
 @pure
@@ -128,7 +131,10 @@ def _transferBalanceWithinVault(
     # calc shares + amount to transfer
     transferShares: uint256 = 0
     transferAmount: uint256 = 0
-    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount)
+    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount, False)
+
+    if transferAmount == 0:
+        return 0, 0, False
 
     # transfer shares
     isFromUserDepleted: bool = False
@@ -221,7 +227,10 @@ def _calcWithdrawalSharesAndAmount(
     _user: address,
     _asset: address,
     _amount: uint256,
+    _shouldRoundUpShares: bool = True,
 ) -> (uint256, uint256):
+    assert _amount != 0 # dev: no withdrawal amount
+
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     assert totalBalance != 0 # dev: no asset to withdraw
 
@@ -234,8 +243,15 @@ def _calcWithdrawalSharesAndAmount(
     # calc amount + shares to withdraw
     withdrawalAmount: uint256 = min(totalBalance, self._sharesToAmount(withdrawalShares, totalShares, totalBalance, False))
     if _amount < withdrawalAmount:
-        withdrawalShares = min(withdrawalShares, self._amountToShares(_amount, totalShares, totalBalance, True))
-        withdrawalAmount = _amount
+        withdrawalShares = min(withdrawalShares, self._amountToShares(_amount, totalShares, totalBalance, _shouldRoundUpShares))
+        if not _shouldRoundUpShares:
+            if withdrawalShares == 0:
+                return 0, 0
+            withdrawalAmount = self._sharesToAmount(withdrawalShares, totalShares, totalBalance, False)
+            if withdrawalAmount == 0:
+                return 0, 0
+        else:
+            withdrawalAmount = _amount
 
     assert withdrawalAmount != 0 # dev: no withdrawal amount
     return withdrawalShares, withdrawalAmount

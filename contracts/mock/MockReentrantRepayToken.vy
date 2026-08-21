@@ -107,9 +107,10 @@ def disableAttack():
 def _maybeAttack():
     if self.attackEnabled and not self.attackExecuted and self.attackAmount != 0 and self.teller != empty(address):
         self.attackExecuted = True
-        # Teller's outer deleverage routes are not @nonreentrant, so its global
-        # lock is free and reentry into repay/borrow can mutate debt. Deleverage
-        # uses a separate lock domain that blocks only mode-2 cross-entry.
+        # The stale-debt defense tests invoke Deleverage directly as Teller, so
+        # Teller's lock is free and repay/borrow can exercise Deleverage's
+        # independent settlement guard. Production Teller deleverage entry
+        # points hold Teller's shared lock before reaching Deleverage.
         if self.attackMode == 0:
             extcall Teller(self.teller).repay(self.attackAmount, self.attackUser, False, False)
         elif self.attackMode == 1:
