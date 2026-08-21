@@ -562,6 +562,55 @@ def test_ripe_gov_points_block_disable_at_start_and_confirmation(
     assert vault_book.getRegId(ripe_gov_vault) == 0
 
 
+def test_historical_ripe_gov_id_requires_compatible_replacement(
+    ripe_hq,
+    governance,
+    vault_book,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+):
+    vault_id = vault_book.getRegId(ripe_gov_vault)
+    assert vault_id == 2
+    assert not ripe_gov_vault.doesVaultHaveAnyFunds()
+    assert ripe_gov_vault.totalGovPoints() == 0
+
+    incompatible = _deploy_replacement(ripe_hq, "incompatible_ripe_gov_replacement")
+    with boa.reverts("external call failed"):
+        vault_book.startAddressUpdateToRegistry(
+            vault_id,
+            incompatible,
+            sender=governance.address,
+        )
+    assert vault_book.pendingAddrUpdate(vault_id).confirmBlock == 0
+    assert vault_book.getAddr(vault_id) == ripe_gov_vault.address
+    assert vault_book.getRegId(incompatible) == 0
+
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        alternate_ripe_gov_vault,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    assert vault_book.getAddr(vault_id) == alternate_ripe_gov_vault.address
+    assert vault_book.getRegId(ripe_gov_vault) == 0
+
+    assert vault_book.startAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    assert vault_book.getAddr(vault_id) == ZERO_ADDRESS
+    assert vault_book.getRegId(alternate_ripe_gov_vault) == 0
+
+
 def test_governed_deposit_route_removal_preserves_debt_risk_and_allows_retirement(
     ripe_hq,
     governance,

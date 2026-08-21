@@ -107,6 +107,7 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
     assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
 
     assert self._canPerformAction(msg.sender) # dev: no perms
+    self._assertValidRipeGovVaultReplacement(_regId, _newAddr)
     return registry._startAddressUpdateToRegistry(_regId, _newAddr)
 
 
@@ -114,7 +115,10 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
     assert self._canPerformAction(msg.sender) # dev: no perms
     assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
-    return registry._confirmAddressUpdateToRegistry(_regId)
+    didUpdate: bool = registry._confirmAddressUpdateToRegistry(_regId)
+    if didUpdate:
+        self._assertValidRipeGovVaultReplacement(_regId, registry._getAddr(_regId))
+    return didUpdate
 
 
 @external
@@ -148,6 +152,16 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 
 # check if vault has funds
+
+
+@view
+@internal
+def _assertValidRipeGovVaultReplacement(_vaultId: uint256, _vaultAddr: address):
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
+        # Historical IDs remain routable forever, so replacements must retain
+        # the RipeGov points interface used by future maintenance checks.
+        points: uint256 = staticcall RipeGovVault(_vaultAddr).totalGovPoints()
 
 
 @view

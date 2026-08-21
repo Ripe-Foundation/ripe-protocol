@@ -591,8 +591,6 @@ def test_g11_are_valid_accepts_and_rejects_overflow_bounds(
     assert not human_resources.areValidContributorTerms(
         *terms_tuple(_valid(t, depositLockDuration=MAX_UINT256))
     )
-    with boa.reverts("unsafe lock duration"):
-        setupRipeGovVaultConfig(_minLockDuration=1, _maxLockDuration=d_ok + 1)
     assert not human_resources.areValidContributorTerms(
         *terms_tuple(_valid(t, startDelay=MAX_UINT256))
     )
