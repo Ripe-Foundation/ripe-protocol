@@ -155,6 +155,40 @@ def test_g5_deposit_reserved_asset_reverts(
         clear_transient_storage()
 
 
+def test_g5_registered_stab_asset_cannot_become_claim_asset(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
+    bob, teller, auction_house, mock_price_source, green_token, savings_green,
+    setGeneralConfig, setAssetConfig,
+):
+    """A registered stability asset cannot acquire a claim liability."""
+    with boa.env.anchor():
+        setGeneralConfig()
+        setAssetConfig(alpha_token)
+        setAssetConfig(bravo_token)
+        amount = 100 * EIGHTEEN_DECIMALS
+        _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller,
+                   mock_price_source, amount)
+        _seed_stab(stability_pool, bravo_token, bravo_token_whale, bob, teller,
+                   mock_price_source, amount)
+
+        claim_amount = 10 * EIGHTEEN_DECIMALS
+        alpha_token.transfer(stability_pool, claim_amount, sender=alpha_token_whale)
+        alpha_custody_before = alpha_token.balanceOf(stability_pool)
+        bravo_custody_before = bravo_token.balanceOf(stability_pool)
+
+        with boa.reverts("liq asset cannot be vault asset"):
+            stability_pool.swapForLiquidatedCollateral(
+                bravo_token, claim_amount, alpha_token, claim_amount,
+                bob, green_token, savings_green, sender=auction_house.address,
+            )
+        clear_transient_storage()
+
+        assert stability_pool.totalClaimableBalances(alpha_token) == 0
+        assert stability_pool.claimableBalances(bravo_token, alpha_token) == 0
+        assert alpha_token.balanceOf(stability_pool) == alpha_custody_before
+        assert bravo_token.balanceOf(stability_pool) == bravo_custody_before
+
+
 def test_g5_deposit_green_as_stab_reverts(
     stability_pool, green_token, whale, bob, teller, setGeneralConfig,
 ):

@@ -85,6 +85,93 @@ def setupStabAssetConfig(
 ###############
 
 
+def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    mock_price_source,
+    performDeposit,
+    simple_erc20_vault,
+    stability_pool,
+    teller,
+    credit_engine,
+    ledger,
+    vault_book,
+    bob,
+    sally,
+):
+    """Stability Pool positions remain non-collateral but phase-2 liquidatable."""
+
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    stab_terms = createDebtTerms(
+        _ltv=10_00,
+        _liqThreshold=70_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[simple_id],
+        _debtTerms=alpha_terms,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[stab_id],
+        _debtTerms=stab_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    alpha_amount = 200 * EIGHTEEN_DECIMALS
+    stab_amount = 50 * EIGHTEEN_DECIMALS
+    performDeposit(bob, alpha_amount, alpha_token, alpha_token_whale)
+    bravo_token.transfer(bob, stab_amount, sender=bravo_token_whale)
+    bravo_token.approve(teller, stab_amount, sender=bob)
+    assert teller.deposit(
+        bravo_token,
+        stab_amount,
+        bob,
+        stability_pool,
+        sender=bob,
+    ) == stab_amount
+
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        bravo_token.address,
+        stab_amount,
+    )
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == alpha_amount
+    assert terms.totalMaxDebt == alpha_amount // 2
+    assert terms.lowestLtv == 50_00
+
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS // 2)
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    assert ledger.hasFungibleAuction(bob, stab_id, bravo_token)
+
+
 def test_basic_vault_quarantine_suppresses_phase_two_stability_pool_assets(
     setGeneralConfig,
     setGeneralDebtConfig,
