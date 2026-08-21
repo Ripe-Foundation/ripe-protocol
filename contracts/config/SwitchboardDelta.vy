@@ -38,7 +38,6 @@ interface BondBooster:
     def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
     def getBoostRatio(_user: address, _units: uint256) -> uint256: view
     def setMinLockDuration(_minLockDuration: uint256): nonpayable
-    def setBondBooster(_config: BoosterConfig): nonpayable
     def removeBondBooster(_user: address): nonpayable
 
 interface HrContributor:

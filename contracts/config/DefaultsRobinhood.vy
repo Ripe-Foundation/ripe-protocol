@@ -26,8 +26,6 @@ YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS
 BLOCKS_PER_MINUTE: constant(uint256) = 5 # 12s per `block.number`
 HOUR_IN_BLOCKS: constant(uint256) = 60 * BLOCKS_PER_MINUTE
 DAY_IN_BLOCKS: constant(uint256) = 24 * HOUR_IN_BLOCKS
-WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS
-MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS
 YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS
 
 # addresses

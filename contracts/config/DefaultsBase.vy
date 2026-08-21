@@ -19,8 +19,6 @@ YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS
 # blocks
 HOUR_IN_BLOCKS: constant(uint256) = 1_800
 DAY_IN_BLOCKS: constant(uint256) = 24 * HOUR_IN_BLOCKS
-WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS
-MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS
 YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS
 
 # addresses
