@@ -118,6 +118,35 @@ def test_default_vault_migrator_disables_base_legacy_route(
         )
 
 
+def test_explicit_exporter_route_rejects_bound_legacy_source(
+    ripe_hq,
+    vault_book,
+    governance,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    teller,
+    mission_control,
+    switchboard_alpha,
+    switchboard_echo,
+):
+    boa.env.evm.patch.chain_id = 8453
+    _, target_id = _register_target(ripe_hq, vault_book, governance)
+    _install_legacy_migrator(ripe_hq, ripe_gov_vault, governance)
+    mission_control.setCoreRipeGovVaultId(
+        target_id, sender=switchboard_alpha.address,
+    )
+    _pause_if_needed(teller, switchboard_alpha)
+
+    with boa.reverts("use legacy ripe gov migration"):
+        switchboard_echo.migrateRipeGovPositionsForUserByAssets(
+            bob,
+            [ripe_token.address],
+            LEGACY_RIPE_GOV_VAULT_ID,
+            sender=governance.address,
+        )
+
+
 def test_legacy_batch_caps_at_twenty_five_users(
     switchboard_echo, governance, bob,
 ):
@@ -541,7 +570,7 @@ def test_legacy_migration_rejects_user_touched_in_same_action_block_and_rolls_ba
 
 
 @pytest.mark.gas
-@pytest.mark.parametrize("num_users", [1, 5, 10, 25])
+@pytest.mark.parametrize("num_users", [1, 5, 10, 20])
 def test_legacy_migration_batch_gas_characterization(
     num_users,
     ripe_hq,
@@ -558,8 +587,7 @@ def test_legacy_migration_batch_gas_characterization(
     setAssetConfig,
     setGeneralConfig,
 ):
-    """The ABI limit is not an operational batch-size promise. Record the
-    measured curve; only the single-user case has a hard block-envelope check."""
+    """Record the gas curve through the enforced 20-slot aggregate limit."""
     boa.env.evm.patch.chain_id = 8453
     source = ripe_gov_vault
     target, target_id = _register_target(ripe_hq, vault_book, governance)
@@ -611,7 +639,7 @@ def test_legacy_migration_batch_gas_characterization(
 
 
 @pytest.mark.gas
-def test_legacy_dual_asset_twenty_five_user_batch_fits_block_envelope(
+def test_legacy_dual_asset_twenty_slot_batch_fits_block_envelope(
     ripe_hq,
     vault_book,
     governance,
@@ -628,7 +656,7 @@ def test_legacy_dual_asset_twenty_five_user_batch_fits_block_envelope(
     setAssetConfig,
     setGeneralConfig,
 ):
-    """Measure the settled worst-case ABI batch, not only one asset/user."""
+    """Measure the enforced 20-slot aggregate migration envelope."""
     boa.env.evm.patch.chain_id = 8453
     source = ripe_gov_vault
     target, target_id = _register_target(ripe_hq, vault_book, governance)
@@ -650,7 +678,7 @@ def test_legacy_dual_asset_twenty_five_user_batch_fits_block_envelope(
         target_id, sender=switchboard_alpha.address,
     )
 
-    users = [boa.env.generate_address() for _ in range(25)]
+    users = [boa.env.generate_address() for _ in range(10)]
     amount = 10 * EIGHTEEN_DECIMALS
     for user in users:
         for asset, funder in assets:
@@ -677,13 +705,159 @@ def test_legacy_dual_asset_twenty_five_user_batch_fits_block_envelope(
 
     assert switchboard_echo.migrateLegacyRipeGovPositions(
         users, sender=governance.address,
-    ) == 50
+    ) == 20
     gas_used = switchboard_echo._computation.get_gas_used()
     print(
-        "LEGACY_MIGRATION_GAS users=25 assets=2 "
-        f"positions=50 total={gas_used} per_user={gas_used // 25}"
+        "LEGACY_MIGRATION_GAS users=10 assets=2 "
+        f"positions=20 total={gas_used} per_user={gas_used // 10}"
     )
     assert gas_used < 30_000_000
+
+
+@pytest.mark.parametrize("registered_slots", [20, 21])
+def test_legacy_migration_registered_slot_boundary(
+    registered_slots,
+    ripe_hq,
+    vault_book,
+    governance,
+    ripe_gov_vault,
+    bob,
+    teller,
+    mission_control,
+    switchboard_alpha,
+    switchboard_echo,
+):
+    boa.env.evm.patch.chain_id = 8453
+    target, target_id = _register_target(ripe_hq, vault_book, governance)
+    _install_legacy_migrator(ripe_hq, ripe_gov_vault, governance)
+    mission_control.setCoreRipeGovVaultId(
+        target_id, sender=switchboard_alpha.address,
+    )
+    target.pause(True, sender=switchboard_alpha.address)
+    _pause_if_needed(teller, switchboard_alpha)
+    ripe_gov_vault.eval(
+        f"vaultData.numUserAssets[{bob}] = {registered_slots + 1}"
+    )
+
+    if registered_slots == 20:
+        assert switchboard_echo.migrateLegacyRipeGovPositions(
+            [bob], sender=governance.address,
+        ) == 0
+    else:
+        with boa.reverts("legacy user asset capacity exceeded"):
+            switchboard_echo.migrateLegacyRipeGovPositions(
+                [bob], sender=governance.address,
+            )
+
+
+def test_legacy_single_user_fills_twenty_position_snapshot_capacity(
+    ripe_hq,
+    vault_book,
+    governance,
+    ripe_gov_vault,
+    bob,
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    switchboard_echo,
+    setAssetConfig,
+    setGeneralConfig,
+):
+    boa.env.evm.patch.chain_id = 8453
+    source = ripe_gov_vault
+    target, target_id = _register_target(ripe_hq, vault_book, governance)
+    _install_legacy_migrator(ripe_hq, source, governance)
+    setGeneralConfig()
+    mission_control.setCoreRipeGovVaultId(
+        target_id, sender=switchboard_alpha.address,
+    )
+
+    amount = EIGHTEEN_DECIMALS
+    assets = []
+    for i in range(20):
+        asset = boa.load(
+            "contracts/mock/MockErc20.vy",
+            governance.address,
+            f"Migration Legacy {i}",
+            f"ML{i}",
+            18,
+            0,
+            name=f"migration_legacy_{i}",
+        )
+        _set_legacy_asset_config(
+            mission_control,
+            setAssetConfig,
+            switchboard_alpha,
+            asset,
+            target_id,
+        )
+        asset.mint(bob, amount, sender=governance.address)
+        _seed_locked_legacy_position(
+            source,
+            asset,
+            bob,
+            bob,
+            teller,
+            ledger,
+            amount,
+        )
+        assets.append(asset)
+
+    assert source.numUserAssets(bob) == 21
+    boa.env.time_travel(blocks=LOCK_TERMS[0] + 25)
+    source.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    source_data = {
+        asset.address: source.userGovData(bob, asset)
+        for asset in assets
+    }
+    assert all(data.govPoints > 0 for data in source_data.values())
+
+    mission_control.setShouldCheckLastTouch(True, sender=switchboard_alpha.address)
+    target.pause(True, sender=switchboard_alpha.address)
+    _pause_if_needed(teller, switchboard_alpha)
+    boa.env.time_travel(blocks=1)
+    expected_points = {
+        asset.address: source_data[asset.address].govPoints
+        + source.getLatestGovPoints(
+            source_data[asset.address].lastShares,
+            source_data[asset.address].lastPointsUpdate,
+            source_data[asset.address].unlock,
+            source_data[asset.address].lastTerms,
+            ASSET_WEIGHT,
+        )
+        for asset in assets
+    }
+
+    assert switchboard_echo.migrateLegacyRipeGovPositions(
+        [bob], sender=governance.address,
+    ) == 20
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
+    migration_logs = filter_logs(
+        switchboard_echo, "LegacyRipeGovPositionMigrationExecuted",
+    )
+    assert len(migration_logs) == 20
+    assert {log.asset for log in migration_logs} == {
+        asset.address for asset in assets
+    }
+
+    for asset in assets:
+        imported = target.userGovData(bob, asset)
+        assert source.getTotalAmountForUser(bob, asset) == 0
+        assert target.getTotalAmountForUser(bob, asset) == amount
+        assert imported.govPoints == expected_points[asset.address]
+        assert imported.unlock == source_data[asset.address].unlock
+        assert imported.lastTerms == source_data[asset.address].lastTerms
+        source_points = ledger.getDepositPointsBundle(
+            bob, LEGACY_RIPE_GOV_VAULT_ID, asset
+        ).userPoints
+        target_points = ledger.getDepositPointsBundle(
+            bob, target_id, asset
+        ).userPoints
+        assert source_points.lastBalance == 0
+        assert source_points.lastUpdate != 0
+        assert target_points.lastBalance > 0
+        assert target_points.lastUpdate != 0
 
 
 def test_base_legacy_route_skips_user_without_source_positions(

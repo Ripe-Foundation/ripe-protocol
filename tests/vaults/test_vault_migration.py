@@ -201,21 +201,210 @@ def test_echo_batch_caps_at_twenty_five_entries(
         )
 
 
-def test_normal_migration_rejects_more_than_twenty_source_asset_slots(
-    teller, simple_pair, simple_erc20_vault, alpha_token, bob, switchboard_echo,
+@pytest.mark.parametrize("registered_slots", [20, 21])
+def test_normal_migration_capacity_and_explicit_asset_fallback(
+    registered_slots, teller, simple_pair, simple_erc20_vault, alpha_token,
+    bob, switchboard_echo, governance,
 ):
-    """Twenty positions are accepted; the twenty-first exceeds the loop bound."""
-    _, target_id = simple_pair
-    simple_erc20_vault.eval(f"vaultData.numUserAssets[{bob}] = 21")
-    assert _migrate(
-        teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id
-    ) == DEPOSIT_AMOUNT
+    """The batch accepts 20 slots; larger users use the strict explicit path."""
+    target, target_id = simple_pair
+    simple_erc20_vault.eval(
+        f"vaultData.numUserAssets[{bob}] = {registered_slots + 1}"
+    )
 
-    simple_erc20_vault.eval(f"vaultData.numUserAssets[{bob}] = 22")
-    with pytest.raises(BoaError):
-        _migrate(
-            teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id
+    if registered_slots == 20:
+        assert switchboard_echo.migrateVaultPositions(
+            [bob], SIMPLE_VAULT_ID, target_id, sender=governance.address
+        ) == 1
+    else:
+        with boa.reverts("use explicit asset migration"):
+            switchboard_echo.migrateVaultPositions(
+                [bob], SIMPLE_VAULT_ID, target_id, sender=governance.address
+            )
+        assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
+        assert switchboard_echo.migrateVaultPositionsForUserByAssets(
+            bob,
+            [alpha_token.address],
+            SIMPLE_VAULT_ID,
+            target_id,
+            sender=governance.address,
+        ) == 1
+
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
+    assert target.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
+
+
+def test_explicit_asset_migration_rejects_duplicates_before_movement(
+    simple_pair, simple_erc20_vault, alpha_token, bob, switchboard_echo,
+    governance,
+):
+    _, target_id = simple_pair
+    with boa.reverts("duplicate asset"):
+        switchboard_echo.migrateVaultPositionsForUserByAssets(
+            bob,
+            [alpha_token.address, alpha_token.address],
+            SIMPLE_VAULT_ID,
+            target_id,
+            sender=governance.address,
         )
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
+
+
+def test_explicit_asset_migration_wrapper_validates_authority_and_inputs(
+    simple_pair, alpha_token, bob, sally, switchboard_echo, governance,
+):
+    _, target_id = simple_pair
+    with boa.reverts("no perms"):
+        switchboard_echo.migrateVaultPositionsForUserByAssets(
+            bob, [alpha_token.address], SIMPLE_VAULT_ID, target_id, sender=sally
+        )
+    with boa.reverts("no migrations"):
+        switchboard_echo.migrateVaultPositionsForUserByAssets(
+            bob, [], SIMPLE_VAULT_ID, target_id, sender=governance.address
+        )
+
+
+@pytest.mark.parametrize(
+    ("invalid_case", "expected_revert"),
+    [
+        ("zero", "invalid asset"),
+        ("missing", "no source position"),
+        ("unsupported", "unsupported target asset"),
+    ],
+)
+def test_explicit_asset_migration_validates_full_list_before_movement(
+    invalid_case,
+    expected_revert,
+    teller,
+    simple_pair,
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    switchboard_alpha,
+    switchboard_echo,
+    governance,
+    setAssetConfig,
+):
+    target, target_id = simple_pair
+    invalid_asset = ZERO_ADDRESS if invalid_case == "zero" else bravo_token.address
+
+    if invalid_case == "unsupported":
+        setAssetConfig(bravo_token, _vaultIds=[SIMPLE_VAULT_ID])
+        teller.pause(False, sender=switchboard_alpha.address)
+        _seed_position(
+            teller,
+            simple_erc20_vault,
+            bravo_token,
+            bravo_token_whale,
+            bob,
+        )
+        teller.pause(True, sender=switchboard_alpha.address)
+
+    with boa.reverts(expected_revert):
+        switchboard_echo.migrateVaultPositionsForUserByAssets(
+            bob,
+            [alpha_token.address, invalid_asset],
+            SIMPLE_VAULT_ID,
+            target_id,
+            sender=governance.address,
+        )
+
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
+    assert target.getTotalAmountForUser(bob, alpha_token) == 0
+    if invalid_case == "unsupported":
+        assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == DEPOSIT_AMOUNT
+        assert target.getTotalAmountForUser(bob, bravo_token) == 0
+    assert filter_logs(switchboard_echo, "VaultPositionMigrationExecuted") == []
+
+
+def test_generic_user_with_twenty_one_real_assets_completes_explicit_twenty_plus_one(
+    target_simple_vault,
+    governance,
+    simple_erc20_vault,
+    bob,
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    switchboard_echo,
+    setAssetConfig,
+    setGeneralConfig,
+):
+    target, target_id = target_simple_vault
+    setGeneralConfig()
+    amount = EIGHTEEN_DECIMALS
+    assets = []
+    for i in range(21):
+        asset = boa.load(
+            "contracts/mock/MockErc20.vy",
+            governance.address,
+            f"Migration Generic {i}",
+            f"MG{i}",
+            18,
+            0,
+            name=f"migration_generic_{i}",
+        )
+        setAssetConfig(asset, _vaultIds=[SIMPLE_VAULT_ID, target_id])
+        asset.mint(simple_erc20_vault, amount, sender=governance.address)
+        assert simple_erc20_vault.depositTokensInVault(
+            bob, asset, amount, sender=teller.address
+        ) == amount
+        assets.append(asset)
+
+    ledger.addVaultToUser(bob, SIMPLE_VAULT_ID, sender=teller.address)
+    assert simple_erc20_vault.numUserAssets(bob) == 22
+    mission_control.setShouldCheckLastTouch(True, sender=switchboard_alpha.address)
+    teller.pause(True, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=1)
+
+    with boa.reverts("use explicit asset migration"):
+        switchboard_echo.migrateVaultPositions(
+            [bob], SIMPLE_VAULT_ID, target_id, sender=governance.address
+        )
+    for asset in assets:
+        assert simple_erc20_vault.getTotalAmountForUser(bob, asset) == amount
+        assert target.getTotalAmountForUser(bob, asset) == 0
+
+    assert switchboard_echo.migrateVaultPositionsForUserByAssets(
+        bob,
+        [asset.address for asset in assets[:20]],
+        SIMPLE_VAULT_ID,
+        target_id,
+        sender=governance.address,
+    ) == 20
+    first_action_block = ledger.lastTouch(bob)
+    assert len(filter_logs(
+        switchboard_echo, "VaultPositionMigrationExecuted"
+    )) == 20
+
+    boa.env.time_travel(blocks=1)
+    assert switchboard_echo.migrateVaultPositionsForUserByAssets(
+        bob,
+        [assets[20].address],
+        SIMPLE_VAULT_ID,
+        target_id,
+        sender=governance.address,
+    ) == 1
+    assert ledger.lastTouch(bob) > first_action_block
+    assert len(filter_logs(
+        switchboard_echo, "VaultPositionMigrationExecuted"
+    )) == 1
+
+    for asset in assets:
+        assert simple_erc20_vault.getTotalAmountForUser(bob, asset) == 0
+        assert target.getTotalAmountForUser(bob, asset) == amount
+        source_points = ledger.getDepositPointsBundle(
+            bob, SIMPLE_VAULT_ID, asset
+        ).userPoints
+        target_points = ledger.getDepositPointsBundle(
+            bob, target_id, asset
+        ).userPoints
+        assert source_points.lastBalance == 0
+        assert source_points.lastUpdate != 0
+        assert target_points.lastBalance > 0
+        assert target_points.lastUpdate != 0
 
 
 def test_teller_migration_steps_are_vault_migrator_only(
