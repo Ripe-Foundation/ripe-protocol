@@ -210,10 +210,26 @@ def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256
     if priceSource == empty(address):
         return 0, 0
 
+    return self._getPriceFromSource(priceSource, _asset, _staleTime)
+
+
+@view
+@external
+def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256):
+    # Admission checks call from the candidate source itself, so no aggregate
+    # fallback can mask a source that is not executable under the live stipend.
+    return self._getPriceFromSource(msg.sender, _asset, _staleTime)
+
+
+@view
+@internal
+def _getPriceFromSource(_priceSource: address, _asset: address, _staleTime: uint256) -> (uint256, uint256):
+    # status: 0 = valid/no feed, 1 = valid/feed, 2 = failed or malformed
+
     success: bool = False
     response: Bytes[65] = b""
     success, response = raw_call(
-        priceSource,
+        _priceSource,
         abi_encode(
             _asset,
             _staleTime,
@@ -484,4 +500,3 @@ def _isUndyAppraiser(_addr: address) -> bool:
 @internal
 def _canPerformAction(_caller: address) -> bool:
     return gov._canGovern(_caller) and not deptBasics.isPaused
-

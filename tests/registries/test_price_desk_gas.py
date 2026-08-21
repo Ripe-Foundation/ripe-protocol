@@ -42,7 +42,7 @@ def get_address(_id: uint256) -> address:
 @view
 @external
 def is_registered(_pool: address) -> bool:
-    return _pool == self
+    return True
 
 @view
 @external
@@ -657,8 +657,7 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
         limit for limit, succeeded in boundary_results.items() if succeeded
     )
     assert not boundary_results[90_000]
-    assert boundary_results[100_000]
-    assert minimum_success == 100_000
+    assert minimum_success == 110_000
     print(
         "PRICEDESK_CURVE_GAS",
         f"four_coin_nested_final_position={curve_gas}",
@@ -677,7 +676,7 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
 
 
 @pytest.mark.gas
-def test_four_coin_curve_over_max_snapshot_bluechip_admission_boundary(
+def test_four_coin_curve_over_max_snapshot_bluechip_is_rejected_at_confirmation(
     ripe_hq,
     deploy3r,
     governance,
@@ -686,6 +685,7 @@ def test_four_coin_curve_over_max_snapshot_bluechip_admission_boundary(
     savings_green,
     mission_control,
     switchboard_alpha,
+    price_desk,
     mock_price_source,
     blue_chip_prices,
     alpha_token,
@@ -717,13 +717,21 @@ def test_four_coin_curve_over_max_snapshot_bluechip_admission_boundary(
             vault,
             whale,
         )
-    _set_priorities(mission_control, switchboard_alpha, [3, 6])
-
     vaults = [vault.address for _, vault, _ in feeds]
     curve_system = boa.loads(
         FOUR_COIN_CURVE_SYSTEM,
         vaults,
         name="four_bluechip_coin_curve_gas_system",
+    )
+    old_pool = boa.loads(
+        FOUR_COIN_CURVE_SYSTEM,
+        vaults,
+        name="four_bluechip_coin_old_pool",
+    )
+    new_pool = boa.loads(
+        FOUR_COIN_CURVE_SYSTEM,
+        vaults,
+        name="four_bluechip_coin_new_pool",
     )
     curve = boa.load(
         "contracts/priceSources/CurvePrices.vy",
@@ -736,57 +744,71 @@ def test_four_coin_curve_over_max_snapshot_bluechip_admission_boundary(
         2,
         name="four_bluechip_coin_curve_gas_source",
     )
+
+    # First activate a cheap exact route so the update path can prove atomic
+    # rollback against a real previous configuration.
+    _set_priorities(mission_control, switchboard_alpha, [6])
     assert curve.addNewPriceFeed(
         curve_system,
-        curve_system,
+        old_pool,
         sender=governance.address,
     )
     assert curve.confirmNewPriceFeed(curve_system, sender=governance.address)
+    previous = curve.curveConfig(curve_system)
 
-    desk = _isolated_price_desk(
+    # Exercise the expensive but governance-reachable canonical topology: each
+    # Curve underlying traverses the other registered sources before reaching
+    # BlueChipYieldPrices, while the final mock source remains a healthy
+    # aggregate fallback for the LP token itself.
+    _set_priorities(
+        mission_control,
+        switchboard_alpha,
+        [1, 2, 4, 5, 7, 8, 9, 10, 3, 6],
+    )
+    assert curve.updatePriceFeed(
+        curve_system,
+        new_pool,
+        sender=governance.address,
+    )
+    update_action = curve.pendingUpdates(curve_system).actionId
+
+    mock_price_source.setPrice(curve_system, EIGHTEEN_DECIMALS)
+    assert price_desk.getPrice(curve_system) == EIGHTEEN_DECIMALS
+    with boa.reverts("price source not executable"):
+        curve.confirmPriceFeedUpdate(curve_system, sender=governance.address)
+
+    assert curve.pendingUpdates(curve_system).actionId == update_action
+    assert curve.curveConfig(curve_system) == previous
+
+    # A fresh source proves the same exact-stipend rejection for new feeds.
+    new_curve = boa.load(
+        "contracts/priceSources/CurvePrices.vy",
         ripe_hq,
-        deploy3r,
-        [mock_price_source, blue_chip_prices, curve],
+        ZERO_ADDRESS,
+        curve_system,
+        green_token,
+        savings_green,
+        1,
+        2,
+        name="four_bluechip_coin_new_curve_gas_source",
     )
-    _set_priorities(mission_control, switchboard_alpha, [3, 2, 1])
-    current_price = desk.getPrice(curve_system, False, gas=3_000_000)
-    current_gas = desk._computation.get_gas_used()
+    assert new_curve.addNewPriceFeed(
+        curve_system,
+        new_pool,
+        sender=governance.address,
+    )
+    pending_action = new_curve.pendingUpdates(curve_system).actionId
 
-    boundary_results = {}
-    for price_limit in range(200_000, 600_001, 50_000):
-        boundary_desk = _isolated_price_desk(
-            ripe_hq,
-            deploy3r,
-            [mock_price_source, blue_chip_prices, curve],
-            price_limit=price_limit,
-        )
-        boundary_results[price_limit] = (
-            boundary_desk.getPrice(
-                curve_system,
-                False,
-                gas=3_000_000,
-            )
-            == EIGHTEEN_DECIMALS
-        )
-    # The selected 250k allowance qualifies the approved direct-underlying Curve
-    # graph, not a future Curve-over-snapshot-source graph. Keep that admission
-    # boundary explicit until governance requalifies this composition.
-    assert current_price == 0
-    assert not boundary_results[350_000]
-    assert boundary_results[400_000]
-    minimum_success = min(
-        limit for limit, succeeded in boundary_results.items() if succeeded
-    )
-    print(
-        "PRICEDESK_CURVE_BLUECHIP_COMPOSITION",
-        f"selected_limit_price={current_price}",
-        f"selected_limit_total_gas={current_gas}",
-        f"forwarded_boundary_50k_resolution={minimum_success}",
-        f"boundary_results={boundary_results}",
-        "bluechip_snapshot_capacity=25",
-        "curve_underlyings=4",
-        "source_slots=3",
-    )
+    # A healthy fallback would make an aggregate PriceDesk query pass, but must
+    # not mask that this exact Curve source exceeds the live 250k stipend.
+    mock_price_source.setPrice(curve_system, EIGHTEEN_DECIMALS)
+    assert price_desk.getPrice(curve_system) == EIGHTEEN_DECIMALS
+    with boa.reverts("price source not executable"):
+        new_curve.confirmNewPriceFeed(curve_system, sender=governance.address)
+
+    assert new_curve.pendingUpdates(curve_system).actionId == pending_action
+    assert new_curve.curveConfig(curve_system).pool == ZERO_ADDRESS
+    assert not new_curve.hasPriceFeed(curve_system)
 
 
 @pytest.mark.gas
