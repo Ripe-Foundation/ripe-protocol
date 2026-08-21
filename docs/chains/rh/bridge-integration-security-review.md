@@ -17,7 +17,8 @@ rev 12 — H-7, M-6, M-7 verified resolved; H-8 corrected down to Medium;
 rev 13 — M-8 verified resolved;
 rev 14 — M-8 reopened: the rev-12 horizon check bounded time-to-expiry, not
 order age; closed with a signed `issuedAt`;
-rev 15 — V-1, independent re-trace of the Relay attestor's ERC-20 path)
+rev 15 — V-1, independent re-trace of the Relay attestor's ERC-20 path;
+rev 16 — M-9, the ledger consequence of the replay-identity gap)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -1125,6 +1126,52 @@ the floor at all.
 the other caps, require `ACTION_LOWER_FLOOR` to keep it non-zero, and include
 `balance >= minFloatBalance` in `isHealthy()` so an inert or breached floor is
 externally observable.
+
+### M-9 (rev 16) — A phantom entry cannot be cleared, so the replay gap halts the lane rather than only overpaying
+
+**Severity: Medium, and it raises the replay-identity gap above "pays twice".
+Depends on that gap; independently true of any entry booked without a deposit
+behind it.**
+
+`isFilled` is keyed on the local EIP-712 struct hash, which includes `salt` and
+`issuedAt`, so two authorizations carrying the same `relayOrderId` both fill.
+Trace what the second one leaves in the ledger.
+
+1. It books `inputAmount` into `outstandingNotional` and appends to the
+   chronological list like any other entry (`fill`, `:363`).
+2. It can never clear. `recordRestored` requires
+   `balance >= accountedBalance + _receivedAmount` (`:~547`), and there is no
+   second deposit, so the tokens to satisfy it do not exist.
+3. `_unlinkEntry` is reachable **only** from `recordRestored` (`:552`), so the
+   entry cannot leave the list by any other route.
+4. It therefore becomes the oldest entry and ages without bound, and
+   `_assertOldestWithinAge` (`:355`) is on the fill path — so once it passes
+   `maxEntryAge`, **every subsequent fill reverts.**
+
+The double payment is the loss; the halt is the consequence, and the halt is
+permanent until someone covers the loss out of pocket. This is M-4's age cap
+doing exactly what it was designed to do, triggered by a defect elsewhere — the
+liveness trap is correct behaviour here, which is why it will not look like a
+bug when it fires.
+
+**The recovery path is the counterintuitive part and is worth stating on its
+own, because it is true independent of the replay gap.** `fundFloat` cannot
+resolve a shortfall: it raises `accountedBalance` in lockstep with the balance
+(`:~738`), so it creates no headroom for `recordRestored` by construction. That
+is correct for its purpose — it is what stops funding being used to recycle the
+cap — but it means the contract's designated "add inventory" function is
+unusable in the one situation an operator would reach for it, and the only thing
+that works is a raw `transfer` straight to the contract, which no function
+documents and no event records.
+
+**Recommendation.** Beyond keying replay correctly, the ledger should not be
+able to reach a state that only an untracked transfer can unstick. Either give
+governance an explicit, timelocked `recordShortfall(orderId, amount)` that
+writes off an entry and emits the loss — making the write-off visible and
+attributable rather than laundered through a bare transfer — or state the raw
+transfer as the supported recovery procedure in the runbook and test it. The
+current position is that the procedure exists, is undocumented, and looks like
+the thing the accounting is designed to prevent.
 
 ### V-1 (rev 15) — Independent verification: `fillContract` is inert on the ERC-20 attestation path
 
