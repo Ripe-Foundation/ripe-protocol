@@ -502,6 +502,20 @@ def disableGovPointAccrualForUser(_user: address):
     log GovPointAccrualDisabledForUser(user=_user, disabledBlock=block.number, caller=msg.sender)
 
 
+@external
+def inheritUserGovPointAccrualDisableForMigration(_user: address, _disabledBlock: uint256) -> bool:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert vaultData.isPaused # dev: vault not paused
+    assert _user != empty(address) # dev: invalid user
+    assert _disabledBlock != 0 and _disabledBlock <= block.number # dev: invalid disabled block
+
+    if self.userGovPointAccrualDisabledBlock[_user] != 0:
+        return False
+
+    self.userGovPointAccrualDisabledBlock[_user] = _disabledBlock
+    return True
+
+
 @view
 @internal
 def _isGovPointAccrualDisabled(_user: address) -> bool:
@@ -597,9 +611,6 @@ def importPositionForMigration(_user: address, _asset: address, _sourceVault: ad
     # gov data validation
     userData: GovData = self.userGovData[_user][_asset]
     assert userData.govPoints == 0 and userData.lastShares == 0 # dev: target gov data exists
-    assert userData.lastPointsUpdate == 0 and userData.unlock == 0 # dev: target gov data exists
-    assert userData.lastTerms.minLockDuration == 0 and userData.lastTerms.maxLockDuration == 0 # dev: target terms exist
-    assert userData.lastTerms.maxLockBoost == 0 and not userData.lastTerms.canExit and userData.lastTerms.exitFee == 0 # dev: target terms exist
 
     # check asset balance
     totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
