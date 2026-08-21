@@ -32,6 +32,9 @@ interface VaultBook:
     def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool: nonpayable
     def getRegId(_vaultAddr: address) -> uint256: view
 
+interface Lootbox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
 
@@ -109,6 +112,8 @@ totalClaimableBalances: public(HashMap[address, uint256]) # claimable asset -> b
 claimableAssets: public(HashMap[address, HashMap[uint256, address]]) # stab asset -> index -> claimable asset
 indexOfClaimableAsset: public(HashMap[address, HashMap[address, uint256]]) # stab asset -> claimable asset -> index
 numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claimable assets
+numClaimablePairs: HashMap[address, uint256] # stab asset -> nonzero claim pairs
+checkpointSeen: transient(HashMap[address, bool])
 
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
@@ -575,7 +580,7 @@ def swapForLiquidatedCollateral(
             assert extcall GreenToken(_greenToken).burn(amount) # dev: failed to burn green
 
     else:
-        assert extcall IERC20(_stabAsset).transfer(_recipient, amount, default_return_value=True) # dev: transfer failed
+        self._transferAssetExact(_stabAsset, amount, _recipient)
 
     return amount
 
@@ -754,8 +759,17 @@ def _claimManyFromStabilityPool(
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
         config = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(c.claimAsset, _claimer, _caller, a.ripeToken)
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, _shouldAutoDeposit, config, a)
+        claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, _shouldAutoDeposit, config, a)
+        # Defer the checkpoint until every mutation in the batch is complete.
+        # The transient set deduplicates repeated claims for one stab asset.
+        if claimUsdValue != 0:
+            self.checkpointSeen[c.stabAsset] = True
+        totalUsdValue += claimUsdValue
     assert totalUsdValue != 0 # dev: nothing claimed
+    for c: StabPoolClaim in _claims:
+        if self.checkpointSeen[c.stabAsset]:
+            self.checkpointSeen[c.stabAsset] = False
+            extcall Lootbox(a.lootbox).updateDepositPoints(_claimer, staticcall VaultBook(a.vaultBook).getRegId(self), self, c.stabAsset, a)
     self._handleClaimRewards(_claimer, totalUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
     return totalUsdValue
 
@@ -1319,6 +1333,49 @@ def activateClaimAssets(_stabAsset: address, _claimAssets: DynArray[address, MAX
     self._maintainClaimableAssets(_stabAsset, _claimAssets, True)
 
 
+# stability-aware vault retirement
+
+
+@external
+def deregisterVaultAsset(_asset: address) -> bool:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+
+    if vaultData.totalBalances[_asset] != 0 or self.numClaimablePairs[_asset] != 0:
+        return False
+
+    numAssets: uint256 = vaultData.numAssets
+    if numAssets == 0:
+        return False
+
+    targetIndex: uint256 = vaultData.indexOfAsset[_asset]
+    if targetIndex == 0:
+        return False
+
+    lastIndex: uint256 = numAssets - 1
+    vaultData.numAssets = lastIndex
+    vaultData.indexOfAsset[_asset] = 0
+
+    if targetIndex != lastIndex:
+        lastItem: address = vaultData.vaultAssets[lastIndex]
+        vaultData.vaultAssets[targetIndex] = lastItem
+        vaultData.indexOfAsset[lastItem] = targetIndex
+
+    return True
+
+
+@view
+@external
+def doesVaultHaveAnyFunds() -> bool:
+    numAssets: uint256 = vaultData.numAssets
+    if numAssets == 0:
+        return False
+    for i: uint256 in range(1, numAssets, bound=max_value(uint256)):
+        asset: address = vaultData.vaultAssets[i]
+        if vaultData.totalBalances[asset] != 0 or self.numClaimablePairs[asset] != 0:
+            return True
+    return False
+
+
 # add claimable
 
 
@@ -1340,7 +1397,8 @@ def _addClaimableBalance(
     assert custody >= priorLiability # dev: claim custody deficit
     assert _reportedAmount <= custody - priorLiability # dev: short claim receipt
 
-    newPairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset] + _reportedAmount
+    prevPairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset]
+    newPairBalance: uint256 = prevPairBalance + _reportedAmount
     isActive: bool = self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0
     usdValue: uint256 = 0
     activeCount: uint256 = 0
@@ -1353,6 +1411,8 @@ def _addClaimableBalance(
     # update balances
     self.claimableBalances[_stabAsset][_claimAsset] = newPairBalance
     self.totalClaimableBalances[_claimAsset] = priorLiability + _reportedAmount
+    if prevPairBalance == 0:
+        self.numClaimablePairs[_stabAsset] += 1
 
     # already active
     if isActive:
@@ -1399,6 +1459,7 @@ def _reduceClaimableBalances(
     self.totalClaimableBalances[_claimAsset] -= _claimAmount
 
     if newClaimableBalance == 0:
+        self.numClaimablePairs[_stabAsset] -= 1
         self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_ZERO)
         return
 

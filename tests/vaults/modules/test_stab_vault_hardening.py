@@ -295,16 +295,12 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     assert existing_receipt_gas < 50_000
     assert prune_gas < 500_000
     assert activation_gas < 1_200_000
-    # Starting head (458235d): single_claim=509,138 against 500,000;
-    # claim_many=7,251,524 against 7,250,000. After the PriceDesk scale
-    # helper and inlined stale-time resolver: single_claim=506,381,
-    # claim_many=7,210,169. claim_many now fits 7,250,000 (0.552%
-    # headroom). single_claim still exceeds 500,000 because the bounded
-    # decimals raw_call and 30,000-gas stipend remain; the 2,757-gas
-    # recovery is not enough. Rebaseline only single_claim to 520,000
-    # (2.689% headroom over 506,381).
-    assert single_claim_gas < 520_000
-    assert claim_many_gas < 7_250_000
+    # The post-claim Lootbox checkpoint adds one strict NAV traversal per
+    # distinct stability asset, after all batch mutations. At this ceiling the
+    # measured paths are single_claim=1,245,562 and claim_many=7,751,278.
+    # Ceilings retain 4.37% and 3.21% local-EVM headroom, respectively.
+    assert single_claim_gas < 1_300_000
+    assert claim_many_gas < 8_000_000
     # Preflight and iteration each traverse the bounded claim set once. The
     # iterator must not repeat the strict NAV traversal after readiness passes.
     assert liquidation_preflight_gas < 600_000
@@ -3429,6 +3425,47 @@ def test_outbound_fee_on_transfer_stability_asset_does_not_burn_shares(
     ) == before
 
 
+def test_liquidation_payment_requires_exact_recipient_delivery(
+    stability_pool, bravo_token, bravo_token_whale, governance, bob, teller,
+    auction_house, mock_price_source, green_token, savings_green,
+):
+    """A taxed stability-asset payment rolls the entire swap back."""
+    amount = 100 * EIGHTEEN_DECIMALS
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance,
+        0,
+        name="fee_liquidation_payment_asset",
+        override_address=boa.env.generate_address(),
+    )
+    _seed_stability_asset(
+        stability_pool, fee_token, governance.address, bob, teller,
+        mock_price_source, amount,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    claim_amount = 10 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claim_amount, sender=bravo_token_whale)
+    fee_token.setTransferFee(5_00, sender=governance.address)
+
+    before = _stab_state_snapshot(
+        stability_pool, fee_token, [bravo_token], [bob]
+    )
+    with boa.reverts("invalid recipient delivery"):
+        stability_pool.swapForLiquidatedCollateral(
+            fee_token,
+            10 * EIGHTEEN_DECIMALS,
+            bravo_token,
+            claim_amount,
+            bob,
+            green_token,
+            savings_green,
+            sender=auction_house.address,
+        )
+    assert _stab_state_snapshot(
+        stability_pool, fee_token, [bravo_token], [bob]
+    ) == before
+
+
 ############################################################################
 # WP5 (Section 12.1) / DV-14: the PriceDesk boundary, per price state
 #
@@ -4070,6 +4107,124 @@ def test_dormant_dust_is_claimable_before_exit_but_stranded_after(
 
     with boa.reverts("nothing claimed"):
         claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
+
+
+def test_claimable_residual_blocks_retirement_until_pair_is_settled(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale,
+    bravo_token_whale, bob, alice, teller, auction_house, mock_price_source,
+    green_token, savings_green, vault_book, switchboard_alpha,
+    setGeneralConfig, setAssetConfig,
+):
+    """Dormant claim custody keeps an otherwise empty pool live."""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, 100 * EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    dust = ACTIVATION_THRESHOLD - 1
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, dust, bob,
+        auction_house, green_token, savings_green,
+    )
+
+    stability_pool.withdrawTokensFromVault(
+        bob, alpha_token, MAX_UINT256, bob, sender=teller.address
+    )
+    assert stability_pool.totalBalances(alpha_token) == 0
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == dust
+    assert stability_pool.doesVaultHaveAnyFunds()
+    assert not stability_pool.deregisterVaultAsset(
+        alpha_token, sender=switchboard_alpha.address
+    )
+    assert stability_pool.isSupportedVaultAsset(alpha_token)
+
+    # A replacement cohort can settle the pair. Retirement becomes available
+    # only after both the claim liability and stability shares reach zero.
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, alice, teller,
+        mock_price_source, EIGHTEEN_DECIMALS,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+    assert claim_from_stability_pool(
+        teller, vault_id, alpha_token, bravo_token, sender=alice
+    ) == dust
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+    stability_pool.withdrawTokensFromVault(
+        alice, alpha_token, MAX_UINT256, alice, sender=teller.address
+    )
+    assert stability_pool.totalBalances(alpha_token) == 0
+    assert not stability_pool.doesVaultHaveAnyFunds()
+    assert stability_pool.deregisterVaultAsset(
+        alpha_token, sender=switchboard_alpha.address
+    )
+    assert not stability_pool.isSupportedVaultAsset(alpha_token)
+
+
+def test_claimable_pair_counter_round_trips_through_redeem_and_green_swap(
+    stability_pool, alpha_token, bravo_token, charlie_token, alpha_token_whale,
+    bravo_token_whale, charlie_token_whale, bob, teller, auction_house,
+    mock_price_source, green_token, savings_green, whale, vault_book,
+    switchboard_alpha, setGeneralConfig, setAssetConfig,
+):
+    """Every redeem/GREEN-swap pair transition returns the gate to zero."""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, 100 * EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+    claim_amount = 10 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale,
+        claim_amount, bob, auction_house, green_token, savings_green,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+
+    green_token.transfer(bob, claim_amount, sender=whale)
+    green_token.approve(teller, claim_amount, sender=bob)
+    assert redeem_from_stability_pool(
+        teller, vault_id, bravo_token, claim_amount, bob, sender=bob
+    ) == claim_amount
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+    assert stability_pool.claimableBalances(
+        alpha_token, green_token
+    ) == claim_amount
+
+    charlie_amount = 10 * 10 ** charlie_token.decimals()
+    charlie_token.transfer(
+        stability_pool, charlie_amount, sender=charlie_token_whale
+    )
+    assert stability_pool.swapWithClaimableGreen(
+        alpha_token,
+        claim_amount,
+        charlie_token,
+        charlie_amount,
+        green_token,
+        sender=auction_house.address,
+    ) == claim_amount
+    assert stability_pool.claimableBalances(alpha_token, green_token) == 0
+    assert stability_pool.claimableBalances(
+        alpha_token, charlie_token
+    ) == charlie_amount
+
+    claimed_value = claim_from_stability_pool(
+        teller, vault_id, alpha_token, charlie_token, sender=bob
+    )
+    assert claim_amount <= claimed_value <= claim_amount + 10**12
+    assert charlie_token.balanceOf(bob) == charlie_amount
+    stability_pool.withdrawTokensFromVault(
+        bob, alpha_token, MAX_UINT256, bob, sender=teller.address
+    )
+    assert stability_pool.totalBalances(alpha_token) == 0
+    assert not stability_pool.doesVaultHaveAnyFunds()
+    assert stability_pool.deregisterVaultAsset(
+        alpha_token, sender=switchboard_alpha.address
+    )
 
 
 @pytest.mark.xfail(
