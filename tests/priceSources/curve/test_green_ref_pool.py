@@ -1594,7 +1594,7 @@ def test_spot_only_danger_restarts_recovery_without_rate_signal(
     preserved = curve.greenRefPoolData().numBlocksInDanger
     _set_local_green_ratio(pool, 20)
 
-    # Capacity reset preserves the counter and seeds a safe recovery anchor.
+    # Capacity reset preserves the counter and seeds a safe recovery endpoint.
     _confirm_local_ref_config(
         curve,
         pool,
@@ -2418,7 +2418,7 @@ def test_category_c_staleness_change_does_not_bridge_expired_recovery(local_curv
     boa.env.time_travel(blocks=curve.actionTimeLock())
     assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
 
-    # The first safe write cannot reuse a pre-gap recovery anchor.
+    # The first safe write cannot reuse a pre-gap recovery endpoint.
     assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
     assert curve.greenRefPoolData().numBlocksInDanger == before
     boa.env.time_travel(blocks=1)
@@ -2494,6 +2494,8 @@ def test_category_c_unavailable_history_leaves_continuity_cleared(local_curve_re
     boa.env.time_travel(blocks=curve.actionTimeLock())
     assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
 
+    # Wait past confirmation so an incorrect SAFE boundary would earn credit.
+    boa.env.time_travel(blocks=1)
     assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
     assert curve.greenRefPoolData().numBlocksInDanger == before
     boa.env.time_travel(blocks=2)
@@ -2861,7 +2863,7 @@ def test_nonclassification_confirmation_preserves_active_recovery_window(
     )
     preserved = curve.greenRefPoolData().numBlocksInDanger
 
-    # Category C first establishes a fresh, observable recovery anchor.
+    # Category C first establishes a fresh, observable recovery boundary.
     aid = curve.setGreenRefPoolConfig(
         pool,
         2,
