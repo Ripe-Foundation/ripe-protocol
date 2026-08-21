@@ -7,8 +7,8 @@ EIP170_LIMIT = 24_576
 # are load-bearing for these numbers — bumping either is a deploy event.
 # RipeGov headroom is 460 bytes after the migration, SharesVault, and
 # governance-remediation changes. Any RipeGov edit must remeasure this pin.
-# Composed SwitchboardAlpha headroom is 5 bytes (rh zero max-lock check plus
-# execution sanitization).
+# Composed SwitchboardAlpha headroom is 19 bytes after RipeGov duration
+# validation and the existing execution sanitization.
 # Teller headroom is 68 bytes after the SharesVault and historical RipeGov
 # routing changes.
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
@@ -20,8 +20,8 @@ EIP170_LIMIT = 24_576
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16183,
-    "SwitchboardAlpha": 24571,
+    "MissionControl": 16143,
+    "SwitchboardAlpha": 24557,
     "SwitchboardBravo": 24541,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,

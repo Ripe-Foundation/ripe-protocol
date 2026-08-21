@@ -1450,7 +1450,12 @@ def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: 
     if _assetWeight > 500_00: # max 500%
         return False
 
-    if _lockTerms.maxLockDuration == 0 or _lockTerms.minLockDuration > _lockTerms.maxLockDuration:
+    # maxLockBoost (1000%) is the largest downstream duration multiplier.
+    if (
+        _lockTerms.maxLockDuration == 0
+        or unsafe_mul(_lockTerms.maxLockDuration, 1000_00) // 1000_00 != _lockTerms.maxLockDuration
+        or _lockTerms.minLockDuration > _lockTerms.maxLockDuration
+    ):
         return False
 
     if _lockTerms.maxLockBoost > 1000_00: # max 1000%
@@ -1459,10 +1464,7 @@ def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: 
     if _lockTerms.exitFee > HUNDRED_PERCENT:
         return False
 
-    if _lockTerms.canExit and _lockTerms.exitFee == 0:
-        return False
-
-    if not _lockTerms.canExit and _lockTerms.exitFee != 0:
+    if _lockTerms.canExit == (_lockTerms.exitFee == 0):
         return False
 
     return True
