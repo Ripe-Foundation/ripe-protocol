@@ -29,6 +29,15 @@ from interfaces import Vault
 import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 
+interface RipeGovVault:
+    def getLatestGovPoints(_lastShares: uint256, _lastPointsUpdate: uint256, _unlock: uint256, _terms: cs.LockTerms, _weight: uint256) -> uint256: view
+    def inheritUserGovPointAccrualDisableForMigration(_user: address, _disabledBlock: uint256) -> bool: nonpayable
+    def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
+    def userBalances(_user: address, _asset: address) -> uint256: view
+    def userGovData(_user: address, _asset: address) -> GovData: view
+    def totalUserGovPoints(_user: address) -> uint256: view
+    def totalGovPoints() -> uint256: view
+
 interface Teller:
     def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _migration: RipeGovMigrationData, _ledger: address) -> uint256: nonpayable
     def depositOnVaultMigration(_user: address, _asset: address, _amount: uint256, _targetVaultId: uint256, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -36,15 +45,6 @@ interface Teller:
     def exportPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
     def withdrawOnVaultMigration(_user: address, _asset: address, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool): nonpayable
     def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
-
-interface RipeGovVault:
-    def getLatestGovPoints(_lastShares: uint256, _lastPointsUpdate: uint256, _unlock: uint256, _terms: cs.LockTerms, _weight: uint256) -> uint256: view
-    def userGovData(_user: address, _asset: address) -> GovData: view
-    def userBalances(_user: address, _asset: address) -> uint256: view
-    def totalUserGovPoints(_user: address) -> uint256: view
-    def totalGovPoints() -> uint256: view
-    def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
-    def inheritUserGovPointAccrualDisableForMigration(_user: address, _disabledBlock: uint256) -> bool: nonpayable
 
 interface MissionControl:
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
@@ -165,7 +165,7 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
     assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
     assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
 
-    # Reject any over-capacity user before the batch mutates state. numUserAssets
+    # reject any over-capacity user before the batch mutates state. numUserAssets
     # is a 1-based exclusive endpoint, so twenty registered slots is 21.
     for user: address in _users:
         if user != empty(address):
@@ -253,7 +253,7 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
     targetVault: address = empty(address)
     sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, targetVaultId, a.vaultBook, a.missionControl)
 
-    # Exporter-capable RipeGov migrations are the only path for a historical
+    # exporter-capable RipeGov migrations are the only path for a historical
     # core vault. The immutable Base source is bound to its dedicated route.
     assert staticcall MissionControl(a.missionControl).isRipeGovVaultId(_sourceVaultId) # dev: source is not ripe gov
     if LEGACY_RIPE_GOV_VAULT != empty(address):
@@ -464,39 +464,12 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
     return numPositions
 
 
-###########################
+############################
 # Shared Migration Helpers #
-###########################
+############################
 
 
-@view
-@internal
-def _getRegisteredAssetSlots(_vault: address, _user: address) -> uint256:
-    endpoint: uint256 = staticcall Vault(_vault).numUserAssets(_user)
-    if endpoint == 0:
-        return 0
-    return endpoint - 1
-
-
-@view
-@internal
-def _validateExplicitAssets(
-    _user: address,
-    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
-    _sourceVault: address,
-    _targetVaultId: uint256,
-    _missionControl: address,
-):
-    for asset: address in _assets:
-        assert asset != empty(address) # dev: invalid asset
-        assert staticcall Vault(_sourceVault).doesUserHaveBalance(_user, asset) # dev: no source position
-        assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_targetVaultId, asset) # dev: unsupported target asset
-
-        occurrences: uint256 = 0
-        for candidate: address in _assets:
-            if candidate == asset:
-                occurrences += 1
-        assert occurrences == 1 # dev: duplicate asset
+# vault asset migration
 
 
 @internal
@@ -541,6 +514,9 @@ def _migrateVaultAsset(
     )
 
 
+# ripe gov asset migration
+
+
 @internal
 def _migrateRipeGovAsset(
     _user: address,
@@ -582,6 +558,9 @@ def _migrateRipeGovAsset(
     )
 
 
+# user gov point accrual disable inheritance
+
+
 @internal
 def _inheritUserGovPointAccrualDisable(
     _user: address,
@@ -603,9 +582,45 @@ def _inheritUserGovPointAccrualDisable(
         )
 
 
-####################
-# Validation Utils #
-####################
+###################
+# Migration Utils #
+###################
+
+
+# asset slots
+
+
+@view
+@internal
+def _getRegisteredAssetSlots(_vault: address, _user: address) -> uint256:
+    endpoint: uint256 = staticcall Vault(_vault).numUserAssets(_user)
+    if endpoint == 0:
+        return 0
+    return endpoint - 1
+
+
+# explicit assets
+
+
+@view
+@internal
+def _validateExplicitAssets(
+    _user: address,
+    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
+    _sourceVault: address,
+    _targetVaultId: uint256,
+    _missionControl: address,
+):
+    for asset: address in _assets:
+        assert asset != empty(address) # dev: invalid asset
+        assert staticcall Vault(_sourceVault).doesUserHaveBalance(_user, asset) # dev: no source position
+        assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_targetVaultId, asset) # dev: unsupported target asset
+
+        occurrences: uint256 = 0
+        for candidate: address in _assets:
+            if candidate == asset:
+                occurrences += 1
+        assert occurrences == 1 # dev: duplicate asset
 
 
 # migration route validation

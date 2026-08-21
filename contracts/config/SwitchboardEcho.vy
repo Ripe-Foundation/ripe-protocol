@@ -27,8 +27,8 @@ interface Endaoment:
     def removeLiquidity(_legoId: uint256, _pool: address, _tokenA: address, _tokenB: address, _lpToken: address, _lpAmount: uint256 = max_value(uint256), _minAmountA: uint256 = 0, _minAmountB: uint256 = 0, _extraData: bytes32 = empty(bytes32)) -> (uint256, uint256, uint256, uint256): nonpayable
     def depositForYield(_legoId: uint256, _asset: address, _vaultAddr: address = empty(address), _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def claimIncentives(_user: address, _legoId: uint256, _rewardToken: address = empty(address), _rewardAmount: uint256 = max_value(uint256), _proofs: DynArray[bytes32, MAX_PROOFS] = []) -> (uint256, uint256): nonpayable
-    def withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256, _expectedLpToken: address) -> (uint256, uint256, uint256): nonpayable
+    def withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def swapTokens(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (address, uint256, address, uint256, uint256): nonpayable
     def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256): nonpayable
@@ -57,18 +57,18 @@ interface EndaomentPSM:
     def setCanMint(_canMint: bool): nonpayable
     def setMintFee(_fee: uint256): nonpayable
 
+interface VaultMigrator:
+    def migrateVaultPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
+
 interface RipeGovVault:
     def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
     def disableGovPointAccrualForUser(_user: address): nonpayable
     def govPointAccrualDisabledBlock() -> uint256: view
     def disableGovPointAccrualGlobally(): nonpayable
-
-interface VaultMigrator:
-    def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
-    def migrateVaultPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
-    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
-    def migrateRipeGovPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256) -> uint256: nonpayable
-    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -610,6 +610,7 @@ def migrateVaultPositionsForUserByAssets(
 
 
 # legacy ripe gov migrations (Base chain only)
+
 
 @external
 def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256:
