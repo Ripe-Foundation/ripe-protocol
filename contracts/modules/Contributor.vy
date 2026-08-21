@@ -6,9 +6,9 @@ interface HumanResources:
     def transferContributorRipeTokens(_owner: address, _lockDuration: uint256, _vaultId: uint256 = 0) -> uint256: nonpayable
     def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool): nonpayable
     def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool: nonpayable
-    def canModifyHrContributor(_addr: address) -> bool: view
-    def getRipeGovVaultId(_vaultId: uint256 = 0) -> uint256: view
     def hasRipeBalance(_contributor: address, _vaultId: uint256 = 0) -> bool: view
+    def getRipeGovVaultId(_vaultId: uint256 = 0) -> uint256: view
+    def canModifyHrContributor(_addr: address) -> bool: view
 
 interface RipeGovernance:
     def removeDelegationFor(_recipient: address = empty(address)): nonpayable

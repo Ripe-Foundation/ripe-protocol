@@ -44,12 +44,12 @@ interface Ledger:
     def didGetRewardsFromStabClaims(_amount: uint256): nonpayable
     def ripeAvailForRewards() -> uint256: view
 
+interface MissionControl:
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
+
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
-
-interface MissionControl:
-    def isStabVaultId(_vaultId: uint256) -> bool: view
-    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
 
 interface RipeGovVault:
     def totalGovPoints() -> uint256: view
@@ -159,7 +159,7 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 def _assertValidRipeGovVaultReplacement(_vaultId: uint256, _vaultAddr: address):
     missionControl: address = addys._getMissionControlAddr()
     if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
-        # Historical IDs remain routable forever, so replacements must retain
+        # historical IDs remain routable forever, so replacements must retain
         # the RipeGov points interface used by future maintenance checks.
         points: uint256 = staticcall RipeGovVault(_vaultAddr).totalGovPoints()
 
@@ -175,7 +175,7 @@ def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
 
     missionControl: address = addys._getMissionControlAddr()
     if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
-        # Zero-share governance points cannot be migrated; clear them before
+        # zero-share governance points cannot be migrated; clear them before
         # retiring or repointing a historical RipeGov vault.
         return staticcall RipeGovVault(vaultAddr).totalGovPoints() != 0
     return False

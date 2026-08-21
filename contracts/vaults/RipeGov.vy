@@ -434,7 +434,7 @@ def _handleGovDataOnTransfer(
     # to user
     self._handleGovDataOnDeposit(_toUser, _asset, _transferShares, _lockDuration, transferPoints, _config)
 
-    # The disabled sender already skips its own Boardroom callback below, but
+    # the disabled sender already skips its own Boardroom callback below, but
     # the healthy recipient would still call it and could strand the sender's
     # emergency exit. Suppress both callbacks for this transaction; canonical
     # totals update atomically and the public update path can retry the recipient.
@@ -542,7 +542,7 @@ def exportPositionForMigration(_user: address, _asset: address, _targetVault: ad
     sourceShares: uint256 = vaultData.userBalances[_user][_asset]
     assert sourceShares != 0 # dev: no position
 
-    # Accrue through this block without refreshing terms from current config.
+    # accrue through this block without refreshing terms from current config.
     # Migration must preserve the terms and unlock the position was actually
     # carrying before a temporary wind-down configuration was installed.
     self._updateGovPointsForUserAsset(_user, _asset, a.missionControl, False)
@@ -716,11 +716,11 @@ def getTotalAmountForVault(_asset: address) -> uint256:
 def updateUserGovPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
 
-    # A gov-point refresh rewrites `unlock` and `lastTerms` from the CURRENT asset config
-    # (`_updateGovPointsForUserAsset`), unconditionally -- the accrual-disable flag gates only the
-    # POINTS, not that rewrite. While this vault is in its migration pause -- the window in which
-    # wind-down terms are live and imported positions carry preserved original terms -- that
-    # rewrite would destroy exactly what the migration preserves, so the route is closed.
+    # A gov-point refresh unconditionally rewrites `unlock` and `lastTerms` from the
+    # current asset config (`_updateGovPointsForUserAsset`); accrual-disable gates only
+    # the points, not that rewrite. During migration pause -- wind-down terms live,
+    # imported positions on original terms -- that rewrite would undo the preserve,
+    # so the route is closed.
     assert not vaultData.isPaused # dev: contract paused
 
     a: addys.Addys = addys._getAddys(_a)
@@ -1029,7 +1029,7 @@ def _getWeightedLockOnTokenDeposit(
     newLockDuration: uint256 = max(_newLockDuration, 1)
     totalShares: uint256 = _prevShares + _newShares
 
-    # Blend with the exact share ratio. Expressing the average as the lower
+    # blend with the exact share ratio. Expressing the average as the lower
     # duration plus one full-precision weighted delta avoids both products and
     # their sum overflowing while preserving floor rounding.
     newWeightedDuration: uint256 = prevDuration
@@ -1052,15 +1052,11 @@ def refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.
 @view
 @internal
 def _refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> uint256:
-    # Courtesy zero when any live term is worse: canExit lost, fee up while
-    # exit was already on, boost down, minLockDuration up, or maxLockDuration
-    # up. Any adverse change wins even if another term improves.
-    # False/0 -> True/fee enables an optional paid exit; that is not a courtesy.
-    # Lazy: only a later touch while the worse config is still live persists
-    # unlock=0. Restoring the old terms first removes the opportunity.
-    # Once recorded, restoring the previous config does not restore the lock.
-    # A later lock-forming action may establish a new lock.
-    # This does not override Teller pause or shouldFreezeWhenBadDebt.
+    # courtesy unlock=0 if any live term is worse (canExit lost, fee up while exit already on,
+    # boost down, min/max lock up). Any adverse change wins; False/0 -> True/fee is not a courtesy.
+    # Lazy: a later touch while the worse config is live persists unlock=0. Restore first to skip;
+    # restore after does not unlock. A later lock-forming action may set a new lock.
+    # Does not override Teller pause or shouldFreezeWhenBadDebt.
     if (
         (_prevTerms.canExit and not _newTerms.canExit)
         or (_prevTerms.canExit and _newTerms.exitFee > _prevTerms.exitFee)
