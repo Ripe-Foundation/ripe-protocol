@@ -18,7 +18,8 @@ rev 13 — M-8 verified resolved;
 rev 14 — M-8 reopened: the rev-12 horizon check bounded time-to-expiry, not
 order age; closed with a signed `issuedAt`;
 rev 15 — V-1, independent re-trace of the Relay attestor's ERC-20 path;
-rev 16 — M-9, the ledger consequence of the replay-identity gap)
+rev 16 — M-9, the ledger consequence of the replay-identity gap;
+rev 17 — M-9 verified resolved with an explicit timelocked write-off)
 Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
 touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -1128,6 +1129,20 @@ the other caps, require `ACTION_LOWER_FLOOR` to keep it non-zero, and include
 externally observable.
 
 ### M-9 (rev 16) — A phantom entry cannot be cleared, so the replay gap halts the lane rather than only overpaying
+
+**Resolved in `28494e2b` (rev 17).** `initiateRecordShortfall` /
+`confirmChange` add a timelocked write-off: governance names the entry and
+the amount, and confirmation removes it from the ledger with no balance
+proof, since none is possible for a loss that already happened. Deliberately
+usable while retired, since a stuck entry is exactly what would keep a
+retired instance's `outstandingEntries` above zero forever, permanently
+blocking `ACTION_WITHDRAW`. Revalidated at confirmation against a live
+re-read of the entry, so a stale write-off queued against an entry that
+clears through the normal `recordWithdrawn`/`recordRestored` path in the
+meantime cannot double-clear it. This does not touch the recommendation's
+"beyond keying replay correctly" framing — it implements the first option
+offered, an explicit write-off, rather than the runbook alternative. 63
+tests.
 
 **Severity: Medium, and it raises the replay-identity gap above "pays twice".
 Depends on that gap; independently true of any entry booked without a deposit
