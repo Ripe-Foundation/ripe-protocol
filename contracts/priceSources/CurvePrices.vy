@@ -40,8 +40,8 @@ interface CurvePool:
     def lp_price() -> uint256: view
 
 interface PriceDesk:
-    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
     def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
+    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
 
 interface CurvePoolNg:
     def price_oracle(_index: uint256) -> uint256: view
@@ -201,7 +201,7 @@ greenRefPoolData: public(GreenRefPoolData)
 snapShots: public(HashMap[uint256, RefPoolSnapshot]) # index -> snapshot
 pendingGreenRefPoolConfig: public(HashMap[uint256, GreenRefPoolConfig]) # actionId -> config
 
-# Confirmed policy-boundary endpoint state.
+# policy-boundary endpoint state.
 greenPolicyBoundaryBlock: uint256
 greenPolicyBoundaryClassification: uint256 # 0 unavailable, 1 safe, 2 dangerous
 greenRecoveryBlocks: uint256
@@ -366,6 +366,7 @@ def _getCurvePrice(_asset: address, _config: CurvePriceConfig, _priceDesk: addre
 
     # lp tokens
     if _asset == _config.lpToken:
+
         # residual/legacy storage fail-closed; admission also rejects this
         if self._lpUnderlyingCanonicalEquals(_asset, _config):
             return 0
@@ -392,10 +393,7 @@ def _getCurvePrice(_asset: address, _config: CurvePriceConfig, _priceDesk: addre
 @internal 
 def _getStableLpPrice(_pool: address, _coins: address[4], _priceDesk: address) -> uint256: 
 
-    # REQUIREMENTS:
-    # all assets must be stable-ish to each other
-    # each underlying asset must have price feed (Price Desk)
-    # Note: see this article: https://news.curve.fi/chainlink-oracles-and-curve-pools/
+    # Stable-ish underlyings, each with a PriceDesk feed. https://news.curve.fi/chainlink-oracles-and-curve-pools/
 
     lowestPrice: uint256 = max_value(uint256)
     for c: address in _coins:
@@ -432,9 +430,7 @@ def getStableLpPrice(_pool: address, _coins: address[4]) -> uint256:
 @internal 
 def _getCryptoLpPrice(_pool: address, _firstAsset: address, _priceDesk: address) -> uint256:
 
-    # REQUIREMENTS:
-    # pool must have `lp_price()`
-    # 0 index asset must have price feed (Price Desk)
+    # Pool `lp_price()`; index-0 asset needs a PriceDesk feed.
 
     lpPrice: uint256 = staticcall CurvePool(_pool).lp_price()
     if lpPrice == 0:
@@ -468,10 +464,7 @@ def _getSingleTokenPrice(
 ) -> uint256:
     price: uint256 = 0
 
-    # REQUIREMENTS:
-    # pool must have `price_oracle()`
-    # can only have 2 assets in pool
-    # alt asset must have price feed (Price Desk)
+    # Pool `price_oracle()`; exactly 2 coins; alt needs a PriceDesk feed.
 
     # curve price oracle
     priceOracle: uint256 = 0
@@ -545,17 +538,15 @@ def confirmNewPriceFeed(_asset: address) -> bool:
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
-    # Empty eco-token LPs may be proposed before launch liquidity exists, but
-    # they cannot become active until the route is actually priceable.
+    # empty eco-token LPs may be proposed before launch; they cannot activate until the route is priceable.
     if _asset == d.config.lpToken:
         assert staticcall IERC20(d.config.lpToken).totalSupply() != 0 # dev: empty pool
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
-    # Stage the pending config so PriceDesk can call this exact source using the
-    # same stipend and calldata as production. Any failure reverts the staging,
-    # timelock confirmation, and pending-state mutation atomically.
+    # stage the pending config so PriceDesk can qualify this exact source with production stipend/calldata.
+    # any failure reverts staging, timelock confirm, and pending-state mutation atomically.
     self.curveConfig[_asset] = d.config
     qualifiedPrice: uint256 = 0
     sourceStatus: uint256 = 0
@@ -732,7 +723,7 @@ def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
     if not self._isValidFeedStructure(_asset, _config):
         return False
 
-    # Initial ecosystem LP deployment may be proposed before liquidity exists.
+    # initial ecosystem lp deployment may be proposed before liquidity exists.
     if _config.hasEcoToken and _asset == _config.lpToken and staticcall IERC20(_config.lpToken).totalSupply() == 0:
         return True
 
@@ -744,6 +735,7 @@ def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
 def _isValidFeedStructure(_asset: address, _config: CurvePriceConfig) -> bool:
     if empty(address) in [_asset, _config.pool, _config.lpToken]:
         return False
+
     # sGREEN prices through GREEN; curveConfig[SGREEN] is never used for pricing
     if _asset == SGREEN:
         return False
@@ -1009,8 +1001,7 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     )
     preservedDangerBlocks: uint256 = self.greenRefPoolData.numBlocksInDanger
 
-    # Meaning and capacity changes invalidate the physical ring. Persist the
-    # cleared state before seeding so same-block suppression sees update == 0.
+    # meaning/capacity changes invalidate the ring. Persist the clear before seeding so same-block suppression sees update == 0.
     if meaningChanged or capacityChanged:
         self._clearGreenRefPoolSnapshots()
         self.greenRefPoolData = empty(GreenRefPoolData)
@@ -1026,17 +1017,14 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     if meaningChanged or capacityChanged:
         assert self._addGreenRefPoolSnapshot() # dev: invalid snapshot
 
-        # Capacity changes preserve danger history, but the new seed has no
-        # completed interval and therefore cannot establish recovery credit.
+        # capacity change keeps danger history; the new seed has no completed interval, so no recovery credit.
         if not meaningChanged:
             data: GreenRefPoolData = self.greenRefPoolData
             data.numBlocksInDanger = preservedDangerBlocks
             self.greenRefPoolData = data
 
-    # A classification/freshness change preserves the ring and danger counter,
-    # but no pre-confirmation time may be credited under the new policy. The
-    # retained rollup establishes the confirmation classification; the first
-    # later observation closes an interval from this explicit boundary.
+    # classification/freshness change keeps the ring and danger counter, but no pre-confirm time is credited under the new policy.
+    # the retained rollup sets the confirm classification; the next observation closes an interval from this boundary.
     elif classificationChanged:
         self.greenPolicyBoundaryBlock = block.number
         self.greenPolicyBoundaryClassification = 0
@@ -1192,8 +1180,8 @@ def _getWeightedGreenRatio(_config: GreenRefPoolConfig, _data: GreenRefPoolData)
         return 0
     if _data.lastSnapshot.update == 0 or _data.lastSnapshot.update > block.number:
         return 0
-    # Closed intervals do not receive live-tail weight, but their classification
-    # still expires when the latest confirmed observation becomes stale.
+
+    # closed intervals get no live-tail weight; classification still expires when the latest confirmed observation is stale.
     if block.number - _data.lastSnapshot.update > _config.staleBlocks:
         return 0
 
@@ -1203,8 +1191,7 @@ def _getWeightedGreenRatio(_config: GreenRefPoolConfig, _data: GreenRefPoolData)
     hasPrevious: bool = False
     lastSeenUpdate: uint256 = 0
 
-    # nextIndex is the oldest slot when full and precedes the live prefix when
-    # partially filled, so this traversal is chronological in both cases.
+    # nextIndex is the oldest slot when full and precedes the live prefix when partial, so this walk is chronological either way.
     for offset: uint256 in range(_config.maxNumSnapshots, bound=MAX_SNAPSHOTS):
         index: uint256 = _data.nextIndex + offset
         if index >= _config.maxNumSnapshots:
@@ -1219,9 +1206,7 @@ def _getWeightedGreenRatio(_config: GreenRefPoolConfig, _data: GreenRefPoolData)
         if hasPrevious:
             duration: uint256 = snapShot.update - previous.update
             if duration <= _config.staleBlocks:
-                # Both endpoints must corroborate a high ratio. Taking the
-                # lower endpoint prevents an isolated dangerous observation
-                # from increasing the borrower rate.
+                # both endpoints must corroborate a high ratio; the lower endpoint stops an isolated danger tick from raising the borrower rate.
                 intervalRatio: uint256 = min(previous.ratio, snapShot.ratio)
                 ok: bool = False
                 weightedValue: uint256 = 0
@@ -1324,9 +1309,8 @@ def _updateGreenDangerState(
     if _config.staleBlocks == 0 or _previous.update == 0 or _previous.update >= _current.update:
         return data
 
-    # A Category C confirmation is an explicit continuity boundary. Use the
-    # retained rollup's confirmation classification as the prior endpoint, or
-    # discard the first interval when retained history was unavailable.
+    # category C confirm is a continuity boundary: use the retained rollup's confirm classification as the prior endpoint.
+    # drop the first interval if retained history is unavailable.
     policyBoundary: uint256 = self.greenPolicyBoundaryBlock
     if policyBoundary != 0:
         self.greenPolicyBoundaryBlock = 0
@@ -1372,8 +1356,7 @@ def _updateGreenDangerState(
             data.numBlocksInDanger += duration
         return data
 
-    # A recovery interval also requires matching safe endpoints. Mixed and
-    # unavailable intervals neither earn credit nor erase credit already earned.
+    # recovery also needs matching safe endpoints. Mixed or unavailable intervals neither earn nor erase credit.
     if previousDanger or currentDanger or data.numBlocksInDanger == 0:
         return data
 

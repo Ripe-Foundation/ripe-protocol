@@ -202,6 +202,9 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
     return price
 
 
+# price from source
+
+
 @view
 @internal
 def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256) -> (uint256, uint256):
@@ -216,7 +219,7 @@ def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256
 @view
 @external
 def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256):
-    # Admission checks call from the candidate source itself, so no aggregate
+    # admission checks call from the candidate source itself, so no aggregate
     # fallback can mask a source that is not executable under the live stipend.
     return self._getPriceFromSource(msg.sender, _asset, _staleTime)
 

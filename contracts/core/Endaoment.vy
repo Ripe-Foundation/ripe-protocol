@@ -147,7 +147,6 @@ MAX_TOKEN_PATH: constant(uint256) = 5
 MAX_ASSETS: constant(uint256) = 10
 MAX_LEGOS: constant(uint256) = 10
 API_VERSION: constant(String[28]) = "0.1.0"
-FIFTY_PERCENT: constant(uint256) = 50_00 # 50.00%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 LEGO_BOOK_ID: constant(uint256) = 3
 CURVE_PRICES_ID: constant(uint256) = 2
@@ -794,6 +793,7 @@ def stabilizeGreenRefPool() -> bool:
     data: StabilizerConfig = self._getGreenStabilizerConfig(a.priceDesk)
     if data.pool == empty(address) or (data.greenBalance == 0 and data.altBalance == 0):
         return False
+
     if data.greenBalance == data.altBalance:
         return False
 
@@ -950,6 +950,7 @@ def _getGreenAmountToRemove(
     # only remove Green when its normalized balance is larger
     if _data.greenBalance <= _data.altBalance:
         return 0
+
     if _lpBalance == 0 or _data.greenIndex >= 2 or not _data.pool.is_contract:
         return 0
     
