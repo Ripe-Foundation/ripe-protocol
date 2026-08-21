@@ -52,8 +52,9 @@ def flf(ripe_hq_deploy, ripe_token, float_recipient, charlie, whale, solver):
     return c
 
 
-def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None, issued=None):
+def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None, issued=None, relay_id=None):
     return (
+        relay_id or (salt or boa.env.timestamp.to_bytes(32, "big")),
         recipient,
         amount,
         out if out is not None else amount,
@@ -76,8 +77,15 @@ def _restore(flf, token, whale, ids, amount, gov_sender):
     return flf.recordRestored(ids, amount, sender=gov_sender)
 
 
-def _fill(flf, solver, order):
-    return flf.fill(order, _sign(flf, solver, order), sender=solver.address)
+def _fill(flf, solver, order, suffix=None):
+    """Relay's attestor requires the canonical order id as the terminal calldata
+    suffix, so every fill appends it. boa has no data_suffix, so build the
+    calldata and append."""
+    sig = _sign(flf, solver, order)
+    data = flf.fill.prepare_calldata(order, sig)
+    data += suffix if suffix is not None else order[0]
+    comp = boa.env.execute_code(to_address=flf.address, sender=solver.address, data=data)
+    return flf.marshal_to_python(comp, flf.fill.func_t.return_type)
 
 
 # ---------- happy path ----------
@@ -611,3 +619,38 @@ def test_burned_signer_cannot_be_reinstated_so_the_backlog_is_dead(flf, solver, 
     flf.confirmChange(aid, sender=charlie)
     with boa.reverts("not solver"):
         flf.fill(order, sig, sender=solver.address)
+
+
+# ---------- Relay attestation: the order-id calldata suffix ----------
+
+
+def test_fill_without_the_order_id_suffix_is_refused(flf, solver, bob):
+    """Relay's attestor requires transaction.input to END with the canonical
+    order id, so a fill lacking it is unattestable. Vyper tolerates trailing
+    calldata, which is why tolerance alone proves nothing -- the suffix has to
+    be read back and bound."""
+    order = _order(bob, 1 * EIGHTEEN_DECIMALS)
+    sig = _sign(flf, solver, order)
+    with boa.reverts("order id suffix"):
+        flf.fill(order, sig, sender=solver.address)   # plain ABI call, no suffix
+
+
+def test_fill_with_a_wrong_order_id_suffix_is_refused(flf, solver, bob):
+    order = _order(bob, 1 * EIGHTEEN_DECIMALS)
+    with boa.reverts("order id suffix"):
+        _fill(flf, solver, order, suffix=b"\xde" * 32)
+
+
+def test_suffix_must_equal_the_signed_relay_order_id(flf, solver, bob):
+    """The suffix is bound to a value the solver signed, so it cannot be chosen
+    at submission time even by the key holder."""
+    order = _order(bob, 1 * EIGHTEEN_DECIMALS, relay_id=b"\x5a" * 32)
+    with boa.reverts("order id suffix"):
+        _fill(flf, solver, order, suffix=b"\x5b" * 32)
+    assert _fill(flf, solver, order, suffix=b"\x5a" * 32) == flf.getOrderId(order)
+
+
+def test_zero_relay_order_id_is_refused(flf, solver, bob):
+    order = _order(bob, 1 * EIGHTEEN_DECIMALS, relay_id=b"\x00" * 32)
+    with boa.reverts("no relay order id"):
+        _fill(flf, solver, order)

@@ -46,8 +46,9 @@ def flf(ripe_hq_deploy, ripe_token, float_recipient, charlie, whale, solver):
     return c
 
 
-def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None, issued=None):
-    return (recipient, amount, out if out is not None else amount, origin,
+def _order(recipient, amount, out=None, origin=8453, deadline=None, salt=None, issued=None, relay_id=None):
+    return (relay_id or (salt or boa.env.timestamp.to_bytes(32, "big")),
+            recipient, amount, out if out is not None else amount, origin,
             issued if issued is not None else boa.env.timestamp,
             deadline if deadline is not None else boa.env.timestamp + 600,
             salt or boa.env.timestamp.to_bytes(32, "big"))
@@ -57,8 +58,15 @@ def _sign(flf, solver, order):
     return bytes(Account._sign_hash(flf.getDigest(order), solver.key).signature)
 
 
-def _fill(flf, solver, order):
-    return flf.fill(order, _sign(flf, solver, order), sender=solver.address)
+def _fill(flf, solver, order, suffix=None):
+    """Relay's attestor requires the canonical order id as the terminal calldata
+    suffix, so every fill appends it. boa has no data_suffix, so build the
+    calldata and append."""
+    sig = _sign(flf, solver, order)
+    data = flf.fill.prepare_calldata(order, sig)
+    data += suffix if suffix is not None else order[0]
+    comp = boa.env.execute_code(to_address=flf.address, sender=solver.address, data=data)
+    return flf.marshal_to_python(comp, flf.fill.func_t.return_type)
 
 
 # These began as proof-of-concept exploits against the pre-fix contract. The

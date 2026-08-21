@@ -39,6 +39,7 @@ interface RipeErc20:
     def ripeHq() -> address: view
 
 struct FillOrder:
+    relayOrderId: bytes32
     recipient: address
     inputAmount: uint256
     outputAmount: uint256
@@ -218,7 +219,7 @@ MAX_BATCH: constant(uint256) = 50
 ENTRY_CEILING: constant(uint256) = 1000
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-ORDER_TYPEHASH: constant(bytes32) = keccak256("FillOrder(address recipient,uint256 inputAmount,uint256 outputAmount,uint256 originChainId,uint256 issuedAt,uint256 deadline,bytes32 salt)")
+ORDER_TYPEHASH: constant(bytes32) = keccak256("FillOrder(bytes32 relayOrderId,address recipient,uint256 inputAmount,uint256 outputAmount,uint256 originChainId,uint256 issuedAt,uint256 deadline,bytes32 salt)")
 NAME_HASH: constant(bytes32) = keccak256("RipeFastLaneFloat")
 VERSION_HASH: constant(bytes32) = keccak256("1")
 ECRECOVER_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000001
@@ -325,6 +326,14 @@ def fill(_order: FillOrder, _signature: Bytes[65]) -> bytes32:
     # implied by the three above, and stated anyway because it is the property
     # that actually matters and the one the previous check only appeared to give
     assert block.timestamp - _order.issuedAt <= MAX_ORDER_HORIZON # dev: order too old
+    # Relay's attestor requires the canonical order id as the terminal calldata
+    # suffix (`transaction.input.endsWith(orderId)`), so a fill without it is
+    # unattestable. Vyper accepts trailing calldata, but tolerance is not
+    # binding: read it back and require it to equal the id the solver signed,
+    # otherwise the suffix is decorative and any bytes would pass.
+    assert _order.relayOrderId != empty(bytes32) # dev: no relay order id
+    assert convert(slice(msg.data, len(msg.data) - 32, 32), bytes32) == _order.relayOrderId # dev: order id suffix
+
     assert _order.originChainId != chain.id # dev: same chain
     assert _order.recipient != empty(address) # dev: invalid recipient
     assert _order.recipient != self # dev: self recipient
@@ -393,6 +402,7 @@ def _orderId(_order: FillOrder) -> bytes32:
     return keccak256(
         abi_encode(
             ORDER_TYPEHASH,
+            _order.relayOrderId,
             _order.recipient,
             _order.inputAmount,
             _order.outputAmount,
