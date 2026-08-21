@@ -7,8 +7,8 @@ EIP170_LIMIT = 24_576
 # are load-bearing for these numbers — bumping either is a deploy event.
 # RipeGov headroom is 486 bytes after the migration and SharesVault
 # remediation changes. Any RipeGov edit must remeasure this pin before merge.
-# Composed SwitchboardAlpha
-# headroom is 5 bytes (rh zero max-lock check plus execution sanitization).
+# Composed SwitchboardAlpha headroom is 5 bytes (rh zero max-lock check plus
+# execution sanitization).
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is

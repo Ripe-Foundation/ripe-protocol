@@ -134,6 +134,8 @@ def _state(
         "debt": credit_engine.getUserDebtAmount(bob),
         "vault_tokens": token.balanceOf(rebase_erc20_vault),
         "buyer_tokens": token.balanceOf(alice),
+        "user_shares": rebase_erc20_vault.userBalances(bob, token),
+        "total_shares": rebase_erc20_vault.totalBalances(token),
         "alice_teller_allowance": green_token.allowance(alice, teller),
         "auction_house_green": green_token.balanceOf(auction_house),
         "credit_engine_green": green_token.balanceOf(credit_engine),
@@ -235,7 +237,7 @@ def test_rebase_auction_exact_outflow_obeys_zero_discount_payment_cap(
     assert after["buyer_tokens"] - before["buyer_tokens"] == 100
 
 
-def test_rebase_auction_plus_one_delivery_reverts_when_collateral_exceeds_cap(
+def test_rebase_auction_plus_one_delivery_caps_credit_at_zero_discount(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -291,8 +293,14 @@ def test_rebase_auction_plus_one_delivery_reverts_when_collateral_exceeds_cap(
     )
     assert ledger.hasFungibleAuction(bob, vault_id, token)
 
-    with boa.reverts("collateral exceeds buy cap"):
-        _buy(teller, bob, vault_id, token, payment, alice)
+    # Caller credit stays capped even though the admitted token consumes and
+    # delivers one additional raw unit within MAX_TRANSFER_DELTA.
+    requested_collateral = 100
+    actual_outflow = requested_collateral + 1
+    expected_shares = rebase_erc20_vault.amountToShares(
+        token, actual_outflow, True
+    )
+    spent = _buy(teller, bob, vault_id, token, payment, alice)
 
     after = _state(
         token,
@@ -304,9 +312,20 @@ def test_rebase_auction_plus_one_delivery_reverts_when_collateral_exceeds_cap(
         auction_house,
         teller,
     )
+    logs = filter_logs(teller, "FungAuctionPurchased")
+
+    assert len(logs) == 1
+    assert logs[0].collateralAmountSent == requested_collateral
+    assert logs[0].collateralUsdValueSent == payment
+    assert logs[0].greenSpent == payment
+    assert spent == payment
+    assert before["payer_green"] - after["payer_green"] == spent
+    assert before["debt"] - after["debt"] == spent
+    assert before["vault_tokens"] - after["vault_tokens"] == actual_outflow
+    assert after["buyer_tokens"] - before["buyer_tokens"] == actual_outflow
+    assert before["user_shares"] - after["user_shares"] == expected_shares
+    assert before["total_shares"] - after["total_shares"] == expected_shares
     assert ledger.hasFungibleAuction(bob, vault_id, token)
-    assert after == before
-    assert filter_logs(teller, "FungAuctionPurchased") == []
 
 
 def test_rebase_auction_exact_outflow_at_ten_percent_discount_obeys_cap(
@@ -410,7 +429,7 @@ def test_rebase_auction_exact_outflow_at_ten_percent_discount_obeys_cap(
     assert after["buyer_tokens"] - before["buyer_tokens"] == expected_collateral_amount
 
 
-def test_rebase_auction_plus_one_delivery_at_ten_percent_discount_reverts_when_collateral_usd_exceeds_cap(
+def test_rebase_auction_plus_one_delivery_at_ten_percent_discount_caps_credit(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -481,8 +500,16 @@ def test_rebase_auction_plus_one_delivery_at_ten_percent_discount_reverts_when_c
     )
     assert ledger.hasFungibleAuction(bob, vault_id, token)
 
-    with boa.reverts("collateral exceeds buy cap"):
-        _buy(teller, bob, vault_id, token, payment, alice)
+    # Discounted caller accounting uses the capped amount; custody accounting
+    # still burns shares for the bounded conserving over-delivery.
+    actual_outflow = max_asset + 1
+    expected_shares = rebase_erc20_vault.amountToShares(
+        token, actual_outflow, True
+    )
+    expected_green = max_collateral_usd * (
+        HUNDRED_PERCENT - TEN_PERCENT
+    ) // HUNDRED_PERCENT
+    spent = _buy(teller, bob, vault_id, token, payment, alice)
 
     after = _state(
         token,
@@ -494,6 +521,18 @@ def test_rebase_auction_plus_one_delivery_at_ten_percent_discount_reverts_when_c
         auction_house,
         teller,
     )
+    logs = filter_logs(teller, "FungAuctionPurchased")
+
+    assert len(logs) == 1
+    assert logs[0].collateralAmountSent == max_asset
+    assert logs[0].collateralUsdValueSent == max_collateral_usd
+    assert logs[0].greenSpent == expected_green
+    assert spent == expected_green
+    assert spent <= payment
+    assert before["payer_green"] - after["payer_green"] == spent
+    assert before["debt"] - after["debt"] == spent
+    assert before["vault_tokens"] - after["vault_tokens"] == actual_outflow
+    assert after["buyer_tokens"] - before["buyer_tokens"] == actual_outflow
+    assert before["user_shares"] - after["user_shares"] == expected_shares
+    assert before["total_shares"] - after["total_shares"] == expected_shares
     assert ledger.hasFungibleAuction(bob, vault_id, token)
-    assert after == before
-    assert filter_logs(teller, "FungAuctionPurchased") == []
