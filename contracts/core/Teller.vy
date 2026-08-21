@@ -52,8 +52,6 @@ interface RipeGovVault:
     def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _migration: RipeGovMigrationData) -> uint256: nonpayable
     def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
-    def getTotalAmountForUser(_user: address, _asset: address) -> uint256: view
-    def doesUserHaveBalance(_user: address, _asset: address) -> bool: view
 
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view

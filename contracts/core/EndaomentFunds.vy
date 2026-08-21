@@ -31,8 +31,6 @@ event EndaomentFundsMoved:
     to: indexed(address)
     amount: uint256
 
-API_VERSION: constant(String[28]) = "0.1.0"
-
 
 @deploy
 def __init__(_ripeHq: address):

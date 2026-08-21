@@ -16,7 +16,6 @@ from interfaces import Vault
 import contracts.modules.Addys as addys
 import contracts.vaults.modules.VaultData as vaultData
 import contracts.vaults.modules.BasicVault as basicVault
-from ethereum.ercs import IERC20
 
 event SimpleErc20VaultDeposit:
     user: indexed(address)

@@ -17,7 +17,6 @@ from interfaces import Vault
 import contracts.modules.Addys as addys
 import contracts.vaults.modules.VaultData as vaultData
 import contracts.vaults.modules.SharesVault as sharesVault
-from ethereum.ercs import IERC20
 
 event RebaseErc20VaultDeposit:
     user: indexed(address)

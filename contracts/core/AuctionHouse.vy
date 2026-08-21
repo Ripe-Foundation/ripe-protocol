@@ -73,7 +73,6 @@ interface PriceDesk:
 
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
-    def burn(_amount: uint256) -> bool: nonpayable
 
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable

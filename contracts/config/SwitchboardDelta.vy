@@ -30,8 +30,6 @@ interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
     def setHrConfig(_config: cs.HrConfig): nonpayable
     def ripeBondConfig() -> cs.RipeBondConfig: view
-    def underscoreRegistry() -> address: view
-    def shouldCheckLastTouch() -> bool: view
     def hrConfig() -> cs.HrConfig: view
 
 interface BondBooster:
@@ -40,7 +38,6 @@ interface BondBooster:
     def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
     def getBoostRatio(_user: address, _units: uint256) -> uint256: view
     def setMinLockDuration(_minLockDuration: uint256): nonpayable
-    def setBondBooster(_config: BoosterConfig): nonpayable
     def removeBondBooster(_user: address): nonpayable
 
 interface HrContributor:
@@ -136,10 +133,6 @@ struct DeleverageAsset:
 struct PendingManager:
     contributor: address
     pendingManager: address
-
-struct PendingCancelPaycheck:
-    contributor: address
-    pendingShouldCancel: bool
 
 struct BoosterConfig:
     user: address

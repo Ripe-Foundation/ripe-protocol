@@ -47,7 +47,6 @@ interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
 
 interface Registry:
-    def isValidAddr(_addr: address) -> bool: view
     def getAddr(_id: uint256) -> address: view
 
 interface VaultRegistry:

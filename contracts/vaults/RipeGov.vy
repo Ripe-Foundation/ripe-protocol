@@ -38,7 +38,6 @@ import contracts.vaults.modules.SharesVault as sharesVault
 import interfaces.ConfigStructs as cs
 
 from ethereum.ercs import IERC20
-from ethereum.ercs import IERC20Detailed
 
 interface VaultBook:
     def getRegId(_vaultAddr: address) -> uint256: view

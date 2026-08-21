@@ -220,7 +220,6 @@ TRICRYPTO_NG_FACTORY_ID: constant(uint256) = 11
 STABLESWAP_NG_FACTORY_ID: constant(uint256) = 12
 TWO_CRYPTO_NG_FACTORY_ID: constant(uint256) = 13
 
-MAX_POOLS: constant(uint256) = 50
 MAX_SNAPSHOTS: constant(uint256) = 100
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
