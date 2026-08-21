@@ -5,17 +5,40 @@
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py
+# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 42563001
+#
+# Snapshot provenance:
+#   repository: ripe-foundation/ripe-protocol
+#   generator: scripts/prepare_defaults.py
+#   generator sha256: 3cde50cbfa9ae90bdc008bff6f512c9d54acdb38977083d4e5e2b89487ef6659
+#   manifest sha256: 7c447715fce4c58e3e05ce94fe2bf3e80369cd13dc43d9995dab6c4795cfa7bf
+#   Vyper compiler: 0.4.3+commit.bff19ea2
+#   Vyper compiler identity sha256: 208c7c41102f13ea781980bf0647dd003d334d34fb02b48f043459c8584aafe0
+#   MissionControl compiler-input integrity: e2289aa22fb374456f4e2c74119ed084180c40d085007db3a414199e940b50b0
+#   MissionControl canonical ABI sha256: 9778661b26a575626b7319a95f81281d39be6d4d081250f27be26f32de138903
+#   Ledger compiler-input integrity: 1f19f2370f430fc10611425f4c4b81cc6f2cd9d87d25cd30843a96adefd57476
+#   Ledger canonical ABI sha256: 2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c
+#   chain id: 4663
+#   snapshot block: 42563001
+#   snapshot block hash: 0x9e99f47a4f3d7063150fe69b81e909865e299f61deae423118c15e4a3662ba42
+#   snapshot finality: verified against the provider finalized tag
+#   MissionControl: 0x5B8b85cD2f56D1a99691de784FB50c0bf2FA3baC
+#   MissionControl code sha256: b2a7de7b9bff3ce544576a9988fff25ea5fca5119f2047d5931b1e9536b59a99
+#   Ledger: 0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d
+#   Ledger code sha256: 915e54b1263edf468241d8b1a90682385004d4cca0a0f42536a1b21ba2640f70
 #
 # This is the defaults contract for REPLACING a MissionControl or Ledger that
 # already exists. DefaultsRobinhood.vy remains the launch config for a
 # brand-new chain; the two are not interchangeable.
 #
-# Every value below was read off the live Robinhood deployment, so this is a
-# snapshot of what governance has configured rather than a set of launch
-# decisions. MissionControl and Ledger copy these into storage at
-# construction, which is the only reason a replacement for either can come up
-# matching what is already running.
+# Every policy and asset value below was read off the live Robinhood
+# deployment, so this is a snapshot of governance configuration rather than a
+# set of launch decisions. The Contributor blueprint is the sole deploy-time
+# override, allowing future clones to use the replacement generation.
+# MissionControl and Ledger copy these values into storage at construction.
+#
+# MissionControl state that Defaults has no slot for -- userConfig and
+# userDelegation -- does NOT survive the redeploy and is not represented here.
 #
 # Percentages are basis points (100_00 == 100%). Durations are in
 # `block.number`, which on this Arbitrum L2 advances roughly every 12s -- it
@@ -27,8 +50,9 @@ implements: Defaults
 from interfaces import Defaults
 import interfaces.ConfigStructs as cs
 
-# addresses -- all read from the live deployment, so there is no
-# constructor and nothing to bind at deploy time
+# addresses -- snapshotted from the live deployment. The Contributor
+# blueprint is supplied by the replacement migration so future
+# contributors use the newly deployed implementation.
 WETH: constant(address) = 0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
 RIPE_TOKEN: constant(address) = 0x4D3f37a965b21aB4122e92Dd41D2693E742c883b
 SGREEN_TOKEN: constant(address) = 0x290a52380A88f743813B8C3e9F6B0e61DB5FDF73
@@ -43,7 +67,13 @@ GME: constant(address) = 0x1b0E319c6A659F002271B69dB8A7df2F911c153E
 RIPE_WETH_LP: constant(address) = 0xba6F6CBa1a4104000847d4fdccB676E99166CEcE
 USDG: constant(address) = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
 TRAINING_WHEELS: constant(address) = 0x987DEa46AEfA442B67Faa5Db6F71024e5be01406
-CONTRIB_TEMPLATE: constant(address) = 0x2593D4eeEeaB39Eb5F86B76AE54C6f0F1A7cC567
+CONTRIB_TEMPLATE: immutable(address)
+
+
+@deploy
+def __init__(_contribTemplate: address):
+    assert _contribTemplate != empty(address) # dev: invalid contributor template
+    CONTRIB_TEMPLATE = _contribTemplate
 
 
 @view
@@ -99,7 +129,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
 @view
 @external
 def ripeAvailForRewards() -> uint256:
-    return 999945968500000000000000
+    return 999857828800000000000000
 
 
 @view
@@ -253,7 +283,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             whitelist=empty(address),
             isNft=False,
         )),
-        # RIPE
+        # RipeToken
         cs.AssetConfigEntry(asset=RIPE_TOKEN, config=cs.AssetConfig(
             vaultIds=[2],
             stakersPointsAlloc=1500,
@@ -290,7 +320,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             whitelist=empty(address),
             isNft=False,
         )),
-        # sGREEN
+        # SavingsGreen
         cs.AssetConfigEntry(asset=SGREEN_TOKEN, config=cs.AssetConfig(
             vaultIds=[1],
             stakersPointsAlloc=1500,
@@ -327,7 +357,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             whitelist=empty(address),
             isNft=False,
         )),
-        # GREEN
+        # GreenToken
         cs.AssetConfigEntry(asset=GREEN_TOKEN, config=cs.AssetConfig(
             vaultIds=[],
             stakersPointsAlloc=0,
@@ -364,7 +394,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             whitelist=empty(address),
             isNft=False,
         )),
-        # GREEN/USDG
+        # GreenUsdgPool
         cs.AssetConfigEntry(asset=GREEN_USDG_LP, config=cs.AssetConfig(
             vaultIds=[1],
             stakersPointsAlloc=2500,
@@ -623,7 +653,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             whitelist=empty(address),
             isNft=False,
         )),
-        # UNI-V2
+        # RIPE_WETH_LP
         cs.AssetConfigEntry(asset=RIPE_WETH_LP, config=cs.AssetConfig(
             vaultIds=[2],
             stakersPointsAlloc=4500,

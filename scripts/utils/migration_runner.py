@@ -125,8 +125,6 @@ class MigrationRunner:
             try:
                 migration = Migration(
                     deploy_args, self.files, timestamp, prev_timestamp, self.history_dir,
-                    # _require_start_point has established a deliberate start.
-                    allow_deployed_history=True,
                 )
                 migrate(migration)
                 self.gas += migration.end()

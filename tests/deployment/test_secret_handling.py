@@ -23,6 +23,7 @@ from config.network_profiles import (
 )
 from scripts import console, migrate, verify
 from scripts.utils import migration_helpers
+from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import TransactionExecutionError
 from scripts.utils.migration_runner import MigrationError
 
@@ -49,6 +50,22 @@ _SENSITIVE_RPC = (
     "https://synthetic-user:synthetic-password@rpc.invalid.example/"
     "path-token?api_key=query-token#fragment-token"
 )
+
+
+def test_deploy_args_log_representation_is_readable_and_redacts_rpc():
+    args = DeployArgs(
+        SimpleNamespace(address="0x" + "1" * 40),
+        "robinhood-mainnet",
+        False,
+        "robinhood",
+        _SENSITIVE_RPC,
+    )
+
+    rendered = repr(args)
+    assert "robinhood-mainnet" in rendered
+    assert "force_replay=False" in rendered
+    assert "rpc=<redacted>" in rendered
+    assert _SENSITIVE_RPC not in rendered
 
 
 @pytest.fixture(scope="session")

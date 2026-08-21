@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -268,7 +269,11 @@ def test_step_manifests_keep_the_record_and_drop_the_bulk():
     manifest outright and redirects to `--migration`.
     """
     root = Path(__file__).resolve().parents[2] / "migration_history"
-    steps = list(root.glob("*/*/[0-9]*-manifest.json"))
+    steps = [
+        path
+        for path in root.glob("*/*/[0-9]*-manifest.json")
+        if re.fullmatch(r"\d+-manifest\.json", path.name)
+    ]
     assert steps, "expected committed step manifests"
 
     for path in steps:
@@ -476,6 +481,43 @@ def test_direct_construction_cannot_bypass_the_runner_boundary(tmp_path):
         MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
     ):
         runner.run(_args(), None, "0", True)
+
+
+def test_attaching_an_old_generation_hides_only_the_boa_bytecode_dump(
+    monkeypatch, tmp_path
+):
+    import warnings
+
+    migration = _migration(_history(tmp_path, deployed=False))
+    address = "0x" + "2" * 40
+    migration._previous_manifest = {
+        "contracts": {
+            "OldGeneration": {
+                "file": "contracts/core/OldGeneration.vy",
+                "address": address,
+            }
+        }
+    }
+
+    attached = object()
+
+    class Partial:
+        def at(self, observed_address):
+            assert observed_address == address
+            warnings.warn(
+                "casted bytecode does not match compiled bytecode at <old>",
+                UserWarning,
+            )
+            warnings.warn("separate useful warning", UserWarning)
+            return attached
+
+    monkeypatch.setattr(migration_module.boa, "load_partial", lambda _file: Partial())
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert migration.get_contract("OldGeneration") is attached
+
+    assert [str(item.message) for item in caught] == ["separate useful warning"]
 
 
 # --- the start point has to name something, and be after the frontier -------

@@ -51,6 +51,17 @@ class DeployArgs:
         self.robinhood_repository_root = None
         self.robinhood_stage_executor = None
 
+    def __repr__(self):
+        sender = getattr(self.sender, "address", self.sender)
+        return (
+            "DeployArgs("
+            f"chain={self.chain!r}, "
+            f"sender={str(sender)!r}, "
+            f"blueprint={self.blueprint.blueprint!r}, "
+            f"force_replay={self.ignore_logs}, "
+            "rpc=<redacted>)"
+        )
+
 
 class LegoType:
     YIELD_OPP = 2**0  # 2 ** 0 = 1
