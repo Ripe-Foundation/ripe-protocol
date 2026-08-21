@@ -85,6 +85,8 @@ def _redemption_state(
         "borrower_debt": credit_engine.getUserDebtAmount(bob),
         "vault_tokens": token.balanceOf(rebase_erc20_vault),
         "recipient_tokens": token.balanceOf(alice),
+        "user_shares": rebase_erc20_vault.userBalances(bob, token),
+        "total_shares": rebase_erc20_vault.totalBalances(token),
     }
 
 
@@ -154,7 +156,7 @@ def test_rebase_redemption_exact_outflow_reports_full_payer_debit(
     assert vault_outflow == recipient_delivery == logs[0].amount
 
 
-def test_rebase_redemption_plus_one_outflow_reverts_atomically(
+def test_rebase_redemption_plus_one_outflow_caps_credit_and_burns_actual_outflow(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -166,7 +168,6 @@ def test_rebase_redemption_plus_one_outflow_reverts_atomically(
     teller,
     green_token,
     credit_engine,
-    credit_redeem,
     whale,
     alpha_token_whale,
     bob,
@@ -195,31 +196,41 @@ def test_rebase_redemption_plus_one_outflow_reverts_atomically(
     assert mock_price_source.getPrice(token) == 5 * EIGHTEEN_DECIMALS // 8
     assert intended_asset_cap * (5 * EIGHTEEN_DECIMALS // 8) == intended_green_cap
 
-    before = {
-        "alice_green": green_token.balanceOf(alice),
-        "alice_teller_allowance": green_token.allowance(alice, teller),
-        "credit_redeem_green": green_token.balanceOf(credit_redeem),
-        "green_supply": green_token.totalSupply(),
-        "borrower_debt": credit_engine.getUserDebtAmount(bob),
-        "vault_tokens": token.balanceOf(rebase_erc20_vault),
-        "recipient_tokens": token.balanceOf(alice),
-    }
+    actual_outflow = intended_asset_cap + 1
+    expected_shares = rebase_erc20_vault.amountToShares(
+        token, actual_outflow, True
+    )
+    before = _redemption_state(
+        token, rebase_erc20_vault, green_token, credit_engine, bob, alice
+    )
 
-    with boa.reverts("vault outflow exceeds request"):
-        teller.redeemCollateralFromMany(
-            redemptions,
-            payment,
-            False,
-            False,
-            False,
-            sender=alice,
-        )
+    spent = teller.redeemCollateralFromMany(
+        redemptions,
+        payment,
+        False,
+        False,
+        False,
+        sender=alice,
+    )
 
-    assert green_token.balanceOf(alice) == before["alice_green"]
-    assert green_token.allowance(alice, teller) == before["alice_teller_allowance"]
-    assert green_token.balanceOf(credit_redeem) == before["credit_redeem_green"]
-    assert green_token.totalSupply() == before["green_supply"]
-    assert credit_engine.getUserDebtAmount(bob) == before["borrower_debt"]
-    assert token.balanceOf(rebase_erc20_vault) == before["vault_tokens"]
-    assert token.balanceOf(alice) == before["recipient_tokens"]
-    assert filter_logs(teller, "CollateralRedeemed") == []
+    after = _redemption_state(
+        token, rebase_erc20_vault, green_token, credit_engine, bob, alice
+    )
+    logs = filter_logs(teller, "CollateralRedeemed")
+    payer_debit = before["payer_green"] - after["payer_green"]
+    burned = before["green_supply"] - after["green_supply"]
+    debt_reduction = before["borrower_debt"] - after["borrower_debt"]
+    vault_outflow = before["vault_tokens"] - after["vault_tokens"]
+    recipient_delivery = after["recipient_tokens"] - before["recipient_tokens"]
+    user_shares_burned = before["user_shares"] - after["user_shares"]
+    total_shares_burned = before["total_shares"] - after["total_shares"]
+
+    assert len(logs) == 1
+    assert logs[0].vaultId == vault_id
+    assert logs[0].amount == intended_asset_cap
+    assert logs[0].repayValue == intended_green_cap
+    assert spent == intended_green_cap
+    assert spent == payer_debit == burned == debt_reduction
+    assert vault_outflow == actual_outflow
+    assert recipient_delivery == intended_asset_cap
+    assert user_shares_burned == total_shares_burned == expected_shares

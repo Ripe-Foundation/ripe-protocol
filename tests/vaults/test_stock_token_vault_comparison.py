@@ -1139,9 +1139,12 @@ def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
         bob, vault_id, stock_token, payment, False,
         should_transfer_balance, False, sender=alice,
     )
-    assert green_spent == payment
-    assert green_token.balanceOf(alice) == green_before - payment
-    assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
+    # DV-001 floors internal SharesVault transfers to the represented amount;
+    # the buyer can spend at most the quote and at most one wei less here.
+    assert 0 < green_spent <= payment
+    assert payment - green_spent <= 1
+    assert green_token.balanceOf(alice) == green_before - green_spent
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - green_spent
 
     collateral = 40 * EIGHTEEN_DECIMALS
     if should_transfer_balance:
@@ -1579,17 +1582,21 @@ def test_auction_started_after_partial_issuer_loss_skips_deficient_simple(
     green_token.approve(teller, payment, sender=alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
     live_before = stock_token.balanceOf(vault)
-    assert buy_fungible_auction(teller,
+    green_spent = buy_fungible_auction(teller,
         bob, vault_id, stock_token, payment, False,
         should_transfer_balance, False, sender=alice,
-    ) == payment
-    assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
+    )
+    # Internal SharesVault delivery is floored to its represented collateral;
+    # external delivery remains exact, and neither path can overspend the quote.
+    assert 0 < green_spent <= payment
+    assert payment - green_spent <= 1
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - green_spent
 
     purchase_event = filter_logs(teller, "FungAuctionPurchased")
     assert len(purchase_event) == 1
-    assert purchase_event[0].greenSpent == payment
+    assert purchase_event[0].greenSpent == green_spent
     assert purchase_event[0].collateralAmountSent in (collateral, collateral - 1)
-    assert purchase_event[0].collateralUsdValueSent == 20 * EIGHTEEN_DECIMALS
+    assert purchase_event[0].collateralUsdValueSent == green_spent
     if should_transfer_balance:
         assert stock_token.balanceOf(alice) == 0
         assert collateral - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= collateral

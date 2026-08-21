@@ -11,8 +11,9 @@ Invariant: immediately before settlement Deleverage re-reads the live debt and
     - otherwise settles using the REFRESHED full struct + interest (never the stale
       snapshot), so a same-amount nested mutation cannot double-count interest.
 
-A shared @nonreentrant guard on the external debt-writing routes additionally
-blocks cross-entry reentrancy between guarded Deleverage routes (defense in depth).
+The stale-debt cases call Deleverage directly as Teller to isolate that defense
+after Teller's deleverage wrappers became guarded. Production Teller entry
+points additionally block callback-time cross-entry with their shared lock.
 """
 
 import pytest
@@ -178,7 +179,7 @@ def _vault_position_snapshot(vault, user, asset):
 
 
 def test_sc07_specific_assets_reverts_on_reentrant_repay(
-    sc07_setup, teller, ledger, credit_engine, green_token, reenter_token,
+    sc07_setup, deleverage, teller, ledger, credit_engine, green_token, reenter_token,
     simple_erc20_vault, endaoment_funds, bob, switchboard_alpha,
 ):
     """Partial reentrant repay -> revert "debt changed" + total atomic rollback."""
@@ -198,7 +199,9 @@ def test_sc07_specific_assets_reverts_on_reentrant_repay(
 
     assets = [(simple_id, reenter_token.address, 100 * EIGHTEEN_DECIMALS)]
     with boa.reverts("debt changed"):
-        teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
+        deleverage.deleverageWithSpecificAssets(
+            bob, assets, switchboard_alpha.address, sender=teller.address
+        )
 
     # full struct rolled back
     _assert_debt_struct_unchanged(ledger, bob, before)
@@ -220,7 +223,7 @@ def test_sc07_specific_assets_reverts_on_reentrant_repay(
 
 
 def test_sc07_broad_deleverage_reverts_on_reentrant_repay(
-    sc07_setup, teller, ledger, green_token, reenter_token, bravo_token,
+    sc07_setup, deleverage, teller, ledger, green_token, reenter_token, bravo_token,
     simple_erc20_vault, rebase_erc20_vault, endaoment_funds, bob,
     switchboard_alpha,
 ):
@@ -247,7 +250,9 @@ def test_sc07_broad_deleverage_reverts_on_reentrant_repay(
     pre_bravo_position = _vault_position_snapshot(rebase_erc20_vault, bob, bravo_token)
 
     with boa.reverts("debt changed"):
-        teller.deleverageManyUsers([(bob, 0)], sender=switchboard_alpha.address)
+        deleverage.deleverageManyUsers(
+            [(bob, 0)], switchboard_alpha.address, sender=teller.address
+        )
 
     _assert_debt_struct_unchanged(ledger, bob, before)
     assert green_token.totalSupply() == pre_green_supply
@@ -299,7 +304,7 @@ def test_sc07_vol_assets_reverts_on_reentrant_repay(
 
 
 def test_sc07_reentrant_borrow_change_reverts(
-    sc07_setup, setUserDelegation, teller, ledger, green_token, reenter_token,
+    sc07_setup, setUserDelegation, deleverage, teller, ledger, green_token, reenter_token,
     simple_erc20_vault, endaoment_funds, bob, switchboard_alpha,
 ):
     """Nested Teller.borrow (increase) also trips the guard; full rollback."""
@@ -316,7 +321,9 @@ def test_sc07_reentrant_borrow_change_reverts(
 
     assets = [(simple_id, reenter_token.address, 100 * EIGHTEEN_DECIMALS)]
     with boa.reverts("debt changed"):
-        teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
+        deleverage.deleverageWithSpecificAssets(
+            bob, assets, switchboard_alpha.address, sender=teller.address
+        )
 
     _assert_debt_struct_unchanged(ledger, bob, before)
     assert green_token.totalSupply() == pre_green_supply
@@ -331,7 +338,7 @@ def test_sc07_reentrant_borrow_change_reverts(
 
 
 def test_sc07_full_repay_during_callback_reverts(
-    sc07_setup, teller, ledger, green_token, reenter_token, simple_erc20_vault,
+    sc07_setup, deleverage, teller, ledger, green_token, reenter_token, simple_erc20_vault,
     endaoment_funds, bob, switchboard_alpha,
 ):
     """Callback fully repays the debt (amount -> 0); guard must catch it."""
@@ -346,7 +353,9 @@ def test_sc07_full_repay_during_callback_reverts(
 
     assets = [(simple_id, reenter_token.address, 100 * EIGHTEEN_DECIMALS)]
     with boa.reverts("debt changed"):
-        teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
+        deleverage.deleverageWithSpecificAssets(
+            bob, assets, switchboard_alpha.address, sender=teller.address
+        )
 
     _assert_debt_struct_unchanged(ledger, bob, before)
     assert green_token.totalSupply() == pre_green_supply
@@ -363,7 +372,7 @@ def test_sc07_full_repay_during_callback_reverts(
 
 
 def test_sc07_same_amount_mutation_uses_refreshed_struct_and_interest(
-    sc07_setup, setUserDelegation, teller, ledger, credit_engine, reenter_token,
+    sc07_setup, setUserDelegation, deleverage, teller, ledger, credit_engine, reenter_token,
     bob, switchboard_alpha,
 ):
     """
@@ -404,7 +413,9 @@ def test_sc07_same_amount_mutation_uses_refreshed_struct_and_interest(
     assets = [(simple_id, reenter_token.address, small_target)]
 
     # amount is restored -> guard passes, deleverage settles
-    repaid = teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
+    repaid = deleverage.deleverageWithSpecificAssets(
+        bob, assets, switchboard_alpha.address, sender=teller.address
+    )
     assert repaid == small_target
 
     after = ledger.userDebt(bob)
@@ -425,13 +436,14 @@ def test_sc07_same_amount_mutation_uses_refreshed_struct_and_interest(
 
 
 def test_sc07_cross_entry_deleverage_reentrancy_blocked(
-    sc07_setup, teller, ledger, green_token, reenter_token, endaoment_funds,
+    sc07_setup, deleverage, teller, ledger, green_token, reenter_token, endaoment_funds,
     simple_erc20_vault, bob, switchboard_alpha,
 ):
     """
-    While deleverageWithSpecificAssets runs, a callback that reenters the guarded
-    deleverageManyUsers route must be rejected by the shared @nonreentrant lock
-    (Vyper emits a bare revert), reverting the whole tx before any debt mutation.
+    While Deleverage.deleverageWithSpecificAssets runs, a callback that enters
+    Teller.deleverageManyUsers must be rejected by Deleverage's already-held
+    shared @nonreentrant lock (Vyper emits a bare revert), reverting the whole
+    transaction before any debt mutation.
     A baseline run with the callback disarmed settles normally, isolating the lock
     as the cause of the reverting run.
     """
@@ -447,7 +459,9 @@ def test_sc07_cross_entry_deleverage_reentrancy_blocked(
     pre_position = _vault_position_snapshot(simple_erc20_vault, bob, reenter_token)
 
     with boa.reverts("token transfer failed"):  # shared nonreentrant lock -> bare revert
-        teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
+        deleverage.deleverageWithSpecificAssets(
+            bob, assets, switchboard_alpha.address, sender=teller.address
+        )
 
     # rejected before any state change (lock fires before the debt-refresh guard)
     _assert_debt_struct_unchanged(ledger, bob, before)
@@ -459,7 +473,9 @@ def test_sc07_cross_entry_deleverage_reentrancy_blocked(
     # baseline: same setup, callback disarmed -> the outer route settles normally,
     # proving the revert above is caused by the reentry, not the scenario itself.
     reenter_token.disableAttack(sender=reenter_token.hq())
-    repaid = teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
+    repaid = deleverage.deleverageWithSpecificAssets(
+        bob, assets, switchboard_alpha.address, sender=teller.address
+    )
     assert repaid > 0
     assert _stored_debt(ledger, bob).amount < before.amount
 
