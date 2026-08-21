@@ -65,7 +65,9 @@ interface RipeGovVault:
 
 interface VaultMigrator:
     def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateVaultPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
     def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256) -> uint256: nonpayable
     def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
 
 interface VaultBook:
@@ -482,6 +484,7 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
 MAX_MIGRATION_USERS: constant(uint256) = 25
+MAX_MIGRATION_ASSETS: constant(uint256) = 20
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 8
@@ -564,6 +567,19 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
     return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositions(_users, _sourceVaultId)
 
 
+@external
+def migrateRipeGovPositionsForUserByAssets(
+    _user: address,
+    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
+    _sourceVaultId: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert len(_assets) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 # dev: invalid source vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositionsForUserByAssets(_user, _assets, _sourceVaultId)
+
+
 # basic vault migrations
 
 
@@ -577,6 +593,20 @@ def migrateVaultPositions(
     assert len(_users) != 0 # dev: no migrations
     assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
     return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositions(_users, _sourceVaultId, _targetVaultId)
+
+
+@external
+def migrateVaultPositionsForUserByAssets(
+    _user: address,
+    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert len(_assets) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositionsForUserByAssets(_user, _assets, _sourceVaultId, _targetVaultId)
 
 
 # legacy ripe gov migrations (Base chain only)
