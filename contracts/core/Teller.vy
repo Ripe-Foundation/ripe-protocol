@@ -38,15 +38,6 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
-    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
-    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
-    def preferredStabVaultId() -> uint256: view
-    def coreRipeGovVaultId() -> uint256: view
-    def shouldCheckLastTouch() -> bool: view
-
 interface TellerUtils:
     def validateOnDeposit(_asset: address, _amount: uint256, _user: address, _vaultId: uint256, _vaultAddr: address, _depositor: address, _didAlreadyValidateSender: bool, _areFundsHereAlready: bool, _d: DepositLedgerData, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def validateOnWithdrawal(_asset: address, _amount: uint256, _user: address, _vaultAddr: address, _vaultId: uint256, _caller: address, _config: TellerWithdrawConfig, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
@@ -61,6 +52,15 @@ interface RipeGovVault:
     def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _migration: RipeGovMigrationData) -> uint256: nonpayable
     def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def shouldCheckLastTouch() -> bool: view
 
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
@@ -784,7 +784,7 @@ def adjustLock(
 ):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, msg.sender, a)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
     self._performHousekeeping(False, _user, True, True, a)
 
@@ -798,7 +798,7 @@ def releaseLock(
 ):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, msg.sender, a)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
     self._performHousekeeping(True, _user, True, True, a)
 
@@ -971,11 +971,11 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
 
 @view
 @internal
-def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _sender: address, _a: addys.Addys) -> address:
+def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _a: addys.Addys) -> address:
     assert (
-        _user == _sender
-        or addys._isSwitchboardAddr(_sender)
-        or staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, _sender, _a.missionControl)
+        _user == msg.sender
+        or addys._isSwitchboardAddr(msg.sender)
+        or staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, _a.missionControl)
     ) # dev: no perms
     vaultId: uint256 = self._getCoreRipeGovVaultId(_a.missionControl)
     if _vaultId != 0:
