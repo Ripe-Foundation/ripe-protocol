@@ -188,8 +188,6 @@ def test_first_quote_matches_initializing_purchase_and_events(lane_env):
 
     assert quote.available
     assert quote.epoch == 0
-    assert quote.pricingConfigVersion == 1
-    assert quote.liveConfigVersion == 1
     assert quote.rate == 10**18
     assert quote.remainingPayment == 1_000 * lane_env.scale
     assert quote.minPaymentAmount == lane_env.scale
@@ -219,7 +217,6 @@ def test_first_quote_matches_initializing_purchase_and_events(lane_env):
     assert lane_env.lane.epochPaymentCap() == quote.remainingPayment
     assert lane_env.lane.epochMinPaymentAmount() == quote.minPaymentAmount
     assert lane_env.lane.epochMaxLockBonus() == 5_000
-    assert lane_env.lane.epochPricingVersion() == quote.pricingConfigVersion
     assert lane_env.lane.epochAcceptedPayment() == amount
     assert lane_env.lane.epochWeightedLateness() == 0
     assert lane_env.lane.epochTimingEligible()
@@ -235,16 +232,12 @@ def test_first_quote_matches_initializing_purchase_and_events(lane_env):
     assert init[0].minPaymentAmount == lane_env.scale
     assert init[0].maxLockBonus == 5_000
     assert init[0].timingEligible
-    assert init[0].pricingConfigVersion == 1
     assert purchase[0].buyer == lane_env.bob
     assert purchase[0].paymentAmount == amount
     assert purchase[0].baseRipe == quote.baseRipe
     assert purchase[0].bonusRipe == 0
     assert purchase[0].totalRipe == payout
     assert purchase[0].epoch == quote.epoch
-    assert purchase[0].pricingConfigVersion == 1
-    assert purchase[0].liveConfigVersion == 1
-    assert purchase[0].ripeGovVaultId == 0
 
 
 def test_failed_first_purchase_is_fully_atomic(lane_env, alice):
@@ -588,16 +581,12 @@ def test_prospective_pricing_config_and_live_version_separation(lane_env):
     )
 
     running = lane_env.quote(lane_env.scale)
-    assert running.pricingConfigVersion == 1
-    assert running.liveConfigVersion == 2
     assert running.rate == old_rate
     assert running.minPaymentAmount == old[2]
     assert running.remainingPayment == old[1] - lane_env.scale
 
     boa.env.time_travel(blocks=lane_env.epoch_length)
     rolled = lane_env.quote(new_minimum)
-    assert rolled.pricingConfigVersion == 2
-    assert rolled.liveConfigVersion == 2
     assert rolled.remainingPayment == new_cap
     assert rolled.minPaymentAmount == new_minimum
 
@@ -614,7 +603,6 @@ def test_prospective_pricing_config_and_live_version_separation(lane_env):
     assert event.previousPaymentCap == old[1]
     assert event.previousWeightedLateness == 0
     assert event.previousTimingEligible
-    assert event.pricingConfigVersion == 2
 
 
 def test_every_pricing_field_is_prospective_while_live_controls_are_immediate(
@@ -642,8 +630,6 @@ def test_every_pricing_field_is_prospective_while_live_controls_are_immediate(
         maxLockBonus=0,
     )
     running = lane_env.quote(lane_env.scale)
-    assert running.pricingConfigVersion == 1
-    assert running.liveConfigVersion == 2
     assert running.rate == old_rate
     assert running.rate > new[4]
     assert running.remainingPayment == old_remaining
@@ -696,7 +682,6 @@ def test_every_pricing_field_is_prospective_while_live_controls_are_immediate(
     )
     boa.env.time_travel(blocks=lane_env.epoch_length)
     rolled = lane_env.quote(new[2])
-    assert rolled.pricingConfigVersion == 4
     assert rolled.rate <= new[4]
     assert rolled.remainingPayment == new[1]
     assert rolled.minPaymentAmount == new[2]
@@ -862,30 +847,25 @@ def test_events_reconstruct_config_and_epoch_history_from_indexed_keys(lane_env)
     rolled_events.extend(filter_logs(lane_env.lane, "EpochRolled"))
     purchase_events.extend(filter_logs(lane_env.lane, "InstantBondPurchased"))
 
-    assert [event.newVersion for event in config_events] == [1, 2, 3]
     assert [event.paymentCapPerEpoch for event in config_events] == [
         config_v1[1],
         config_v2[1],
         config_v3[1],
     ]
+    assert [event.epoch for event in initialized_events] == [0]
     assert [
-        (event.epoch, event.pricingConfigVersion)
-        for event in initialized_events
-    ] == [(0, 1)]
-    assert [
-        (event.fromEpoch, event.toEpoch, event.pricingConfigVersion)
+        (event.fromEpoch, event.toEpoch)
         for event in rolled_events
-    ] == [(0, 1, 2), (1, 2, 3)]
+    ] == [(0, 1), (1, 2)]
     assert [
-        (event.buyer, event.epoch, event.pricingConfigVersion)
+        (event.buyer, event.epoch)
         for event in purchase_events
     ] == [
-        (lane_env.bob, 0, 1),
-        (lane_env.bob, 0, 1),
-        (lane_env.bob, 1, 2),
-        (lane_env.bob, 2, 3),
+        (lane_env.bob, 0),
+        (lane_env.bob, 0),
+        (lane_env.bob, 1),
+        (lane_env.bob, 2),
     ]
-    assert [event.liveConfigVersion for event in purchase_events] == [1, 2, 2, 3]
 
     latest_roll = rolled_events[-1]
     assert lane_env.lane.currentEpoch() == latest_roll.toEpoch == third_epoch.epoch
@@ -893,7 +873,6 @@ def test_events_reconstruct_config_and_epoch_history_from_indexed_keys(lane_env)
     assert lane_env.lane.epochPaymentCap() == latest_roll.newPaymentCap == config_v3[1]
     assert lane_env.lane.epochMinPaymentAmount() == latest_roll.newMinPaymentAmount == config_v3[2]
     assert lane_env.lane.epochMaxLockBonus() == latest_roll.newMaxLockBonus == config_v3[14]
-    assert lane_env.lane.epochPricingVersion() == latest_roll.pricingConfigVersion == 3
     assert lane_env.lane.epochAcceptedPayment() == 3 * lane_env.scale
 
 
@@ -914,7 +893,7 @@ def test_preview_is_unavailable_when_endaoment_destination_is_unset(lane_env):
         100,
     )
     config = lane_env.make_config()
-    lane.setConfig(config, 0, sender=lane_env.bob)
+    lane.setConfig(config, sender=lane_env.bob)
     lane.pause(False, sender=lane_env.bob)
 
     quote = lane.previewBuyNow(lane_env.scale, 0)

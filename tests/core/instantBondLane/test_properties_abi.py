@@ -189,9 +189,8 @@ def test_event_abi_names_order_and_indexing():
         "minPaymentAmount",
         "maxLockBonus",
         "timingEligible",
-        "pricingConfigVersion",
     ]
-    assert indexed_fields(initialized) == ["epoch", "pricingConfigVersion"]
+    assert indexed_fields(initialized) == ["epoch"]
 
     assert [item["name"] for item in rolled["inputs"]] == [
         "fromEpoch",
@@ -209,12 +208,10 @@ def test_event_abi_names_order_and_indexing():
         "effectiveAdjustmentBps",
         "decaySteps",
         "controllerRate",
-        "pricingConfigVersion",
     ]
     assert indexed_fields(rolled) == [
         "fromEpoch",
         "toEpoch",
-        "pricingConfigVersion",
     ]
 
     assert [item["name"] for item in purchased["inputs"]] == [
@@ -227,16 +224,12 @@ def test_event_abi_names_order_and_indexing():
         "totalRipe",
         "epochRate",
         "epoch",
-        "pricingConfigVersion",
-        "liveConfigVersion",
-        "ripeGovVaultId",
     ]
     assert indexed_fields(purchased) == [
         "buyer",
         "epoch",
-        "pricingConfigVersion",
     ]
-    assert indexed_fields(config_set) == ["newVersion"]
+    assert indexed_fields(config_set) == []
 
     override_events = {
         name: event_abi(path, name)
@@ -250,11 +243,9 @@ def test_event_abi_names_order_and_indexing():
     assert [item["name"] for item in override_events["RateOverrideInstalled"]["inputs"]] == [
         "newVersion",
         "targetRate",
-        "boundConfigVersion",
     ]
     assert indexed_fields(override_events["RateOverrideInstalled"]) == [
         "newVersion",
-        "boundConfigVersion",
     ]
     assert [item["name"] for item in override_events["RateOverrideApplied"]["inputs"]] == [
         "newVersion",
@@ -276,11 +267,9 @@ def test_event_abi_names_order_and_indexing():
     assert [item["name"] for item in override_events["RateOverrideInvalidated"]["inputs"]] == [
         "newVersion",
         "targetRate",
-        "newConfigVersion",
     ]
     assert indexed_fields(override_events["RateOverrideInvalidated"]) == [
         "newVersion",
-        "newConfigVersion",
     ]
 
 
@@ -306,15 +295,6 @@ def test_quote_and_purchase_constraint_abi_is_explicit():
             "_expectedEpoch",
             "_minRipeOut",
             "_deadlineBlock",
-            "_expectedCoreRipeGovVaultId",
-        ],
-        [
-            "_paymentAmount",
-            "_requestedLock",
-            "_expectedEpoch",
-            "_minRipeOut",
-            "_deadlineBlock",
-            "_expectedCoreRipeGovVaultId",
             "_minActualLock",
         ],
     ]
@@ -327,8 +307,6 @@ def test_quote_and_purchase_constraint_abi_is_explicit():
     assert [component["name"] for component in preview["outputs"][0]["components"]] == [
         "available",
         "epoch",
-        "pricingConfigVersion",
-        "liveConfigVersion",
         "rate",
         "remainingPayment",
         "minPaymentAmount",
@@ -355,7 +333,7 @@ def test_instant_bond_config_struct_bodies_are_byte_for_byte_identical():
 
 
 @pytest.mark.artifact
-def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
+def test_indexed_epoch_topics_filter_raw_runtime_logs(lane_env):
     path = "contracts/core/InstantBondLane.vy"
     initialized_topic = event_topic(path, "EpochInitialized")
     rolled_topic = event_topic(path, "EpochRolled")
@@ -368,7 +346,7 @@ def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
         RawLogEntry(*entry)
         for entry in lane_env.lane._computation.get_raw_log_entries()
     ]
-    assert any(list(log.topics) == [config_topic, 1] for log in raw_logs)
+    assert any(list(log.topics) == [config_topic] for log in raw_logs)
 
     first = lane_env.quote(lane_env.scale)
     lane_env.buy(
@@ -380,9 +358,9 @@ def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
         RawLogEntry(*entry)
         for entry in lane_env.lane._computation.get_raw_log_entries()
     ]
-    assert any(list(log.topics) == [initialized_topic, 0, 1] for log in raw_logs)
+    assert any(list(log.topics) == [initialized_topic, 0] for log in raw_logs)
     assert any(
-        list(log.topics) == [purchased_topic, buyer_topic, 0, 1]
+        list(log.topics) == [purchased_topic, buyer_topic, 0]
         for log in raw_logs
     )
 
@@ -391,7 +369,7 @@ def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
         RawLogEntry(*entry)
         for entry in lane_env.lane._computation.get_raw_log_entries()
     ]
-    assert any(list(log.topics) == [config_topic, 2] for log in raw_logs)
+    assert any(list(log.topics) == [config_topic] for log in raw_logs)
 
     boa.env.time_travel(blocks=lane_env.epoch_length)
     second = lane_env.quote(lane_env.scale)
@@ -404,9 +382,9 @@ def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
         RawLogEntry(*entry)
         for entry in lane_env.lane._computation.get_raw_log_entries()
     ]
-    assert any(list(log.topics) == [rolled_topic, 0, 1, 2] for log in raw_logs)
+    assert any(list(log.topics) == [rolled_topic, 0, 1] for log in raw_logs)
     assert any(
-        list(log.topics) == [purchased_topic, buyer_topic, 1, 2]
+        list(log.topics) == [purchased_topic, buyer_topic, 1]
         for log in raw_logs
     )
 
@@ -556,7 +534,7 @@ def test_worst_case_valid_config_payout_across_decimal_counts(
                 max_bonus,
             )
             assert lane.isValidConfig(config)
-            lane.setConfig(config, 0, sender=switchboard_alpha.address)
+            lane.setConfig(config, sender=switchboard_alpha.address)
 
             quote = lane.previewBuyNow(cap, 2)
             assert quote.baseRipe == cap * seed // scale
@@ -703,7 +681,7 @@ def test_fuzz_valid_worst_case_payout_never_overflows_and_respects_floor(
             max_bonus,
         )
         assert lane.isValidConfig(config)
-        lane.setConfig(config, 0, sender=switchboard_alpha.address)
+        lane.setConfig(config, sender=switchboard_alpha.address)
 
         quote = lane.previewBuyNow(cap, 2)
         assert quote.rate == derived_ceiling

@@ -195,16 +195,14 @@ rateOverride       # exact target; zero means none installed
 overrideVersion    # independent optimistic lifecycle version
 ```
 
-There is no stored config-version binding. Installation validates the exact current
-config version and records it only as the `boundConfigVersion` event field in
-`RateOverrideInstalled`; every subsequent full config write synchronously invalidates
-an installed target. The override version advances
+There is no stored config-version binding. Every subsequent full config write
+synchronously invalidates an installed target. The override version advances
 once on installation, successful application, installed cancellation, or config
 invalidation. Preview, same-epoch purchases, failed execution, expired queued-action
 cleanup, and reverted settlement do not advance it.
 
-Installation requires an initialized Lane, an empty override slot, exact expected
-config and override versions, and a target between `MIN_BASE_RATE` and the live derived
+Installation requires an initialized Lane, an empty override slot, the exact expected
+override version, and a target between `MIN_BASE_RATE` and the live derived
 base-rate ceiling. Invalid targets revert rather than being clamped.
 
 For stored epoch `S` and projected deterministic epoch `E`:
@@ -429,13 +427,13 @@ Key Lane views and entry points are:
 
 ```text
 isValidConfig(config)
-setConfig(config, expectedVersion)
-isValidRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
-setRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
+setConfig(config)
+isValidRateOverride(targetRate, expectedOverrideVersion)
+setRateOverride(targetRate, expectedOverrideVersion)
 canCancelRateOverride(expectedOverrideVersion)
 cancelRateOverride(expectedOverrideVersion)
 buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock,
-       expectedCoreRipeGovVaultId=0, minActualLock=0)
+       minActualLock=0)
 previewBuyNow(paymentAmount, requestedLock)
 
 rateOverride
@@ -446,16 +444,16 @@ epochTimingEligible
 
 The public immutables are `PAYMENT_TOKEN`, `PAYMENT_DECIMALS`, `PAYMENT_SCALE`,
 `GENESIS_BLOCK`, and `EPOCH_LENGTH`. Public stored state is `config`,
-`configVersion`, `isInitialized`, `currentEpoch`, `epochRate`, `epochPaymentCap`,
-`epochMinPaymentAmount`, `epochMaxLockBonus`, `epochPricingVersion`,
+`isInitialized`, `currentEpoch`, `epochRate`, `epochPaymentCap`,
+`epochMinPaymentAmount`, `epochMaxLockBonus`,
 `epochAcceptedPayment`, `epochWeightedLateness`, `epochTimingEligible`,
 `rateOverride`, `overrideVersion`, and `cumulativeMinted`.
 
 Key Foxtrot workflows are:
 
 ```text
-setInstantBondConfig(config, expectedVersion)
-setInstantBondRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
+setInstantBondConfig(config)
+setInstantBondRateOverride(targetRate, expectedOverrideVersion)
 cancelInstantBondRateOverride(expectedOverrideVersion)
 executePendingAction(aid)
 cancelPendingAction(aid)

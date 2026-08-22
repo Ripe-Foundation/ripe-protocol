@@ -155,14 +155,12 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
 
 def settlement_snapshot(ctx):
     return (
-        ctx.lane.configVersion(),
         ctx.lane.isInitialized(),
         ctx.lane.currentEpoch(),
         ctx.lane.epochRate(),
         ctx.lane.epochPaymentCap(),
         ctx.lane.epochMinPaymentAmount(),
         ctx.lane.epochMaxLockBonus(),
-        ctx.lane.epochPricingVersion(),
         ctx.lane.epochAcceptedPayment(),
         ctx.lane.epochWeightedLateness(),
         ctx.lane.epochTimingEligible(),
@@ -276,7 +274,6 @@ def test_live_lock_terms_change_within_epoch_without_changing_epoch_bonus(lane_e
     lane_env.setup_lock_terms(min_lock=200, max_lock=800)
     second = lane_env.quote(amount, 550)
     assert second.epoch == first.epoch
-    assert second.pricingConfigVersion == first.pricingConfigVersion
     assert second.rate == first.rate
     assert second.bonusRatio == 3_500
     assert second.actualLock == 550

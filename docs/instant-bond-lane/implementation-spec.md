@@ -129,9 +129,10 @@ their named operational owners supply production values.
   state read-only.
 - There is no reactivation/rebaseline branch. An unavailable gap is ordinary empty
   time and receives at most `maxDecayEpochs` decay steps at the next rollover.
-- Config staleness is enforced in the lane itself with `expectedVersion`.
-- Every epoch snapshots the version that supplied its rate, cap, minimum payment, and
-  maximum bonus.
+- Config writes are last-write-wins, matching MissionControl ripe-bond config. There is
+  no `configVersion` or `expectedVersion` CAS.
+- Epochs snapshot rate, cap, minimum payment, and maximum bonus at initialization or
+  rollover. They do not snapshot a config generation counter.
 - `MIN_BASE_RATE = 10_000` is an engineering liveness floor that prevents inverse-rate
   recovery from becoming an integer fixed point. It is not an economic calibration
   substitute or a complete defense against mis-scaled governance inputs.
@@ -151,8 +152,6 @@ their named operational owners supply production values.
 - Config events emit all fields rather than only a hash.
 - Rollover events emit the complete new epoch snapshot as well as the previous epoch's
   utilization inputs.
-- Pricing config versions are indexed consistently across initialization, rollover,
-  and purchase events for monitoring.
 - Preview remains a caller-specific quote with a boolean availability signal. It
   preflights every deterministic same-state prerequisite reasonably exposed by the
   current protocol interfaces, while ordinary transaction-order races remain possible.
@@ -359,7 +358,6 @@ Lane state holds:
 
 ```text
 config                  # current governed config
-configVersion           # starts 0; increments after every successful setConfig
 isInitialized
 
 currentEpoch
@@ -367,7 +365,6 @@ epochRate               # fixed base rate for currentEpoch
 epochPaymentCap         # fixed cap for currentEpoch
 epochMinPaymentAmount   # fixed minimum purchase for currentEpoch
 epochMaxLockBonus       # fixed bonus magnitude for currentEpoch
-epochPricingVersion     # config version that supplied the epoch pricing fields
 epochAcceptedPayment
 epochWeightedLateness   # sum(paymentAmount * latenessBps) for the stored epoch
 epochTimingEligible     # whether timing may amplify the high-utilization step
@@ -381,10 +378,10 @@ cumulativeMinted        # all RIPE minted by the lane, including bonuses
 No epoch-history mapping is stored. Events are the historical audit record.
 
 Required read ABI exposes `PAYMENT_TOKEN`, `PAYMENT_DECIMALS`, `PAYMENT_SCALE`,
-`GENESIS_BLOCK`, and `EPOCH_LENGTH` as public immutables; `config`, `configVersion`,
-and `cumulativeMinted` are public. The complete stored epoch snapshot is also public:
+`GENESIS_BLOCK`, and `EPOCH_LENGTH` as public immutables; `config` and
+`cumulativeMinted` are public. The complete stored epoch snapshot is also public:
 `isInitialized`, `currentEpoch`, `epochRate`, `epochPaymentCap`,
-`epochMinPaymentAmount`, `epochMaxLockBonus`, `epochPricingVersion`, and
+`epochMinPaymentAmount`, `epochMaxLockBonus`, and
 `epochAcceptedPayment`, `epochWeightedLateness`, and `epochTimingEligible`. The
 installed `rateOverride` and its independent `overrideVersion` are also public. The
 switchboard depends on the lane validators and version getters, while operators
@@ -500,8 +497,9 @@ totalRipe * PAYMENT_SCALE
     <= paymentAmount * epochMaxEffectiveRate
 ```
 
-Here `epochMaxEffectiveRate` means the value in the config identified by
-`epochPricingVersion`; it does not mean a newer live config installed mid-epoch.
+Here `epochMaxEffectiveRate` means the max effective rate from the config that
+supplied the snapshotted epoch rate and bonus; it does not mean a newer live config
+installed mid-epoch.
 Tests use cross multiplication, not truncating division.
 
 A governance action that lowers `maxEffectiveRate` is **prospective**: the tighter
@@ -617,9 +615,9 @@ values. Because `EPOCH_LENGTH` is immutable, historical epoch indices never rema
 
 The lane has one initialization path:
 
-1. Deployment leaves `configVersion == 0` and `isInitialized == false`.
-2. Timelocked `setConfig(config, expectedVersion=0)` installs the first validated
-   config and sets `configVersion = 1`; the lane remains paused and `canBuyNow=false`.
+1. Deployment leaves an empty, invalid config and `isInitialized == false`.
+2. Timelocked `setConfig(config)` installs the first validated
+   config; the lane remains paused and `canBuyNow=false`.
 3. Governance later installs an enabling config and unpauses the Department.
 4. The first successful `buyNow` at or after genesis initializes state before quoting:
 
@@ -629,7 +627,6 @@ epochRate            = config.seedRate
 epochPaymentCap      = config.paymentCapPerEpoch
 epochMinPaymentAmount = config.minPaymentAmount
 epochMaxLockBonus    = config.maxLockBonus
-epochPricingVersion  = configVersion
 epochAcceptedPayment = 0
 epochWeightedLateness = 0
 epochTimingEligible  = ((block.number - GENESIS_BLOCK) % EPOCH_LENGTH == 0)
@@ -755,7 +752,6 @@ def rollover():
     epochPaymentCap      = cfg.paymentCapPerEpoch
     epochMinPaymentAmount = cfg.minPaymentAmount
     epochMaxLockBonus    = cfg.maxLockBonus
-    epochPricingVersion  = configVersion
     epochAcceptedPayment = 0
     epochWeightedLateness = 0
     epochTimingEligible  = True
@@ -788,7 +784,6 @@ def rollover():
         effectiveAdjustmentBps=effectiveAdjustmentBps,
         decaySteps=decaySteps,
         controllerRate=controllerRate,
-        pricingConfigVersion=configVersion,
     )
 ```
 
@@ -858,8 +853,6 @@ Logical return structure:
 InstantBondQuote
     available
     epoch
-    pricingConfigVersion
-    liveConfigVersion
     rate
     remainingPayment
     minPaymentAmount
@@ -933,12 +926,13 @@ The line wrapping below is illustrative; operation order, local terminology, and
 diagnostics are normative where shown.
 
 ```text
-1.  assert configVersion != 0                                  # dev: not configured
-2.  assert block.number >= GENESIS_BLOCK                       # dev: before genesis
-3.  assert not deptBasics.isPaused                             # dev: paused
-4.  cfg = live config; assert cfg.canBuyNow                    # dev: disabled
-5.  assert block.number <= deadlineBlock                       # dev: expired
-6.  a = addys._getAddys()
+1.  assert block.number >= GENESIS_BLOCK                       # dev: before genesis
+2.  assert not deptBasics.isPaused                             # dev: paused
+3.  cfg = live config
+    assert isValidConfig(cfg)                                  # dev: not configured
+    assert cfg.canBuyNow                                       # dev: disabled
+4.  assert block.number <= deadlineBlock                       # dev: expired
+5.  a = addys._getAddys()
     assert RipeHq(a.hq).canMintRipe(self)                     # dev: mint unavailable
     assert not RipeToken(a.ripeToken).isPaused()              # dev: ripe paused
     assert not RipeToken(a.ripeToken).blacklisted(msg.sender) # dev: blacklisted buyer
@@ -1100,29 +1094,26 @@ The following references were rebound after merging current `origin/rh` at
 ## 11. Governed configuration semantics
 
 ```text
-setConfig(newConfig, expectedVersion)
+setConfig(newConfig)
 ```
 
 The lane function must:
 
 1. require `addys._isSwitchboardAddr(msg.sender)`;
-2. require `expectedVersion == configVersion`;
-3. validate `newConfig` under §3.3;
-4. store the complete new config;
-5. increment `configVersion` exactly once;
-6. if an override is installed, clear it, increment `overrideVersion` exactly once,
+2. validate `newConfig` under §3.3;
+3. store the complete new config;
+4. if an override is installed, clear it, increment `overrideVersion` exactly once,
    and emit `RateOverrideInvalidated`;
-7. emit every config field and the new version;
-8. return the resulting config version.
+5. emit every config field.
 
 `setConfig`, `setRateOverride`, and `cancelRateOverride` are `@nonreentrant` as
 defense-in-depth even though only registered switchboards may call them and their
 normal paths have no state-changing external interaction.
 
-Initial configuration uses `expectedVersion=0`. Stale actions revert in the lane even
-if they came from a registered switchboard. This preserves the protocol's standard
-registered-switchboard authorization model while placing overwrite protection at the
-actual state boundary.
+Config writes are last-write-wins, matching MissionControl `setRipeBondConfig`. Two
+queued Foxtrot config actions may both execute; later execution overwrites overlapping
+fields. Ops should avoid queueing a second full config unless that last-write-wins
+overwrite is intended.
 
 Activation timing:
 
@@ -1135,33 +1126,24 @@ Activation timing:
   take effect together at the next rollover. They never rewrite the running epoch.
 - `seedRate` never resets or directly changes an initialized `epochRate`.
 
-Every action replaces the full config and increments `configVersion`, even when the
+Every action replaces the full config, even when the
 operator intends only to toggle `canBuyNow` or change `mintBudget`. There is no partial
 config action. Operators must copy and verify every unchanged pricing field; the next
-rollover snapshots the newly versioned full config even when those values are identical.
-Because initiation pins `expectedVersion`, config actions cannot be safely pipelined:
-each successful action changes the version and any later action prepared against the
-old version will revert. Multi-step plans therefore require serial timelocks.
+rollover snapshots the latest full config even when those values are identical.
 
-A purchase event therefore carries both:
-
-- `pricingConfigVersion` — source of rate, cap, and max bonus; and
-- `liveConfigVersion` — live source of availability and mint budget.
-
-Lock-duration terms are separately live through SwitchboardAlpha and are not covered
-by the lane config version.
+Lock-duration terms are separately live through SwitchboardAlpha.
 
 Rate-override governance uses:
 
 ```text
-isValidRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion) -> bool
-setRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion) -> newVersion
+isValidRateOverride(targetRate, expectedOverrideVersion) -> bool
+setRateOverride(targetRate, expectedOverrideVersion) -> newVersion
 canCancelRateOverride(expectedOverrideVersion) -> bool
 cancelRateOverride(expectedOverrideVersion) -> newVersion
 ```
 
 The two mutators require a registered switchboard. Installation additionally requires
-an initialized lane, no installed override, exact config and override versions, and:
+an initialized lane, no installed override, the exact override version, and:
 
 ```text
 MIN_BASE_RATE <= targetRate <= baseRateCeiling(live config)
@@ -1177,8 +1159,7 @@ both effects. Installed cancellation clears the target and advances the version.
 
 The scalar `rateOverride == 0` sentinel is unambiguous because zero is outside every
 valid target range. A separate stored bound-config field is unnecessary: every
-successful full config write synchronously invalidates the installed target. The
-installation event records the config version against which validation occurred.
+successful full config write synchronously invalidates the installed target.
 
 ---
 
@@ -1217,27 +1198,23 @@ ActionType
     RATE_OVERRIDE_SET
     RATE_OVERRIDE_CANCEL
 
-PendingInstantBondConfig
-    config
-    expectedVersion
+PendingInstantBondConfig is the config blob itself.
 
 PendingRateOverride
     targetRate
-    expectedConfigVersion
     expectedOverrideVersion
 
 public actionType[aid] -> ActionType
-public pendingConfig[aid] -> PendingInstantBondConfig
+public pendingConfig[aid] -> InstantBondConfig
 public pendingRateOverride[aid] -> PendingRateOverride
 ```
 
 External workflow:
 
 ```text
-setInstantBondConfig(config, expectedVersion) -> aid
+setInstantBondConfig(config) -> aid
 setInstantBondRateOverride(
     targetRate,
-    expectedConfigVersion,
     expectedOverrideVersion,
 ) -> aid
 cancelInstantBondRateOverride(expectedOverrideVersion) -> aid
@@ -1250,8 +1227,8 @@ The workflow above omits source-level leading underscores for readability. The c
 remain the more descriptive `actionId`.
 
 Every initiation requires LocalGov permission and a nonzero inherited
-`actionTimeLock`. Config initiation requires `LANE.isValidConfig(config)` and exact
-`LANE.configVersion()`. Override installation initiation requires
+`actionTimeLock`. Config initiation requires `LANE.isValidConfig(config)`.
+Override installation initiation requires
 `LANE.isValidRateOverride(...)`; installed-override cancellation initiation requires
 `LANE.canCancelRateOverride(...)`. A rejected precheck must not allocate an action ID.
 The nonzero timelock assertion makes the required
@@ -1259,8 +1236,9 @@ The nonzero timelock assertion makes the required
 
 Execution requires LocalGov permission and a confirmable, unexpired action. The action
 type dispatches to `LANE.setConfig`, `LANE.setRateOverride`, or
-`LANE.cancelRateOverride`. Each lane mutator repeats authorization and version/state
-validation and returns the actual resulting version. Only after the external call
+`LANE.cancelRateOverride`. Config execute is last-write-wins. Override mutators
+repeat authorization and override-version/state
+validation and return the actual resulting override version. Only after the external call
 succeeds does Foxtrot clear `actionType`, `pendingConfig`, and `pendingRateOverride` and
 emit the action-specific result.
 
@@ -1281,17 +1259,15 @@ Required switchboard events:
 PendingInstantBondConfigSet(
     actionId,
     confirmationBlock,
-    expectedVersion,
     <all config fields in §3.1 order>,
 )
-InstantBondConfigExecuted(actionId, newVersion)
+InstantBondConfigExecuted(actionId)
 InstantBondConfigCancelled(actionId)
 
 PendingRateOverrideSet(
     actionId,
     confirmationBlock,
     targetRate,
-    expectedConfigVersion,
     expectedOverrideVersion,
 )
 PendingRateOverrideCancellationSet(
@@ -1394,7 +1370,6 @@ EpochInitialized(
     minPaymentAmount,
     maxLockBonus,
     timingEligible,
-    pricingConfigVersion indexed,
 )
 
 EpochRolled(
@@ -1413,7 +1388,6 @@ EpochRolled(
     effectiveAdjustmentBps,
     decaySteps,
     controllerRate,
-    pricingConfigVersion indexed,
 )
 
 InstantBondPurchased(
@@ -1426,17 +1400,13 @@ InstantBondPurchased(
     totalRipe,
     epochRate,
     epoch indexed,
-    pricingConfigVersion indexed,
-    liveConfigVersion,
-    ripeGovVaultId,
 )
 
 InstantBondConfigSet(
-    newVersion indexed,
     <all config fields in §3.1 order>,
 )
 
-RateOverrideInstalled(newVersion indexed, targetRate, boundConfigVersion indexed)
+RateOverrideInstalled(newVersion indexed, targetRate)
 RateOverrideApplied(
     newVersion indexed,
     fromEpoch indexed,
@@ -1448,24 +1418,19 @@ RateOverrideCancelled(newVersion indexed, targetRate)
 RateOverrideInvalidated(
     newVersion indexed,
     targetRate,
-    newConfigVersion indexed,
 )
 ```
 
 `DeptBasics` already emits pause and recovery events. Switchboard events are specified
-in §12. Initialization `epoch`, both rollover epoch endpoints, purchase `epoch`, and
-each event's `pricingConfigVersion` are indexed as shown so indexers can filter by lane
-epoch or pricing source without decoding every log. Events must be sufficient to
+in §12. Initialization `epoch`, both rollover epoch endpoints, and purchase `epoch`
+are indexed as shown so indexers can filter by lane epoch without decoding every log.
+Events must be sufficient to
 reconstruct every config and epoch transition without an on-chain history mapping.
 `previousWeightedLateness`, `previousAcceptedPayment`, utilization, eligibility, the
 historical config, and the deterministic formulas reconstruct the timing and severity
 signals. `effectiveAdjustmentBps` records the final dynamic step directly, while
 `controllerRate` distinguishes ordinary control from an exact override.
-The purchase event has no remaining indexed slot: the signature plus `buyer`, `epoch`,
-and `pricingConfigVersion` consume the EVM's four-topic maximum. The owner ratified
-`pricingConfigVersion` over `liveConfigVersion` because it identifies the economic
-terms used for the payout and aligns with initialization and rollover monitoring;
-`liveConfigVersion` remains in event data for authorization and budget forensics.
+The purchase event indexes `buyer` and `epoch`.
 
 The snapshot-field naming asymmetry is deliberate. `EpochInitialized` uses bare
 `paymentCap`, `minPaymentAmount`, and `maxLockBonus` because there is no prior snapshot
@@ -1479,8 +1444,8 @@ because that event also carries previous-epoch inputs.
 Tests must prove:
 
 1. **All-in floor:** for every successful purchase,
-   `totalRipe * PAYMENT_SCALE <= paymentAmount * maxEffectiveRateFor(epochPricingVersion)`.
-2. **Fixed epoch pricing:** rate, cap, minimum payment, max bonus, and pricing version
+   `totalRipe * PAYMENT_SCALE <= paymentAmount * epochMaxEffectiveRate`.
+2. **Fixed epoch pricing:** rate, cap, minimum payment, and max bonus
    do not change within a stored epoch.
 3. **Controller direction and ranges:** high utilization increases price/decreases
    inverse rate by a step in `[minUpBps, maxUpBps]`; low utilization decreases price/
@@ -1570,7 +1535,7 @@ Tests must prove:
   retired lane's final minted amount in the external program ledger and configure the
   replacement's `mintBudget` to no more than the previously approved program remainder.
   Reusing the old nominal budget would silently reauthorize prior issuance.
-- Monitoring must also expose `configVersion`, `currentEpoch`, `cumulativeMinted`, the
+- Monitoring must also expose `currentEpoch`, `cumulativeMinted`, the
   live `mintBudget`, worst-case issuance per epoch, and the deployment-approved
   rolling-day bound from §18. Crossing an approved warning or shutdown threshold is an
   operational halt condition even when the on-chain config remains valid.
@@ -1845,8 +1810,7 @@ credentialed gate and must never silently fall back to the transport-only test.
 - reconstruct full config history and epoch transitions from events;
 - read the complete stored epoch snapshot through its public getters and reconcile it
   with initialization and rollover events;
-- filter initialization, rollover, and purchase logs by indexed epoch identifiers and
-  `pricingConfigVersion`;
+- filter initialization, rollover, and purchase logs by indexed epoch identifiers;
 - prove rollover events include `newPaymentCap`, `newMinPaymentAmount`, and
   `newMaxLockBonus`, alongside weighted lateness, eligibility, adjustment,
   counterfactual controller rate, and the distinctly named prior-epoch inputs;
@@ -1952,15 +1916,14 @@ Deployment is multi-phase and must honor live timelocks:
    capture the returned `regId`. Never hardcode a guessed id.
 8. Initiate `HqConfig(regId, canMintGreen=false, canMintRipe=true,
    canSetTokenBlacklist=false)`; wait; confirm.
-9. Queue the initial lane config with `expectedVersion=0`, `canBuyNow=false`, and a
-   deliberately small calibrated cap/budget; wait; execute. Verify version 1 and all
+9. Queue the initial lane config with `canBuyNow=false`, and a
+   deliberately small calibrated cap/budget; wait; execute. Verify all
    emitted fields. Keep the Department paused.
 10. Verify preview remains unavailable while paused/disabled and that RipeHq recognizes
    the lane as an authorized RIPE minter.
-11. Queue a full config with `expectedVersion=1` and `canBuyNow=true`; wait; execute.
-   While still paused, verify `previewBuyNow` shows the intended rate and
-   `pricingConfigVersion == liveConfigVersion`; this proves any prospective floor
-   tightening is active at the simulated rollover. Unpause through the established
+11. Queue a full config with `canBuyNow=true`; wait; execute.
+   While still paused, verify `previewBuyNow` shows the intended rate.
+   Unpause through the established
    SwitchboardCharlie governance path only after the enabling config is confirmed.
 12. Execute small unlocked and locked smoke purchases. Verify exact Endaoment receipt,
     cumulative mint accounting, event versions, the actual `ripeGovVaultId`, lock

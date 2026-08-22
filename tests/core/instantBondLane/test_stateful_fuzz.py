@@ -37,14 +37,12 @@ def as_config_dict(config):
 
 def settlement_snapshot(ctx):
     return (
-        ctx.lane.configVersion(),
         ctx.lane.isInitialized(),
         ctx.lane.currentEpoch(),
         ctx.lane.epochRate(),
         ctx.lane.epochPaymentCap(),
         ctx.lane.epochMinPaymentAmount(),
         ctx.lane.epochMaxLockBonus(),
-        ctx.lane.epochPricingVersion(),
         ctx.lane.epochAcceptedPayment(),
         ctx.lane.epochWeightedLateness(),
         ctx.lane.epochTimingEligible(),
@@ -90,9 +88,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 seedRate=10**18,
                 maxLockBonus=5_000,
             )
-            self.config_version = 1
             self.live_config = as_config_dict(initial)
-            self.config_history = {self.config_version: self.live_config.copy()}
 
             self.initialized = False
             self.stored_pricing = None
@@ -132,7 +128,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                     "cap": config["paymentCapPerEpoch"],
                     "minimum": config["minPaymentAmount"],
                     "max_bonus": config["maxLockBonus"],
-                    "version": self.config_version,
+                    "max_effective_rate": config["maxEffectiveRate"],
                     "accepted": 0,
                     "weighted_lateness": 0,
                     "timing_eligible": (
@@ -222,7 +218,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 "cap": config["paymentCapPerEpoch"],
                 "minimum": config["minPaymentAmount"],
                 "max_bonus": config["maxLockBonus"],
-                "version": self.config_version,
+                "max_effective_rate": config["maxEffectiveRate"],
                 "accepted": 0,
                 "weighted_lateness": 0,
                 "timing_eligible": True,
@@ -294,8 +290,6 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             )
 
             assert quote.epoch == pricing["epoch"]
-            assert quote.pricingConfigVersion == pricing["version"]
-            assert quote.liveConfigVersion == self.config_version
             assert quote.rate == pricing["rate"]
             assert quote.remainingPayment == remaining
             assert quote.minPaymentAmount == pricing["minimum"]
@@ -328,7 +322,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             assert (
                 quote.totalRipe * self.ctx.scale
                 <= payment_amount
-                * self.config_history[pricing["version"]]["maxEffectiveRate"]
+                * pricing["max_effective_rate"]
             )
             return quote, pricing, payout
 
@@ -433,16 +427,13 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             assert self.ctx.lane.isValidConfig(config)
             self.ctx.lane.setConfig(
                 config,
-                self.config_version,
                 sender=self.ctx.switchboard.address,
             )
 
-            self.config_version += 1
             if self.override_rate is not None:
                 self.override_rate = None
                 self.override_version += 1
             self.live_config = as_config_dict(config)
-            self.config_history[self.config_version] = self.live_config.copy()
 
         @rule(
             min_lock=st.integers(min_value=0, max_value=300),
@@ -494,13 +485,11 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             )
             assert self.ctx.lane.isValidRateOverride(
                 target_rate,
-                self.config_version,
                 self.override_version,
             )
             assert (
                 self.ctx.lane.setRateOverride(
                     target_rate,
-                    self.config_version,
                     self.override_version,
                     sender=self.ctx.switchboard.address,
                 )
@@ -536,7 +525,6 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 with boa.reverts("stale override version"):
                     self.ctx.lane.setRateOverride(
                         ceiling,
-                        self.config_version,
                         self.override_version + 1,
                         sender=self.ctx.switchboard.address,
                     )
@@ -592,13 +580,6 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 assert purchase.totalRipe == payout["total_ripe"]
                 assert purchase.epochRate == pricing["rate"]
                 assert purchase.epoch == pricing["epoch"]
-                assert purchase.pricingConfigVersion == pricing["version"]
-                assert purchase.liveConfigVersion == self.config_version
-                assert purchase.ripeGovVaultId == (
-                    self.ctx.mission_control.coreRipeGovVaultId()
-                    if payout["actual_lock"]
-                    else 0
-                )
                 self._commit_purchase(pricing, payment_amount, payout)
                 return
 
@@ -698,20 +679,17 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             assert settlement_snapshot(self.ctx) == before
 
         @rule()
-        def stale_config_version_rolls_back(self):
-            config = tuple(self.live_config[key] for key in CONFIG_KEYS)
+        def invalid_config_rolls_back(self):
             before = settlement_snapshot(self.ctx)
-            with boa.reverts("stale config version"):
+            with boa.reverts("invalid config"):
                 self.ctx.lane.setConfig(
-                    config,
-                    self.config_version - 1,
+                    self.ctx.make_config(minDownBps=0),
                     sender=self.ctx.switchboard.address,
                 )
             assert settlement_snapshot(self.ctx) == before
 
         @invariant()
         def model_and_accounting_invariants_hold(self):
-            assert self.ctx.lane.configVersion() == self.config_version
             assert self.ctx.lane.overrideVersion() == self.override_version
             assert self.ctx.lane.rateOverride() == (self.override_rate or 0)
             assert self.ctx.lane.cumulativeMinted() == self.cumulative_minted
@@ -741,10 +719,6 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 assert (
                     self.ctx.lane.epochMaxLockBonus()
                     == self.stored_pricing["max_bonus"]
-                )
-                assert (
-                    self.ctx.lane.epochPricingVersion()
-                    == self.stored_pricing["version"]
                 )
                 assert (
                     self.ctx.lane.epochAcceptedPayment()

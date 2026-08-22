@@ -174,25 +174,19 @@ def lane_factory(
                 endaoment_funds=endaoment_funds,
             )
 
-            def set_config(expected_version=None, **overrides):
-                if expected_version is None:
-                    expected_version = lane.configVersion()
+            def set_config(**overrides):
                 config = make_config(scale, **overrides)
-                lane.setConfig(config, expected_version, sender=switchboard_alpha.address)
+                lane.setConfig(config, sender=switchboard_alpha.address)
                 return config
 
             def set_rate_override(
                 target_rate,
-                expected_config_version=None,
                 expected_override_version=None,
             ):
-                if expected_config_version is None:
-                    expected_config_version = lane.configVersion()
                 if expected_override_version is None:
                     expected_override_version = lane.overrideVersion()
                 return lane.setRateOverride(
                     target_rate,
-                    expected_config_version,
                     expected_override_version,
                     sender=switchboard_alpha.address,
                 )

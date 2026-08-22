@@ -377,7 +377,6 @@ initialized Lane requires:
 
 ```text
 MIN_BASE_RATE <= targetRate <= currentBaseRateCeiling
-expectedConfigVersion == configVersion
 expectedOverrideVersion == overrideVersion
 no installed override
 ```

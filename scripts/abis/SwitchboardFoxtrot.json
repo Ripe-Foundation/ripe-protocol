@@ -13,11 +13,6 @@
         "indexed": false
       },
       {
-        "name": "expectedVersion",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
         "name": "canBuyNow",
         "type": "bool",
         "indexed": false
@@ -103,11 +98,6 @@
         "name": "actionId",
         "type": "uint256",
         "indexed": false
-      },
-      {
-        "name": "newVersion",
-        "type": "uint256",
-        "indexed": false
       }
     ],
     "anonymous": false,
@@ -140,11 +130,6 @@
       },
       {
         "name": "targetRate",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "expectedConfigVersion",
         "type": "uint256",
         "indexed": false
       },
@@ -934,10 +919,6 @@
             "type": "uint256"
           }
         ]
-      },
-      {
-        "name": "_expectedVersion",
-        "type": "uint256"
       }
     ],
     "outputs": [
@@ -954,10 +935,6 @@
     "inputs": [
       {
         "name": "_targetRate",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedConfigVersion",
         "type": "uint256"
       },
       {
@@ -1068,73 +1045,63 @@
         "type": "tuple",
         "components": [
           {
-            "name": "config",
-            "type": "tuple",
-            "components": [
-              {
-                "name": "canBuyNow",
-                "type": "bool"
-              },
-              {
-                "name": "paymentCapPerEpoch",
-                "type": "uint256"
-              },
-              {
-                "name": "minPaymentAmount",
-                "type": "uint256"
-              },
-              {
-                "name": "mintBudget",
-                "type": "uint256"
-              },
-              {
-                "name": "maxEffectiveRate",
-                "type": "uint256"
-              },
-              {
-                "name": "seedRate",
-                "type": "uint256"
-              },
-              {
-                "name": "uHighBps",
-                "type": "uint256"
-              },
-              {
-                "name": "uLowBps",
-                "type": "uint256"
-              },
-              {
-                "name": "minUpBps",
-                "type": "uint256"
-              },
-              {
-                "name": "maxUpBps",
-                "type": "uint256"
-              },
-              {
-                "name": "minDownBps",
-                "type": "uint256"
-              },
-              {
-                "name": "maxDownBps",
-                "type": "uint256"
-              },
-              {
-                "name": "decayBps",
-                "type": "uint256"
-              },
-              {
-                "name": "maxDecayEpochs",
-                "type": "uint256"
-              },
-              {
-                "name": "maxLockBonus",
-                "type": "uint256"
-              }
-            ]
+            "name": "canBuyNow",
+            "type": "bool"
           },
           {
-            "name": "expectedVersion",
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "mintBudget",
+            "type": "uint256"
+          },
+          {
+            "name": "maxEffectiveRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLockBonus",
             "type": "uint256"
           }
         ]
@@ -1158,10 +1125,6 @@
         "components": [
           {
             "name": "targetRate",
-            "type": "uint256"
-          },
-          {
-            "name": "expectedConfigVersion",
             "type": "uint256"
           },
           {

@@ -204,7 +204,6 @@ def test_first_purchase_many_epochs_after_genesis_uses_seed_without_decay(lane_f
     quote = ctx.quote(ctx.scale)
     assert quote.epoch == target_epoch
     assert quote.rate == config[5]
-    assert quote.pricingConfigVersion == 1
     assert not ctx.lane.isInitialized()
 
     ctx.buy(ctx.scale, expected_epoch=target_epoch)

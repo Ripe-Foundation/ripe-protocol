@@ -89,7 +89,6 @@ class OverrideState:
 
     version: int = 0
     target_rate: int = 0
-    bound_config_version: int = 0
 
     @property
     def exists(self) -> bool:
@@ -339,20 +338,16 @@ def install_override(
     *,
     initialized: bool,
     target_rate: int,
-    config_version: int,
-    expected_config_version: int,
     expected_override_version: int,
     p: Params,
 ) -> OverrideState:
     assert initialized
     assert not state.exists
-    assert expected_config_version == config_version
     assert expected_override_version == state.version
     assert valid_override(target_rate, p)
     return OverrideState(
         version=state.version + 1,
         target_rate=target_rate,
-        bound_config_version=config_version,
     )
 
 
@@ -362,16 +357,12 @@ def project_installed_override(
     stored_epoch: int,
     projected_epoch: int,
     controller_rate: int,
-    config_version: int,
     p: Params,
 ) -> OverrideProjection:
     assert 0 <= stored_epoch <= projected_epoch
     assert p.min_rate <= controller_rate <= p.rate_ceiling
     if not state.exists:
         return OverrideProjection("none", controller_rate, controller_rate, 0)
-    # On chain, setConfig clears an installed override and increments its version
-    # atomically. A mismatched persisted state is therefore outside this model.
-    assert state.bound_config_version == config_version
     elapsed_epochs = projected_epoch - stored_epoch
     if elapsed_epochs == 0:
         return OverrideProjection("pending", controller_rate, controller_rate, 0)
@@ -389,7 +380,6 @@ def commit_override(
     stored_epoch: int,
     projected_epoch: int,
     controller_rate: int,
-    config_version: int,
     successful: bool,
     p: Params,
 ) -> tuple[OverrideProjection, OverrideState]:
@@ -398,7 +388,6 @@ def commit_override(
         stored_epoch=stored_epoch,
         projected_epoch=projected_epoch,
         controller_rate=controller_rate,
-        config_version=config_version,
         p=p,
     )
     if not successful or projection.status != "apply":
@@ -418,14 +407,9 @@ def cancel_override(
 
 def invalidate_override_for_config_change(
     state: OverrideState,
-    *,
-    old_config_version: int,
-    new_config_version: int,
 ) -> OverrideState:
-    assert new_config_version > old_config_version
     if not state.exists:
         return state
-    assert state.bound_config_version == old_config_version
     return OverrideState(version=state.version + 1)
 
 
@@ -460,8 +444,6 @@ def override_lifecycle_evidence(p: Params) -> dict:
         empty,
         initialized=True,
         target_rate=925_000_000_000_000_000,
-        config_version=7,
-        expected_config_version=7,
         expected_override_version=0,
         p=p,
     )
@@ -472,7 +454,6 @@ def override_lifecycle_evidence(p: Params) -> dict:
         stored_epoch=4,
         projected_epoch=4,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     )
     next_rollover = project_installed_override(
@@ -480,7 +461,6 @@ def override_lifecycle_evidence(p: Params) -> dict:
         stored_epoch=4,
         projected_epoch=5,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     )
     skipped_rollover = project_installed_override(
@@ -488,7 +468,6 @@ def override_lifecycle_evidence(p: Params) -> dict:
         stored_epoch=4,
         projected_epoch=8,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     )
     assert same_epoch.status == "pending"
@@ -501,7 +480,6 @@ def override_lifecycle_evidence(p: Params) -> dict:
         stored_epoch=4,
         projected_epoch=5,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     ) == next_rollover
 
@@ -510,7 +488,6 @@ def override_lifecycle_evidence(p: Params) -> dict:
         stored_epoch=4,
         projected_epoch=8,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         successful=False,
         p=p,
     )
@@ -520,7 +497,6 @@ def override_lifecycle_evidence(p: Params) -> dict:
         stored_epoch=4,
         projected_epoch=8,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         successful=True,
         p=p,
     )
@@ -531,15 +507,12 @@ def override_lifecycle_evidence(p: Params) -> dict:
         stored_epoch=8,
         projected_epoch=8,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     ).status == "none"
 
     cancelled = cancel_override(installed, expected_override_version=1)
     invalidated = invalidate_override_for_config_change(
         installed,
-        old_config_version=7,
-        new_config_version=8,
     )
     assert cancelled == OverrideState(version=2)
     assert invalidated == OverrideState(version=2)

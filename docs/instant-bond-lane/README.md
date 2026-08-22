@@ -283,7 +283,7 @@ from this summary.
 
 ## Snapshot fields versus live fields
 
-A full config write replaces all 15 fields and increments `configVersion`, but it does
+A full config write replaces all 15 fields. It does
 not rewrite the already committed epoch snapshot.
 
 | Snapshotted until initialization/rollover | Read live for each preview/purchase |
@@ -292,7 +292,7 @@ not rewrite the already committed epoch snapshot.
 | Epoch payment cap | Remaining cumulative `mintBudget` |
 | Epoch minimum payment | Department, RIPE, and global mint availability |
 | Epoch maximum lock bonus | RIPE blacklist |
-| Pricing config version | MissionControl lock terms and core vault ID |
+| | MissionControl lock terms and core vault ID |
 | | Address-registry destinations and Teller/vault admission |
 
 Changing a pricing field mid-epoch is prospective. Even lowering
@@ -387,16 +387,16 @@ User entry points:
 ```text
 previewBuyNow(paymentAmount, requestedLock) -> InstantBondQuote
 buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock,
-       expectedCoreRipeGovVaultId=0, minActualLock=0) -> totalRipe
+       minActualLock=0) -> totalRipe
 ```
 
 Governance validation and mutation:
 
 ```text
 isValidConfig(config)
-setConfig(config, expectedVersion)
-isValidRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
-setRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
+setConfig(config)
+isValidRateOverride(targetRate, expectedOverrideVersion)
+setRateOverride(targetRate, expectedOverrideVersion)
 canCancelRateOverride(expectedOverrideVersion)
 cancelRateOverride(expectedOverrideVersion)
 ```
@@ -404,10 +404,10 @@ cancelRateOverride(expectedOverrideVersion)
 Important state:
 
 ```text
-config / configVersion
+config
 isInitialized / currentEpoch / epochRate
 epochPaymentCap / epochMinPaymentAmount / epochMaxLockBonus
-epochPricingVersion / epochAcceptedPayment
+epochAcceptedPayment
 epochWeightedLateness / epochTimingEligible
 rateOverride / overrideVersion
 cumulativeMinted
@@ -429,8 +429,8 @@ RateOverrideInvalidated
 ### SwitchboardFoxtrot
 
 ```text
-setInstantBondConfig(config, expectedVersion)
-setInstantBondRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
+setInstantBondConfig(config)
+setInstantBondRateOverride(targetRate, expectedOverrideVersion)
 cancelInstantBondRateOverride(expectedOverrideVersion)
 executePendingAction(actionId)
 cancelPendingAction(actionId)

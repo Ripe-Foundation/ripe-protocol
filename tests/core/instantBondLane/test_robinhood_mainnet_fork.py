@@ -461,10 +461,10 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     lane.pause(False, sender=charlie)
 
     config = _fork_config(lane.PAYMENT_SCALE())
-    action_id = foxtrot.setInstantBondConfig(config, 0, sender=operator)
+        action_id = foxtrot.setInstantBondConfig(config, sender=operator)
     _advance_blocks(foxtrot.actionTimeLock())
     assert foxtrot.executePendingAction(action_id, sender=operator)
-    assert lane.configVersion() == 1
+    assert tuple(lane.config()) == config
 
     return SimpleNamespace(
         lane=lane,

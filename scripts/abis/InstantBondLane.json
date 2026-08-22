@@ -31,11 +31,6 @@
         "name": "timingEligible",
         "type": "bool",
         "indexed": false
-      },
-      {
-        "name": "pricingConfigVersion",
-        "type": "uint256",
-        "indexed": true
       }
     ],
     "anonymous": false,
@@ -118,11 +113,6 @@
         "name": "controllerRate",
         "type": "uint256",
         "indexed": false
-      },
-      {
-        "name": "pricingConfigVersion",
-        "type": "uint256",
-        "indexed": true
       }
     ],
     "anonymous": false,
@@ -175,21 +165,6 @@
         "name": "epoch",
         "type": "uint256",
         "indexed": true
-      },
-      {
-        "name": "pricingConfigVersion",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "liveConfigVersion",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "ripeGovVaultId",
-        "type": "uint256",
-        "indexed": false
       }
     ],
     "anonymous": false,
@@ -198,11 +173,6 @@
   {
     "name": "InstantBondConfigSet",
     "inputs": [
-      {
-        "name": "newVersion",
-        "type": "uint256",
-        "indexed": true
-      },
       {
         "name": "canBuyNow",
         "type": "bool",
@@ -294,11 +264,6 @@
         "name": "targetRate",
         "type": "uint256",
         "indexed": false
-      },
-      {
-        "name": "boundConfigVersion",
-        "type": "uint256",
-        "indexed": true
       }
     ],
     "anonymous": false,
@@ -365,11 +330,6 @@
         "name": "targetRate",
         "type": "uint256",
         "indexed": false
-      },
-      {
-        "name": "newConfigVersion",
-        "type": "uint256",
-        "indexed": true
       }
     ],
     "anonymous": false,
@@ -590,6 +550,235 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "isValidRateOverride",
+    "inputs": [
+      {
+        "name": "_targetRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRateOverride",
+    "inputs": [
+      {
+        "name": "_targetRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canCancelRateOverride",
+    "inputs": [
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelRateOverride",
+    "inputs": [
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "buyNow",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedEpoch",
+        "type": "uint256"
+      },
+      {
+        "name": "_minRipeOut",
+        "type": "uint256"
+      },
+      {
+        "name": "_deadlineBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "buyNow",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedEpoch",
+        "type": "uint256"
+      },
+      {
+        "name": "_minRipeOut",
+        "type": "uint256"
+      },
+      {
+        "name": "_deadlineBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_minActualLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "previewBuyNow",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "available",
+            "type": "bool"
+          },
+          {
+            "name": "epoch",
+            "type": "uint256"
+          },
+          {
+            "name": "rate",
+            "type": "uint256"
+          },
+          {
+            "name": "remainingPayment",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "budgetRemaining",
+            "type": "uint256"
+          },
+          {
+            "name": "baseRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "bonusRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "bonusRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "actualLock",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeGovVaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "totalRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "canExitEarly",
+            "type": "bool"
+          },
+          {
+            "name": "exitFee",
+            "type": "uint256"
+          },
+          {
+            "name": "isExitFrozen",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "isValidConfig",
     "inputs": [
       {
@@ -736,304 +925,9 @@
             "type": "uint256"
           }
         ]
-      },
-      {
-        "name": "_expectedVersion",
-        "type": "uint256"
       }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "isValidRateOverride",
-    "inputs": [
-      {
-        "name": "_targetRate",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedConfigVersion",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedOverrideVersion",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "setRateOverride",
-    "inputs": [
-      {
-        "name": "_targetRate",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedConfigVersion",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedOverrideVersion",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "canCancelRateOverride",
-    "inputs": [
-      {
-        "name": "_expectedOverrideVersion",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "cancelRateOverride",
-    "inputs": [
-      {
-        "name": "_expectedOverrideVersion",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyNow",
-    "inputs": [
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_requestedLock",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedEpoch",
-        "type": "uint256"
-      },
-      {
-        "name": "_minRipeOut",
-        "type": "uint256"
-      },
-      {
-        "name": "_deadlineBlock",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyNow",
-    "inputs": [
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_requestedLock",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedEpoch",
-        "type": "uint256"
-      },
-      {
-        "name": "_minRipeOut",
-        "type": "uint256"
-      },
-      {
-        "name": "_deadlineBlock",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedCoreRipeGovVaultId",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyNow",
-    "inputs": [
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_requestedLock",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedEpoch",
-        "type": "uint256"
-      },
-      {
-        "name": "_minRipeOut",
-        "type": "uint256"
-      },
-      {
-        "name": "_deadlineBlock",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedCoreRipeGovVaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_minActualLock",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "previewBuyNow",
-    "inputs": [
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_requestedLock",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "available",
-            "type": "bool"
-          },
-          {
-            "name": "epoch",
-            "type": "uint256"
-          },
-          {
-            "name": "pricingConfigVersion",
-            "type": "uint256"
-          },
-          {
-            "name": "liveConfigVersion",
-            "type": "uint256"
-          },
-          {
-            "name": "rate",
-            "type": "uint256"
-          },
-          {
-            "name": "remainingPayment",
-            "type": "uint256"
-          },
-          {
-            "name": "minPaymentAmount",
-            "type": "uint256"
-          },
-          {
-            "name": "budgetRemaining",
-            "type": "uint256"
-          },
-          {
-            "name": "baseRipe",
-            "type": "uint256"
-          },
-          {
-            "name": "bonusRatio",
-            "type": "uint256"
-          },
-          {
-            "name": "bonusRipe",
-            "type": "uint256"
-          },
-          {
-            "name": "actualLock",
-            "type": "uint256"
-          },
-          {
-            "name": "ripeGovVaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "totalRipe",
-            "type": "uint256"
-          },
-          {
-            "name": "canExitEarly",
-            "type": "bool"
-          },
-          {
-            "name": "exitFee",
-            "type": "uint256"
-          },
-          {
-            "name": "isExitFrozen",
-            "type": "bool"
-          }
-        ]
-      }
-    ]
+    "outputs": []
   },
   {
     "stateMutability": "view",
@@ -1172,18 +1066,6 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "configVersion",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
     "name": "isInitialized",
     "inputs": [],
     "outputs": [
@@ -1245,18 +1127,6 @@
     "stateMutability": "view",
     "type": "function",
     "name": "epochMaxLockBonus",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "epochPricingVersion",
     "inputs": [],
     "outputs": [
       {

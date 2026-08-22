@@ -292,20 +292,12 @@ def _install_fixture(
     *,
     initialized: bool = True,
     target_rate: int = 925_000_000_000_000_000,
-    config_version: int = 7,
-    expected_config_version: int | None = None,
     expected_override_version: int | None = None,
 ) -> OverrideState:
     return install_override(
         state,
         initialized=initialized,
         target_rate=target_rate,
-        config_version=config_version,
-        expected_config_version=(
-            config_version
-            if expected_config_version is None
-            else expected_config_version
-        ),
         expected_override_version=(
             state.version
             if expected_override_version is None
@@ -325,7 +317,6 @@ def test_override_lifecycle_is_versioned_repeatable_and_one_shot():
         stored_epoch=4,
         projected_epoch=5,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     )
     assert preview == project_installed_override(
@@ -333,7 +324,6 @@ def test_override_lifecycle_is_versioned_repeatable_and_one_shot():
         stored_epoch=4,
         projected_epoch=5,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     )
     assert preview.final_rate == installed.target_rate
@@ -344,7 +334,6 @@ def test_override_lifecycle_is_versioned_repeatable_and_one_shot():
         stored_epoch=4,
         projected_epoch=4,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         successful=True,
         p=p,
     )
@@ -356,7 +345,6 @@ def test_override_lifecycle_is_versioned_repeatable_and_one_shot():
         stored_epoch=4,
         projected_epoch=8,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         successful=False,
         p=p,
     )
@@ -367,7 +355,6 @@ def test_override_lifecycle_is_versioned_repeatable_and_one_shot():
         stored_epoch=4,
         projected_epoch=8,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         successful=True,
         p=p,
     )
@@ -377,7 +364,6 @@ def test_override_lifecycle_is_versioned_repeatable_and_one_shot():
         stored_epoch=8,
         projected_epoch=8,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     ).status == "none"
 
@@ -386,7 +372,6 @@ def test_override_lifecycle_is_versioned_repeatable_and_one_shot():
         stored_epoch=4,
         projected_epoch=5 + p.max_decay_epochs + 10,
         controller_rate=880_000_000_000_000_000,
-        config_version=7,
         p=p,
     )
     assert skipped.elapsed_epochs == p.max_decay_epochs + 11
@@ -402,13 +387,9 @@ def test_override_cancel_invalidation_and_stale_versions():
     ) == OverrideState(version=2)
     assert invalidate_override_for_config_change(
         installed,
-        old_config_version=7,
-        new_config_version=8,
     ) == OverrideState(version=2)
     assert invalidate_override_for_config_change(
         OverrideState(version=2),
-        old_config_version=7,
-        new_config_version=8,
     ) == OverrideState(version=2)
 
     with pytest.raises(AssertionError):
@@ -435,7 +416,6 @@ def test_override_install_rejects_stale_or_impossible_inputs_without_clamping():
         {"initialized": False},
         {"target_rate": p.min_rate - 1},
         {"target_rate": p.rate_ceiling + 1},
-        {"expected_config_version": 6},
         {"expected_override_version": 1},
     )
     for changes in invalid_cases:
@@ -444,14 +424,7 @@ def test_override_install_rejects_stale_or_impossible_inputs_without_clamping():
 
     installed = _install_fixture()
     with pytest.raises(AssertionError):
-        project_installed_override(
-            installed,
-            stored_epoch=4,
-            projected_epoch=5,
-            controller_rate=880_000_000_000_000_000,
-            config_version=8,
-            p=p,
-        )
+        cancel_override(installed, expected_override_version=0)
 
 
 def test_repeated_first_midpoint_and_last_block_strategies_are_explicit():
@@ -667,8 +640,6 @@ def test_published_override_model_matches_lane_lifecycle(lane_factory):
         OverrideState(),
         initialized=True,
         target_rate=target_rate,
-        config_version=1,
-        expected_config_version=1,
         expected_override_version=0,
         p=p,
     )
@@ -680,7 +651,6 @@ def test_published_override_model_matches_lane_lifecycle(lane_factory):
         stored_epoch=0,
         projected_epoch=0,
         controller_rate=old_rate,
-        config_version=1,
         p=p,
     )
     assert same_epoch.status == "pending"
@@ -692,7 +662,6 @@ def test_published_override_model_matches_lane_lifecycle(lane_factory):
         stored_epoch=0,
         projected_epoch=1,
         controller_rate=controller_rate,
-        config_version=1,
         p=p,
     )
     quote = ctx.quote(ctx.scale)
@@ -704,7 +673,6 @@ def test_published_override_model_matches_lane_lifecycle(lane_factory):
         stored_epoch=0,
         projected_epoch=1,
         controller_rate=controller_rate,
-        config_version=1,
         successful=True,
         p=p,
     )

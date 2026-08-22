@@ -21,7 +21,6 @@ LANE_IDENTITY_MOCK = """
 
 ripeHq: public(immutable(address))
 EPOCH_LENGTH: public(immutable(uint256))
-configVersion: public(uint256)
 overrideVersion: public(uint256)
 
 @deploy
@@ -41,7 +40,6 @@ PARTIAL_LANE_IDENTITY_MOCK = """
 
 ripeHq: public(immutable(address))
 EPOCH_LENGTH: public(constant(uint256)) = 1
-configVersion: public(uint256)
 
 @deploy
 def __init__(_ripeHq: address):
@@ -76,7 +74,6 @@ struct InstantBondConfig:
 
 ripeHq: public(immutable(address))
 EPOCH_LENGTH: public(constant(uint256)) = 1
-configVersion: public(uint256)
 overrideVersion: public(uint256)
 
 @deploy
@@ -97,7 +94,6 @@ def isValidConfig(_config: InstantBondConfig) -> bool:
 @external
 def isValidRateOverride(
     _targetRate: uint256,
-    _expectedConfigVersion: uint256,
     _expectedOverrideVersion: uint256,
 ) -> bool:
     return True
@@ -235,14 +231,9 @@ def initialize_lane(ctx, config=None):
     if config is None:
         config = make_config(ctx.scale)
 
-    expected_version = ctx.lane.configVersion()
-    assert (
-        ctx.lane.setConfig(
-            config,
-            expected_version,
-            sender=ctx.switchboard_alpha.address,
-        )
-        == expected_version + 1
+    ctx.lane.setConfig(
+        config,
+        sender=ctx.switchboard_alpha.address,
     )
     quote = ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob)
     assert quote.available
@@ -261,7 +252,6 @@ def initialize_lane(ctx, config=None):
 def install_override(ctx, target_rate):
     action_id = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        ctx.lane.configVersion(),
         ctx.lane.overrideVersion(),
         sender=ctx.governance.address,
     )
@@ -284,12 +274,10 @@ def assert_pending_cleared(ctx, action_id):
     assert ctx.foxtrot.actionType(action_id) == 0
 
     pending_config = ctx.foxtrot.pendingConfig(action_id)
-    assert pending_config.expectedVersion == 0
-    assert tuple(pending_config.config) == (False,) + (0,) * 14
+    assert tuple(pending_config) == (False,) + (0,) * 14
 
     pending_override = ctx.foxtrot.pendingRateOverride(action_id)
     assert pending_override.targetRate == 0
-    assert pending_override.expectedConfigVersion == 0
     assert pending_override.expectedOverrideVersion == 0
 
 
@@ -397,7 +385,6 @@ def test_rate_override_function_and_event_abi():
     set_override = functions["setInstantBondRateOverride"]
     assert [item["name"] for item in set_override["inputs"]] == [
         "_targetRate",
-        "_expectedConfigVersion",
         "_expectedOverrideVersion",
     ]
     assert [item["type"] for item in set_override["outputs"]] == ["uint256"]
@@ -415,7 +402,6 @@ def test_rate_override_function_and_event_abi():
             "actionId",
             "confirmationBlock",
             "targetRate",
-            "expectedConfigVersion",
             "expectedOverrideVersion",
         ],
         "PendingRateOverrideCancellationSet": [
@@ -432,28 +418,21 @@ def test_rate_override_function_and_event_abi():
         assert not any(item["indexed"] for item in events[event_name]["inputs"])
 
 
-def test_initiation_requires_governance_nonzero_timelock_valid_config_and_version(
+def test_initiation_requires_governance_nonzero_timelock_and_valid_config(
     foxtrot_env, alice
 ):
     ctx = foxtrot_env
     config = make_config(ctx.scale)
 
     with boa.reverts("no perms"):
-        ctx.foxtrot.setInstantBondConfig(config, 0, sender=alice)
+        ctx.foxtrot.setInstantBondConfig(config, sender=alice)
     with boa.reverts("action time lock not set"):
-        ctx.foxtrot.setInstantBondConfig(config, 0, sender=ctx.governance.address)
+        ctx.foxtrot.setInstantBondConfig(config, sender=ctx.governance.address)
 
     enable_actions(ctx)
     with boa.reverts("invalid config"):
         ctx.foxtrot.setInstantBondConfig(
             make_config(ctx.scale, minDownBps=0),
-            0,
-            sender=ctx.governance.address,
-        )
-    with boa.reverts("stale config version"):
-        ctx.foxtrot.setInstantBondConfig(
-            config,
-            1,
             sender=ctx.governance.address,
         )
 
@@ -480,20 +459,18 @@ def test_pending_config_round_trip_and_execution_readback(foxtrot_env):
     )
 
     action_id = ctx.foxtrot.setInstantBondConfig(
-        config, 0, sender=ctx.governance.address
+        config, sender=ctx.governance.address
     )
     pending_event = filter_logs(ctx.foxtrot, "PendingInstantBondConfigSet")[0]
     pending = ctx.foxtrot.pendingConfig(action_id)
 
     assert action_id == 1
     assert ctx.foxtrot.actionType(action_id) == ACTION_INSTANT_BOND_CONFIG
-    assert tuple(pending.config) == config
-    assert pending.expectedVersion == 0
+    assert tuple(pending) == config
     assert pending_event.actionId == action_id
     assert pending_event.confirmationBlock == ctx.foxtrot.getActionConfirmationBlock(
         action_id
     )
-    assert pending_event.expectedVersion == 0
     assert pending_event.paymentCapPerEpoch == config[1]
     assert pending_event.minPaymentAmount == config[2]
     assert pending_event.mintBudget == config[3]
@@ -520,38 +497,39 @@ def test_pending_config_round_trip_and_execution_readback(foxtrot_env):
     )
     executed = filter_logs(ctx.foxtrot, "InstantBondConfigExecuted")[0]
     assert executed.actionId == action_id
-    assert executed.newVersion == ctx.lane.configVersion() == 1
     assert tuple(ctx.lane.config()) == config
     assert ctx.foxtrot.actionType(action_id) == 0
     assert_pending_cleared(ctx, action_id)
 
 
-def test_stale_parallel_action_reverts_at_lane_and_can_be_cancelled(foxtrot_env):
+def test_parallel_config_actions_are_last_write_wins(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
+    first_config = make_config(ctx.scale)
+    second_config = make_config(ctx.scale, mintBudget=2_000_000 * 10**18)
     first = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale), 0, sender=ctx.governance.address
+        first_config, sender=ctx.governance.address
     )
     second = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale, mintBudget=2_000_000 * 10**18),
-        0,
+        second_config,
         sender=ctx.governance.address,
     )
     travel(ctx.foxtrot.actionTimeLock())
 
     assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
-    with boa.reverts("stale config version"):
-        ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
-    assert ctx.foxtrot.hasPendingAction(second)
-    assert ctx.foxtrot.cancelPendingAction(second, sender=ctx.governance.address)
+    assert tuple(ctx.lane.config()) == first_config
+    assert ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
+    assert tuple(ctx.lane.config()) == second_config
+    assert_pending_cleared(ctx, first)
     assert_pending_cleared(ctx, second)
 
 
-def test_out_of_order_parallel_execution_makes_earlier_action_stale(foxtrot_env):
+def test_out_of_order_parallel_execution_is_last_write_wins(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
+    first_config = make_config(ctx.scale)
     first = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale), 0, sender=ctx.governance.address
+        first_config, sender=ctx.governance.address
     )
     second_config = make_config(
         ctx.scale,
@@ -559,25 +537,23 @@ def test_out_of_order_parallel_execution_makes_earlier_action_stale(foxtrot_env)
         maxDecayEpochs=17,
     )
     second = ctx.foxtrot.setInstantBondConfig(
-        second_config, 0, sender=ctx.governance.address
+        second_config, sender=ctx.governance.address
     )
     travel(ctx.foxtrot.actionTimeLock())
 
     assert ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
     assert tuple(ctx.lane.config()) == second_config
-    assert ctx.lane.configVersion() == 1
-    with boa.reverts("stale config version"):
-        ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
-    assert ctx.foxtrot.hasPendingAction(first)
-    assert ctx.foxtrot.cancelPendingAction(first, sender=ctx.governance.address)
+    assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
+    assert tuple(ctx.lane.config()) == first_config
     assert_pending_cleared(ctx, first)
+    assert_pending_cleared(ctx, second)
 
 
 def test_cancel_permissions_cleanup_and_event(foxtrot_env, alice):
     ctx = foxtrot_env
     enable_actions(ctx)
     action_id = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale), 0, sender=ctx.governance.address
+        make_config(ctx.scale), sender=ctx.governance.address
     )
 
     with boa.reverts("no perms"):
@@ -596,7 +572,7 @@ def test_expired_execution_auto_cancels_both_pending_records(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
     action_id = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale), 0, sender=ctx.governance.address
+        make_config(ctx.scale), sender=ctx.governance.address
     )
     pending_action = ctx.foxtrot.pendingActions(action_id)
     travel(pending_action.expiration - boa.env.evm.patch.block_number)
@@ -623,7 +599,6 @@ def test_execution_and_cancellation_exact_timelock_boundaries(foxtrot_env):
 
     first = ctx.foxtrot.setInstantBondConfig(
         make_config(ctx.scale),
-        0,
         sender=ctx.governance.address,
     )
     assert not ctx.foxtrot.executePendingAction(
@@ -646,8 +621,7 @@ def test_execution_and_cancellation_exact_timelock_boundaries(foxtrot_env):
 
     last = ctx.foxtrot.setInstantBondConfig(
         make_config(ctx.scale, mintBudget=2_000_000 * 10**18),
-        1,
-        sender=ctx.governance.address,
+                sender=ctx.governance.address,
     )
     expiration = ctx.foxtrot.pendingActions(last).expiration
     travel(expiration - boa.env.evm.patch.block_number - 1)
@@ -658,8 +632,7 @@ def test_execution_and_cancellation_exact_timelock_boundaries(foxtrot_env):
 
     expired = ctx.foxtrot.setInstantBondConfig(
         make_config(ctx.scale, mintBudget=3_000_000 * 10**18),
-        2,
-        sender=ctx.governance.address,
+                sender=ctx.governance.address,
     )
     expiration = ctx.foxtrot.pendingActions(expired).expiration
     travel(expiration - boa.env.evm.patch.block_number)
@@ -680,7 +653,6 @@ def test_action_aware_pending_cleanup_gas_is_reported(foxtrot_env):
     enable_actions(ctx)
     config_action = ctx.foxtrot.setInstantBondConfig(
         make_config(ctx.scale),
-        0,
         sender=ctx.governance.address,
     )
     travel(ctx.foxtrot.actionTimeLock())
@@ -694,7 +666,6 @@ def test_action_aware_pending_cleanup_gas_is_reported(foxtrot_env):
     target_rate = 9 * 10**17
     override_action = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        ctx.lane.configVersion(),
         ctx.lane.overrideVersion(),
         sender=ctx.governance.address,
     )
@@ -733,12 +704,12 @@ def test_action_aware_pending_cleanup_gas_is_reported(foxtrot_env):
 def test_execution_revalidates_budget_after_intervening_purchase(foxtrot_env):
     ctx = foxtrot_env
     initial = make_config(ctx.scale)
-    ctx.lane.setConfig(initial, 0, sender=ctx.switchboard_alpha.address)
+    ctx.lane.setConfig(initial, sender=ctx.switchboard_alpha.address)
     enable_actions(ctx)
 
     proposed = make_config(ctx.scale, mintBudget=2 * 10**18)
     action_id = ctx.foxtrot.setInstantBondConfig(
-        proposed, 1, sender=ctx.governance.address
+        proposed, sender=ctx.governance.address
     )
 
     amount = 3 * ctx.scale
@@ -756,9 +727,8 @@ def test_execution_revalidates_budget_after_intervening_purchase(foxtrot_env):
 
     with boa.reverts("invalid config"):
         ctx.foxtrot.executePendingAction(action_id, sender=ctx.governance.address)
-    assert ctx.lane.configVersion() == 1
+    assert tuple(ctx.lane.config()) == initial
     assert ctx.foxtrot.hasPendingAction(action_id)
-    assert ctx.foxtrot.pendingConfig(action_id).expectedVersion == 1
 
 
 def test_rate_override_initiation_guards(foxtrot_env, alice):
@@ -769,13 +739,11 @@ def test_rate_override_initiation_guards(foxtrot_env, alice):
         ctx.foxtrot.setInstantBondRateOverride(
             target_rate,
             0,
-            0,
             sender=alice,
         )
     with boa.reverts("action time lock not set"):
         ctx.foxtrot.setInstantBondRateOverride(
             target_rate,
-            0,
             0,
             sender=ctx.governance.address,
         )
@@ -785,32 +753,27 @@ def test_rate_override_initiation_guards(foxtrot_env, alice):
         ctx.foxtrot.setInstantBondRateOverride(
             target_rate,
             0,
-            0,
             sender=ctx.governance.address,
         )
 
     config = initialize_lane(ctx)
-    config_version = ctx.lane.configVersion()
     override_version = ctx.lane.overrideVersion()
     ceiling = config[4] * 10_000 // (10_000 + config[14])
 
-    for rate, expected_config, expected_override in (
-        (MIN_BASE_RATE - 1, config_version, override_version),
-        (ceiling + 1, config_version, override_version),
-        (target_rate, config_version + 1, override_version),
-        (target_rate, config_version, override_version + 1),
+    for rate, expected_override in (
+        (MIN_BASE_RATE - 1, override_version),
+        (ceiling + 1, override_version),
+        (target_rate, override_version + 1),
     ):
         with boa.reverts("invalid rate override"):
             ctx.foxtrot.setInstantBondRateOverride(
                 rate,
-                expected_config,
                 expected_override,
                 sender=ctx.governance.address,
             )
 
     action_id = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        config_version,
         override_version,
         sender=ctx.governance.address,
     )
@@ -823,7 +786,6 @@ def test_rate_override_initiation_guards(foxtrot_env, alice):
     with boa.reverts("invalid rate override"):
         ctx.foxtrot.setInstantBondRateOverride(
             target_rate,
-            config_version,
             ctx.lane.overrideVersion(),
             sender=ctx.governance.address,
         )
@@ -871,7 +833,6 @@ def test_pending_rate_override_round_trip_execution_and_events(foxtrot_env):
 
     action_id = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        1,
         0,
         sender=ctx.governance.address,
     )
@@ -881,12 +842,10 @@ def test_pending_rate_override_round_trip_execution_and_events(foxtrot_env):
     assert action_id == 1
     assert ctx.foxtrot.actionType(action_id) == ACTION_RATE_OVERRIDE_SET
     assert pending.targetRate == target_rate
-    assert pending.expectedConfigVersion == 1
     assert pending.expectedOverrideVersion == 0
     assert queued.actionId == action_id
     assert queued.confirmationBlock == ctx.foxtrot.getActionConfirmationBlock(action_id)
     assert queued.targetRate == target_rate
-    assert queued.expectedConfigVersion == 1
     assert queued.expectedOverrideVersion == 0
 
     assert not ctx.foxtrot.executePendingAction(
@@ -927,7 +886,6 @@ def test_pending_rate_override_cancellation_round_trip_execution_and_events(
 
     assert ctx.foxtrot.actionType(action_id) == ACTION_RATE_OVERRIDE_CANCEL
     assert pending.targetRate == 0
-    assert pending.expectedConfigVersion == 0
     assert pending.expectedOverrideVersion == 1
     assert queued.actionId == action_id
     assert queued.confirmationBlock == ctx.foxtrot.getActionConfirmationBlock(action_id)
@@ -960,7 +918,6 @@ def test_manual_cancellation_distinguishes_override_set_and_cancel_actions(foxtr
 
     set_action = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        1,
         0,
         sender=ctx.governance.address,
     )
@@ -999,7 +956,6 @@ def test_expired_rate_override_set_action_cleans_without_changing_lane(foxtrot_e
     target_rate = 11 * 10**17
     action_id = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        1,
         0,
         sender=ctx.governance.address,
     )
@@ -1053,13 +1009,11 @@ def test_parallel_rate_override_sets_leave_stale_action_pending(foxtrot_env):
     second_target = 12 * 10**17
     first = ctx.foxtrot.setInstantBondRateOverride(
         first_target,
-        1,
         0,
         sender=ctx.governance.address,
     )
     second = ctx.foxtrot.setInstantBondRateOverride(
         second_target,
-        1,
         0,
         sender=ctx.governance.address,
     )
@@ -1109,21 +1063,19 @@ def test_parallel_rate_override_cancellations_leave_stale_action_pending(
     assert_pending_cleared(ctx, second)
 
 
-def test_config_first_makes_queued_rate_override_stale(foxtrot_env):
+def test_config_first_does_not_block_queued_rate_override(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
     initialize_lane(ctx)
     target_rate = 11 * 10**17
     override_action = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        1,
         0,
         sender=ctx.governance.address,
     )
     new_config = make_config(ctx.scale, mintBudget=2_000_000 * 10**18)
     config_action = ctx.foxtrot.setInstantBondConfig(
         new_config,
-        1,
         sender=ctx.governance.address,
     )
     travel(ctx.foxtrot.actionTimeLock())
@@ -1132,20 +1084,15 @@ def test_config_first_makes_queued_rate_override_stale(foxtrot_env):
         config_action,
         sender=ctx.governance.address,
     )
-    assert ctx.lane.configVersion() == 2
     assert ctx.lane.overrideVersion() == 0
-    with boa.reverts("stale config version"):
-        ctx.foxtrot.executePendingAction(
-            override_action,
-            sender=ctx.governance.address,
-        )
-    assert ctx.foxtrot.hasPendingAction(override_action)
-    assert ctx.foxtrot.pendingRateOverride(override_action).targetRate == target_rate
-    assert ctx.foxtrot.cancelPendingAction(
+    assert ctx.foxtrot.executePendingAction(
         override_action,
         sender=ctx.governance.address,
     )
+    assert ctx.lane.rateOverride() == target_rate
+    assert ctx.lane.overrideVersion() == 1
     assert_pending_cleared(ctx, override_action)
+    assert_pending_cleared(ctx, config_action)
 
 
 def test_override_first_then_config_invalidates_installed_override(foxtrot_env):
@@ -1155,14 +1102,12 @@ def test_override_first_then_config_invalidates_installed_override(foxtrot_env):
     target_rate = 11 * 10**17
     override_action = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        1,
         0,
         sender=ctx.governance.address,
     )
     new_config = make_config(ctx.scale, mintBudget=2_000_000 * 10**18)
     config_action = ctx.foxtrot.setInstantBondConfig(
         new_config,
-        1,
         sender=ctx.governance.address,
     )
     travel(ctx.foxtrot.actionTimeLock())
@@ -1179,8 +1124,6 @@ def test_override_first_then_config_invalidates_installed_override(foxtrot_env):
     )
     executed = filter_logs(ctx.foxtrot, "InstantBondConfigExecuted")[-1]
     assert executed.actionId == config_action
-    assert executed.newVersion == 2
-    assert ctx.lane.configVersion() == 2
     assert ctx.lane.rateOverride() == 0
     assert ctx.lane.overrideVersion() == 2
     assert_pending_cleared(ctx, override_action)
@@ -1199,8 +1142,7 @@ def test_config_invalidation_makes_queued_override_cancellation_stale(foxtrot_en
     )
     config_action = ctx.foxtrot.setInstantBondConfig(
         make_config(ctx.scale, mintBudget=2_000_000 * 10**18),
-        1,
-        sender=ctx.governance.address,
+                sender=ctx.governance.address,
     )
     travel(ctx.foxtrot.actionTimeLock())
 
@@ -1238,8 +1180,7 @@ def test_override_cancellation_before_config_does_not_double_bump_version(
     )
     config_action = ctx.foxtrot.setInstantBondConfig(
         make_config(ctx.scale, mintBudget=2_000_000 * 10**18),
-        1,
-        sender=ctx.governance.address,
+                sender=ctx.governance.address,
     )
     travel(ctx.foxtrot.actionTimeLock())
 
@@ -1252,7 +1193,6 @@ def test_override_cancellation_before_config_does_not_double_bump_version(
         config_action,
         sender=ctx.governance.address,
     )
-    assert ctx.lane.configVersion() == 2
     assert ctx.lane.rateOverride() == 0
     assert ctx.lane.overrideVersion() == 2
     assert_pending_cleared(ctx, cancel_action)
