@@ -1,9 +1,12 @@
-#    _____           _              _       ___                 _     
-#    \_   \_ __  ___| |_ __ _ _ __ | |_    / __\ ___  _ __   __| |___ 
-#     / /\/ '_ \/ __| __/ _` | '_ \| __|  /__\/// _ \| '_ \ / _` / __|
-#  /\/ /_ | | | \__ \ || (_| | | | | |_  / \/  \ (_) | | | | (_| \__ \
-#  \____/ |_| |_|___/\__\__,_|_| |_|\__| \_____/\___/|_| |_|\__,_|___/
-#                                                                   
+#    ___  ________   ________  _________  ________  ________   _________        ________  ________  ________   ________  ________      
+#   |\  \|\   ___  \|\   ____\|\___   ___\\   __  \|\   ___  \|\___   ___\     |\   __  \|\   __  \|\   ___  \|\   ___ \|\   ____\     
+#   \ \  \ \  \\ \  \ \  \___|\|___ \  \_\ \  \|\  \ \  \\ \  \|___ \  \_|     \ \  \|\ /\ \  \|\  \ \  \\ \  \ \  \_|\ \ \  \___|_    
+#    \ \  \ \  \\ \  \ \_____  \   \ \  \ \ \   __  \ \  \\ \  \   \ \  \       \ \   __  \ \  \\\  \ \  \\ \  \ \  \ \\ \ \_____  \   
+#     \ \  \ \  \\ \  \|____|\  \   \ \  \ \ \  \ \  \ \  \\ \  \   \ \  \       \ \  \|\  \ \  \\\  \ \  \\ \  \ \  \_\\ \|____|\  \  
+#      \ \__\ \__\\ \__\____\_\  \   \ \__\ \ \__\ \__\ \__\\ \__\   \ \__\       \ \_______\ \_______\ \__\\ \__\ \_______\____\_\  \ 
+#       \|__|\|__| \|__|\_________\   \|__|  \|__|\|__|\|__| \|__|    \|__|        \|_______|\|_______|\|__| \|__|\|_______|\_________\
+#                      \|_________|                                                                                        \|_________|
+#                                                                                                                                   
 #     ╔════════════════════════════════════════╗
 #     ║  ** Instant Bonds **                   ║
 #     ║  Fixed-price direct RIPE purchases     ║
@@ -13,7 +16,6 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
-# pragma optimize codesize
 
 implements: Department
 
@@ -31,15 +33,15 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
-interface RipeToken:
-    def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
-
 interface MissionControl:
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
     def coreRipeGovVaultId() -> uint256: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface RipeToken:
+    def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
 
 interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
@@ -160,6 +162,9 @@ event InstantBondConfigSet:
     maxLockBonus: uint256
     minLockDuration: uint256
     epochLength: uint256
+
+event CanBuyNowSet:
+    canBuyNow: bool
 
 event InstantBondStarted:
     genesisBlock: uint256
@@ -377,10 +382,11 @@ def _nextRate(
     adjustmentBps: uint256 = 0
     decaySteps: uint256 = 0
 
-    # Stored empty epochs have no fill signal; decay the whole gap.
-    # A committed buy always records a positive payment, so this is defensive.
+    # stored empty epochs have no fill signal; decay the whole gap.
+    # a committed buy always records a positive payment, so this is defensive.
     if _prev.acceptedPayment == 0: # pragma: no branch
         decaySteps = min(_elapsed, _config.maxDecayEpochs)
+
     else:
         utilizationBps = _prev.acceptedPayment * HUNDRED_PERCENT // _prev.paymentCap
 
@@ -638,6 +644,18 @@ def setConfig(_newConfig: InstantBondConfig):
         minLockDuration=_newConfig.minLockDuration,
         epochLength=_newConfig.epochLength,
     )
+
+
+# can buy now
+
+
+@nonreentrant
+@external
+def setCanBuyNow(_canBuyNow: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self.bondConfig.canBuyNow != _canBuyNow # dev: no change
+    self.bondConfig.canBuyNow = _canBuyNow
+    log CanBuyNowSet(canBuyNow=_canBuyNow)
 
 
 # utils

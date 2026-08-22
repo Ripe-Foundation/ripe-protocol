@@ -3,9 +3,9 @@
   "authority": "implemented mechanism evidence; not calibration, deployment, or integration authority",
   "bound_implementation": {
     "feature_starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
-    "instant_bond_lane_source_sha256": "b8e3c9cd665dfe31edfcdc1b319d7fdc68d99b6ecccc89b77243e99af4242252",
+    "instant_bond_lane_source_sha256": "c4e25ca5ca7bd4b097bbc3c2a22604a9be2a0506d277bcdc5039e31470441ebb",
     "integrated_rh_commit": "36ee0db42482c3e7d6c43d045fc02655b90bebf4",
-    "switchboard_foxtrot_source_sha256": "50e0a1baacfa5c20175b15596d27d842c9fad765bcfd6b89ca4307cff041bc9b"
+    "switchboard_foxtrot_source_sha256": "a84bd3f8cd48942ea65f57d0911a866998243c28e51dddaaf22c6125e9d5f2e9"
   },
   "calibration_status": "not_approved",
   "economic_metrics": {
@@ -77,40 +77,34 @@
   "manual_override_lifecycle": {
     "calendar_target_window_or_lead": "not_applicable",
     "cancelled_state": {
-      "bound_config_version": 0,
       "exists": false,
       "target_rate": 0,
       "version": 2
     },
     "config_invalidated_state": {
-      "bound_config_version": 0,
       "exists": false,
       "target_rate": 0,
       "version": 2
     },
     "config_invalidation": "pass",
     "consumed_state": {
-      "bound_config_version": 0,
       "exists": false,
       "target_rate": 0,
       "version": 2
     },
     "failed_commit_preserves_state": "pass",
     "failed_commit_state": {
-      "bound_config_version": 7,
       "exists": true,
       "target_rate": 925000000000000000,
       "version": 1
     },
     "initial_state": {
-      "bound_config_version": 0,
       "exists": false,
       "target_rate": 0,
       "version": 0
     },
     "installed_cancellation": "pass",
     "installed_state": {
-      "bound_config_version": 7,
       "exists": true,
       "target_rate": 925000000000000000,
       "version": 1

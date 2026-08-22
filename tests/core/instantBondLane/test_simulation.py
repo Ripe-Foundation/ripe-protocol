@@ -547,7 +547,7 @@ def test_published_controller_model_matches_lane_rollover(
 
     accepted = accepted_units * ctx.scale
     ctx.buy(accepted)
-    old_rate = ctx.lane.epochRate()
+    old_rate = ctx.lane.epochState().rate
     p = contract_params(ctx, config, old_rate)
     signal = signal_for(((offset, accepted),), p)
     expected_rate = apply_signal(old_rate, signal, p)
@@ -589,7 +589,7 @@ def test_published_decay_model_matches_lane_skipped_epochs(
     )
     accepted = 50 * ctx.scale
     ctx.buy(accepted)
-    old_rate = ctx.lane.epochRate()
+    old_rate = ctx.lane.epochState().rate
     p = contract_params(ctx, config, old_rate)
     signal = signal_for(((0, accepted),), p)
     expected_steps = min(elapsed - 1, p.max_decay_epochs)
@@ -627,7 +627,7 @@ def test_published_override_model_matches_lane_lifecycle(lane_factory):
     )
     accepted = ctx.scale
     ctx.buy(accepted)
-    old_rate = ctx.lane.epochRate()
+    old_rate = ctx.lane.epochState().rate
     p = contract_params(ctx, config, old_rate)
     controller_rate = apply_signal(
         old_rate,
@@ -643,7 +643,7 @@ def test_published_override_model_matches_lane_lifecycle(lane_factory):
         expected_override_version=0,
         p=p,
     )
-    assert ctx.set_rate_override(target_rate) == model_state.version
+    ctx.set_rate_override(target_rate)
     assert ctx.lane.rateOverride() == model_state.target_rate
 
     same_epoch = project_installed_override(
@@ -682,4 +682,3 @@ def test_published_override_model_matches_lane_lifecycle(lane_factory):
     assert applied.controllerRate == projection.counterfactual_controller_rate
     assert applied.targetRate == projection.final_rate
     assert ctx.lane.rateOverride() == committed_state.target_rate == 0
-    assert ctx.lane.overrideVersion() == committed_state.version

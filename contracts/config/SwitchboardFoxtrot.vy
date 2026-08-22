@@ -11,7 +11,6 @@
 #      Ripe Foundation (C) 2025
 
 # @version 0.4.3
-# pragma optimize codesize
 
 exports: gov.__interface__
 exports: timeLock.__interface__
@@ -23,30 +22,31 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 
 interface InstantBondLane:
-    def setConfig(_newConfig: InstantBondConfig): nonpayable
-    def setRateOverride(_targetRate: uint256): nonpayable
-    def cancelRateOverride(): nonpayable
     def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
-    def stop(): nonpayable
-    def setPaymentToken(_token: address): nonpayable
-    def setCumulativeMinted(_amount: uint256): nonpayable
-    def bondConfig() -> InstantBondConfig: view
-    def isValidConfig(_config: InstantBondConfig) -> bool: view
-    def isValidRateOverride(_targetRate: uint256) -> bool: view
-    def canCancelRateOverride() -> bool: view
-    def isValidEpochLength(_epochLength: uint256) -> bool: view
-    def isValidPaymentToken(_token: address) -> bool: view
     def isValidCumulativeMinted(_amount: uint256) -> bool: view
-    def getRipeHq() -> address: view
-    def epochLength() -> uint256: view
+    def isValidRateOverride(_targetRate: uint256) -> bool: view
+    def isValidConfig(_config: InstantBondConfig) -> bool: view
+    def isValidEpochLength(_epochLength: uint256) -> bool: view
+    def setConfig(_newConfig: InstantBondConfig): nonpayable
+    def isValidPaymentToken(_token: address) -> bool: view
+    def setRateOverride(_targetRate: uint256): nonpayable
+    def setCumulativeMinted(_amount: uint256): nonpayable
+    def setPaymentToken(_token: address): nonpayable
+    def setCanBuyNow(_canBuyNow: bool): nonpayable
+    def bondConfig() -> InstantBondConfig: view
+    def canCancelRateOverride() -> bool: view
+    def cancelRateOverride(): nonpayable
+    def isRunning() -> bool: view
+    def stop(): nonpayable
+
+interface RipeHq:
+    def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
     INSTANT_BOND_CONFIG
     RATE_OVERRIDE_SET
     RATE_OVERRIDE_CANCEL
 
-# NOTE: Keep this struct byte-for-byte aligned with InstantBondLane.InstantBondConfig.
-# Guarded by test_instant_bond_config_struct_bodies_are_byte_for_byte_identical.
 struct InstantBondConfig:
     canBuyNow: bool
     paymentCapPerEpoch: uint256
@@ -90,9 +90,6 @@ event PendingInstantBondConfigSet:
 event InstantBondConfigExecuted:
     actionId: uint256
 
-event InstantBondConfigCancelled:
-    actionId: uint256
-
 event PendingRateOverrideSet:
     actionId: uint256
     confirmationBlock: uint256
@@ -108,10 +105,6 @@ event RateOverrideExecuted:
 event RateOverrideCancellationExecuted:
     actionId: uint256
 
-event RateOverrideActionCancelled:
-    actionId: uint256
-    isCancellation: bool
-
 event InstantBondStarted:
     genesisBlock: uint256
     epochLength: uint256
@@ -122,12 +115,15 @@ event InstantBondCumulativeMintedSet:
 event InstantBondPaymentTokenSet:
     token: indexed(address)
 
-LANE: public(immutable(address))
+event InstantBondCanBuyNowSet:
+    canBuyNow: bool
 
 # pending actions
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingConfig: public(HashMap[uint256, InstantBondConfig]) # aid -> config
 pendingRateOverride: public(HashMap[uint256, uint256]) # aid -> target rate
+
+INSTANT_BOND_LANE_ID: constant(uint256) = 26
 
 
 @deploy
@@ -136,16 +132,20 @@ def __init__(
     _tempGov: address,
     _minConfigTimeLock: uint256,
     _maxConfigTimeLock: uint256,
-    _instantBondLane: address,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
-    assert _instantBondLane != empty(address) and _instantBondLane.is_contract # dev: invalid lane
-    assert staticcall InstantBondLane(_instantBondLane).getRipeHq() == _ripeHq # dev: invalid lane
-    assert staticcall InstantBondLane(_instantBondLane).epochLength() != 0 # dev: invalid lane
-    assert not staticcall InstantBondLane(_instantBondLane).isValidConfig(empty(InstantBondConfig)) # dev: invalid lane
-    assert not staticcall InstantBondLane(_instantBondLane).isValidRateOverride(0) # dev: invalid lane
-    LANE = _instantBondLane
+
+
+# address getters
+
+
+@view
+@internal
+def _getInstantBondLaneAddr() -> address:
+    lane: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(INSTANT_BOND_LANE_ID)
+    assert lane != empty(address) # dev: invalid lane
+    return lane
 
 
 #######################
@@ -156,9 +156,8 @@ def __init__(
 @external
 def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert timeLock.actionTimeLock != 0 # dev: action time lock not set
 
-    lane: address = LANE
+    lane: address = self._getInstantBondLaneAddr()
     assert staticcall InstantBondLane(lane).isValidConfig(_config) # dev: invalid config
 
     aid: uint256 = timeLock._initiateAction()
@@ -190,6 +189,20 @@ def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
     return aid
 
 
+# can buy now
+
+
+@external
+def setCanBuyNow(_canBuyNow: bool):
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    lane: address = self._getInstantBondLaneAddr()
+    config: InstantBondConfig = staticcall InstantBondLane(lane).bondConfig()
+    assert config.canBuyNow != _canBuyNow # dev: no change
+    extcall InstantBondLane(lane).setCanBuyNow(_canBuyNow)
+    log InstantBondCanBuyNowSet(canBuyNow=_canBuyNow)
+
+
 #################
 # Rate Override #
 #################
@@ -198,9 +211,8 @@ def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
 @external
 def setInstantBondRateOverride(_targetRate: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert timeLock.actionTimeLock != 0 # dev: action time lock not set
 
-    lane: address = LANE
+    lane: address = self._getInstantBondLaneAddr()
     assert staticcall InstantBondLane(lane).isValidRateOverride(_targetRate) # dev: invalid rate override
 
     aid: uint256 = timeLock._initiateAction()
@@ -219,9 +231,8 @@ def setInstantBondRateOverride(_targetRate: uint256) -> uint256:
 @external
 def cancelInstantBondRateOverride() -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert timeLock.actionTimeLock != 0 # dev: action time lock not set
 
-    lane: address = LANE
+    lane: address = self._getInstantBondLaneAddr()
     assert staticcall InstantBondLane(lane).canCancelRateOverride() # dev: no rate override
 
     aid: uint256 = timeLock._initiateAction()
@@ -244,7 +255,8 @@ def cancelInstantBondRateOverride() -> uint256:
 def startInstantBond(_genesisBlock: uint256, _epochLength: uint256):
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = LANE
+    lane: address = self._getInstantBondLaneAddr()
+    assert not staticcall InstantBondLane(lane).isRunning() # dev: already running
     assert staticcall InstantBondLane(lane).isValidEpochLength(_epochLength) # dev: invalid epoch length
     assert staticcall InstantBondLane(lane).isValidConfig(staticcall InstantBondLane(lane).bondConfig()) # dev: not configured
     extcall InstantBondLane(lane).start(_genesisBlock, _epochLength)
@@ -254,7 +266,10 @@ def startInstantBond(_genesisBlock: uint256, _epochLength: uint256):
 @external
 def stopInstantBond():
     assert gov._canGovern(msg.sender) # dev: no perms
-    extcall InstantBondLane(LANE).stop()
+
+    lane: address = self._getInstantBondLaneAddr()
+    assert staticcall InstantBondLane(lane).isRunning() # dev: not running
+    extcall InstantBondLane(lane).stop()
 
 
 ####################
@@ -266,7 +281,7 @@ def stopInstantBond():
 def setInstantBondPaymentToken(_token: address):
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = LANE
+    lane: address = self._getInstantBondLaneAddr()
     assert staticcall InstantBondLane(lane).isValidPaymentToken(_token) # dev: invalid payment token
     extcall InstantBondLane(lane).setPaymentToken(_token)
     log InstantBondPaymentTokenSet(token=_token)
@@ -276,7 +291,7 @@ def setInstantBondPaymentToken(_token: address):
 def setInstantBondCumulativeMinted(_amount: uint256):
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = LANE
+    lane: address = self._getInstantBondLaneAddr()
     assert staticcall InstantBondLane(lane).isValidCumulativeMinted(_amount) # dev: exceeds mint budget
     extcall InstantBondLane(lane).setCumulativeMinted(_amount)
     log InstantBondCumulativeMintedSet(amount=_amount)
@@ -299,21 +314,22 @@ def executePendingAction(_aid: uint256) -> bool:
 
     actionType: ActionType = self.actionType[_aid]
     assert actionType != empty(ActionType) # dev: invalid action
-    lane: address = LANE
-    if actionType == ActionType.INSTANT_BOND_CONFIG:
-        extcall InstantBondLane(lane).setConfig(self.pendingConfig[_aid])
-    elif actionType == ActionType.RATE_OVERRIDE_SET:
-        extcall InstantBondLane(lane).setRateOverride(self.pendingRateOverride[_aid])
-    else:
-        extcall InstantBondLane(lane).cancelRateOverride()
+    lane: address = self._getInstantBondLaneAddr()
 
-    self._clearPending(_aid, actionType)
     if actionType == ActionType.INSTANT_BOND_CONFIG:
+        assert staticcall InstantBondLane(lane).isValidConfig(self.pendingConfig[_aid]) # dev: invalid config
+        extcall InstantBondLane(lane).setConfig(self.pendingConfig[_aid])
         log InstantBondConfigExecuted(actionId=_aid)
     elif actionType == ActionType.RATE_OVERRIDE_SET:
+        assert staticcall InstantBondLane(lane).isValidRateOverride(self.pendingRateOverride[_aid]) # dev: invalid rate override
+        extcall InstantBondLane(lane).setRateOverride(self.pendingRateOverride[_aid])
         log RateOverrideExecuted(actionId=_aid)
     else:
+        assert staticcall InstantBondLane(lane).canCancelRateOverride() # dev: no rate override
+        extcall InstantBondLane(lane).cancelRateOverride()
         log RateOverrideCancellationExecuted(actionId=_aid)
+
+    self.actionType[_aid] = empty(ActionType)
     return True
 
 
@@ -331,22 +347,5 @@ def cancelPendingAction(_aid: uint256) -> bool:
 
 @internal
 def _cancelPendingAction(_aid: uint256):
-    actionType: ActionType = self.actionType[_aid]
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
-    self._clearPending(_aid, actionType)
-    if actionType == ActionType.INSTANT_BOND_CONFIG:
-        log InstantBondConfigCancelled(actionId=_aid)
-    else:
-        log RateOverrideActionCancelled(
-            actionId=_aid,
-            isCancellation=actionType == ActionType.RATE_OVERRIDE_CANCEL,
-        )
-
-
-@internal
-def _clearPending(_aid: uint256, _actionType: ActionType):
-    if _actionType == ActionType.INSTANT_BOND_CONFIG:
-        self.pendingConfig[_aid] = empty(InstantBondConfig)
-    else:
-        self.pendingRateOverride[_aid] = 0
     self.actionType[_aid] = empty(ActionType)

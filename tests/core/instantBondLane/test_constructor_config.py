@@ -1,13 +1,13 @@
 import boa
 import pytest
 
-from conf_utils import filter_logs
-from constants import ZERO_ADDRESS
+from conf_utils import filter_logs, get_boa_dev_reasons
+from constants import MAX_UINT256, ZERO_ADDRESS
+
+from tests.core.instantBondLane.conftest import DEFAULT_EPOCH_LENGTH, make_config
 
 
-MAX_UINT256 = 2**256 - 1
 MAX_EPOCH_LENGTH = MAX_UINT256 // 10_000 + 1
-
 
 REVERTING_DECIMALS = """
 # @version 0.4.3
@@ -19,14 +19,14 @@ def decimals() -> uint8:
 """
 
 
-def deploy_token(governance, decimals):
+def deploy_token(governance, decimals, supply=0):
     return boa.load(
         "contracts/mock/MockErc20.vy",
         governance,
         "Payment Token",
         "PAY",
         decimals,
-        0,
+        supply,
     )
 
 
@@ -34,159 +34,120 @@ def deploy_token(governance, decimals):
 def test_constructor_derives_payment_scale(ripe_hq, governance, decimals):
     with boa.env.anchor():
         token = deploy_token(governance.address, decimals)
-        genesis = boa.env.evm.patch.block_number
+        scale = 10**decimals
+        config = make_config(scale)
         lane = boa.load(
             "contracts/core/InstantBondLane.vy",
             ripe_hq,
             token,
-            genesis,
-            100,
+            config,
         )
 
-        assert lane.PAYMENT_TOKEN() == token.address
-        assert lane.PAYMENT_DECIMALS() == decimals
-        assert lane.PAYMENT_SCALE() == 10**decimals
-        assert lane.GENESIS_BLOCK() == genesis
-        assert lane.EPOCH_LENGTH() == 100
-        assert lane.isPaused()
-        assert not lane.isInitialized()
-        assert lane.rateOverride() == 0
-        assert lane.overrideVersion() == 0
+        assert lane.paymentToken() == token.address
+        assert lane.paymentDecimals() == decimals
+        assert lane.paymentScale() == scale
+        assert lane.genesisBlock() == 0
+        assert lane.isRunning() is False
+        assert lane.epochLength() == DEFAULT_EPOCH_LENGTH
+        assert tuple(lane.bondConfig()) == config
         assert lane.cumulativeMinted() == 0
+        assert lane.rateOverride() == 0
+        assert lane.epochState().rate == 0
 
 
-def test_constructor_uses_genesis_relative_boundaries_without_absolute_alignment(
-    ripe_hq, governance
-):
+def test_constructor_starts_paused_and_not_running(ripe_hq, governance, charlie_token):
     with boa.env.anchor():
-        token = deploy_token(governance.address, 6)
-        if boa.env.evm.patch.block_number < 3:
-            boa.env.time_travel(blocks=3 - boa.env.evm.patch.block_number)
-        current_block = boa.env.evm.patch.block_number
-        genesis = current_block - 1
-        if genesis % 100 == 0:
-            genesis -= 1
-
+        scale = 10 ** charlie_token.decimals()
         lane = boa.load(
             "contracts/core/InstantBondLane.vy",
             ripe_hq,
-            token,
-            genesis,
-            100,
+            charlie_token,
+            make_config(scale),
         )
-
-        assert genesis > 0
-        assert genesis % lane.EPOCH_LENGTH() != 0
-        assert lane.GENESIS_BLOCK() == genesis
-
-        zero_genesis_lane = boa.load(
-            "contracts/core/InstantBondLane.vy",
-            ripe_hq,
-            token,
-            0,
-            100,
-        )
-        assert zero_genesis_lane.GENESIS_BLOCK() == 0
+        assert lane.isPaused() is True
+        assert lane.isRunning() is False
+        assert lane.genesisBlock() == 0
 
 
-def test_constructor_rejects_invalid_payment_token_and_epoch_length(
-    ripe_hq, governance, alice, mock_rando_contract
+def test_constructor_rejects_invalid_payment_token(
+    ripe_hq, governance, ripe_token, charlie_token
 ):
     with boa.env.anchor():
-        token = deploy_token(governance.address, 6)
-        genesis = boa.env.evm.patch.block_number
+        scale = 10 ** charlie_token.decimals()
+        config = make_config(scale)
 
         with boa.reverts("invalid payment token"):
             boa.load(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
                 ZERO_ADDRESS,
-                genesis,
-                100,
+                config,
             )
         with boa.reverts("invalid payment token"):
             boa.load(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
-                alice,
-                genesis,
-                100,
-            )
-        with boa.reverts("invalid epoch length"):
-            boa.load(
-                "contracts/core/InstantBondLane.vy",
-                ripe_hq,
-                token,
-                genesis,
-                0,
-            )
-        with boa.reverts("invalid epoch length"):
-            boa.load(
-                "contracts/core/InstantBondLane.vy",
-                ripe_hq,
-                token,
-                genesis,
-                MAX_EPOCH_LENGTH + 1,
-            )
-        with boa.reverts():
-            boa.load(
-                "contracts/core/InstantBondLane.vy",
-                ripe_hq,
-                mock_rando_contract,
-                genesis,
-                100,
+                ripe_token,
+                make_config(10 ** ripe_token.decimals()),
             )
 
 
 def test_constructor_rejects_reverting_or_excessive_decimals(ripe_hq, governance):
     with boa.env.anchor():
-        genesis = boa.env.evm.patch.block_number
         reverting = boa.loads(REVERTING_DECIMALS)
-        too_many = deploy_token(governance.address, 74)
-
-        with boa.reverts("decimals unavailable"):
+        with boa.reverts():
             boa.load(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
                 reverting,
-                genesis,
-                100,
+                make_config(1),
             )
-        with boa.reverts("invalid payment decimals"):
+
+        excessive = deploy_token(governance.address, 74)
+        with boa.reverts("invalid payment token"):
             boa.load(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
-                too_many,
-                genesis,
-                100,
+                excessive,
+                make_config(10**74),
             )
 
 
-def test_constructor_rejects_ripe_as_payment_token(ripe_hq, ripe_token):
+def test_constructor_rejects_invalid_config(ripe_hq, charlie_token):
     with boa.env.anchor():
-        with boa.reverts("payment token is ripe"):
+        scale = 10 ** charlie_token.decimals()
+        with boa.reverts("invalid config"):
             boa.load(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
-                ripe_token,
-                boa.env.evm.patch.block_number,
-                100,
+                charlie_token,
+                make_config(scale, uLowBps=0),
+            )
+        with boa.reverts("invalid config"):
+            boa.load(
+                "contracts/core/InstantBondLane.vy",
+                ripe_hq,
+                charlie_token,
+                make_config(scale, epochLength=0),
             )
 
 
 def test_constructor_accepts_largest_overflow_safe_epoch_length(
-    ripe_hq, governance
+    ripe_hq, charlie_token
 ):
     with boa.env.anchor():
-        token = deploy_token(governance.address, 6)
+        scale = 10 ** charlie_token.decimals()
+        config = make_config(scale, epochLength=MAX_EPOCH_LENGTH)
         lane = boa.load(
             "contracts/core/InstantBondLane.vy",
             ripe_hq,
-            token,
-            boa.env.evm.patch.block_number,
-            MAX_EPOCH_LENGTH,
+            charlie_token,
+            config,
         )
-        assert lane.EPOCH_LENGTH() == MAX_EPOCH_LENGTH
+        assert lane.epochLength() == MAX_EPOCH_LENGTH
+        assert lane.isValidEpochLength(MAX_EPOCH_LENGTH)
+        assert not lane.isValidEpochLength(0)
+        assert not lane.isValidEpochLength(MAX_EPOCH_LENGTH + 1)
 
 
 def test_valid_config_boundaries(lane_env):
@@ -228,6 +189,8 @@ def test_valid_config_boundaries(lane_env):
             seedRate=10_000,
         ),
         lane_env.make_config(mintBudget=0),
+        lane_env.make_config(minLockDuration=0),
+        lane_env.make_config(minLockDuration=1_000),
     ]
 
     for config in valid_cases:
@@ -278,214 +241,108 @@ def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
             seedRate=9_999,
         ),
         lane_env.make_config(seedRate=9_999),
-        lane_env.make_config(seedRate=2 * 10**18),
+        lane_env.make_config(epochLength=0),
+        lane_env.make_config(epochLength=MAX_EPOCH_LENGTH + 1),
+        lane_env.make_config(epochLength=lane.epochLength() + 1),
     ]
 
     for config in invalid_cases:
         assert lane.isValidConfig(config) is False
 
 
-def test_low_decimal_bonus_intermediate_overflow_config_rejects(
-    ripe_hq, governance
-):
-    with boa.env.anchor():
-        token = deploy_token(governance.address, 0)
-        lane = boa.load(
-            "contracts/core/InstantBondLane.vy",
-            ripe_hq,
-            token,
-            boa.env.evm.patch.block_number,
-            100,
-        )
-        config = (
-            True,
-            1_000,
-            1,
-            MAX_UINT256,
-            MAX_UINT256 // 10_000,
-            10_000,
-            8_000,
-            2_000,
-            1_000,
-            1_000,
-            500,
-            500,
-            1_000,
-            4,
-            100_000,
+def test_set_config_cannot_change_live_epoch_length(lane_env):
+    with boa.reverts("invalid config"):
+        lane_env.lane.setConfig(
+            lane_env.make_config(epochLength=lane_env.epoch_length + 1),
+            sender=lane_env.switchboard.address,
         )
 
-        assert lane.isValidConfig(config) is False
+
+def test_set_config_cannot_cut_budget_below_minted(lane_env):
+    lane_env.buy(lane_env.scale)
+    minted = lane_env.lane.cumulativeMinted()
+    assert minted > 0
+    with boa.reverts("invalid config"):
+        lane_env.set_config(mintBudget=minted - 1)
+    lane_env.set_config(mintBudget=minted)
+    assert lane_env.lane.bondConfig().mintBudget == minted
 
 
 def test_set_config_authorization_storage_and_event(lane_env, alice):
-    lane = lane_env.lane
-    config = lane_env.make_config()
-
     with boa.reverts("no perms"):
-        lane.setConfig(config, sender=alice)
+        lane_env.lane.setConfig(lane_env.make_config(), sender=alice)
 
-    lane.setConfig(config, sender=lane_env.switchboard.address)
-    logs = filter_logs(lane, "InstantBondConfigSet")
-    assert tuple(lane.config()) == config
-
+    config = lane_env.make_config(maxLockBonus=0, canBuyNow=True)
+    lane_env.lane.setConfig(config, sender=lane_env.switchboard.address)
+    logs = filter_logs(lane_env.lane, "InstantBondConfigSet")
+    stored = tuple(lane_env.lane.bondConfig())
+    assert stored == config
     assert len(logs) == 1
     event = logs[0]
-    assert event.canBuyNow == config[0]
-    assert event.paymentCapPerEpoch == config[1]
-    assert event.minPaymentAmount == config[2]
-    assert event.mintBudget == config[3]
-    assert event.maxEffectiveRate == config[4]
-    assert event.seedRate == config[5]
-    assert event.uHighBps == config[6]
-    assert event.uLowBps == config[7]
-    assert event.minUpBps == config[8]
-    assert event.maxUpBps == config[9]
-    assert event.minDownBps == config[10]
-    assert event.maxDownBps == config[11]
-    assert event.decayBps == config[12]
-    assert event.maxDecayEpochs == config[13]
-    assert event.maxLockBonus == config[14]
-
-    with boa.reverts("invalid config"):
-        lane.setConfig(
-            lane_env.make_config(minDownBps=0),
-            sender=lane_env.switchboard.address,
-        )
-
-
-def test_rate_override_validation_authorization_versions_and_cancel(lane_env, alice):
-    lane = lane_env.lane
-    config = lane_env.set_config(maxLockBonus=5_000, maxEffectiveRate=2 * 10**18)
-    ceiling = config[4] * 10_000 // (10_000 + config[14])
-
-    assert not lane.isValidRateOverride(10**18, 0)
-    with boa.reverts("invalid rate override"):
-        lane.setRateOverride(
-            10**18,
-            0,
-            sender=lane_env.switchboard.address,
-        )
-
-    lane_env.buy(lane_env.scale)
-    assert lane.isValidRateOverride(10_000, 0)
-    assert lane.isValidRateOverride(ceiling, 0)
-    assert not lane.isValidRateOverride(9_999, 0)
-    assert not lane.isValidRateOverride(ceiling + 1, 0)
-    assert not lane.isValidRateOverride(10**18, 1)
-
-    with boa.reverts("no perms"):
-        lane.setRateOverride(10**18, 0, sender=alice)
-    with boa.reverts("stale override version"):
-        lane.setRateOverride(
-            10**18,
-            1,
-            sender=lane_env.switchboard.address,
-        )
-    with boa.reverts("invalid rate override"):
-        lane.setRateOverride(
-            ceiling + 1,
-            0,
-            sender=lane_env.switchboard.address,
-        )
-
-    assert lane_env.set_rate_override(10**18) == 1
-    installed = filter_logs(lane, "RateOverrideInstalled")[0]
-    assert installed.newVersion == 1
-    assert installed.targetRate == 10**18
-    assert lane.rateOverride() == 10**18
-    assert lane.overrideVersion() == 1
-    assert lane.canCancelRateOverride(1)
-    assert not lane.canCancelRateOverride(0)
-    assert not lane.isValidRateOverride(10**18, 1)
-
-    with boa.reverts("invalid rate override"):
-        lane.setRateOverride(
-            10**18,
-            1,
-            sender=lane_env.switchboard.address,
-        )
-    with boa.reverts("no perms"):
-        lane.cancelRateOverride(1, sender=alice)
-    with boa.reverts("stale override version"):
-        lane.cancelRateOverride(0, sender=lane_env.switchboard.address)
-
-    assert lane_env.cancel_rate_override() == 2
-    cancelled = filter_logs(lane, "RateOverrideCancelled")[0]
-    assert cancelled.newVersion == 2
-    assert cancelled.targetRate == 10**18
-    assert lane.rateOverride() == 0
-    assert lane.overrideVersion() == 2
-    assert not lane.canCancelRateOverride(2)
-    with boa.reverts("no override"):
-        lane.cancelRateOverride(2, sender=lane_env.switchboard.address)
-
-
-def test_config_change_invalidates_installed_override_once(lane_env):
-    lane_env.set_config(maxLockBonus=0)
-    lane_env.buy(lane_env.scale)
-    lane_env.set_rate_override(777_777_777_777_777_777)
-
-    assert lane_env.set_config(maxLockBonus=0) is not None
-    invalidated = filter_logs(lane_env.lane, "RateOverrideInvalidated")[0]
-    assert invalidated.newVersion == 2
-    assert invalidated.targetRate == 777_777_777_777_777_777
-    assert lane_env.lane.rateOverride() == 0
-    assert lane_env.lane.overrideVersion() == 2
-
-    lane_env.set_config(maxLockBonus=0)
-    invalidation_logs = filter_logs(lane_env.lane, "RateOverrideInvalidated")
-    assert lane_env.lane.overrideVersion() == 2
-    assert invalidation_logs == []
+    assert event.canBuyNow is True
+    assert event.maxLockBonus == 0
+    assert event.epochLength == lane_env.epoch_length
+    assert event.minLockDuration == 0
 
 
 def test_pause_and_recovery_remain_switchboard_gated(lane_env, alice):
-    lane = lane_env.lane
-
     with boa.reverts("no perms"):
-        lane.pause(True, sender=alice)
-    lane.pause(True, sender=lane_env.switchboard.address)
-    assert lane.isPaused()
+        lane_env.lane.pause(True, sender=alice)
+
+    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
+    assert lane_env.lane.isPaused() is True
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(lane_env.scale)
+    assert "paused" in get_boa_dev_reasons(err.value)
+
+    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
+    payout = lane_env.buy(lane_env.scale)
+    assert payout > 0
+
+
+def test_set_config_last_write_wins_and_works_while_paused(lane_env):
+    first = lane_env.set_config(maxLockBonus=1_000)
+    second = lane_env.make_config(maxLockBonus=0)
+    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
+    lane_env.lane.setConfig(second, sender=lane_env.switchboard.address)
+    assert tuple(lane_env.lane.bondConfig()) == second
+    assert tuple(lane_env.lane.bondConfig()) != first
+    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
+    assert lane_env.quote(lane_env.scale).available is True
+
+
+def test_empty_config_is_never_valid(lane_env):
+    empty = (False,) + (0,) * 16
+    assert lane_env.lane.isValidConfig(empty) is False
+
+
+def test_set_can_buy_now_toggles_only_the_switch(lane_env, alice):
+    with boa.reverts("no perms"):
+        lane_env.lane.setCanBuyNow(False, sender=alice)
     with boa.reverts("no change"):
-        lane.pause(True, sender=lane_env.switchboard.address)
+        lane_env.lane.setCanBuyNow(True, sender=lane_env.switchboard.address)
 
-    amount = 7 * lane_env.scale
-    lane_env.payment_token.transfer(lane, amount, sender=lane_env.bob)
-    with boa.reverts("no perms"):
-        lane.recoverFunds(alice, lane_env.payment_token, sender=alice)
-    before = lane_env.payment_token.balanceOf(alice)
-    lane.recoverFunds(alice, lane_env.payment_token, sender=lane_env.switchboard.address)
-    assert lane_env.payment_token.balanceOf(alice) == before + amount
-    assert lane_env.payment_token.balanceOf(lane) == 0
+    before = tuple(lane_env.lane.bondConfig())
+    lane_env.buy(lane_env.scale)
+    lane_env.set_rate_override(9 * 10**17)
 
+    lane_env.lane.setCanBuyNow(False, sender=lane_env.switchboard.address)
+    logs = filter_logs(lane_env.lane, "CanBuyNowSet")
+    assert logs[-1].canBuyNow is False
+    after = tuple(lane_env.lane.bondConfig())
+    assert after[0] is False
+    assert after[1:] == before[1:]
+    assert lane_env.lane.rateOverride() == 9 * 10**17
 
-def test_recover_funds_many_recovers_each_asset_and_remains_gated(lane_env, alice):
-    payment_amount = 7 * lane_env.scale
-    ripe_amount = 11 * 10**18
-    lane_env.payment_token.transfer(
-        lane_env.lane,
-        payment_amount,
-        sender=lane_env.bob,
-    )
-    lane_env.ripe_token.transfer(
-        lane_env.lane,
-        ripe_amount,
-        sender=lane_env.ripe_whale,
-    )
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(lane_env.scale)
+    assert "disabled" in get_boa_dev_reasons(err.value)
+    quote = lane_env.quote(lane_env.scale)
+    assert quote.available is False
+    assert quote.rate == lane_env.lane.epochState().rate
 
-    assets = [lane_env.payment_token, lane_env.ripe_token]
-    with boa.reverts("no perms"):
-        lane_env.lane.recoverFundsMany(alice, assets, sender=alice)
-
-    payment_before = lane_env.payment_token.balanceOf(alice)
-    ripe_before = lane_env.ripe_token.balanceOf(alice)
-    lane_env.lane.recoverFundsMany(
-        alice,
-        assets,
-        sender=lane_env.switchboard.address,
-    )
-
-    assert lane_env.payment_token.balanceOf(alice) == payment_before + payment_amount
-    assert lane_env.ripe_token.balanceOf(alice) == ripe_before + ripe_amount
-    assert lane_env.payment_token.balanceOf(lane_env.lane) == 0
-    assert lane_env.ripe_token.balanceOf(lane_env.lane) == 0
+    lane_env.lane.setCanBuyNow(True, sender=lane_env.switchboard.address)
+    assert filter_logs(lane_env.lane, "CanBuyNowSet")[-1].canBuyNow is True
+    assert lane_env.quote(lane_env.scale).available is True
+    assert lane_env.buy(lane_env.scale) > 0
+    assert lane_env.lane.rateOverride() == 9 * 10**17

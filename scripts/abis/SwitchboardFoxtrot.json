@@ -86,16 +86,14 @@
         "name": "maxLockBonus",
         "type": "uint256",
         "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "InstantBondConfigExecuted",
-    "inputs": [
+      },
       {
-        "name": "actionId",
+        "name": "minLockDuration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "epochLength",
         "type": "uint256",
         "indexed": false
       }
@@ -104,7 +102,7 @@
     "type": "event"
   },
   {
-    "name": "InstantBondConfigCancelled",
+    "name": "InstantBondConfigExecuted",
     "inputs": [
       {
         "name": "actionId",
@@ -132,11 +130,6 @@
         "name": "targetRate",
         "type": "uint256",
         "indexed": false
-      },
-      {
-        "name": "expectedOverrideVersion",
-        "type": "uint256",
-        "indexed": false
       }
     ],
     "anonymous": false,
@@ -154,11 +147,6 @@
         "name": "confirmationBlock",
         "type": "uint256",
         "indexed": false
-      },
-      {
-        "name": "expectedOverrideVersion",
-        "type": "uint256",
-        "indexed": false
       }
     ],
     "anonymous": false,
@@ -169,11 +157,6 @@
     "inputs": [
       {
         "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "newVersion",
         "type": "uint256",
         "indexed": false
       }
@@ -188,9 +171,21 @@
         "name": "actionId",
         "type": "uint256",
         "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "InstantBondStarted",
+    "inputs": [
+      {
+        "name": "genesisBlock",
+        "type": "uint256",
+        "indexed": false
       },
       {
-        "name": "newVersion",
+        "name": "epochLength",
         "type": "uint256",
         "indexed": false
       }
@@ -199,15 +194,34 @@
     "type": "event"
   },
   {
-    "name": "RateOverrideActionCancelled",
+    "name": "InstantBondCumulativeMintedSet",
     "inputs": [
       {
-        "name": "actionId",
+        "name": "amount",
         "type": "uint256",
         "indexed": false
-      },
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "InstantBondPaymentTokenSet",
+    "inputs": [
       {
-        "name": "isCancellation",
+        "name": "token",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "InstantBondCanBuyNowSet",
+    "inputs": [
+      {
+        "name": "canBuyNow",
         "type": "bool",
         "indexed": false
       }
@@ -917,6 +931,14 @@
           {
             "name": "maxLockBonus",
             "type": "uint256"
+          },
+          {
+            "name": "minLockDuration",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
           }
         ]
       }
@@ -931,14 +953,22 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "setCanBuyNow",
+    "inputs": [
+      {
+        "name": "_canBuyNow",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "setInstantBondRateOverride",
     "inputs": [
       {
         "name": "_targetRate",
-        "type": "uint256"
-      },
-      {
-        "name": "_expectedOverrideVersion",
         "type": "uint256"
       }
     ],
@@ -953,18 +983,60 @@
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "cancelInstantBondRateOverride",
-    "inputs": [
-      {
-        "name": "_expectedOverrideVersion",
-        "type": "uint256"
-      }
-    ],
+    "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "uint256"
       }
     ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "startInstantBond",
+    "inputs": [
+      {
+        "name": "_genesisBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_epochLength",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "stopInstantBond",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setInstantBondPaymentToken",
+    "inputs": [
+      {
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setInstantBondCumulativeMinted",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
   },
   {
     "stateMutability": "nonpayable",
@@ -997,18 +1069,6 @@
       {
         "name": "",
         "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "LANE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
       }
     ]
   },
@@ -1103,6 +1163,14 @@
           {
             "name": "maxLockBonus",
             "type": "uint256"
+          },
+          {
+            "name": "minLockDuration",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
           }
         ]
       }
@@ -1121,17 +1189,7 @@
     "outputs": [
       {
         "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "targetRate",
-            "type": "uint256"
-          },
-          {
-            "name": "expectedOverrideVersion",
-            "type": "uint256"
-          }
-        ]
+        "type": "uint256"
       }
     ]
   },
@@ -1154,10 +1212,6 @@
       {
         "name": "_maxConfigTimeLock",
         "type": "uint256"
-      },
-      {
-        "name": "_instantBondLane",
-        "type": "address"
       }
     ],
     "outputs": []

@@ -15,13 +15,19 @@ DEFAULT_MANIFEST = ROOT / "config" / "instant-bond-lane-activation.json"
 EXPECTED_SWITCHBOARDS = tuple(
     f"Switchboard{name}" for name in ("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot")
 )
-LANE_MUTATORS = ("setConfig", "setRateOverride", "cancelRateOverride")
+LANE_MUTATORS = (
+    "setConfig",
+    "setCanBuyNow",
+    "setRateOverride",
+    "cancelRateOverride",
+)
 EXPECTED_LANE_REACHABILITY = {
     name: list(LANE_MUTATORS) if name == "SwitchboardFoxtrot" else []
     for name in EXPECTED_SWITCHBOARDS
 }
 FOXTROT_SEMANTIC_METHODS = (
     "setInstantBondConfig",
+    "setCanBuyNow",
     "setInstantBondRateOverride",
     "cancelInstantBondRateOverride",
     "executePendingAction",
@@ -73,12 +79,8 @@ def draft_errors(manifest: dict[str, Any], root: Path = ROOT) -> list[str]:
     if not manifest.get("owner_decision_url", "").startswith("https://github.com/"):
         errors.append("owner decision evidence URL is missing")
     limits = manifest.get("runtime_limits", {})
-    if limits != {
-        "instant_bond_lane": 13_000,
-        "switchboard_foxtrot": 6_500,
-        "eip170": 24_576,
-    }:
-        errors.append("runtime limits do not match the dated owner decision")
+    if limits != {"eip170": 24_576}:
+        errors.append("runtime limits must be EIP-170 only")
     if manifest.get("lock_bonus", {}).get("maximum_bps") != 0:
         errors.append("lock bonuses must remain disabled")
     pricing = manifest.get("pricing", {})

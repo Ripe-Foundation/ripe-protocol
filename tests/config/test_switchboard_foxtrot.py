@@ -1,147 +1,22 @@
-import json
-import os
-from pathlib import Path
-from types import SimpleNamespace
-
 import boa
 import pytest
+from types import SimpleNamespace
 from vyper.compiler.output import build_abi_output
 
 from conf_utils import filter_logs
-from constants import MAX_UINT256, ZERO_ADDRESS
+from constants import INSTANT_BOND_LANE_HQ_ID, MAX_UINT256, ZERO_ADDRESS
+
+from tests.core.instantBondLane.conftest import make_config
 
 
 ACTION_INSTANT_BOND_CONFIG = 1
 ACTION_RATE_OVERRIDE_SET = 2
 ACTION_RATE_OVERRIDE_CANCEL = 4
-
-
-LANE_IDENTITY_MOCK = """
-# @version 0.4.3
-
-ripeHq: public(immutable(address))
-EPOCH_LENGTH: public(immutable(uint256))
-overrideVersion: public(uint256)
-
-@deploy
-def __init__(_ripeHq: address, _epochLength: uint256):
-    ripeHq = _ripeHq
-    EPOCH_LENGTH = _epochLength
-
-@view
-@external
-def getRipeHq() -> address:
-    return ripeHq
-"""
-
-
-PARTIAL_LANE_IDENTITY_MOCK = """
-# @version 0.4.3
-
-ripeHq: public(immutable(address))
-EPOCH_LENGTH: public(constant(uint256)) = 1
-
-@deploy
-def __init__(_ripeHq: address):
-    ripeHq = _ripeHq
-
-@view
-@external
-def getRipeHq() -> address:
-    return ripeHq
-"""
-
-
-MALICIOUS_LANE_IDENTITY_MOCK = """
-# @version 0.4.3
-
-struct InstantBondConfig:
-    canBuyNow: bool
-    paymentCapPerEpoch: uint256
-    minPaymentAmount: uint256
-    mintBudget: uint256
-    maxEffectiveRate: uint256
-    seedRate: uint256
-    uHighBps: uint256
-    uLowBps: uint256
-    minUpBps: uint256
-    maxUpBps: uint256
-    minDownBps: uint256
-    maxDownBps: uint256
-    decayBps: uint256
-    maxDecayEpochs: uint256
-    maxLockBonus: uint256
-
-ripeHq: public(immutable(address))
-EPOCH_LENGTH: public(constant(uint256)) = 1
-overrideVersion: public(uint256)
-
-@deploy
-def __init__(_ripeHq: address):
-    ripeHq = _ripeHq
-
-@view
-@external
-def getRipeHq() -> address:
-    return ripeHq
-
-@view
-@external
-def isValidConfig(_config: InstantBondConfig) -> bool:
-    return True
-
-@view
-@external
-def isValidRateOverride(
-    _targetRate: uint256,
-    _expectedOverrideVersion: uint256,
-) -> bool:
-    return True
-"""
 MIN_BASE_RATE = 10_000
-
 
 def travel(blocks):
     if blocks:
         boa.env.time_travel(blocks=blocks)
-
-
-def make_config(scale, **overrides):
-    values = {
-        "canBuyNow": True,
-        "paymentCapPerEpoch": 1_000 * scale,
-        "minPaymentAmount": scale,
-        "mintBudget": 1_000_000 * 10**18,
-        "maxEffectiveRate": 2 * 10**18,
-        "seedRate": 10**18,
-        "uHighBps": 8_000,
-        "uLowBps": 2_000,
-        "minUpBps": 1_000,
-        "maxUpBps": 1_000,
-        "minDownBps": 500,
-        "maxDownBps": 500,
-        "decayBps": 900,
-        "maxDecayEpochs": 4,
-        "maxLockBonus": 5_000,
-    }
-    values.update(overrides)
-    return (
-        values["canBuyNow"],
-        values["paymentCapPerEpoch"],
-        values["minPaymentAmount"],
-        values["mintBudget"],
-        values["maxEffectiveRate"],
-        values["seedRate"],
-        values["uHighBps"],
-        values["uLowBps"],
-        values["minUpBps"],
-        values["maxUpBps"],
-        values["minDownBps"],
-        values["maxDownBps"],
-        values["decayBps"],
-        values["maxDecayEpochs"],
-        values["maxLockBonus"],
-    )
 
 
 @pytest.fixture
@@ -157,13 +32,12 @@ def foxtrot_env(
     with boa.env.anchor():
         scale = 10 ** charlie_token.decimals()
         registry_lock = ripe_hq.registryChangeTimeLock()
-        genesis = boa.env.evm.patch.block_number + registry_lock * 2 + 5
+        config = make_config(scale, epoch_length=100)
         lane = boa.load(
             "contracts/core/InstantBondLane.vy",
             ripe_hq,
             charlie_token,
-            genesis,
-            100,
+            config,
             name="foxtrot_test_lane",
         )
 
@@ -174,6 +48,7 @@ def foxtrot_env(
         lane_reg_id = ripe_hq.confirmNewAddressToRegistry(
             lane, sender=governance.address
         )
+        assert lane_reg_id == INSTANT_BOND_LANE_HQ_ID
         ripe_hq.initiateHqConfigChange(
             lane_reg_id, False, True, False, sender=governance.address
         )
@@ -181,7 +56,6 @@ def foxtrot_env(
         assert ripe_hq.confirmHqConfigChange(
             lane_reg_id, sender=governance.address
         )
-        travel(genesis - boa.env.evm.patch.block_number)
         lane.pause(False, sender=switchboard_alpha.address)
 
         foxtrot = boa.load(
@@ -190,7 +64,6 @@ def foxtrot_env(
             ZERO_ADDRESS,
             2,
             20,
-            lane,
             name="switchboard_foxtrot",
         )
         assert switchboard.startAddNewAddressToRegistry(
@@ -200,6 +73,8 @@ def foxtrot_env(
         foxtrot_reg_id = switchboard.confirmNewAddressToRegistry(
             foxtrot, sender=governance.address
         )
+
+        foxtrot.startInstantBond(0, 100, sender=governance.address)
 
         charlie_token.transfer(
             bob,
@@ -219,6 +94,7 @@ def foxtrot_env(
             lane_reg_id=lane_reg_id,
             foxtrot_reg_id=foxtrot_reg_id,
             payment_token=charlie_token,
+            config=config,
         )
 
 
@@ -229,12 +105,8 @@ def enable_actions(ctx):
 
 def initialize_lane(ctx, config=None):
     if config is None:
-        config = make_config(ctx.scale)
-
-    ctx.lane.setConfig(
-        config,
-        sender=ctx.switchboard_alpha.address,
-    )
+        config = make_config(ctx.scale, epoch_length=ctx.lane.epochLength())
+        ctx.lane.setConfig(config, sender=ctx.switchboard_alpha.address)
     quote = ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob)
     assert quote.available
     ctx.lane.buyNow(
@@ -245,14 +117,13 @@ def initialize_lane(ctx, config=None):
         boa.env.evm.patch.block_number,
         sender=ctx.bob,
     )
-    assert ctx.lane.isInitialized()
+    assert ctx.lane.epochState().rate != 0
     return config
 
 
 def install_override(ctx, target_rate):
     action_id = ctx.foxtrot.setInstantBondRateOverride(
         target_rate,
-        ctx.lane.overrideVersion(),
         sender=ctx.governance.address,
     )
     travel(ctx.foxtrot.actionTimeLock())
@@ -265,20 +136,14 @@ def install_override(ctx, target_rate):
 
 def travel_to_next_lane_epoch(ctx):
     block_number = boa.env.evm.patch.block_number
-    offset = (block_number - ctx.lane.GENESIS_BLOCK()) % ctx.lane.EPOCH_LENGTH()
-    travel(ctx.lane.EPOCH_LENGTH() - offset)
+    length = ctx.lane.epochLength()
+    offset = (block_number - ctx.lane.genesisBlock()) % length
+    travel(length - offset)
 
 
 def assert_pending_cleared(ctx, action_id):
     assert not ctx.foxtrot.hasPendingAction(action_id)
     assert ctx.foxtrot.actionType(action_id) == 0
-
-    pending_config = ctx.foxtrot.pendingConfig(action_id)
-    assert tuple(pending_config) == (False,) + (0,) * 14
-
-    pending_override = ctx.foxtrot.pendingRateOverride(action_id)
-    assert pending_override.targetRate == 0
-    assert pending_override.expectedOverrideVersion == 0
 
 
 def contract_abi():
@@ -288,153 +153,107 @@ def contract_abi():
     return build_abi_output(compiler_data)
 
 
-def test_constructor_target_and_immutables(ripe_hq, governance, alice, mock_rando_contract):
-    with boa.env.anchor():
-        with boa.reverts("invalid lane"):
-            boa.load(
-                "contracts/config/SwitchboardFoxtrot.vy",
-                ripe_hq,
-                ZERO_ADDRESS,
-                2,
-                20,
-                ZERO_ADDRESS,
-            )
-        with boa.reverts("invalid lane"):
-            boa.load(
-                "contracts/config/SwitchboardFoxtrot.vy",
-                ripe_hq,
-                ZERO_ADDRESS,
-                2,
-                20,
-                alice,
-            )
-
-        with boa.reverts("invalid lane"):
-            boa.load(
-                "contracts/config/SwitchboardFoxtrot.vy",
-                ripe_hq,
-                ZERO_ADDRESS,
-                2,
-                20,
-                mock_rando_contract,
-            )
-
-        wrong_hq_lane = boa.loads(LANE_IDENTITY_MOCK, alice, 1)
-        with boa.reverts("invalid lane"):
-            boa.load(
-                "contracts/config/SwitchboardFoxtrot.vy",
-                ripe_hq,
-                ZERO_ADDRESS,
-                2,
-                20,
-                wrong_hq_lane,
-            )
-
-        zero_epoch_lane = boa.loads(LANE_IDENTITY_MOCK, ripe_hq, 0)
-        with boa.reverts("invalid lane"):
-            boa.load(
-                "contracts/config/SwitchboardFoxtrot.vy",
-                ripe_hq,
-                ZERO_ADDRESS,
-                2,
-                20,
-                zero_epoch_lane,
-            )
-
-        partial_lane = boa.loads(PARTIAL_LANE_IDENTITY_MOCK, ripe_hq)
-        with boa.reverts():
-            boa.load(
-                "contracts/config/SwitchboardFoxtrot.vy",
-                ripe_hq,
-                ZERO_ADDRESS,
-                2,
-                20,
-                partial_lane,
-            )
-
-        malicious_lane = boa.loads(MALICIOUS_LANE_IDENTITY_MOCK, ripe_hq)
-        with boa.reverts("invalid lane"):
-            boa.load(
-                "contracts/config/SwitchboardFoxtrot.vy",
-                ripe_hq,
-                ZERO_ADDRESS,
-                2,
-                20,
-                malicious_lane,
-            )
+def test_constructor_does_not_bind_a_lane_address(ripe_hq, governance):
+    foxtrot = boa.load(
+        "contracts/config/SwitchboardFoxtrot.vy",
+        ripe_hq,
+        ZERO_ADDRESS,
+        2,
+        20,
+    )
+    functions = {
+        item["name"] for item in contract_abi() if item.get("type") == "function"
+    }
+    assert "LANE" not in functions
+    assert ripe_hq.getAddr(INSTANT_BOND_LANE_HQ_ID) == ZERO_ADDRESS
+    with boa.reverts("invalid lane"):
+        foxtrot.startInstantBond(0, 100, sender=governance.address)
+    with boa.reverts("invalid lane"):
+        foxtrot.stopInstantBond(sender=governance.address)
+    with boa.reverts("invalid lane"):
+        foxtrot.setCanBuyNow(False, sender=governance.address)
 
 
 def test_constructor_accepts_the_exact_lane_surface(foxtrot_env):
-    assert foxtrot_env.foxtrot.LANE() == foxtrot_env.lane.address
+    assert foxtrot_env.lane_reg_id == INSTANT_BOND_LANE_HQ_ID
+    assert (
+        foxtrot_env.ripe_hq.getAddr(INSTANT_BOND_LANE_HQ_ID)
+        == foxtrot_env.lane.address
+    )
     assert foxtrot_env.lane.getRipeHq() == foxtrot_env.ripe_hq.address
+    assert foxtrot_env.lane.epochLength() != 0
+    assert foxtrot_env.lane.isRunning() is True
 
 
 def test_rate_override_function_and_event_abi():
     abi = contract_abi()
     functions = {
-        item["name"]: item
-        for item in abi
-        if item.get("type") == "function"
+        item["name"]: item for item in abi if item.get("type") == "function"
     }
     events = {
-        item["name"]: item
-        for item in abi
-        if item.get("type") == "event"
+        item["name"]: item for item in abi if item.get("type") == "event"
     }
-
-    set_override = functions["setInstantBondRateOverride"]
-    assert [item["name"] for item in set_override["inputs"]] == [
-        "_targetRate",
-        "_expectedOverrideVersion",
+    constructor = next(item for item in abi if item.get("type") == "constructor")
+    assert [item["name"] for item in constructor["inputs"]] == [
+        "_ripeHq",
+        "_tempGov",
+        "_minConfigTimeLock",
+        "_maxConfigTimeLock",
     ]
-    assert [item["type"] for item in set_override["outputs"]] == ["uint256"]
-    assert set_override["stateMutability"] == "nonpayable"
 
-    cancel_override = functions["cancelInstantBondRateOverride"]
-    assert [item["name"] for item in cancel_override["inputs"]] == [
-        "_expectedOverrideVersion"
+    assert [item["name"] for item in functions["setInstantBondRateOverride"]["inputs"]] == [
+        "_targetRate"
     ]
-    assert [item["type"] for item in cancel_override["outputs"]] == ["uint256"]
-    assert cancel_override["stateMutability"] == "nonpayable"
+    assert [item["name"] for item in functions["cancelInstantBondRateOverride"]["inputs"]] == []
+    assert [item["name"] for item in functions["startInstantBond"]["inputs"]] == [
+        "_genesisBlock",
+        "_epochLength",
+    ]
+    assert [item["name"] for item in functions["setCanBuyNow"]["inputs"]] == [
+        "_canBuyNow"
+    ]
+    assert "setCanPurchaseRipeBond" not in functions
+    assert [item["name"] for item in events["InstantBondCanBuyNowSet"]["inputs"]] == [
+        "canBuyNow"
+    ]
 
-    expected_event_fields = {
-        "PendingRateOverrideSet": [
-            "actionId",
-            "confirmationBlock",
-            "targetRate",
-            "expectedOverrideVersion",
-        ],
-        "PendingRateOverrideCancellationSet": [
-            "actionId",
-            "confirmationBlock",
-            "expectedOverrideVersion",
-        ],
-        "RateOverrideExecuted": ["actionId", "newVersion"],
-        "RateOverrideCancellationExecuted": ["actionId", "newVersion"],
-        "RateOverrideActionCancelled": ["actionId", "isCancellation"],
-    }
-    for event_name, expected_fields in expected_event_fields.items():
-        assert [item["name"] for item in events[event_name]["inputs"]] == expected_fields
-        assert not any(item["indexed"] for item in events[event_name]["inputs"])
+    assert [item["name"] for item in events["PendingRateOverrideSet"]["inputs"]] == [
+        "actionId",
+        "confirmationBlock",
+        "targetRate",
+    ]
+    assert [item["name"] for item in events["PendingRateOverrideCancellationSet"]["inputs"]] == [
+        "actionId",
+        "confirmationBlock",
+    ]
+    assert [item["name"] for item in events["RateOverrideExecuted"]["inputs"]] == ["actionId"]
+    assert [item["name"] for item in events["RateOverrideCancellationExecuted"]["inputs"]] == [
+        "actionId"
+    ]
+    assert "InstantBondConfigCancelled" not in events
+    assert "RateOverrideActionCancelled" not in events
+    assert "LANE" not in functions
 
 
-def test_initiation_requires_governance_nonzero_timelock_and_valid_config(
-    foxtrot_env, alice
-):
+def test_initiation_requires_governance_and_valid_config(foxtrot_env, alice):
     ctx = foxtrot_env
-    config = make_config(ctx.scale)
+    config = make_config(ctx.scale, epoch_length=ctx.lane.epochLength())
 
+    assert ctx.foxtrot.actionTimeLock() == 0
     with boa.reverts("no perms"):
         ctx.foxtrot.setInstantBondConfig(config, sender=alice)
-    with boa.reverts("action time lock not set"):
-        ctx.foxtrot.setInstantBondConfig(config, sender=ctx.governance.address)
-
-    enable_actions(ctx)
     with boa.reverts("invalid config"):
         ctx.foxtrot.setInstantBondConfig(
-            make_config(ctx.scale, minDownBps=0),
+            make_config(ctx.scale, epoch_length=ctx.lane.epochLength(), minDownBps=0),
             sender=ctx.governance.address,
         )
+
+    action_id = ctx.foxtrot.setInstantBondConfig(
+        config, sender=ctx.governance.address
+    )
+    pending = filter_logs(ctx.foxtrot, "PendingInstantBondConfigSet")[0]
+    assert pending.actionId == action_id
+    assert pending.confirmationBlock == boa.env.evm.patch.block_number
 
 
 def test_pending_config_round_trip_and_execution_readback(foxtrot_env):
@@ -442,6 +261,7 @@ def test_pending_config_round_trip_and_execution_readback(foxtrot_env):
     enable_actions(ctx)
     config = make_config(
         ctx.scale,
+        epoch_length=ctx.lane.epochLength(),
         paymentCapPerEpoch=1_234 * ctx.scale,
         minPaymentAmount=2 * ctx.scale,
         mintBudget=987_654 * 10**18,
@@ -456,6 +276,7 @@ def test_pending_config_round_trip_and_execution_readback(foxtrot_env):
         decayBps=333,
         maxDecayEpochs=17,
         maxLockBonus=4_321,
+        minLockDuration=9,
     )
 
     action_id = ctx.foxtrot.setInstantBondConfig(
@@ -467,802 +288,345 @@ def test_pending_config_round_trip_and_execution_readback(foxtrot_env):
     assert action_id == 1
     assert ctx.foxtrot.actionType(action_id) == ACTION_INSTANT_BOND_CONFIG
     assert tuple(pending) == config
-    assert pending_event.actionId == action_id
-    assert pending_event.confirmationBlock == ctx.foxtrot.getActionConfirmationBlock(
-        action_id
-    )
-    assert pending_event.paymentCapPerEpoch == config[1]
-    assert pending_event.minPaymentAmount == config[2]
-    assert pending_event.mintBudget == config[3]
-    assert pending_event.maxEffectiveRate == config[4]
-    assert pending_event.seedRate == config[5]
-    assert pending_event.uHighBps == config[6]
-    assert pending_event.uLowBps == config[7]
-    assert pending_event.minUpBps == config[8]
-    assert pending_event.maxUpBps == config[9]
-    assert pending_event.minDownBps == config[10]
-    assert pending_event.maxDownBps == config[11]
-    assert pending_event.decayBps == config[12]
-    assert pending_event.maxDecayEpochs == config[13]
-    assert pending_event.maxLockBonus == config[14]
+    assert pending_event.minLockDuration == 9
+    assert pending_event.epochLength == ctx.lane.epochLength()
 
     assert not ctx.foxtrot.executePendingAction(
         action_id, sender=ctx.governance.address
     )
-    assert ctx.foxtrot.hasPendingAction(action_id)
-
     travel(ctx.foxtrot.actionTimeLock())
     assert ctx.foxtrot.executePendingAction(
         action_id, sender=ctx.governance.address
     )
-    executed = filter_logs(ctx.foxtrot, "InstantBondConfigExecuted")[0]
-    assert executed.actionId == action_id
-    assert tuple(ctx.lane.config()) == config
-    assert ctx.foxtrot.actionType(action_id) == 0
+    executed = filter_logs(ctx.foxtrot, "InstantBondConfigExecuted")[-1]
+    assert tuple(ctx.lane.bondConfig()) == config
     assert_pending_cleared(ctx, action_id)
+    assert executed.actionId == action_id
 
 
 def test_parallel_config_actions_are_last_write_wins(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
-    first_config = make_config(ctx.scale)
-    second_config = make_config(ctx.scale, mintBudget=2_000_000 * 10**18)
-    first = ctx.foxtrot.setInstantBondConfig(
-        first_config, sender=ctx.governance.address
-    )
-    second = ctx.foxtrot.setInstantBondConfig(
-        second_config,
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
-    assert tuple(ctx.lane.config()) == first_config
-    assert ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
-    assert tuple(ctx.lane.config()) == second_config
-    assert_pending_cleared(ctx, first)
-    assert_pending_cleared(ctx, second)
-
-
-def test_out_of_order_parallel_execution_is_last_write_wins(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    first_config = make_config(ctx.scale)
-    first = ctx.foxtrot.setInstantBondConfig(
-        first_config, sender=ctx.governance.address
-    )
-    second_config = make_config(
+    first = make_config(
         ctx.scale,
-        mintBudget=2_000_000 * 10**18,
-        maxDecayEpochs=17,
+        epoch_length=ctx.lane.epochLength(),
+        seedRate=10**18,
     )
-    second = ctx.foxtrot.setInstantBondConfig(
-        second_config, sender=ctx.governance.address
+    second = make_config(
+        ctx.scale,
+        epoch_length=ctx.lane.epochLength(),
+        seedRate=11 * 10**17,
     )
+    first_id = ctx.foxtrot.setInstantBondConfig(first, sender=ctx.governance.address)
+    second_id = ctx.foxtrot.setInstantBondConfig(second, sender=ctx.governance.address)
     travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
-    assert tuple(ctx.lane.config()) == second_config
-    assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
-    assert tuple(ctx.lane.config()) == first_config
-    assert_pending_cleared(ctx, first)
-    assert_pending_cleared(ctx, second)
+    assert ctx.foxtrot.executePendingAction(second_id, sender=ctx.governance.address)
+    assert ctx.lane.bondConfig().seedRate == 11 * 10**17
+    assert ctx.foxtrot.executePendingAction(first_id, sender=ctx.governance.address)
+    assert ctx.lane.bondConfig().seedRate == 10**18
 
 
-def test_cancel_permissions_cleanup_and_event(foxtrot_env, alice):
+def test_cancel_permissions_and_clears_action_type(foxtrot_env, alice):
     ctx = foxtrot_env
     enable_actions(ctx)
-    action_id = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale), sender=ctx.governance.address
-    )
-
+    config = make_config(ctx.scale, epoch_length=ctx.lane.epochLength())
+    action_id = ctx.foxtrot.setInstantBondConfig(config, sender=ctx.governance.address)
     with boa.reverts("no perms"):
         ctx.foxtrot.cancelPendingAction(action_id, sender=alice)
-    assert ctx.foxtrot.cancelPendingAction(
-        action_id, sender=ctx.governance.address
-    )
-    cancelled = filter_logs(ctx.foxtrot, "InstantBondConfigCancelled")[0]
-    assert cancelled.actionId == action_id
-    assert_pending_cleared(ctx, action_id)
-    with boa.reverts("cannot cancel action"):
-        ctx.foxtrot.cancelPendingAction(action_id, sender=ctx.governance.address)
-
-
-def test_expired_execution_auto_cancels_both_pending_records(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    action_id = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale), sender=ctx.governance.address
-    )
-    pending_action = ctx.foxtrot.pendingActions(action_id)
-    travel(pending_action.expiration - boa.env.evm.patch.block_number)
-
-    assert ctx.foxtrot.isExpired(action_id)
-    assert not ctx.foxtrot.executePendingAction(
-        action_id, sender=ctx.governance.address
-    )
-    cancelled = filter_logs(ctx.foxtrot, "InstantBondConfigCancelled")[0]
-    assert cancelled.actionId == action_id
+    assert ctx.foxtrot.cancelPendingAction(action_id, sender=ctx.governance.address)
     assert_pending_cleared(ctx, action_id)
 
 
-def test_execution_and_cancellation_exact_timelock_boundaries(foxtrot_env):
+def test_expired_execution_auto_cancels(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
-
-    assert not ctx.foxtrot.executePendingAction(0, sender=ctx.governance.address)
-    assert not ctx.foxtrot.executePendingAction(999, sender=ctx.governance.address)
-    with boa.reverts("cannot cancel action"):
-        ctx.foxtrot.cancelPendingAction(0, sender=ctx.governance.address)
-    with boa.reverts("cannot cancel action"):
-        ctx.foxtrot.cancelPendingAction(999, sender=ctx.governance.address)
-
-    first = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale),
-        sender=ctx.governance.address,
-    )
+    config = make_config(ctx.scale, epoch_length=ctx.lane.epochLength())
+    action_id = ctx.foxtrot.setInstantBondConfig(config, sender=ctx.governance.address)
+    travel(ctx.foxtrot.actionTimeLock() + ctx.foxtrot.expiration())
     assert not ctx.foxtrot.executePendingAction(
-        first,
-        sender=ctx.governance.address,
+        action_id, sender=ctx.governance.address
     )
-    assert ctx.foxtrot.hasPendingAction(first)
-    travel(
-        ctx.foxtrot.getActionConfirmationBlock(first)
-        - boa.env.evm.patch.block_number
-    )
-    assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
-    assert_pending_cleared(ctx, first)
-    assert not ctx.foxtrot.executePendingAction(
-        first,
-        sender=ctx.governance.address,
-    )
-    with boa.reverts("cannot cancel action"):
-        ctx.foxtrot.cancelPendingAction(first, sender=ctx.governance.address)
-
-    last = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale, mintBudget=2_000_000 * 10**18),
-                sender=ctx.governance.address,
-    )
-    expiration = ctx.foxtrot.pendingActions(last).expiration
-    travel(expiration - boa.env.evm.patch.block_number - 1)
-    assert ctx.foxtrot.canConfirmAction(last)
-    assert not ctx.foxtrot.isExpired(last)
-    assert ctx.foxtrot.executePendingAction(last, sender=ctx.governance.address)
-    assert_pending_cleared(ctx, last)
-
-    expired = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale, mintBudget=3_000_000 * 10**18),
-                sender=ctx.governance.address,
-    )
-    expiration = ctx.foxtrot.pendingActions(expired).expiration
-    travel(expiration - boa.env.evm.patch.block_number)
-    assert ctx.foxtrot.isExpired(expired)
-    assert not ctx.foxtrot.canConfirmAction(expired)
-    assert not ctx.foxtrot.executePendingAction(
-        expired,
-        sender=ctx.governance.address,
-    )
-    cancelled = filter_logs(ctx.foxtrot, "InstantBondConfigCancelled")[-1]
-    assert cancelled.actionId == expired
-    assert_pending_cleared(ctx, expired)
-
-
-@pytest.mark.artifact
-def test_action_aware_pending_cleanup_gas_is_reported(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    config_action = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale),
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-    assert ctx.foxtrot.executePendingAction(
-        config_action,
-        sender=ctx.governance.address,
-    )
-    gas = {"execute_config": ctx.foxtrot._computation.get_gas_used()}
-
-    initialize_lane(ctx)
-    target_rate = 9 * 10**17
-    override_action = ctx.foxtrot.setInstantBondRateOverride(
-        target_rate,
-        ctx.lane.overrideVersion(),
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-    assert ctx.foxtrot.executePendingAction(
-        override_action,
-        sender=ctx.governance.address,
-    )
-    gas["execute_override_set"] = ctx.foxtrot._computation.get_gas_used()
-
-    cancel_action = ctx.foxtrot.cancelInstantBondRateOverride(
-        ctx.lane.overrideVersion(),
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-    assert ctx.foxtrot.cancelPendingAction(
-        cancel_action,
-        sender=ctx.governance.address,
-    )
-    gas["cancel_override_action"] = ctx.foxtrot._computation.get_gas_used()
-
-    assert all(value > 0 for value in gas.values())
-    print("switchboard foxtrot cleanup gas: " + json.dumps(gas, sort_keys=True))
-    report_path = os.environ.get("INSTANT_BOND_FOXTROT_GAS_REPORT")
-    if report_path:
-        Path(report_path).write_text(json.dumps(gas, indent=2, sort_keys=True) + "\n")
-    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if summary_path:
-        with Path(summary_path).open("a") as summary:
-            summary.write("## Switchboard Foxtrot action gas\n\n")
-            summary.write("| Scenario | Gas |\n| --- | ---: |\n")
-            for scenario, value in gas.items():
-                summary.write(f"| {scenario} | {value} |\n")
+    assert_pending_cleared(ctx, action_id)
 
 
 def test_execution_revalidates_budget_after_intervening_purchase(foxtrot_env):
     ctx = foxtrot_env
-    initial = make_config(ctx.scale)
-    ctx.lane.setConfig(initial, sender=ctx.switchboard_alpha.address)
     enable_actions(ctx)
-
-    proposed = make_config(ctx.scale, mintBudget=2 * 10**18)
-    action_id = ctx.foxtrot.setInstantBondConfig(
-        proposed, sender=ctx.governance.address
+    initialize_lane(ctx)
+    minted = ctx.lane.cumulativeMinted()
+    queued = make_config(
+        ctx.scale,
+        epoch_length=ctx.lane.epochLength(),
+        mintBudget=minted + 1,
     )
-
-    amount = 3 * ctx.scale
-    quote = ctx.lane.previewBuyNow(amount, 0, sender=ctx.bob)
-    assert quote.totalRipe == 3 * 10**18
+    action_id = ctx.foxtrot.setInstantBondConfig(
+        queued, sender=ctx.governance.address
+    )
     ctx.lane.buyNow(
-        amount,
+        ctx.scale,
         0,
-        quote.epoch,
-        quote.totalRipe,
+        ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob).epoch,
+        0,
         boa.env.evm.patch.block_number,
         sender=ctx.bob,
     )
+    assert ctx.lane.cumulativeMinted() > minted + 1
     travel(ctx.foxtrot.actionTimeLock())
-
     with boa.reverts("invalid config"):
         ctx.foxtrot.executePendingAction(action_id, sender=ctx.governance.address)
-    assert tuple(ctx.lane.config()) == initial
-    assert ctx.foxtrot.hasPendingAction(action_id)
 
 
-def test_rate_override_initiation_guards(foxtrot_env, alice):
+def test_rate_override_initiation_and_execution(foxtrot_env, alice):
     ctx = foxtrot_env
-    target_rate = 11 * 10**17
-
+    target = 11 * 10**17
+    assert ctx.foxtrot.actionTimeLock() == 0
     with boa.reverts("no perms"):
-        ctx.foxtrot.setInstantBondRateOverride(
-            target_rate,
-            0,
-            sender=alice,
-        )
-    with boa.reverts("action time lock not set"):
-        ctx.foxtrot.setInstantBondRateOverride(
-            target_rate,
-            0,
-            sender=ctx.governance.address,
-        )
-
-    enable_actions(ctx)
+        ctx.foxtrot.setInstantBondRateOverride(target, sender=alice)
     with boa.reverts("invalid rate override"):
-        ctx.foxtrot.setInstantBondRateOverride(
-            target_rate,
-            0,
-            sender=ctx.governance.address,
-        )
-
-    config = initialize_lane(ctx)
-    override_version = ctx.lane.overrideVersion()
-    ceiling = config[4] * 10_000 // (10_000 + config[14])
-
-    for rate, expected_override in (
-        (MIN_BASE_RATE - 1, override_version),
-        (ceiling + 1, override_version),
-        (target_rate, override_version + 1),
-    ):
-        with boa.reverts("invalid rate override"):
-            ctx.foxtrot.setInstantBondRateOverride(
-                rate,
-                expected_override,
-                sender=ctx.governance.address,
-            )
-
-    action_id = ctx.foxtrot.setInstantBondRateOverride(
-        target_rate,
-        override_version,
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-    assert ctx.foxtrot.executePendingAction(
-        action_id,
-        sender=ctx.governance.address,
-    )
-
-    with boa.reverts("invalid rate override"):
-        ctx.foxtrot.setInstantBondRateOverride(
-            target_rate,
-            ctx.lane.overrideVersion(),
-            sender=ctx.governance.address,
-        )
-
-
-def test_rate_override_cancellation_initiation_guards(foxtrot_env, alice):
-    ctx = foxtrot_env
-
-    with boa.reverts("no perms"):
-        ctx.foxtrot.cancelInstantBondRateOverride(0, sender=alice)
-    with boa.reverts("action time lock not set"):
-        ctx.foxtrot.cancelInstantBondRateOverride(
-            0,
-            sender=ctx.governance.address,
-        )
+        ctx.foxtrot.setInstantBondRateOverride(target, sender=ctx.governance.address)
 
     enable_actions(ctx)
     initialize_lane(ctx)
-    with boa.reverts("no rate override"):
-        ctx.foxtrot.cancelInstantBondRateOverride(
-            0,
-            sender=ctx.governance.address,
+    with boa.reverts("invalid rate override"):
+        ctx.foxtrot.setInstantBondRateOverride(
+            MIN_BASE_RATE - 1, sender=ctx.governance.address
         )
-
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
-    with boa.reverts("no rate override"):
-        ctx.foxtrot.cancelInstantBondRateOverride(
-            ctx.lane.overrideVersion() - 1,
-            sender=ctx.governance.address,
-        )
-
-    action_id = ctx.foxtrot.cancelInstantBondRateOverride(
-        ctx.lane.overrideVersion(),
-        sender=ctx.governance.address,
-    )
-    assert ctx.foxtrot.actionType(action_id) == ACTION_RATE_OVERRIDE_CANCEL
-
-
-def test_pending_rate_override_round_trip_execution_and_events(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
 
     action_id = ctx.foxtrot.setInstantBondRateOverride(
-        target_rate,
-        0,
-        sender=ctx.governance.address,
+        target, sender=ctx.governance.address
     )
     queued = filter_logs(ctx.foxtrot, "PendingRateOverrideSet")[-1]
-    pending = ctx.foxtrot.pendingRateOverride(action_id)
-
-    assert action_id == 1
-    assert ctx.foxtrot.actionType(action_id) == ACTION_RATE_OVERRIDE_SET
-    assert pending.targetRate == target_rate
-    assert pending.expectedOverrideVersion == 0
-    assert queued.actionId == action_id
-    assert queued.confirmationBlock == ctx.foxtrot.getActionConfirmationBlock(action_id)
-    assert queued.targetRate == target_rate
-    assert queued.expectedOverrideVersion == 0
-
-    assert not ctx.foxtrot.executePendingAction(
-        action_id,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.rateOverride() == 0
-    assert ctx.foxtrot.hasPendingAction(action_id)
-
+    assert queued.targetRate == target
+    assert ctx.foxtrot.pendingRateOverride(action_id) == target
     travel(ctx.foxtrot.actionTimeLock())
-    assert ctx.foxtrot.executePendingAction(
-        action_id,
-        sender=ctx.governance.address,
-    )
-    executed = filter_logs(ctx.foxtrot, "RateOverrideExecuted")[-1]
-    assert executed.actionId == action_id
-    assert executed.newVersion == 1
-    assert ctx.lane.rateOverride() == target_rate
-    assert ctx.lane.overrideVersion() == 1
+    assert ctx.foxtrot.executePendingAction(action_id, sender=ctx.governance.address)
+    assert ctx.lane.rateOverride() == target
     assert_pending_cleared(ctx, action_id)
 
 
-def test_pending_rate_override_cancellation_round_trip_execution_and_events(
-    foxtrot_env,
-):
+def test_rate_override_cancel_round_trip(foxtrot_env, alice):
     ctx = foxtrot_env
     enable_actions(ctx)
     initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
+    with boa.reverts("no rate override"):
+        ctx.foxtrot.cancelInstantBondRateOverride(sender=ctx.governance.address)
+
+    install_override(ctx, 11 * 10**17)
+    with boa.reverts("no perms"):
+        ctx.foxtrot.cancelInstantBondRateOverride(sender=alice)
 
     action_id = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
+        sender=ctx.governance.address
     )
-    queued = filter_logs(ctx.foxtrot, "PendingRateOverrideCancellationSet")[-1]
-    pending = ctx.foxtrot.pendingRateOverride(action_id)
-
     assert ctx.foxtrot.actionType(action_id) == ACTION_RATE_OVERRIDE_CANCEL
-    assert pending.targetRate == 0
-    assert pending.expectedOverrideVersion == 1
-    assert queued.actionId == action_id
-    assert queued.confirmationBlock == ctx.foxtrot.getActionConfirmationBlock(action_id)
-    assert queued.expectedOverrideVersion == 1
-
-    assert not ctx.foxtrot.executePendingAction(
-        action_id,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.rateOverride() == target_rate
-
     travel(ctx.foxtrot.actionTimeLock())
-    assert ctx.foxtrot.executePendingAction(
-        action_id,
-        sender=ctx.governance.address,
-    )
+    assert ctx.foxtrot.executePendingAction(action_id, sender=ctx.governance.address)
     executed = filter_logs(ctx.foxtrot, "RateOverrideCancellationExecuted")[-1]
+    assert ctx.lane.rateOverride() == 0
     assert executed.actionId == action_id
-    assert executed.newVersion == 2
-    assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 2
-    assert_pending_cleared(ctx, action_id)
 
 
-def test_manual_cancellation_distinguishes_override_set_and_cancel_actions(foxtrot_env):
+def test_config_invalidates_installed_override(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
     initialize_lane(ctx)
-    target_rate = 11 * 10**17
-
-    set_action = ctx.foxtrot.setInstantBondRateOverride(
-        target_rate,
-        0,
-        sender=ctx.governance.address,
+    install_override(ctx, 11 * 10**17)
+    config = make_config(
+        ctx.scale,
+        epoch_length=ctx.lane.epochLength(),
+        maxLockBonus=0,
     )
-    assert ctx.foxtrot.cancelPendingAction(
-        set_action,
-        sender=ctx.governance.address,
-    )
-    set_cancelled = filter_logs(ctx.foxtrot, "RateOverrideActionCancelled")[-1]
-    assert set_cancelled.actionId == set_action
-    assert not set_cancelled.isCancellation
-    assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 0
-    assert_pending_cleared(ctx, set_action)
-
-    install_override(ctx, target_rate)
-    cancel_action = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
-    )
-    assert ctx.foxtrot.cancelPendingAction(
-        cancel_action,
-        sender=ctx.governance.address,
-    )
-    cancel_cancelled = filter_logs(ctx.foxtrot, "RateOverrideActionCancelled")[-1]
-    assert cancel_cancelled.actionId == cancel_action
-    assert cancel_cancelled.isCancellation
-    assert ctx.lane.rateOverride() == target_rate
-    assert ctx.lane.overrideVersion() == 1
-    assert_pending_cleared(ctx, cancel_action)
-
-
-def test_expired_rate_override_set_action_cleans_without_changing_lane(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    action_id = ctx.foxtrot.setInstantBondRateOverride(
-        target_rate,
-        0,
-        sender=ctx.governance.address,
-    )
-    pending_action = ctx.foxtrot.pendingActions(action_id)
-    travel(pending_action.expiration - boa.env.evm.patch.block_number)
-
-    assert ctx.foxtrot.isExpired(action_id)
-    assert not ctx.foxtrot.executePendingAction(
-        action_id,
-        sender=ctx.governance.address,
-    )
-    cancelled = filter_logs(ctx.foxtrot, "RateOverrideActionCancelled")[-1]
-    assert cancelled.actionId == action_id
-    assert not cancelled.isCancellation
-    assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 0
-    assert_pending_cleared(ctx, action_id)
-
-
-def test_expired_rate_override_cancel_action_preserves_installed_override(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
-    action_id = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
-    )
-    pending_action = ctx.foxtrot.pendingActions(action_id)
-    travel(pending_action.expiration - boa.env.evm.patch.block_number)
-
-    assert ctx.foxtrot.isExpired(action_id)
-    assert not ctx.foxtrot.executePendingAction(
-        action_id,
-        sender=ctx.governance.address,
-    )
-    cancelled = filter_logs(ctx.foxtrot, "RateOverrideActionCancelled")[-1]
-    assert cancelled.actionId == action_id
-    assert cancelled.isCancellation
-    assert ctx.lane.rateOverride() == target_rate
-    assert ctx.lane.overrideVersion() == 1
-    assert_pending_cleared(ctx, action_id)
-
-
-def test_parallel_rate_override_sets_leave_stale_action_pending(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    first_target = 11 * 10**17
-    second_target = 12 * 10**17
-    first = ctx.foxtrot.setInstantBondRateOverride(
-        first_target,
-        0,
-        sender=ctx.governance.address,
-    )
-    second = ctx.foxtrot.setInstantBondRateOverride(
-        second_target,
-        0,
-        sender=ctx.governance.address,
-    )
+    action_id = ctx.foxtrot.setInstantBondConfig(config, sender=ctx.governance.address)
     travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
-    with boa.reverts("stale override version"):
-        ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
-    assert ctx.lane.rateOverride() == first_target
-    assert ctx.lane.overrideVersion() == 1
-    assert ctx.foxtrot.hasPendingAction(second)
-    assert ctx.foxtrot.actionType(second) == ACTION_RATE_OVERRIDE_SET
-    assert ctx.foxtrot.pendingRateOverride(second).targetRate == second_target
-    assert ctx.foxtrot.cancelPendingAction(second, sender=ctx.governance.address)
-    assert ctx.lane.overrideVersion() == 1
-    assert_pending_cleared(ctx, second)
-
-
-def test_parallel_rate_override_cancellations_leave_stale_action_pending(
-    foxtrot_env,
-):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
-    first = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
-    )
-    second = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
-    with boa.reverts("stale override version"):
-        ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
+    assert ctx.foxtrot.executePendingAction(action_id, sender=ctx.governance.address)
     assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 2
-    assert ctx.foxtrot.hasPendingAction(second)
-    assert ctx.foxtrot.actionType(second) == ACTION_RATE_OVERRIDE_CANCEL
-    assert ctx.foxtrot.pendingRateOverride(second).expectedOverrideVersion == 1
-    assert ctx.foxtrot.cancelPendingAction(second, sender=ctx.governance.address)
-    assert ctx.lane.overrideVersion() == 2
-    assert_pending_cleared(ctx, second)
-
-
-def test_config_first_does_not_block_queued_rate_override(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    override_action = ctx.foxtrot.setInstantBondRateOverride(
-        target_rate,
-        0,
-        sender=ctx.governance.address,
-    )
-    new_config = make_config(ctx.scale, mintBudget=2_000_000 * 10**18)
-    config_action = ctx.foxtrot.setInstantBondConfig(
-        new_config,
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(
-        config_action,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.overrideVersion() == 0
-    assert ctx.foxtrot.executePendingAction(
-        override_action,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.rateOverride() == target_rate
-    assert ctx.lane.overrideVersion() == 1
-    assert_pending_cleared(ctx, override_action)
-    assert_pending_cleared(ctx, config_action)
-
-
-def test_override_first_then_config_invalidates_installed_override(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    override_action = ctx.foxtrot.setInstantBondRateOverride(
-        target_rate,
-        0,
-        sender=ctx.governance.address,
-    )
-    new_config = make_config(ctx.scale, mintBudget=2_000_000 * 10**18)
-    config_action = ctx.foxtrot.setInstantBondConfig(
-        new_config,
-        sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(
-        override_action,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.rateOverride() == target_rate
-    assert ctx.lane.overrideVersion() == 1
-    assert ctx.foxtrot.executePendingAction(
-        config_action,
-        sender=ctx.governance.address,
-    )
-    executed = filter_logs(ctx.foxtrot, "InstantBondConfigExecuted")[-1]
-    assert executed.actionId == config_action
-    assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 2
-    assert_pending_cleared(ctx, override_action)
-    assert_pending_cleared(ctx, config_action)
-
-
-def test_config_invalidation_makes_queued_override_cancellation_stale(foxtrot_env):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
-    cancel_action = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
-    )
-    config_action = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale, mintBudget=2_000_000 * 10**18),
-                sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(
-        config_action,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 2
-    with boa.reverts("stale override version"):
-        ctx.foxtrot.executePendingAction(
-            cancel_action,
-            sender=ctx.governance.address,
-        )
-    assert ctx.foxtrot.hasPendingAction(cancel_action)
-    assert ctx.foxtrot.pendingRateOverride(cancel_action).expectedOverrideVersion == 1
-    assert ctx.foxtrot.cancelPendingAction(
-        cancel_action,
-        sender=ctx.governance.address,
-    )
-    assert_pending_cleared(ctx, cancel_action)
-
-
-def test_override_cancellation_before_config_does_not_double_bump_version(
-    foxtrot_env,
-):
-    ctx = foxtrot_env
-    enable_actions(ctx)
-    initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
-    cancel_action = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
-    )
-    config_action = ctx.foxtrot.setInstantBondConfig(
-        make_config(ctx.scale, mintBudget=2_000_000 * 10**18),
-                sender=ctx.governance.address,
-    )
-    travel(ctx.foxtrot.actionTimeLock())
-
-    assert ctx.foxtrot.executePendingAction(
-        cancel_action,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.overrideVersion() == 2
-    assert ctx.foxtrot.executePendingAction(
-        config_action,
-        sender=ctx.governance.address,
-    )
-    assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 2
-    assert_pending_cleared(ctx, cancel_action)
-    assert_pending_cleared(ctx, config_action)
 
 
 def test_override_applies_only_on_next_successful_rollover(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
     initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
-    stored_epoch = ctx.lane.currentEpoch()
-    stored_rate = ctx.lane.epochRate()
-
-    same_epoch_quote = ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob)
-    assert same_epoch_quote.epoch == stored_epoch
-    assert same_epoch_quote.rate == stored_rate
-    ctx.lane.buyNow(
-        ctx.scale,
-        0,
-        same_epoch_quote.epoch,
-        same_epoch_quote.totalRipe,
-        boa.env.evm.patch.block_number,
-        sender=ctx.bob,
-    )
-    assert ctx.lane.rateOverride() == target_rate
-    assert ctx.lane.overrideVersion() == 1
-
+    install_override(ctx, 9 * 10**17)
     travel_to_next_lane_epoch(ctx)
-    rollover_quote = ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob)
-    assert rollover_quote.epoch > stored_epoch
-    assert rollover_quote.rate == target_rate
-    assert ctx.lane.rateOverride() == target_rate
-    assert ctx.lane.overrideVersion() == 1
-
+    quote = ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob)
+    assert quote.rate == 9 * 10**17
     ctx.lane.buyNow(
         ctx.scale,
         0,
-        rollover_quote.epoch,
-        rollover_quote.totalRipe,
+        quote.epoch,
+        quote.totalRipe,
         boa.env.evm.patch.block_number,
         sender=ctx.bob,
     )
-    applied = filter_logs(ctx.lane, "RateOverrideApplied")[-1]
-    assert applied.newVersion == 2
-    assert applied.fromEpoch == stored_epoch
-    assert applied.toEpoch == rollover_quote.epoch
-    assert applied.targetRate == target_rate
-    assert ctx.lane.currentEpoch() == rollover_quote.epoch
-    assert ctx.lane.epochRate() == target_rate
+    assert ctx.lane.epochState().rate == 9 * 10**17
     assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 2
 
 
-def test_successful_rollover_makes_pending_override_cancellation_stale(foxtrot_env):
+def test_start_stop_payment_token_and_cumulative(foxtrot_env, governance):
+    ctx = foxtrot_env
+    with boa.reverts("already running"):
+        ctx.foxtrot.startInstantBond(0, 100, sender=ctx.governance.address)
+
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+    assert ctx.lane.isRunning() is False
+
+    other = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Other",
+        "OTH",
+        8,
+        1_000_000,
+    )
+    ctx.foxtrot.setInstantBondPaymentToken(other.address, sender=ctx.governance.address)
+    token_event = filter_logs(ctx.foxtrot, "InstantBondPaymentTokenSet")[-1]
+    assert token_event.token == other.address
+    assert ctx.lane.paymentDecimals() == 8
+
+    # restore a valid 8-decimal config, then start again
+    ctx.lane.setConfig(
+        make_config(10**8, epoch_length=ctx.lane.epochLength()),
+        sender=ctx.switchboard_alpha.address,
+    )
+    ctx.foxtrot.startInstantBond(0, ctx.lane.epochLength(), sender=ctx.governance.address)
+    assert ctx.lane.isRunning() is True
+
+    ctx.foxtrot.setInstantBondCumulativeMinted(50, sender=ctx.governance.address)
+    minted_event = filter_logs(ctx.foxtrot, "InstantBondCumulativeMintedSet")[-1]
+    assert minted_event.amount == 50
+    assert ctx.lane.cumulativeMinted() == 50
+
+    with boa.reverts("exceeds mint budget"):
+        ctx.foxtrot.setInstantBondCumulativeMinted(
+            ctx.lane.bondConfig().mintBudget + 1,
+            sender=ctx.governance.address,
+        )
+
+
+def test_start_rejects_invalid_length_and_invalid_config(foxtrot_env, governance):
+    ctx = foxtrot_env
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+    with boa.reverts("invalid epoch length"):
+        ctx.foxtrot.startInstantBond(0, 0, sender=ctx.governance.address)
+
+    other = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Other",
+        "OTH",
+        18,
+        1,
+    )
+    ctx.foxtrot.setInstantBondPaymentToken(other.address, sender=ctx.governance.address)
+    with boa.reverts("not configured"):
+        ctx.foxtrot.startInstantBond(
+            0, ctx.lane.epochLength(), sender=ctx.governance.address
+        )
+
+
+def test_foxtrot_cannot_queue_a_different_epoch_length(foxtrot_env):
+    ctx = foxtrot_env
+    enable_actions(ctx)
+    with boa.reverts("invalid config"):
+        ctx.foxtrot.setInstantBondConfig(
+            make_config(ctx.scale, epoch_length=ctx.lane.epochLength() + 1),
+            sender=ctx.governance.address,
+        )
+
+
+def test_immediate_actions_require_governance(foxtrot_env, alice):
+    ctx = foxtrot_env
+    with boa.reverts("no perms"):
+        ctx.foxtrot.stopInstantBond(sender=alice)
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+    with boa.reverts("no perms"):
+        ctx.foxtrot.startInstantBond(0, 100, sender=alice)
+    with boa.reverts("no perms"):
+        ctx.foxtrot.setInstantBondPaymentToken(
+            ctx.payment_token.address, sender=alice
+        )
+    with boa.reverts("no perms"):
+        ctx.foxtrot.setInstantBondCumulativeMinted(1, sender=alice)
+    with boa.reverts("no perms"):
+        ctx.foxtrot.setCanBuyNow(False, sender=alice)
+    ctx.foxtrot.startInstantBond(0, 100, sender=ctx.governance.address)
+
+
+def test_parallel_override_actions_are_last_write_wins(foxtrot_env):
     ctx = foxtrot_env
     enable_actions(ctx)
     initialize_lane(ctx)
-    target_rate = 11 * 10**17
-    install_override(ctx, target_rate)
-    travel_to_next_lane_epoch(ctx)
-    cancel_action = ctx.foxtrot.cancelInstantBondRateOverride(
-        1,
-        sender=ctx.governance.address,
+    first = ctx.foxtrot.setInstantBondRateOverride(
+        8 * 10**17, sender=ctx.governance.address
+    )
+    second = ctx.foxtrot.setInstantBondRateOverride(
+        9 * 10**17, sender=ctx.governance.address
     )
     travel(ctx.foxtrot.actionTimeLock())
+    assert ctx.foxtrot.executePendingAction(second, sender=ctx.governance.address)
+    assert ctx.lane.rateOverride() == 9 * 10**17
+    assert ctx.foxtrot.executePendingAction(first, sender=ctx.governance.address)
+    assert ctx.lane.rateOverride() == 8 * 10**17
 
+
+def test_foxtrot_start_logs_raw_genesis_zero(foxtrot_env):
+    ctx = foxtrot_env
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+    length = ctx.lane.epochLength()
+    before = boa.env.evm.patch.block_number
+    ctx.foxtrot.startInstantBond(0, length, sender=ctx.governance.address)
+    foxtrot_event = filter_logs(ctx.foxtrot, "InstantBondStarted")[-1]
+    genesis = ctx.lane.genesisBlock()
+    assert foxtrot_event.genesisBlock == 0
+    assert foxtrot_event.epochLength == length
+    assert genesis == before != 0
+
+
+def test_execute_queued_override_fails_after_stop_and_stays_pending(foxtrot_env):
+    ctx = foxtrot_env
+    enable_actions(ctx)
+    initialize_lane(ctx)
+    action_id = ctx.foxtrot.setInstantBondRateOverride(
+        9 * 10**17, sender=ctx.governance.address
+    )
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+    travel(ctx.foxtrot.actionTimeLock())
+    with boa.reverts("invalid rate override"):
+        ctx.foxtrot.executePendingAction(action_id, sender=ctx.governance.address)
+    assert ctx.foxtrot.hasPendingAction(action_id)
+    assert ctx.foxtrot.actionType(action_id) == ACTION_RATE_OVERRIDE_SET
+    assert ctx.foxtrot.pendingRateOverride(action_id) == 9 * 10**17
+    assert ctx.lane.rateOverride() == 0
+
+
+def test_execute_queued_override_fails_after_restart_before_first_buy(foxtrot_env):
+    ctx = foxtrot_env
+    enable_actions(ctx)
+    initialize_lane(ctx)
+    action_id = ctx.foxtrot.setInstantBondRateOverride(
+        9 * 10**17, sender=ctx.governance.address
+    )
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+    ctx.foxtrot.startInstantBond(
+        0, ctx.lane.epochLength(), sender=ctx.governance.address
+    )
+    travel(ctx.foxtrot.actionTimeLock())
+    with boa.reverts("invalid rate override"):
+        ctx.foxtrot.executePendingAction(action_id, sender=ctx.governance.address)
+    assert ctx.lane.rateOverride() == 0
+    assert ctx.lane.epochState().rate == 0
+
+
+def test_execute_queued_cancel_fails_after_override_is_consumed(foxtrot_env):
+    ctx = foxtrot_env
+    enable_actions(ctx)
+    initialize_lane(ctx)
+    install_override(ctx, 9 * 10**17)
+    travel_to_next_lane_epoch(ctx)
+    cancel_id = ctx.foxtrot.cancelInstantBondRateOverride(
+        sender=ctx.governance.address
+    )
     quote = ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob)
-    assert quote.rate == target_rate
     ctx.lane.buyNow(
         ctx.scale,
         0,
@@ -1272,17 +636,166 @@ def test_successful_rollover_makes_pending_override_cancellation_stale(foxtrot_e
         sender=ctx.bob,
     )
     assert ctx.lane.rateOverride() == 0
-    assert ctx.lane.overrideVersion() == 2
+    travel(ctx.foxtrot.actionTimeLock())
+    with boa.reverts("no rate override"):
+        ctx.foxtrot.executePendingAction(cancel_id, sender=ctx.governance.address)
+    assert ctx.foxtrot.hasPendingAction(cancel_id)
+    assert ctx.foxtrot.actionType(cancel_id) == ACTION_RATE_OVERRIDE_CANCEL
 
-    with boa.reverts("stale override version"):
-        ctx.foxtrot.executePendingAction(
-            cancel_action,
-            sender=ctx.governance.address,
+
+def test_set_can_buy_now_is_immediate_and_does_not_need_timelock(foxtrot_env, alice):
+    ctx = foxtrot_env
+    assert ctx.lane.bondConfig().canBuyNow is True
+    with boa.reverts("no perms"):
+        ctx.foxtrot.setCanBuyNow(False, sender=alice)
+    ctx.foxtrot.setCanBuyNow(False, sender=ctx.governance.address)
+    assert filter_logs(ctx.foxtrot, "InstantBondCanBuyNowSet")[-1].canBuyNow is False
+    assert ctx.lane.bondConfig().canBuyNow is False
+    with boa.reverts("disabled"):
+        ctx.lane.buyNow(
+            ctx.scale,
+            0,
+            0,
+            0,
+            boa.env.evm.patch.block_number,
+            sender=ctx.bob,
         )
-    assert ctx.foxtrot.hasPendingAction(cancel_action)
-    assert ctx.foxtrot.actionType(cancel_action) == ACTION_RATE_OVERRIDE_CANCEL
-    assert ctx.foxtrot.cancelPendingAction(
-        cancel_action,
+    with boa.reverts("no change"):
+        ctx.foxtrot.setCanBuyNow(False, sender=ctx.governance.address)
+
+    ctx.foxtrot.setCanBuyNow(True, sender=ctx.governance.address)
+    assert filter_logs(ctx.foxtrot, "InstantBondCanBuyNowSet")[-1].canBuyNow is True
+    assert ctx.lane.bondConfig().canBuyNow is True
+    quote = ctx.lane.previewBuyNow(ctx.scale, 0, sender=ctx.bob)
+    payout = ctx.lane.buyNow(
+        ctx.scale,
+        0,
+        quote.epoch,
+        quote.totalRipe,
+        boa.env.evm.patch.block_number,
+        sender=ctx.bob,
+    )
+    assert payout == quote.totalRipe
+
+
+def test_zero_timelock_config_executes_in_the_same_block(foxtrot_env):
+    ctx = foxtrot_env
+    assert ctx.foxtrot.actionTimeLock() == 0
+    config = make_config(
+        ctx.scale,
+        epoch_length=ctx.lane.epochLength(),
+        minLockDuration=7,
+    )
+    action_id = ctx.foxtrot.setInstantBondConfig(
+        config, sender=ctx.governance.address
+    )
+    assert ctx.foxtrot.executePendingAction(
+        action_id, sender=ctx.governance.address
+    )
+    assert filter_logs(ctx.foxtrot, "InstantBondConfigExecuted")[-1].actionId == action_id
+    assert ctx.lane.bondConfig().minLockDuration == 7
+    assert_pending_cleared(ctx, action_id)
+    assert tuple(ctx.foxtrot.pendingConfig(action_id)) == config
+
+
+def test_execute_and_cancel_leave_pending_payloads(foxtrot_env):
+    ctx = foxtrot_env
+    enable_actions(ctx)
+    initialize_lane(ctx)
+    config = make_config(
+        ctx.scale,
+        epoch_length=ctx.lane.epochLength(),
+        minLockDuration=4,
+    )
+    config_id = ctx.foxtrot.setInstantBondConfig(
+        config, sender=ctx.governance.address
+    )
+    travel(ctx.foxtrot.actionTimeLock())
+    assert ctx.foxtrot.executePendingAction(
+        config_id, sender=ctx.governance.address
+    )
+    assert_pending_cleared(ctx, config_id)
+    assert tuple(ctx.foxtrot.pendingConfig(config_id)) == config
+
+    override_id = ctx.foxtrot.setInstantBondRateOverride(
+        11 * 10**17, sender=ctx.governance.address
+    )
+    travel(ctx.foxtrot.actionTimeLock())
+    assert ctx.foxtrot.executePendingAction(
+        override_id, sender=ctx.governance.address
+    )
+    assert_pending_cleared(ctx, override_id)
+    assert ctx.foxtrot.pendingRateOverride(override_id) == 11 * 10**17
+
+    cancel_id = ctx.foxtrot.cancelInstantBondRateOverride(
+        sender=ctx.governance.address
+    )
+    assert ctx.foxtrot.cancelPendingAction(cancel_id, sender=ctx.governance.address)
+    assert_pending_cleared(ctx, cancel_id)
+    assert ctx.lane.rateOverride() == 11 * 10**17
+
+
+def test_unknown_or_cancelled_execute_returns_false(foxtrot_env):
+    ctx = foxtrot_env
+    enable_actions(ctx)
+    assert ctx.foxtrot.executePendingAction(99, sender=ctx.governance.address) is False
+
+    action_id = ctx.foxtrot.setInstantBondConfig(
+        make_config(ctx.scale, epoch_length=ctx.lane.epochLength()),
         sender=ctx.governance.address,
     )
-    assert_pending_cleared(ctx, cancel_action)
+    assert ctx.foxtrot.cancelPendingAction(action_id, sender=ctx.governance.address)
+    assert ctx.foxtrot.executePendingAction(
+        action_id, sender=ctx.governance.address
+    ) is False
+
+
+def test_running_lane_rejects_payment_token_and_double_stop(foxtrot_env, governance):
+    ctx = foxtrot_env
+    other = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Other",
+        "OTH",
+        8,
+        1,
+    )
+    with boa.reverts("invalid payment token"):
+        ctx.foxtrot.setInstantBondPaymentToken(
+            other.address, sender=ctx.governance.address
+        )
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+    with boa.reverts("not running"):
+        ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+
+
+def test_foxtrot_follows_the_hq_lane_id(foxtrot_env, charlie_token):
+    ctx = foxtrot_env
+    original = ctx.lane
+    ctx.foxtrot.stopInstantBond(sender=ctx.governance.address)
+
+    replacement = boa.load(
+        "contracts/core/InstantBondLane.vy",
+        ctx.ripe_hq,
+        charlie_token,
+        make_config(ctx.scale, epoch_length=100),
+        name="foxtrot_replacement_lane",
+    )
+    replacement.pause(False, sender=ctx.switchboard_alpha.address)
+    lock = ctx.ripe_hq.registryChangeTimeLock()
+    assert ctx.ripe_hq.startAddressUpdateToRegistry(
+        INSTANT_BOND_LANE_HQ_ID,
+        replacement,
+        sender=ctx.governance.address,
+    )
+    travel(lock)
+    assert ctx.ripe_hq.confirmAddressUpdateToRegistry(
+        INSTANT_BOND_LANE_HQ_ID, sender=ctx.governance.address
+    )
+    assert ctx.ripe_hq.getAddr(INSTANT_BOND_LANE_HQ_ID) == replacement.address
+
+    ctx.foxtrot.startInstantBond(0, 100, sender=ctx.governance.address)
+    assert replacement.isRunning() is True
+    assert original.isRunning() is False
+    assert replacement.genesisBlock() != 0
+    assert original.genesisBlock() == 0

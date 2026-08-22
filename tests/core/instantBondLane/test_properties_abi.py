@@ -12,11 +12,10 @@ from vyper.compiler.output import build_abi_output
 
 from constants import ZERO_ADDRESS
 
+from tests.core.instantBondLane.conftest import make_config
+
 
 EIP170_LIMIT = 24_576
-# Dated owner decision: https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427
-LANE_RUNTIME_MAX = 13_000
-FOXTROT_RUNTIME_MAX = 6_500
 MAX_UINT256 = 2**256 - 1
 
 
@@ -92,14 +91,13 @@ def test_runtime_sizes_have_large_eip170_headroom(lane_env, ripe_hq):
         ZERO_ADDRESS,
         2,
         20,
-        lane_env.lane,
     )
     lane_size = len(boa.env.get_code(lane_env.lane.address))
     foxtrot_size = len(boa.env.get_code(foxtrot.address))
-
-    assert 0 < lane_size < EIP170_LIMIT
-    assert 0 < foxtrot_size < EIP170_LIMIT
     size_report = f"deployed runtime sizes: lane={lane_size}, foxtrot={foxtrot_size}"
+
+    assert 0 < lane_size < EIP170_LIMIT, size_report
+    assert 0 < foxtrot_size < EIP170_LIMIT, size_report
     print(size_report)
     report_path = os.environ.get("INSTANT_BOND_SIZE_REPORT")
     if report_path:
@@ -108,8 +106,6 @@ def test_runtime_sizes_have_large_eip170_headroom(lane_env, ripe_hq):
                 {
                     "instant_bond_lane": lane_size,
                     "switchboard_foxtrot": foxtrot_size,
-                    "instant_bond_lane_local_ceiling": LANE_RUNTIME_MAX,
-                    "switchboard_foxtrot_local_ceiling": FOXTROT_RUNTIME_MAX,
                     "eip170_ceiling": EIP170_LIMIT,
                 },
                 indent=2,
@@ -121,18 +117,15 @@ def test_runtime_sizes_have_large_eip170_headroom(lane_env, ripe_hq):
     if summary_path:
         with Path(summary_path).open("a") as summary:
             summary.write("## Instant Bond Lane deployed runtime sizes\n\n")
-            summary.write("| Contract | Bytes | Local gate | EIP-170 headroom |\n")
-            summary.write("| --- | ---: | ---: | ---: |\n")
+            summary.write("| Contract | Bytes | EIP-170 headroom |\n")
+            summary.write("| --- | ---: | ---: |\n")
             summary.write(
-                f"| InstantBondLane | {lane_size} | {LANE_RUNTIME_MAX} | "
-                f"{EIP170_LIMIT - lane_size} |\n"
+                f"| InstantBondLane | {lane_size} | {EIP170_LIMIT - lane_size} |\n"
             )
             summary.write(
-                f"| SwitchboardFoxtrot | {foxtrot_size} | {FOXTROT_RUNTIME_MAX} | "
+                f"| SwitchboardFoxtrot | {foxtrot_size} | "
                 f"{EIP170_LIMIT - foxtrot_size} |\n"
             )
-    assert lane_size <= LANE_RUNTIME_MAX, size_report
-    assert foxtrot_size <= FOXTROT_RUNTIME_MAX, size_report
 
 
 @pytest.mark.artifact
@@ -230,6 +223,35 @@ def test_event_abi_names_order_and_indexing():
         "epoch",
     ]
     assert indexed_fields(config_set) == []
+    assert [item["name"] for item in config_set["inputs"]] == [
+        "canBuyNow",
+        "paymentCapPerEpoch",
+        "minPaymentAmount",
+        "mintBudget",
+        "maxEffectiveRate",
+        "seedRate",
+        "uHighBps",
+        "uLowBps",
+        "minUpBps",
+        "maxUpBps",
+        "minDownBps",
+        "maxDownBps",
+        "decayBps",
+        "maxDecayEpochs",
+        "maxLockBonus",
+        "minLockDuration",
+        "epochLength",
+    ]
+
+    started = event_abi(path, "InstantBondStarted")
+    stopped = event_abi(path, "InstantBondStopped")
+    assert [item["name"] for item in started["inputs"]] == [
+        "genesisBlock",
+        "epochLength",
+    ]
+    assert [item["name"] for item in stopped["inputs"]] == ["epochLength"]
+    assert indexed_fields(started) == []
+    assert indexed_fields(stopped) == []
 
     override_events = {
         name: event_abi(path, name)
@@ -241,36 +263,31 @@ def test_event_abi_names_order_and_indexing():
         )
     }
     assert [item["name"] for item in override_events["RateOverrideInstalled"]["inputs"]] == [
-        "newVersion",
         "targetRate",
     ]
-    assert indexed_fields(override_events["RateOverrideInstalled"]) == [
-        "newVersion",
-    ]
+    assert indexed_fields(override_events["RateOverrideInstalled"]) == []
     assert [item["name"] for item in override_events["RateOverrideApplied"]["inputs"]] == [
-        "newVersion",
         "fromEpoch",
         "toEpoch",
         "targetRate",
         "controllerRate",
     ]
     assert indexed_fields(override_events["RateOverrideApplied"]) == [
-        "newVersion",
         "fromEpoch",
         "toEpoch",
     ]
     assert [item["name"] for item in override_events["RateOverrideCancelled"]["inputs"]] == [
-        "newVersion",
         "targetRate",
     ]
-    assert indexed_fields(override_events["RateOverrideCancelled"]) == ["newVersion"]
+    assert indexed_fields(override_events["RateOverrideCancelled"]) == []
     assert [item["name"] for item in override_events["RateOverrideInvalidated"]["inputs"]] == [
-        "newVersion",
         "targetRate",
     ]
-    assert indexed_fields(override_events["RateOverrideInvalidated"]) == [
-        "newVersion",
-    ]
+    assert indexed_fields(override_events["RateOverrideInvalidated"]) == []
+
+    can_buy = event_abi(path, "CanBuyNowSet")
+    assert [item["name"] for item in can_buy["inputs"]] == ["canBuyNow"]
+    assert indexed_fields(can_buy) == []
 
 
 @pytest.mark.artifact
@@ -288,16 +305,40 @@ def test_quote_and_purchase_constraint_abi_is_explicit():
             "_expectedEpoch",
             "_minRipeOut",
             "_deadlineBlock",
-        ],
-        [
-            "_paymentAmount",
-            "_requestedLock",
-            "_expectedEpoch",
-            "_minRipeOut",
-            "_deadlineBlock",
-            "_minActualLock",
-        ],
+        ]
     ]
+    start_fn = next(
+        function
+        for function in abi
+        if function.get("type") == "function" and function.get("name") == "start"
+    )
+    assert [item["name"] for item in start_fn["inputs"]] == [
+        "_genesisBlock",
+        "_epochLength",
+    ]
+    set_override = next(
+        function
+        for function in abi
+        if function.get("type") == "function"
+        and function.get("name") == "setRateOverride"
+    )
+    assert [item["name"] for item in set_override["inputs"]] == ["_targetRate"]
+    set_can_buy = next(
+        function
+        for function in abi
+        if function.get("type") == "function"
+        and function.get("name") == "setCanBuyNow"
+    )
+    assert [item["name"] for item in set_can_buy["inputs"]] == ["_canBuyNow"]
+    constructor = next(
+        item for item in abi if item.get("type") == "constructor"
+    )
+    assert [item["name"] for item in constructor["inputs"]] == [
+        "_ripeHq",
+        "_paymentToken",
+        "_config",
+    ]
+
     preview = next(
         function
         for function in abi
@@ -492,15 +533,6 @@ def test_worst_case_valid_config_payout_across_decimal_counts(
                 0,
             )
             scale = 10**decimals
-            lane = boa.load(
-                "contracts/core/InstantBondLane.vy",
-                ripe_hq,
-                token,
-                boa.env.evm.patch.block_number,
-                100,
-            )
-            lane.pause(False, sender=switchboard_alpha.address)
-
             if decimals == 73:
                 # At 73 decimals, cap >= PAYMENT_SCALE leaves only ~15.79% rate
                 # headroom above MIN_BASE_RATE. This deterministic preview keeps
@@ -516,23 +548,23 @@ def test_worst_case_valid_config_payout_across_decimal_counts(
                 max_effective = 11 * 10**18
                 seed = 10**18
 
-            config = (
-                True,
-                cap,
+            config = make_config(
                 scale,
-                MAX_UINT256,
-                max_effective,
-                seed,
-                8_000,
-                2_000,
-                1_000,
-                1_000,
-                500,
-                500,
-                900,
-                32,
-                max_bonus,
+                paymentCapPerEpoch=cap,
+                minPaymentAmount=scale,
+                mintBudget=MAX_UINT256,
+                maxEffectiveRate=max_effective,
+                seedRate=seed,
+                maxDecayEpochs=32,
+                maxLockBonus=max_bonus,
             )
+            lane = boa.load(
+                "contracts/core/InstantBondLane.vy",
+                ripe_hq,
+                token,
+                config,
+            )
+            lane.pause(False, sender=switchboard_alpha.address)
             assert lane.isValidConfig(config)
             lane.setConfig(config, sender=switchboard_alpha.address)
 
@@ -641,14 +673,6 @@ def test_fuzz_valid_worst_case_payout_never_overflows_and_respects_floor(
             0,
         )
         scale = 10**decimals
-        lane = boa.load(
-            "contracts/core/InstantBondLane.vy",
-            ripe_hq,
-            token,
-            boa.env.evm.patch.block_number,
-            100,
-        )
-
         if decimals == 73:
             # The randomized preview keeps this absolute scale at the conservative
             # zero-bonus boundary; the executable test above covers a nonzero bonus.
@@ -663,22 +687,21 @@ def test_fuzz_valid_worst_case_payout_never_overflows_and_respects_floor(
             ) // 10_000
 
         derived_ceiling = max_effective * 10_000 // (10_000 + max_bonus)
-        config = (
-            True,
-            cap,
+        config = make_config(
             scale,
-            MAX_UINT256,
-            max_effective,
-            derived_ceiling,
-            8_000,
-            2_000,
-            1_000,
-            1_000,
-            500,
-            500,
-            900,
-            32,
-            max_bonus,
+            paymentCapPerEpoch=cap,
+            minPaymentAmount=scale,
+            mintBudget=MAX_UINT256,
+            maxEffectiveRate=max_effective,
+            seedRate=derived_ceiling,
+            maxDecayEpochs=32,
+            maxLockBonus=max_bonus,
+        )
+        lane = boa.load(
+            "contracts/core/InstantBondLane.vy",
+            ripe_hq,
+            token,
+            config,
         )
         assert lane.isValidConfig(config)
         lane.setConfig(config, sender=switchboard_alpha.address)

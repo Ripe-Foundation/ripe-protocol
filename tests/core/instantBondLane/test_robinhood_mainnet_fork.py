@@ -54,6 +54,7 @@ MISSION_CONTROL_ID = 5
 SWITCHBOARD_ID = 6
 VAULT_BOOK_ID = 8
 ENDAOMENT_FUNDS_ID = 21
+INSTANT_BOND_LANE_ID = 26
 SWITCHBOARD_ALPHA_ID = 1
 SWITCHBOARD_CHARLIE_ID = 3
 MAX_UINT256 = 2**256 - 1
@@ -388,7 +389,7 @@ def _register(registry, address, description: str, governance) -> int:
     return registry.confirmNewAddressToRegistry(address, sender=governance)
 
 
-def _fork_config(scale: int) -> tuple[object, ...]:
+def _fork_config(scale: int, epoch_length: int) -> tuple[object, ...]:
     # Synthetic test-only economics. The fork test validates integration and
     # settlement; deployment calibration remains a separate owner decision.
     return (
@@ -407,6 +408,8 @@ def _fork_config(scale: int) -> tuple[object, ...]:
         400,
         12,
         1_000,
+        0,
+        epoch_length,
     )
 
 
@@ -415,13 +418,14 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     boa.env.set_balance(operator, 100 * 10**18)
     current_number = boa.env.evm.patch.block_number
     genesis = current_number - current_number % inputs.epoch_length
+    scale = 10 ** live.payment_token.decimals()
+    config = _fork_config(scale, inputs.epoch_length)
 
     lane = boa.load(
         "contracts/core/InstantBondLane.vy",
         live.hq,
         live.payment_token,
-        genesis,
-        inputs.epoch_length,
+        config,
         name="robinhood_fork_instant_bond_lane",
         sender=operator,
     )
@@ -434,7 +438,6 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
         operator,
         alpha.minActionTimeLock(),
         alpha.maxActionTimeLock(),
-        lane,
         name="robinhood_fork_switchboard_foxtrot",
         sender=operator,
     )
@@ -449,6 +452,7 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     assert live.switchboard.isSwitchboardAddr(foxtrot)
 
     lane_reg_id = _register(live.hq, lane, "Instant Bond Lane", governance)
+    assert lane_reg_id == INSTANT_BOND_LANE_ID
     hq_delay = live.hq.registryChangeTimeLock()
     live.hq.initiateHqConfigChange(
         lane_reg_id, False, True, False, sender=governance
@@ -460,11 +464,11 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     charlie = live.switchboard.getAddr(SWITCHBOARD_CHARLIE_ID)
     lane.pause(False, sender=charlie)
 
-    config = _fork_config(lane.PAYMENT_SCALE())
-        action_id = foxtrot.setInstantBondConfig(config, sender=operator)
+    action_id = foxtrot.setInstantBondConfig(config, sender=operator)
     _advance_blocks(foxtrot.actionTimeLock())
     assert foxtrot.executePendingAction(action_id, sender=operator)
-    assert tuple(lane.config()) == config
+    assert tuple(lane.bondConfig()) == config
+    foxtrot.startInstantBond(genesis, inputs.epoch_length, sender=operator)
 
     return SimpleNamespace(
         lane=lane,
@@ -533,11 +537,12 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_full_purchase_paths(rh_f
     with boa.env.anchor():
         deployed = _deploy_local_lane(rh_fork, live)
         lane = deployed.lane
-        scale = lane.PAYMENT_SCALE()
-        assert lane.PAYMENT_DECIMALS() == rh_fork.payment_decimals
-        assert lane.PAYMENT_TOKEN() == live.payment_token.address
-        assert lane.EPOCH_LENGTH() == rh_fork.epoch_length
-        assert lane.GENESIS_BLOCK() % lane.EPOCH_LENGTH() == 0
+        scale = lane.paymentScale()
+        assert lane.paymentDecimals() == rh_fork.payment_decimals
+        assert lane.paymentToken() == live.payment_token.address
+        assert lane.epochLength() == rh_fork.epoch_length
+        assert lane.genesisBlock() % lane.epochLength() == 0
+        assert lane.isRunning() is True
 
         endaoment_funds = live.hq.getAddr(ENDAOMENT_FUNDS_ID)
         unlocked_buyer = boa.env.generate_address("ibl-rh-fork-unlocked-buyer")
@@ -586,7 +591,7 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_full_purchase_paths(rh_f
             for log in lane.get_logs()
             if type(log).__name__ == "InstantBondPurchased"
         )
-        assert purchase.ripeGovVaultId == live.ripe_gov_vault_id
+        assert locked_quote.ripeGovVaultId == live.ripe_gov_vault_id
         assert live.ripe_gov.getTotalAmountForUser(
             locked_buyer, live.ripe_token
         ) == locked_vault_before + locked_payout
@@ -594,7 +599,7 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_full_purchase_paths(rh_f
         assert live.payment_token.balanceOf(endaoment_funds) == (
             payment_before + 2 * purchase_amount
         )
-        assert lane.epochAcceptedPayment() == 2 * purchase_amount
+        assert lane.epochState().acceptedPayment == 2 * purchase_amount
         assert lane.cumulativeMinted() == unlocked_payout + locked_payout
         assert live.payment_token.balanceOf(lane) == 0
         assert live.ripe_token.balanceOf(lane) == 0

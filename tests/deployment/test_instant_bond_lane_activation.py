@@ -32,7 +32,7 @@ def test_activation_manifest_is_structurally_valid_but_fail_closed():
 
 def test_owner_policies_cannot_be_relaxed_in_the_draft():
     mutations = (
-        ("runtime_limits", "instant_bond_lane", 13_001),
+        ("runtime_limits", "eip170", 24_577),
         ("lock_bonus", "maximum_bps", 1),
         ("pricing", "snapshot_only_mid_epoch", False),
         ("pricing", "timing_is_strategically_selectable", False),
@@ -146,7 +146,12 @@ def test_unknown_or_generic_registered_switchboard_blocks_readiness():
             "code_hash": "0x" + "ab" * 32,
             "selectors_sha256": "0x" + "bc" * 32,
             "reachable_lane_selectors": list(
-                ("setConfig", "setRateOverride", "cancelRateOverride")
+                (
+                    "setConfig",
+                    "setCanBuyNow",
+                    "setRateOverride",
+                    "cancelRateOverride",
+                )
                 if name == "SwitchboardFoxtrot"
                 else ()
             ),

@@ -115,25 +115,32 @@ def project_lock_quote(
     requested_lock: int,
     min_lock: int,
     max_lock: int,
+    lane_min_lock: int = 0,
 ) -> dict[str, int | bool]:
     """Independent integer model of the Lane's lock-bound payout."""
 
     actual_lock = 0
     bonus_ratio_bps = 0
-    if max_lock and max_lock >= min_lock and requested_lock >= min_lock:
-        actual_lock = min(requested_lock, max_lock)
-        if max_lock == min_lock:
+    effective_min = max(min_lock, lane_min_lock)
+    if (
+        (requested_lock != 0 or lane_min_lock != 0)
+        and max_lock != 0
+        and max_lock >= effective_min
+    ):
+        actual_lock = min(max(requested_lock, effective_min), max_lock)
+        if max_lock == effective_min:
             bonus_ratio_bps = max_lock_bonus_bps
         else:
             bonus_ratio_bps = (
                 max_lock_bonus_bps
-                * (actual_lock - min_lock)
-                // (max_lock - min_lock)
+                * (actual_lock - effective_min)
+                // (max_lock - effective_min)
             )
     base_ripe = payment_amount * rate // payment_scale
     bonus_ripe = base_ripe * bonus_ratio_bps // BPS
     return {
-        "valid_requested_lock": requested_lock == 0 or actual_lock != 0,
+        # Lock duration never rejects a buy; illegal ranges settle unlocked.
+        "valid_requested_lock": True,
         "actual_lock": actual_lock,
         "bonus_ratio_bps": bonus_ratio_bps,
         "base_ripe": base_ripe,

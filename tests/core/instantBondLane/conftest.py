@@ -8,16 +8,40 @@ from constants import MAX_UINT256
 
 HUNDRED_PERCENT = 10_000
 DEFAULT_EPOCH_LENGTH = 100
+MIN_BASE_RATE = 10_000
+
+CONFIG_KEYS = (
+    "canBuyNow",
+    "paymentCapPerEpoch",
+    "minPaymentAmount",
+    "mintBudget",
+    "maxEffectiveRate",
+    "seedRate",
+    "uHighBps",
+    "uLowBps",
+    "minUpBps",
+    "maxUpBps",
+    "minDownBps",
+    "maxDownBps",
+    "decayBps",
+    "maxDecayEpochs",
+    "maxLockBonus",
+    "minLockDuration",
+    "epochLength",
+)
 
 
-def make_config(scale, **overrides):
+def make_config(scale, epoch_length=DEFAULT_EPOCH_LENGTH, **overrides):
+    max_safe_scaled = (2**256 - 1) // 10_000
+    cap = scale if 1_000 * scale > max_safe_scaled else 1_000 * scale
+    max_safe_rate = (2**256 - 1) // max(cap, 1)
     values = {
         "canBuyNow": True,
-        "paymentCapPerEpoch": 1_000 * scale,
+        "paymentCapPerEpoch": cap,
         "minPaymentAmount": scale,
         "mintBudget": 1_000_000 * 10**18,
-        "maxEffectiveRate": 2 * 10**18,
-        "seedRate": 10**18,
+        "maxEffectiveRate": 2 * 10**18 if 2 * 10**18 <= max_safe_rate else 11_000,
+        "seedRate": 10**18 if 10**18 <= max_safe_rate else 10_000,
         "uHighBps": 8_000,
         "uLowBps": 2_000,
         "minUpBps": 1_000,
@@ -26,47 +50,16 @@ def make_config(scale, **overrides):
         "maxDownBps": 500,
         "decayBps": 900,
         "maxDecayEpochs": 4,
-        "maxLockBonus": 5_000,
+        "maxLockBonus": 5_000 if 2 * 10**18 <= max_safe_rate else 0,
+        "minLockDuration": 0,
+        "epochLength": epoch_length,
     }
     values.update(overrides)
-    return (
-        values["canBuyNow"],
-        values["paymentCapPerEpoch"],
-        values["minPaymentAmount"],
-        values["mintBudget"],
-        values["maxEffectiveRate"],
-        values["seedRate"],
-        values["uHighBps"],
-        values["uLowBps"],
-        values["minUpBps"],
-        values["maxUpBps"],
-        values["minDownBps"],
-        values["maxDownBps"],
-        values["decayBps"],
-        values["maxDecayEpochs"],
-        values["maxLockBonus"],
-    )
+    return tuple(values[key] for key in CONFIG_KEYS)
 
 
 def config_dict(config):
-    keys = (
-        "canBuyNow",
-        "paymentCapPerEpoch",
-        "minPaymentAmount",
-        "mintBudget",
-        "maxEffectiveRate",
-        "seedRate",
-        "uHighBps",
-        "uLowBps",
-        "minUpBps",
-        "maxUpBps",
-        "minDownBps",
-        "maxDownBps",
-        "decayBps",
-        "maxDecayEpochs",
-        "maxLockBonus",
-    )
-    return dict(zip(keys, config))
+    return dict(zip(CONFIG_KEYS, config))
 
 
 def travel_blocks(blocks):
@@ -74,10 +67,85 @@ def travel_blocks(blocks):
         boa.env.time_travel(blocks=blocks)
 
 
+def settlement_accounting(ctx):
+    return (
+        ctx.lane.epochState().rate,
+        ctx.lane.epochState().acceptedPayment,
+        ctx.lane.cumulativeMinted(),
+        ctx.payment_token.balanceOf(ctx.bob),
+        ctx.payment_token.balanceOf(ctx.endaoment_funds),
+        ctx.ripe_token.balanceOf(ctx.lane),
+        ctx.ripe_token.balanceOf(ctx.bob),
+        ctx.ripe_gov_vault.getTotalAmountForUser(ctx.bob, ctx.ripe_token),
+        ctx.ripe_token.allowance(ctx.lane, ctx.teller),
+    )
+
+
+def controller_rate(
+    rate,
+    accepted,
+    cap,
+    elapsed,
+    config,
+    weighted_lateness=0,
+    timing_eligible=True,
+):
+    values = config_dict(config)
+    ceiling = values["maxEffectiveRate"] * HUNDRED_PERCENT // (
+        HUNDRED_PERCENT + values["maxLockBonus"]
+    )
+    rate = min(rate, ceiling)
+    utilization = 0
+    adjustment = 0
+    decay_steps = 0
+
+    if accepted == 0:
+        decay_steps = min(elapsed, values["maxDecayEpochs"])
+    else:
+        utilization = accepted * HUNDRED_PERCENT // cap
+        if utilization >= values["uHighBps"]:
+            strength = (
+                (utilization - values["uHighBps"])
+                * HUNDRED_PERCENT
+                // (HUNDRED_PERCENT - values["uHighBps"])
+            )
+            earliness = 0
+            if timing_eligible:
+                earliness = HUNDRED_PERCENT - weighted_lateness // accepted
+            demand = strength * earliness // HUNDRED_PERCENT
+            adjustment = values["minUpBps"] + (
+                values["maxUpBps"] - values["minUpBps"]
+            ) * demand // HUNDRED_PERCENT
+            rate = max(
+                rate * HUNDRED_PERCENT // (HUNDRED_PERCENT + adjustment),
+                MIN_BASE_RATE,
+            )
+        elif utilization <= values["uLowBps"]:
+            weakness = (
+                (values["uLowBps"] - utilization)
+                * HUNDRED_PERCENT
+                // values["uLowBps"]
+            )
+            adjustment = values["minDownBps"] + (
+                values["maxDownBps"] - values["minDownBps"]
+            ) * weakness // HUNDRED_PERCENT
+            rate = min(
+                rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - adjustment),
+                ceiling,
+            )
+        decay_steps = min(elapsed - 1, values["maxDecayEpochs"])
+
+    for _ in range(decay_steps):
+        rate = min(
+            rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - values["decayBps"]),
+            ceiling,
+        )
+    return rate, utilization, decay_steps, adjustment
+
+
 @pytest.fixture
 def lane_factory(
     ripe_hq,
-    switchboard,
     switchboard_alpha,
     governance,
     charlie_token,
@@ -97,28 +165,32 @@ def lane_factory(
         def factory(
             payment_token=charlie_token,
             epoch_length=DEFAULT_EPOCH_LENGTH,
-            start_at_genesis=True,
+            auto_start=True,
+            genesis_block=0,
             register_lane=True,
             enable_mint=True,
             fund_buyer=True,
             buyer_funding=None,
-            genesis_delay=5,
+            unpause=True,
+            config_overrides=None,
         ):
-            registry_lock = ripe_hq.registryChangeTimeLock()
-            setup_blocks = registry_lock * 2 if register_lane else 0
-            genesis = boa.env.evm.patch.block_number + setup_blocks + genesis_delay
-
+            scale = 10 ** payment_token.decimals()
+            config = make_config(
+                scale,
+                epoch_length=epoch_length,
+                **(config_overrides or {}),
+            )
             lane = boa.load(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
                 payment_token,
-                genesis,
-                epoch_length,
+                config,
                 name="instant_bond_lane",
             )
 
             reg_id = 0
             if register_lane:
+                registry_lock = ripe_hq.registryChangeTimeLock()
                 assert ripe_hq.startAddNewAddressToRegistry(
                     lane, "Instant Bond Lane", sender=governance.address
                 )
@@ -134,12 +206,22 @@ def lane_factory(
                     reg_id, sender=governance.address
                 )
 
-            lane.pause(False, sender=switchboard_alpha.address)
+            if unpause:
+                lane.pause(False, sender=switchboard_alpha.address)
 
-            if start_at_genesis:
-                travel_blocks(genesis - boa.env.evm.patch.block_number)
+            started_genesis = 0
+            if auto_start:
+                lane.start(
+                    genesis_block,
+                    epoch_length,
+                    sender=switchboard_alpha.address,
+                )
+                started_genesis = lane.genesisBlock()
+                if started_genesis > boa.env.evm.patch.block_number:
+                    travel_blocks(
+                        started_genesis - boa.env.evm.patch.block_number
+                    )
 
-            scale = 10 ** payment_token.decimals()
             if fund_buyer:
                 funding = (
                     10_000_000 * scale
@@ -157,14 +239,14 @@ def lane_factory(
                 lane=lane,
                 payment_token=payment_token,
                 scale=scale,
-                genesis=genesis,
+                genesis=started_genesis,
                 epoch_length=epoch_length,
+                config=config,
                 reg_id=reg_id,
                 bob=bob,
                 ripe_whale=whale,
                 governance=governance,
                 switchboard=switchboard_alpha,
-                switchboard_registry=switchboard,
                 ripe_hq=ripe_hq,
                 mission_control=mission_control,
                 ledger=ledger,
@@ -175,29 +257,36 @@ def lane_factory(
             )
 
             def set_config(**overrides):
-                config = make_config(scale, **overrides)
-                lane.setConfig(config, sender=switchboard_alpha.address)
-                return config
+                next_config = make_config(
+                    scale,
+                    epoch_length=lane.epochLength(),
+                    **overrides,
+                )
+                lane.setConfig(next_config, sender=switchboard_alpha.address)
+                ctx.config = next_config
+                return next_config
 
-            def set_rate_override(
-                target_rate,
-                expected_override_version=None,
-            ):
-                if expected_override_version is None:
-                    expected_override_version = lane.overrideVersion()
+            def start(genesis=0, length=None):
+                length = epoch_length if length is None else length
+                resolved = (
+                    boa.env.evm.patch.block_number if genesis == 0 else genesis
+                )
+                lane.start(genesis, length, sender=switchboard_alpha.address)
+                ctx.genesis = resolved
+                ctx.epoch_length = length
+                return ctx.genesis
+
+            def stop():
+                lane.stop(sender=switchboard_alpha.address)
+                ctx.genesis = 0
+
+            def set_rate_override(target_rate):
                 return lane.setRateOverride(
-                    target_rate,
-                    expected_override_version,
-                    sender=switchboard_alpha.address,
+                    target_rate, sender=switchboard_alpha.address
                 )
 
-            def cancel_rate_override(expected_override_version=None):
-                if expected_override_version is None:
-                    expected_override_version = lane.overrideVersion()
-                return lane.cancelRateOverride(
-                    expected_override_version,
-                    sender=switchboard_alpha.address,
-                )
+            def cancel_rate_override():
+                return lane.cancelRateOverride(sender=switchboard_alpha.address)
 
             def setup_lock_terms(
                 min_lock=100,
@@ -208,9 +297,6 @@ def lane_factory(
                 can_deposit=True,
                 asset_can_deposit=True,
             ):
-                # Lane-unit tests write MissionControl directly so they can cover
-                # defensive states independently of governance validation. Dedicated
-                # integration cases use the real timelocked switchboard path.
                 setGeneralConfig(_canDeposit=can_deposit)
                 lock_terms = (
                     min_lock,
@@ -248,8 +334,6 @@ def lane_factory(
                 expected_epoch=None,
                 min_ripe_out=0,
                 deadline=None,
-                expected_core_vault_id=0,
-                min_actual_lock=0,
                 sender=bob,
             ):
                 if expected_epoch is None:
@@ -266,15 +350,17 @@ def lane_factory(
                     expected_epoch,
                     min_ripe_out,
                     deadline,
-                    expected_core_vault_id,
-                    min_actual_lock,
                     sender=sender,
                 )
 
             ctx.set_config = set_config
+            ctx.start = start
+            ctx.stop = stop
             ctx.set_rate_override = set_rate_override
             ctx.cancel_rate_override = cancel_rate_override
-            ctx.make_config = lambda **overrides: make_config(scale, **overrides)
+            ctx.make_config = lambda **overrides: make_config(
+                scale, epoch_length=lane.epochLength(), **overrides
+            )
             ctx.setup_lock_terms = setup_lock_terms
             ctx.quote = quote
             ctx.buy = buy

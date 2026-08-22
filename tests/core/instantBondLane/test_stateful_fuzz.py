@@ -28,6 +28,8 @@ CONFIG_KEYS = (
     "decayBps",
     "maxDecayEpochs",
     "maxLockBonus",
+    "minLockDuration",
+    "epochLength",
 )
 
 
@@ -36,18 +38,18 @@ def as_config_dict(config):
 
 
 def settlement_snapshot(ctx):
+    state = ctx.lane.epochState()
     return (
-        ctx.lane.isInitialized(),
-        ctx.lane.currentEpoch(),
-        ctx.lane.epochRate(),
-        ctx.lane.epochPaymentCap(),
-        ctx.lane.epochMinPaymentAmount(),
-        ctx.lane.epochMaxLockBonus(),
-        ctx.lane.epochAcceptedPayment(),
-        ctx.lane.epochWeightedLateness(),
-        ctx.lane.epochTimingEligible(),
+        ctx.lane.isRunning(),
+        state.epoch,
+        state.rate,
+        state.paymentCap,
+        state.minPaymentAmount,
+        state.maxLockBonus,
+        state.acceptedPayment,
+        state.weightedLateness,
+        state.timingEligible,
         ctx.lane.rateOverride(),
-        ctx.lane.overrideVersion(),
         ctx.lane.cumulativeMinted(),
         ctx.payment_token.balanceOf(ctx.bob),
         ctx.payment_token.balanceOf(ctx.endaoment_funds),
@@ -152,6 +154,35 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 // (HUNDRED_PERCENT + config["maxLockBonus"])
             )
             rate = min(pricing["rate"], ceiling)
+            utilization = 0
+            if pricing["accepted"] == 0:
+                decay_steps = min(elapsed, config["maxDecayEpochs"])
+                for _ in range(decay_steps):
+                    rate = min(
+                        rate
+                        * HUNDRED_PERCENT
+                        // (HUNDRED_PERCENT - config["decayBps"]),
+                        ceiling,
+                    )
+                controller_rate = rate
+                consumes_override = self.override_rate is not None
+                if consumes_override:
+                    rate = self.override_rate
+                return {
+                    "epoch": epoch,
+                    "rate": rate,
+                    "cap": config["paymentCapPerEpoch"],
+                    "minimum": config["minPaymentAmount"],
+                    "max_bonus": config["maxLockBonus"],
+                    "max_effective_rate": config["maxEffectiveRate"],
+                    "accepted": 0,
+                    "weighted_lateness": 0,
+                    "timing_eligible": True,
+                    "did_rollover": True,
+                    "consumes_override": consumes_override,
+                    "controller_rate": controller_rate,
+                }
+
             utilization = pricing["accepted"] * HUNDRED_PERCENT // pricing["cap"]
 
             if utilization >= config["uHighBps"]:
@@ -228,16 +259,18 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             }
 
         def _expected_payout(self, pricing, payment_amount, requested_lock):
-            min_lock, max_lock, _, can_exit, exit_fee = self.lock_terms
+            vault_min, max_lock, _, can_exit, exit_fee = self.lock_terms
+            lane_min = self.live_config.get("minLockDuration", 0)
+            min_lock = max(vault_min, lane_min)
             actual_lock = 0
             bonus_ratio = 0
 
             if (
-                max_lock != 0
+                (requested_lock != 0 or lane_min != 0)
+                and max_lock != 0
                 and max_lock >= min_lock
-                and requested_lock >= min_lock
             ):
-                actual_lock = min(requested_lock, max_lock)
+                actual_lock = min(max(requested_lock, min_lock), max_lock)
                 if max_lock == min_lock:
                     bonus_ratio = pricing["max_bonus"]
                 else:
@@ -315,7 +348,6 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
 
             expected_available = (
                 self._operational()
-                and (requested_lock == 0 or payout["actual_lock"] != 0)
                 and payout["total_ripe"] <= budget_remaining
             )
             assert quote.available == expected_available
@@ -483,57 +515,31 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             target_rate = HUNDRED_PERCENT + target_selector % (
                 ceiling - HUNDRED_PERCENT + 1
             )
-            assert self.ctx.lane.isValidRateOverride(
+            assert self.ctx.lane.isValidRateOverride(target_rate)
+            self.ctx.lane.setRateOverride(
                 target_rate,
-                self.override_version,
-            )
-            assert (
-                self.ctx.lane.setRateOverride(
-                    target_rate,
-                    self.override_version,
-                    sender=self.ctx.switchboard.address,
-                )
-                == self.override_version + 1
+                sender=self.ctx.switchboard.address,
             )
             self.override_rate = target_rate
-            self.override_version += 1
 
         @precondition(lambda self: self.override_rate is not None)
         @rule()
         def cancel_rate_override(self):
-            assert self.ctx.lane.canCancelRateOverride(self.override_version)
-            assert (
-                self.ctx.lane.cancelRateOverride(
-                    self.override_version,
-                    sender=self.ctx.switchboard.address,
-                )
-                == self.override_version + 1
+            assert self.ctx.lane.canCancelRateOverride()
+            self.ctx.lane.cancelRateOverride(
+                sender=self.ctx.switchboard.address,
             )
             self.override_rate = None
-            self.override_version += 1
 
         @precondition(lambda self: self.initialized)
         @rule()
-        def stale_override_versions_roll_back(self):
+        def invalid_override_rolls_back(self):
             before = settlement_snapshot(self.ctx)
-            ceiling = (
-                self.live_config["maxEffectiveRate"]
-                * HUNDRED_PERCENT
-                // (HUNDRED_PERCENT + self.live_config["maxLockBonus"])
-            )
-            if self.override_rate is None:
-                with boa.reverts("stale override version"):
-                    self.ctx.lane.setRateOverride(
-                        ceiling,
-                        self.override_version + 1,
-                        sender=self.ctx.switchboard.address,
-                    )
-            else:
-                with boa.reverts("stale override version"):
-                    self.ctx.lane.cancelRateOverride(
-                        self.override_version - 1,
-                        sender=self.ctx.switchboard.address,
-                    )
+            with boa.reverts("invalid rate override"):
+                self.ctx.lane.setRateOverride(
+                    HUNDRED_PERCENT - 1,
+                    sender=self.ctx.switchboard.address,
+                )
             assert settlement_snapshot(self.ctx) == before
 
         @rule(
@@ -588,11 +594,9 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             elif not self.live_config["canBuyNow"]:
                 reason = "disabled"
             elif not self.mint_enabled:
-                reason = "mint unavailable"
+                reason = "cannot mint"
             elif payment_amount > remaining:
-                reason = "exceeds epoch cap"
-            elif requested_lock != 0 and payout["actual_lock"] == 0:
-                reason = "invalid lock"
+                reason = "exceeds available amount"
             else:
                 reason = "mint budget"
 
@@ -615,7 +619,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 reason = "below minimum payment"
             else:
                 payment_amount = max(remaining + 1, pricing["minimum"])
-                reason = "exceeds epoch cap"
+                reason = "exceeds available amount"
 
             quote, _, _ = self._assert_quote(payment_amount, 0)
             before = settlement_snapshot(self.ctx)
@@ -690,7 +694,6 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
 
         @invariant()
         def model_and_accounting_invariants_hold(self):
-            assert self.ctx.lane.overrideVersion() == self.override_version
             assert self.ctx.lane.rateOverride() == (self.override_rate or 0)
             assert self.ctx.lane.cumulativeMinted() == self.cumulative_minted
             assert self.cumulative_minted <= self.live_config["mintBudget"]
@@ -706,32 +709,21 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
             assert self.ctx.ripe_token.balanceOf(self.ctx.lane) == 0
             assert self.ctx.ripe_token.allowance(self.ctx.lane, self.ctx.teller) == 0
 
-            assert self.ctx.lane.isInitialized() == self.initialized
+            state = self.ctx.lane.epochState()
+            assert (state.rate != 0) == self.initialized
             if self.initialized:
                 assert self.stored_pricing["accepted"] > 0
-                assert self.ctx.lane.currentEpoch() == self.stored_pricing["epoch"]
-                assert self.ctx.lane.epochRate() == self.stored_pricing["rate"]
-                assert self.ctx.lane.epochPaymentCap() == self.stored_pricing["cap"]
+                assert state.epoch == self.stored_pricing["epoch"]
+                assert state.rate == self.stored_pricing["rate"]
+                assert state.paymentCap == self.stored_pricing["cap"]
+                assert state.minPaymentAmount == self.stored_pricing["minimum"]
+                assert state.maxLockBonus == self.stored_pricing["max_bonus"]
+                assert state.acceptedPayment == self.stored_pricing["accepted"]
                 assert (
-                    self.ctx.lane.epochMinPaymentAmount()
-                    == self.stored_pricing["minimum"]
-                )
-                assert (
-                    self.ctx.lane.epochMaxLockBonus()
-                    == self.stored_pricing["max_bonus"]
-                )
-                assert (
-                    self.ctx.lane.epochAcceptedPayment()
-                    == self.stored_pricing["accepted"]
-                )
-                assert (
-                    self.ctx.lane.epochWeightedLateness()
+                    state.weightedLateness
                     == self.stored_pricing["weighted_lateness"]
                 )
-                assert (
-                    self.ctx.lane.epochTimingEligible()
-                    == self.stored_pricing["timing_eligible"]
-                )
+                assert state.timingEligible == self.stored_pricing["timing_eligible"]
                 assert self.stored_pricing["accepted"] <= self.stored_pricing["cap"]
                 assert self.stored_pricing["epoch"] <= self._lane_epoch()
 

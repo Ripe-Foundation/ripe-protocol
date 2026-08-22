@@ -1,76 +1,23 @@
 import boa
 import pytest
 
-from conf_utils import filter_logs
+from conf_utils import filter_logs, get_boa_dev_reasons
 from constants import MAX_UINT256
-
-
-MOCK_HQ = """
-# @version 0.4.3
-
-addrs: public(HashMap[uint256, address])
-mintable: public(bool)
-
-@external
-def setAddr(_id: uint256, _addr: address):
-    self.addrs[_id] = _addr
-
-@external
-def setMintable(_mintable: bool):
-    self.mintable = _mintable
-
-@view
-@external
-def getAddr(_id: uint256) -> address:
-    return self.addrs[_id]
-
-@view
-@external
-def isValidAddr(_addr: address) -> bool:
-    return False
-
-@view
-@external
-def canMintRipe(_addr: address) -> bool:
-    return self.mintable
-"""
-
-
-MOCK_SWITCHBOARD = """
-# @version 0.4.3
-
-allowed: immutable(address)
-
-@deploy
-def __init__(_allowed: address):
-    allowed = _allowed
-
-@view
-@external
-def isSwitchboardAddr(_addr: address) -> bool:
-    return _addr == allowed
-"""
-
-
-MOCK_MISSION_CONTROL = """
-# @version 0.4.3
-
-import interfaces.ConfigStructs as cs
-
-@view
-@external
-def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig:
-    return empty(cs.RipeGovVaultConfig)
-"""
 
 
 REENTRANT_PAYMENT = """
 # @version 0.4.3
 
 interface Lane:
-    def epochAcceptedPayment() -> uint256: view
+    def buyNow(
+        _paymentAmount: uint256,
+        _requestedLock: uint256,
+        _expectedEpoch: uint256,
+        _minRipeOut: uint256,
+        _deadlineBlock: uint256,
+    ) -> uint256: nonpayable
+    def epochState() -> (uint256, uint256, uint256, uint256, uint256, uint256, uint256, bool): view
     def cumulativeMinted() -> uint256: view
-    def isInitialized() -> bool: view
 
 decimals: public(immutable(uint8))
 balanceOf: public(HashMap[address, uint256])
@@ -81,10 +28,8 @@ attackTarget: public(address)
 attackAttempted: public(bool)
 attackSucceeded: public(bool)
 attackAmount: public(uint256)
-attackResponse: public(Bytes[256])
-observedAcceptedPayment: public(uint256)
-observedCumulativeMinted: public(uint256)
-observedInitialized: public(bool)
+observedAccepted: public(uint256)
+observedMinted: public(uint256)
 shouldFail: public(bool)
 
 @deploy
@@ -102,8 +47,6 @@ def arm(_target: address, _amount: uint256, _shouldFail: bool = False):
     self.shouldFail = _shouldFail
     self.attackAttempted = False
     self.attackSucceeded = False
-    self.attackResponse = b""
-    self.allowance[self][_target] = max_value(uint256)
 
 @external
 def transfer(_to: address, _value: uint256) -> bool:
@@ -119,794 +62,298 @@ def approve(_spender: address, _value: uint256) -> bool:
 @external
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     self.allowance[_from][msg.sender] -= _value
-
     if not self.attackAttempted and self.attackTarget != empty(address):
         self.attackAttempted = True
-        self.observedAcceptedPayment = staticcall Lane(self.attackTarget).epochAcceptedPayment()
-        self.observedCumulativeMinted = staticcall Lane(self.attackTarget).cumulativeMinted()
-        self.observedInitialized = staticcall Lane(self.attackTarget).isInitialized()
-        payload: Bytes[164] = concat(
-            method_id(
-                "buyNow(uint256,uint256,uint256,uint256,uint256)",
-                output_type=Bytes[4],
-            ),
-            convert(self.attackAmount, bytes32),
-            empty(bytes32),
-            empty(bytes32),
-            empty(bytes32),
-            convert(max_value(uint256), bytes32),
-        )
+        state: (uint256, uint256, uint256, uint256, uint256, uint256, uint256, bool) = staticcall Lane(self.attackTarget).epochState()
+        self.observedAccepted = state[5]
+        self.observedMinted = staticcall Lane(self.attackTarget).cumulativeMinted()
         success: bool = False
-        response: Bytes[256] = b""
+        response: Bytes[32] = b""
         success, response = raw_call(
             self.attackTarget,
-            payload,
-            max_outsize=256,
+            concat(
+                method_id("buyNow(uint256,uint256,uint256,uint256,uint256)"),
+                convert(self.attackAmount, bytes32),
+                empty(bytes32),
+                empty(bytes32),
+                empty(bytes32),
+                convert(max_value(uint256), bytes32),
+            ),
+            max_outsize=32,
             revert_on_failure=False,
         )
         self.attackSucceeded = success
-        self.attackResponse = response
-
     if self.shouldFail:
         return False
-
     self.balanceOf[_from] -= _value
     self.balanceOf[_to] += _value
     return True
 """
 
 
-def test_preview_zeroed_before_config_and_before_genesis(lane_env, lane_factory):
+def test_first_quote_matches_initializing_purchase_and_events(lane_env):
     amount = lane_env.scale
     quote = lane_env.quote(amount)
-    assert not quote.available
+    assert quote.available is True
     assert quote.epoch == 0
-    assert quote.rate == 0
-    assert quote.totalRipe == 0
-
-    pre_genesis = lane_factory(start_at_genesis=False, genesis_delay=50)
-    pre_genesis.set_config()
-    quote = pre_genesis.quote(pre_genesis.scale)
-    assert boa.env.evm.patch.block_number < pre_genesis.genesis
-    assert not quote.available
-    assert quote.epoch == 0
-    assert quote.rate == 0
-    assert quote.totalRipe == 0
-
-    with boa.reverts("before genesis"):
-        pre_genesis.buy(
-            pre_genesis.scale,
-            expected_epoch=0,
-            deadline=pre_genesis.genesis,
-        )
-
-
-def test_first_quote_matches_initializing_purchase_and_events(lane_env):
-    lane_env.set_config()
-    amount = 25 * lane_env.scale
-    quote = lane_env.quote(amount)
-
-    assert quote.available
-    assert quote.epoch == 0
-    assert quote.rate == 10**18
-    assert quote.remainingPayment == 1_000 * lane_env.scale
-    assert quote.minPaymentAmount == lane_env.scale
-    assert quote.baseRipe == 25 * 10**18
+    assert quote.rate == lane_env.lane.bondConfig().seedRate
+    assert quote.remainingPayment == lane_env.lane.bondConfig().paymentCapPerEpoch
+    assert quote.minPaymentAmount == amount
+    assert quote.actualLock == 0
     assert quote.bonusRipe == 0
-    assert quote.totalRipe == quote.baseRipe
-    assert not lane_env.lane.isInitialized()
+    assert quote.totalRipe == amount * quote.rate // lane_env.scale
 
-    payment_before = lane_env.payment_token.balanceOf(lane_env.endaoment_funds)
     ripe_before = lane_env.ripe_token.balanceOf(lane_env.bob)
-    payout = lane_env.buy(
-        amount,
-        expected_epoch=quote.epoch,
-        min_ripe_out=quote.totalRipe,
-    )
-    logs = lane_env.lane.get_logs()
-
+    funds_before = lane_env.payment_token.balanceOf(lane_env.endaoment_funds)
+    payout = lane_env.buy(amount, min_ripe_out=quote.totalRipe)
+    initialized = filter_logs(lane_env.lane, "EpochInitialized")
+    purchased = filter_logs(lane_env.lane, "InstantBondPurchased")
     assert payout == quote.totalRipe
-    assert lane_env.payment_token.balanceOf(lane_env.endaoment_funds) == payment_before + amount
     assert lane_env.ripe_token.balanceOf(lane_env.bob) == ripe_before + payout
-    assert lane_env.payment_token.balanceOf(lane_env.lane) == 0
-    assert lane_env.ripe_token.balanceOf(lane_env.lane) == 0
-    assert lane_env.ripe_token.allowance(lane_env.lane, lane_env.teller) == 0
-    assert lane_env.lane.isInitialized()
-    assert lane_env.lane.currentEpoch() == quote.epoch
-    assert lane_env.lane.epochRate() == quote.rate
-    assert lane_env.lane.epochPaymentCap() == quote.remainingPayment
-    assert lane_env.lane.epochMinPaymentAmount() == quote.minPaymentAmount
-    assert lane_env.lane.epochMaxLockBonus() == 5_000
-    assert lane_env.lane.epochAcceptedPayment() == amount
-    assert lane_env.lane.epochWeightedLateness() == 0
-    assert lane_env.lane.epochTimingEligible()
+    assert (
+        lane_env.payment_token.balanceOf(lane_env.endaoment_funds)
+        == funds_before + amount
+    )
     assert lane_env.lane.cumulativeMinted() == payout
 
-    init = [log for log in logs if type(log).__name__ == "EpochInitialized"]
-    purchase = [log for log in logs if type(log).__name__ == "InstantBondPurchased"]
-    assert len(init) == 1
-    assert len(purchase) == 1
-    assert init[0].epoch == quote.epoch
-    assert init[0].rate == quote.rate
-    assert init[0].paymentCap == 1_000 * lane_env.scale
-    assert init[0].minPaymentAmount == lane_env.scale
-    assert init[0].maxLockBonus == 5_000
-    assert init[0].timingEligible
-    assert purchase[0].buyer == lane_env.bob
-    assert purchase[0].paymentAmount == amount
-    assert purchase[0].baseRipe == quote.baseRipe
-    assert purchase[0].bonusRipe == 0
-    assert purchase[0].totalRipe == payout
-    assert purchase[0].epoch == quote.epoch
+    state = lane_env.lane.epochState()
+    assert state.epoch == 0
+    assert state.rate == quote.rate
+    assert state.acceptedPayment == amount
+    assert state.timingEligible is True
+    assert initialized[-1].epoch == 0
+    assert initialized[-1].rate == quote.rate
+    assert purchased[-1].buyer == lane_env.bob
+    assert purchased[-1].paymentAmount == amount
+    assert purchased[-1].totalRipe == payout
+    assert purchased[-1].actualLock == 0
+    assert purchased[-1].epoch == 0
 
 
-def test_failed_first_purchase_is_fully_atomic(lane_env, alice):
-    lane_env.set_config()
+def test_getters_are_stale_until_purchase_but_snapshot_is_live(lane_env):
+    live = lane_env.lane.getEpochSnapshot()
+    stored = lane_env.lane.epochState()
+    assert stored.rate == 0
+    assert live.rate == lane_env.lane.bondConfig().seedRate
+    assert live.epoch == 0
+
+    lane_env.buy(lane_env.scale)
+    assert lane_env.lane.epochState().rate == live.rate
+    assert lane_env.lane.getEpochSnapshot().rate == live.rate
+
+
+def test_purchase_protections_min_cap_budget_deadline_epoch_slippage(lane_env):
     amount = lane_env.scale
     quote = lane_env.quote(amount)
-    payment_before = lane_env.payment_token.balanceOf(lane_env.endaoment_funds)
 
-    with boa.reverts("epoch moved"):
-        lane_env.buy(amount, expected_epoch=quote.epoch + 1)
-    assert not lane_env.lane.isInitialized()
-    assert lane_env.lane.cumulativeMinted() == 0
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(amount - 1)
+    assert "below minimum payment" in get_boa_dev_reasons(err.value)
 
-    with boa.reverts("slippage"):
-        lane_env.buy(
+    cap = lane_env.lane.bondConfig().paymentCapPerEpoch
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(cap + 1)
+    assert "exceeds available amount" in get_boa_dev_reasons(err.value)
+
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.lane.buyNow(
             amount,
-            expected_epoch=quote.epoch,
-            min_ripe_out=quote.totalRipe + 1,
+            0,
+            quote.epoch + 1,
+            0,
+            boa.env.evm.patch.block_number,
+            sender=lane_env.bob,
         )
-    assert not lane_env.lane.isInitialized()
+    assert "epoch moved" in get_boa_dev_reasons(err.value)
 
-    lane_env.payment_token.approve(lane_env.lane, 0, sender=lane_env.bob)
-    with boa.reverts():
-        lane_env.buy(amount, expected_epoch=quote.epoch)
-    assert not lane_env.lane.isInitialized()
-    assert lane_env.lane.epochAcceptedPayment() == 0
-    assert lane_env.lane.cumulativeMinted() == 0
-    assert lane_env.payment_token.balanceOf(lane_env.endaoment_funds) == payment_before
-
-    lane_env.payment_token.approve(lane_env.lane, MAX_UINT256, sender=alice)
-    with boa.reverts():
-        lane_env.buy(amount, expected_epoch=quote.epoch, sender=alice)
-    assert not lane_env.lane.isInitialized()
-    assert lane_env.ripe_token.balanceOf(alice) == 0
-
-
-def test_public_getters_are_stale_until_next_successful_purchase(lane_env):
-    lane_env.set_config()
-    lane_env.buy(lane_env.scale)
-
-    stored_epoch = lane_env.lane.currentEpoch()
-    stored_rate = lane_env.lane.epochRate()
-    stored_accepted = lane_env.lane.epochAcceptedPayment()
-    stored_weighted_lateness = lane_env.lane.epochWeightedLateness()
-    stored_timing_eligible = lane_env.lane.epochTimingEligible()
-
-    boa.env.time_travel(blocks=lane_env.epoch_length)
-    projected = lane_env.quote(lane_env.scale)
-
-    assert projected.epoch == stored_epoch + 1
-    assert projected.rate > stored_rate
-    assert projected.remainingPayment == 1_000 * lane_env.scale
-    assert lane_env.lane.currentEpoch() == stored_epoch
-    assert lane_env.lane.epochRate() == stored_rate
-    assert lane_env.lane.epochAcceptedPayment() == stored_accepted
-    assert lane_env.lane.epochWeightedLateness() == stored_weighted_lateness
-    assert lane_env.lane.epochTimingEligible() == stored_timing_eligible
-
-    lane_env.buy(
-        lane_env.scale,
-        expected_epoch=projected.epoch,
-        min_ripe_out=projected.totalRipe,
-    )
-    assert lane_env.lane.currentEpoch() == projected.epoch
-    assert lane_env.lane.epochRate() == projected.rate
-    assert lane_env.lane.epochAcceptedPayment() == lane_env.scale
-
-
-def test_purchase_protections_minimum_cap_budget_deadline_epoch_and_slippage(lane_env):
-    cap = 10 * lane_env.scale
-    minimum = 2 * lane_env.scale
-    lane_env.set_config(paymentCapPerEpoch=cap, minPaymentAmount=minimum)
-    quote = lane_env.quote(minimum)
-
-    with boa.reverts("below minimum payment"):
-        lane_env.buy(minimum - 1, expected_epoch=quote.epoch)
-    with boa.reverts("exceeds epoch cap"):
-        lane_env.buy(cap + 1, expected_epoch=quote.epoch)
-    with boa.reverts("expired"):
-        lane_env.buy(
-            minimum,
-            expected_epoch=quote.epoch,
-            deadline=boa.env.evm.patch.block_number - 1,
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.lane.buyNow(
+            amount,
+            0,
+            quote.epoch,
+            0,
+            boa.env.evm.patch.block_number - 1,
+            sender=lane_env.bob,
         )
-    with boa.reverts("epoch moved"):
-        lane_env.buy(minimum, expected_epoch=quote.epoch + 1)
-    with boa.reverts("slippage"):
-        lane_env.buy(
-            minimum,
-            expected_epoch=quote.epoch,
-            min_ripe_out=quote.totalRipe + 1,
-        )
+    assert "expired" in get_boa_dev_reasons(err.value)
 
-    assert lane_env.lane.epochAcceptedPayment() == 0
-    assert lane_env.lane.cumulativeMinted() == 0
-
-    lane_env.buy(cap, expected_epoch=quote.epoch)
-    assert lane_env.lane.epochAcceptedPayment() == cap
-    assert not lane_env.quote(minimum).available
-    with boa.reverts("exceeds epoch cap"):
-        lane_env.buy(minimum, expected_epoch=quote.epoch)
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(amount, min_ripe_out=quote.totalRipe + 1)
+    assert "slippage" in get_boa_dev_reasons(err.value)
 
 
-def test_full_fill_only_capacity_race_reverts_and_retry_uses_new_remainder(
-    lane_env,
-    alice,
-    charlie_token_whale,
-):
+def test_full_fill_only_and_remaining_capacity(lane_env):
     cap = 10 * lane_env.scale
     lane_env.set_config(paymentCapPerEpoch=cap, minPaymentAmount=lane_env.scale)
-    lane_env.payment_token.transfer(
-        alice,
-        lane_env.scale,
-        sender=charlie_token_whale,
-    )
-    lane_env.payment_token.approve(
-        lane_env.lane,
-        lane_env.scale,
-        sender=alice,
-    )
-    stale_full_fill = lane_env.quote(cap)
-    alice_quote = lane_env.quote(lane_env.scale, sender=alice)
-    lane_env.buy(
-        lane_env.scale,
-        expected_epoch=alice_quote.epoch,
-        sender=alice,
-    )
-
-    bob_payment_before = lane_env.payment_token.balanceOf(lane_env.bob)
-    bob_ripe_before = lane_env.ripe_token.balanceOf(lane_env.bob)
-    with boa.reverts("exceeds epoch cap"):
-        lane_env.buy(cap, expected_epoch=stale_full_fill.epoch)
-    assert lane_env.payment_token.balanceOf(lane_env.bob) == bob_payment_before
-    assert lane_env.ripe_token.balanceOf(lane_env.bob) == bob_ripe_before
-    assert lane_env.lane.epochAcceptedPayment() == lane_env.scale
-
-    retry = lane_env.quote(cap - lane_env.scale)
-    assert retry.available
-    lane_env.buy(
-        retry.remainingPayment,
-        expected_epoch=retry.epoch,
-        min_ripe_out=retry.totalRipe,
-    )
-    assert lane_env.lane.epochAcceptedPayment() == cap
+    lane_env.buy(6 * lane_env.scale)
+    remaining = lane_env.quote(lane_env.scale).remainingPayment
+    assert remaining == 4 * lane_env.scale
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(5 * lane_env.scale)
+    assert "exceeds available amount" in get_boa_dev_reasons(err.value)
+    lane_env.buy(4 * lane_env.scale)
+    assert lane_env.lane.epochState().acceptedPayment == cap
+    assert lane_env.quote(lane_env.scale).remainingPayment == 0
 
 
 def test_budget_is_immediate_and_cannot_drop_below_minted(lane_env):
-    lane_env.set_config()
-    payout = lane_env.buy(lane_env.scale)
-
-    with boa.reverts("invalid config"):
-        lane_env.set_config(mintBudget=payout - 1)
-
-    lane_env.set_config(mintBudget=payout)
+    first = lane_env.buy(lane_env.scale)
+    lane_env.set_config(mintBudget=first)
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(lane_env.scale)
+    assert "mint budget" in get_boa_dev_reasons(err.value)
     quote = lane_env.quote(lane_env.scale)
+    assert quote.available is False
+    assert quote.totalRipe > 0
     assert quote.budgetRemaining == 0
-    assert quote.totalRipe > 0
-    assert not quote.available
-    with boa.reverts("mint budget"):
-        lane_env.buy(lane_env.scale, expected_epoch=quote.epoch)
-
-    lane_env.set_config(mintBudget=payout + quote.totalRipe)
-    assert lane_env.quote(lane_env.scale).available
 
 
-def test_availability_controls_disabled_paused_global_and_lane_minting(
-    lane_env, lane_factory
+def test_disabled_paused_and_mint_authority_block_buys(
+    lane_env, governance
 ):
-    amount = lane_env.scale
     lane_env.set_config(canBuyNow=False)
-    assert not lane_env.quote(amount).available
-    with boa.reverts("disabled"):
-        lane_env.buy(amount, expected_epoch=0)
-
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(lane_env.scale)
+    assert "disabled" in get_boa_dev_reasons(err.value)
+    quote = lane_env.quote(lane_env.scale)
+    assert quote.available is False
+    assert quote.rate == lane_env.lane.bondConfig().seedRate
     lane_env.set_config(canBuyNow=True)
+
     lane_env.lane.pause(True, sender=lane_env.switchboard.address)
-    assert not lane_env.quote(amount).available
-    with boa.reverts("paused"):
-        lane_env.buy(amount, expected_epoch=0)
-
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(lane_env.scale)
+    assert "paused" in get_boa_dev_reasons(err.value)
     lane_env.lane.pause(False, sender=lane_env.switchboard.address)
-    lane_env.ripe_hq.setMintingEnabled(False, sender=lane_env.governance.address)
-    assert not lane_env.quote(amount).available
-    with boa.reverts("mint unavailable"):
-        lane_env.buy(amount, expected_epoch=0)
 
-    lane_env.ripe_hq.setMintingEnabled(True, sender=lane_env.governance.address)
+    registry_lock = lane_env.ripe_hq.registryChangeTimeLock()
+    lane_env.ripe_hq.initiateHqConfigChange(
+        lane_env.reg_id, False, False, False, sender=governance.address
+    )
+    boa.env.time_travel(blocks=registry_lock)
+    assert lane_env.ripe_hq.confirmHqConfigChange(
+        lane_env.reg_id, sender=governance.address
+    )
+    quote = lane_env.quote(lane_env.scale)
+    assert quote.available is False
+    with pytest.raises(boa.BoaError):
+        lane_env.buy(lane_env.scale)
 
-    unregistered = lane_factory(register_lane=False)
-    unregistered.set_config()
-    quote = unregistered.quote(unregistered.scale)
-    assert quote.totalRipe > 0
-    assert not quote.available
-    with boa.reverts("mint unavailable"):
-        unregistered.buy(unregistered.scale, expected_epoch=quote.epoch)
 
-    mint_disabled = lane_factory(enable_mint=False)
-    mint_disabled.set_config()
-    quote = mint_disabled.quote(mint_disabled.scale)
-    assert not quote.available
-    with boa.reverts("mint unavailable"):
-        mint_disabled.buy(mint_disabled.scale, expected_epoch=quote.epoch)
+def test_buy_requires_allowance_and_balance(lane_env, alice, charlie_token_whale):
+    with pytest.raises(boa.BoaError):
+        lane_env.buy(lane_env.scale, sender=alice)
+
+    lane_env.payment_token.transfer(
+        alice, lane_env.scale, sender=charlie_token_whale
+    )
+    with pytest.raises(boa.BoaError):
+        lane_env.buy(lane_env.scale, sender=alice)
+
+    lane_env.payment_token.approve(
+        lane_env.lane, MAX_UINT256, sender=alice
+    )
+    assert lane_env.buy(lane_env.scale, sender=alice) > 0
 
 
 def test_anyone_can_buy_only_for_self(lane_env, alice, charlie_token_whale):
-    lane_env.set_config()
-    amount = 3 * lane_env.scale
-    lane_env.payment_token.transfer(alice, amount, sender=charlie_token_whale)
-    lane_env.payment_token.approve(lane_env.lane, amount, sender=alice)
-
-    before_alice = lane_env.ripe_token.balanceOf(alice)
-    before_bob = lane_env.ripe_token.balanceOf(lane_env.bob)
-    quote = lane_env.quote(amount)
-    payout = lane_env.buy(
-        amount,
-        expected_epoch=quote.epoch,
-        min_ripe_out=quote.totalRipe,
-        sender=alice,
-    )
-
-    assert lane_env.ripe_token.balanceOf(alice) == before_alice + payout
-    assert lane_env.ripe_token.balanceOf(lane_env.bob) == before_bob
-
-
-def test_preview_checks_callers_payment_balance_and_allowance(
-    lane_env,
-    alice,
-    charlie_token_whale,
-):
-    lane_env.set_config()
-    amount = lane_env.scale
-    assert not lane_env.quote(amount, sender=alice).available
-
     lane_env.payment_token.transfer(
-        alice,
-        amount,
-        sender=charlie_token_whale,
+        alice, 100 * lane_env.scale, sender=charlie_token_whale
     )
-    assert not lane_env.quote(amount, sender=alice).available
+    lane_env.payment_token.approve(
+        lane_env.lane, MAX_UINT256, sender=alice
+    )
+    alice_before = lane_env.ripe_token.balanceOf(alice)
+    bob_before = lane_env.ripe_token.balanceOf(lane_env.bob)
+    payout = lane_env.buy(lane_env.scale, sender=alice)
+    assert lane_env.ripe_token.balanceOf(alice) == alice_before + payout
+    assert lane_env.ripe_token.balanceOf(lane_env.bob) == bob_before
 
-    lane_env.payment_token.approve(lane_env.lane, amount, sender=alice)
-    quote = lane_env.quote(amount, sender=alice)
-    assert quote.available
-    assert lane_env.buy(
+
+def test_same_epoch_fill_does_not_change_snapshotted_rate(lane_env):
+    first = lane_env.buy(lane_env.scale)
+    state = lane_env.lane.epochState()
+    second = lane_env.buy(2 * lane_env.scale)
+    after = lane_env.lane.epochState()
+    assert first > 0 and second > 0
+    assert after.rate == state.rate
+    assert after.paymentCap == state.paymentCap
+    assert after.minPaymentAmount == state.minPaymentAmount
+    assert after.maxLockBonus == state.maxLockBonus
+    assert after.epoch == state.epoch
+    assert after.acceptedPayment == 3 * lane_env.scale
+    assert after.weightedLateness >= state.weightedLateness
+
+
+def test_deadline_is_inclusive_of_the_current_block(lane_env):
+    amount = lane_env.scale
+    quote = lane_env.quote(amount)
+    payout = lane_env.lane.buyNow(
         amount,
-        expected_epoch=quote.epoch,
-        min_ripe_out=quote.totalRipe,
-        sender=alice,
-    ) == quote.totalRipe
+        0,
+        quote.epoch,
+        quote.totalRipe,
+        boa.env.evm.patch.block_number,
+        sender=lane_env.bob,
+    )
+    assert payout == quote.totalRipe
+
+
+def test_same_epoch_second_buy_does_not_reinitialize(lane_env):
+    first = lane_env.buy(lane_env.scale)
+    second = lane_env.buy(2 * lane_env.scale)
+    state = lane_env.lane.epochState()
+    assert state.epoch == 0
+    assert state.acceptedPayment == 3 * lane_env.scale
+    assert lane_env.lane.cumulativeMinted() == first + second
+    assert filter_logs(lane_env.lane, "EpochInitialized") == []
+    assert filter_logs(lane_env.lane, "EpochRolled") == []
+
+
+def test_set_cumulative_minted_is_switchboard_gated(lane_env, alice):
+    with boa.reverts("no perms"):
+        lane_env.lane.setCumulativeMinted(1, sender=alice)
+    with boa.reverts("exceeds mint budget"):
+        lane_env.lane.setCumulativeMinted(
+            lane_env.lane.bondConfig().mintBudget + 1,
+            sender=lane_env.switchboard.address,
+        )
+    lane_env.lane.setCumulativeMinted(123, sender=lane_env.switchboard.address)
+    logs = filter_logs(lane_env.lane, "CumulativeMintedSet")
+    assert logs[-1].amount == 123
+    assert lane_env.lane.cumulativeMinted() == 123
+    assert lane_env.lane.isValidCumulativeMinted(123)
+    assert not lane_env.lane.isValidCumulativeMinted(
+        lane_env.lane.bondConfig().mintBudget + 1
+    )
 
 
 @pytest.mark.parametrize("decimals", [6, 18])
 def test_payment_token_reentrancy_cannot_create_a_second_purchase(
     lane_factory,
-    charlie_token_whale,
+    governance,
     decimals,
 ):
-    token = boa.loads(REENTRANT_PAYMENT, charlie_token_whale, decimals)
-    ctx = lane_factory(payment_token=token)
-    ctx.set_config()
-
-    token.transfer(token, ctx.scale, sender=charlie_token_whale)
-    amount = ctx.scale
-    token.arm(ctx.lane, amount, sender=charlie_token_whale)
-    quote = ctx.quote(amount)
-    payment_before = token.balanceOf(ctx.endaoment_funds)
-
-    payout = ctx.buy(
-        amount,
-        expected_epoch=quote.epoch,
-        min_ripe_out=quote.totalRipe,
+    token = boa.loads(REENTRANT_PAYMENT, governance.address, decimals)
+    scale = 10**decimals
+    token.transfer(governance.address, 0, sender=governance.address)  # no-op touch
+    ctx = lane_factory(
+        payment_token=token,
+        fund_buyer=False,
+        config_overrides={
+            "paymentCapPerEpoch": 1_000 * scale,
+            "minPaymentAmount": scale,
+        },
     )
+    # factory tried to transfer from charlie whale; this token is owned by governance
+    token.transfer(ctx.bob, 100 * scale, sender=governance.address)
+    token.approve(ctx.lane, MAX_UINT256, sender=ctx.bob)
+    token.arm(ctx.lane.address, scale, sender=governance.address)
 
-    assert token.attackAttempted()
-    assert not token.attackSucceeded()
-    assert token.observedAcceptedPayment() == amount
-    assert token.observedCumulativeMinted() == payout
-    assert token.observedInitialized()
-    # Vyper's generated @nonreentrant guard returns empty revert data. The
-    # callback amount equals the configured minimum and every body precondition
-    # is otherwise satisfied, so the exact empty response pins that boundary.
-    assert token.attackAmount() == ctx.scale
-    assert bytes(token.attackResponse()) == b""
-    assert ctx.lane.epochAcceptedPayment() == amount
-    assert ctx.lane.cumulativeMinted() == payout
-    assert token.balanceOf(ctx.endaoment_funds) == payment_before + amount
-    assert ctx.ripe_token.balanceOf(token) == 0
-
-
-@pytest.mark.parametrize("decimals", [6, 18])
-def test_callback_payment_failure_rolls_back_forward_committed_state(
-    lane_factory,
-    charlie_token_whale,
-    decimals,
-):
-    token = boa.loads(REENTRANT_PAYMENT, charlie_token_whale, decimals)
-    ctx = lane_factory(payment_token=token)
-    ctx.set_config()
-    amount = ctx.scale
-    token.transfer(token, amount, sender=charlie_token_whale)
-    token.arm(ctx.lane, amount, True, sender=charlie_token_whale)
-    before = (
-        ctx.lane.isInitialized(),
-        ctx.lane.epochAcceptedPayment(),
-        ctx.lane.cumulativeMinted(),
-        token.balanceOf(ctx.endaoment_funds),
-        token.balanceOf(ctx.bob),
-        token.allowance(ctx.bob, ctx.lane),
-        ctx.ripe_token.totalSupply(),
-    )
-    quote = ctx.quote(amount)
-
-    with boa.reverts("payment failed"):
-        ctx.buy(amount, expected_epoch=quote.epoch)
-
-    assert (
-        ctx.lane.isInitialized(),
-        ctx.lane.epochAcceptedPayment(),
-        ctx.lane.cumulativeMinted(),
-        token.balanceOf(ctx.endaoment_funds),
-        token.balanceOf(ctx.bob),
-        token.allowance(ctx.bob, ctx.lane),
-        ctx.ripe_token.totalSupply(),
-    ) == before
-    assert not token.attackAttempted()
-
-
-def test_prospective_pricing_config_and_live_version_separation(lane_env):
-    old = lane_env.set_config()
-    lane_env.buy(lane_env.scale)
-    old_rate = lane_env.lane.epochRate()
-
-    new_cap = 2_000 * lane_env.scale
-    new_minimum = 2 * lane_env.scale
-    lane_env.set_config(
-        paymentCapPerEpoch=new_cap,
-        minPaymentAmount=new_minimum,
-        maxLockBonus=0,
-        maxEffectiveRate=3 * 10**18,
-        seedRate=2 * 10**18,
-    )
-
-    running = lane_env.quote(lane_env.scale)
-    assert running.rate == old_rate
-    assert running.minPaymentAmount == old[2]
-    assert running.remainingPayment == old[1] - lane_env.scale
-
-    boa.env.time_travel(blocks=lane_env.epoch_length)
-    rolled = lane_env.quote(new_minimum)
-    assert rolled.remainingPayment == new_cap
-    assert rolled.minPaymentAmount == new_minimum
-
-    lane_env.buy(new_minimum, expected_epoch=rolled.epoch)
-    event = filter_logs(lane_env.lane, "EpochRolled")[0]
-    assert event.fromEpoch == 0
-    assert event.toEpoch == 1
-    assert event.oldRate == old_rate
-    assert event.newRate == rolled.rate
-    assert event.newPaymentCap == new_cap
-    assert event.newMinPaymentAmount == new_minimum
-    assert event.newMaxLockBonus == 0
-    assert event.previousAcceptedPayment == lane_env.scale
-    assert event.previousPaymentCap == old[1]
-    assert event.previousWeightedLateness == 0
-    assert event.previousTimingEligible
-
-
-def test_every_pricing_field_is_prospective_while_live_controls_are_immediate(
-    lane_env,
-):
-    old = lane_env.set_config(maxLockBonus=0)
-    lane_env.buy(lane_env.scale)
-    old_rate = lane_env.lane.epochRate()
-    old_remaining = old[1] - lane_env.scale
-
-    new = lane_env.set_config(
-        paymentCapPerEpoch=2_000 * lane_env.scale,
-        minPaymentAmount=2 * lane_env.scale,
-        mintBudget=lane_env.lane.cumulativeMinted(),
-        maxEffectiveRate=5 * 10**17,
-        seedRate=4 * 10**17,
-        uHighBps=9_000,
-        uLowBps=1_000,
-        minUpBps=1_000,
-        maxUpBps=1_500,
-        minDownBps=100,
-        maxDownBps=500,
-        decayBps=900,
-        maxDecayEpochs=8,
-        maxLockBonus=0,
-    )
-    running = lane_env.quote(lane_env.scale)
-    assert running.rate == old_rate
-    assert running.rate > new[4]
-    assert running.remainingPayment == old_remaining
-    assert running.minPaymentAmount == old[2]
-    assert running.budgetRemaining == 0
-    assert not running.available
-
-    lane_env.set_config(
-        paymentCapPerEpoch=new[1],
-        minPaymentAmount=new[2],
-        mintBudget=10**30,
-        maxEffectiveRate=new[4],
-        seedRate=new[5],
-        uHighBps=new[6],
-        uLowBps=new[7],
-        minUpBps=new[8],
-        maxUpBps=new[9],
-        minDownBps=new[10],
-        maxDownBps=new[11],
-        decayBps=new[12],
-        maxDecayEpochs=new[13],
-        maxLockBonus=new[14],
-        canBuyNow=False,
-    )
-    assert not lane_env.quote(lane_env.scale).available
-    with boa.reverts("disabled"):
-        lane_env.buy(lane_env.scale, expected_epoch=0)
-
-    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
-    with boa.reverts("paused"):
-        lane_env.buy(lane_env.scale, expected_epoch=0)
-    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
-
-    lane_env.set_config(
-        paymentCapPerEpoch=new[1],
-        minPaymentAmount=new[2],
-        mintBudget=10**30,
-        maxEffectiveRate=new[4],
-        seedRate=new[5],
-        uHighBps=new[6],
-        uLowBps=new[7],
-        minUpBps=new[8],
-        maxUpBps=new[9],
-        minDownBps=new[10],
-        maxDownBps=new[11],
-        decayBps=new[12],
-        maxDecayEpochs=new[13],
-        maxLockBonus=new[14],
-        canBuyNow=True,
-    )
-    boa.env.time_travel(blocks=lane_env.epoch_length)
-    rolled = lane_env.quote(new[2])
-    assert rolled.rate <= new[4]
-    assert rolled.remainingPayment == new[1]
-    assert rolled.minPaymentAmount == new[2]
-
-
-def test_override_revalidation_before_reopen_handles_pause_disable_and_cancel(
-    lane_env,
-):
-    lane_env.set_config(maxLockBonus=0)
-    lane_env.buy(lane_env.scale)
-    target = 777_777_777_777_777_777
-    lane_env.set_rate_override(target)
-
-    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
-    boa.env.time_travel(blocks=20 * lane_env.epoch_length)
-    paused = lane_env.quote(lane_env.scale)
-    assert not paused.available
-    assert paused.rate == target
-    assert lane_env.lane.rateOverride() == target
-
-    lane_env.cancel_rate_override()
-    assert lane_env.lane.rateOverride() == 0
-    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
-    reopened = lane_env.quote(lane_env.scale)
-    assert reopened.available
-    assert reopened.rate != target
-
-    lane_env.set_rate_override(reopened.rate)
-    version = lane_env.lane.overrideVersion()
-    lane_env.set_config(canBuyNow=False, maxLockBonus=0)
-    assert lane_env.lane.rateOverride() == 0
-    assert lane_env.lane.overrideVersion() == version + 1
-    lane_env.set_config(canBuyNow=True, maxLockBonus=0)
-    assert lane_env.quote(lane_env.scale).available
-
-
-def test_one_shot_override_waits_for_next_successful_rollover_and_preview_is_pure(
-    lane_env,
-):
-    lane_env.set_config(
-        paymentCapPerEpoch=100 * lane_env.scale,
-        maxLockBonus=0,
-    )
-    lane_env.buy(50 * lane_env.scale)
-    stored_rate = lane_env.lane.epochRate()
-    target_rate = 777_777_777_777_777_777
-
-    assert lane_env.set_rate_override(target_rate) == 1
-    assert lane_env.lane.rateOverride() == target_rate
-    assert lane_env.lane.overrideVersion() == 1
-
-    same_epoch = lane_env.quote(lane_env.scale)
-    assert same_epoch.rate == stored_rate
-    lane_env.buy(lane_env.scale, expected_epoch=same_epoch.epoch)
-    assert lane_env.lane.rateOverride() == target_rate
-    assert lane_env.lane.overrideVersion() == 1
-
-    boa.env.time_travel(blocks=3 * lane_env.epoch_length)
-    first_preview = lane_env.quote(lane_env.scale)
-    second_preview = lane_env.quote(lane_env.scale)
-    assert first_preview.rate == second_preview.rate == target_rate
-    assert first_preview.epoch == 3
-    assert lane_env.lane.currentEpoch() == 0
-    assert lane_env.lane.rateOverride() == target_rate
-    assert lane_env.lane.overrideVersion() == 1
-
-    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
-    assert not lane_env.quote(lane_env.scale).available
-    with boa.reverts("paused"):
-        lane_env.buy(lane_env.scale, expected_epoch=first_preview.epoch)
-    assert lane_env.lane.rateOverride() == target_rate
-    assert lane_env.lane.overrideVersion() == 1
-    assert lane_env.lane.currentEpoch() == 0
-    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
-
-    payout = lane_env.buy(
-        lane_env.scale,
-        expected_epoch=first_preview.epoch,
-        min_ripe_out=first_preview.totalRipe,
-    )
-    applied = filter_logs(lane_env.lane, "RateOverrideApplied")[0]
-    rolled = filter_logs(lane_env.lane, "EpochRolled")[0]
-    assert payout == first_preview.totalRipe
-    assert lane_env.lane.currentEpoch() == 3
-    assert lane_env.lane.epochRate() == target_rate
-    assert lane_env.lane.rateOverride() == 0
-    assert lane_env.lane.overrideVersion() == 2
-
-    assert applied.newVersion == 2
-    assert applied.fromEpoch == 0
-    assert applied.toEpoch == 3
-    assert applied.targetRate == target_rate
-    assert applied.controllerRate == rolled.controllerRate
-    assert rolled.newRate == target_rate
-    assert rolled.controllerRate != target_rate
-
-
-def test_events_reconstruct_config_and_epoch_history_from_indexed_keys(lane_env):
-    config_events = []
-    initialized_events = []
-    rolled_events = []
-    purchase_events = []
-
-    config_v1 = lane_env.set_config(
-        paymentCapPerEpoch=100 * lane_env.scale,
-        minPaymentAmount=lane_env.scale,
-        maxLockBonus=0,
-    )
-    config_events.extend(filter_logs(lane_env.lane, "InstantBondConfigSet"))
-
-    first = lane_env.quote(10 * lane_env.scale)
-    lane_env.buy(
-        10 * lane_env.scale,
-        expected_epoch=first.epoch,
-        min_ripe_out=first.totalRipe,
-    )
-    initialized_events.extend(filter_logs(lane_env.lane, "EpochInitialized"))
-    purchase_events.extend(filter_logs(lane_env.lane, "InstantBondPurchased"))
-
-    config_v2 = lane_env.set_config(
-        paymentCapPerEpoch=200 * lane_env.scale,
-        minPaymentAmount=2 * lane_env.scale,
-        maxLockBonus=5_000,
-        maxEffectiveRate=3 * 10**18,
-        seedRate=2 * 10**18,
-    )
-    config_events.extend(filter_logs(lane_env.lane, "InstantBondConfigSet"))
-
-    same_epoch = lane_env.quote(5 * lane_env.scale)
-    lane_env.buy(
-        5 * lane_env.scale,
-        expected_epoch=same_epoch.epoch,
-        min_ripe_out=same_epoch.totalRipe,
-    )
-    purchase_events.extend(filter_logs(lane_env.lane, "InstantBondPurchased"))
-
-    boa.env.time_travel(blocks=lane_env.epoch_length)
-    second_epoch = lane_env.quote(2 * lane_env.scale)
-    lane_env.buy(
-        2 * lane_env.scale,
-        expected_epoch=second_epoch.epoch,
-        min_ripe_out=second_epoch.totalRipe,
-    )
-    rolled_events.extend(filter_logs(lane_env.lane, "EpochRolled"))
-    purchase_events.extend(filter_logs(lane_env.lane, "InstantBondPurchased"))
-
-    config_v3 = lane_env.set_config(
-        paymentCapPerEpoch=300 * lane_env.scale,
-        minPaymentAmount=3 * lane_env.scale,
-        maxLockBonus=0,
-        maxEffectiveRate=4 * 10**18,
-        seedRate=3 * 10**18,
-    )
-    config_events.extend(filter_logs(lane_env.lane, "InstantBondConfigSet"))
-
-    boa.env.time_travel(blocks=lane_env.epoch_length)
-    third_epoch = lane_env.quote(3 * lane_env.scale)
-    lane_env.buy(
-        3 * lane_env.scale,
-        expected_epoch=third_epoch.epoch,
-        min_ripe_out=third_epoch.totalRipe,
-    )
-    rolled_events.extend(filter_logs(lane_env.lane, "EpochRolled"))
-    purchase_events.extend(filter_logs(lane_env.lane, "InstantBondPurchased"))
-
-    assert [event.paymentCapPerEpoch for event in config_events] == [
-        config_v1[1],
-        config_v2[1],
-        config_v3[1],
-    ]
-    assert [event.epoch for event in initialized_events] == [0]
-    assert [
-        (event.fromEpoch, event.toEpoch)
-        for event in rolled_events
-    ] == [(0, 1), (1, 2)]
-    assert [
-        (event.buyer, event.epoch)
-        for event in purchase_events
-    ] == [
-        (lane_env.bob, 0),
-        (lane_env.bob, 0),
-        (lane_env.bob, 1),
-        (lane_env.bob, 2),
-    ]
-
-    latest_roll = rolled_events[-1]
-    assert lane_env.lane.currentEpoch() == latest_roll.toEpoch == third_epoch.epoch
-    assert lane_env.lane.epochRate() == latest_roll.newRate == third_epoch.rate
-    assert lane_env.lane.epochPaymentCap() == latest_roll.newPaymentCap == config_v3[1]
-    assert lane_env.lane.epochMinPaymentAmount() == latest_roll.newMinPaymentAmount == config_v3[2]
-    assert lane_env.lane.epochMaxLockBonus() == latest_roll.newMaxLockBonus == config_v3[14]
-    assert lane_env.lane.epochAcceptedPayment() == 3 * lane_env.scale
-
-
-def test_preview_is_unavailable_when_endaoment_destination_is_unset(lane_env):
-    hq = boa.loads(MOCK_HQ)
-    switchboard = boa.loads(MOCK_SWITCHBOARD, lane_env.bob)
-    mission_control = boa.loads(MOCK_MISSION_CONTROL)
-    hq.setAddr(3, lane_env.ripe_token)
-    hq.setAddr(5, mission_control)
-    hq.setAddr(6, switchboard)
-    hq.setMintable(True)
-
-    lane = boa.load(
-        "contracts/core/InstantBondLane.vy",
-        hq,
-        lane_env.payment_token,
-        boa.env.evm.patch.block_number,
-        100,
-    )
-    config = lane_env.make_config()
-    lane.setConfig(config, sender=lane_env.bob)
-    lane.pause(False, sender=lane_env.bob)
-
-    quote = lane.previewBuyNow(lane_env.scale, 0)
-    assert not quote.available
-    assert quote.totalRipe > 0
-    with boa.reverts("no destination"):
-        lane.buyNow(
-            lane_env.scale,
-            0,
-            quote.epoch,
-            quote.totalRipe,
-            boa.env.evm.patch.block_number,
-            sender=lane_env.bob,
-        )
-    assert not lane.isInitialized()
-    assert lane.cumulativeMinted() == 0
+    payout = ctx.buy(scale)
+    assert payout > 0
+    assert token.attackAttempted() is True
+    assert token.attackSucceeded() is False
+    assert token.observedAccepted() == scale
+    assert token.observedMinted() == payout
+    assert ctx.lane.epochState().acceptedPayment == scale

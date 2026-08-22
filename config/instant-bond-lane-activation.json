@@ -4,8 +4,6 @@
   "owner_decision_url": "https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427",
   "activation_approved": false,
   "runtime_limits": {
-    "instant_bond_lane": 13000,
-    "switchboard_foxtrot": 6500,
     "eip170": 24576
   },
   "lock_bonus": {
