@@ -968,7 +968,7 @@ def build_artifact(repo_root: Path = REPO_ROOT) -> dict:
             "Vyper must bound or safely decompose offset*10000",
             "first partially exposed initialized epoch is timing-ineligible",
             "pause and disable intervals remain wall-clock time",
-            "manual next-rollover target must be timelocked, version-bound, and one-shot",
+            "manual next-rollover target must be timelocked, last-write-wins, and one-shot",
         ],
     }
     return artifact

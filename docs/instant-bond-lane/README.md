@@ -5,17 +5,10 @@ the mechanism does, how a purchase moves through the protocol, how the epoch
 controller changes the next rate, how governance intervenes, and which production
 decisions are still deliberately blocked.
 
-> **Current status — contract candidate, not an active product.** The Instant Bond
-> branch contains feature checkpoint `5d12e60070d6892ce481813b27784bbe2dcfd43b`
-> and integrates
-> `rh-audit-remediation@04c76bebb2565ec4d1109e60c1981284145b22c0` through merge
-> checkpoint `32792b6280c572a3bde779e8463405c7bca781ce` on branch
-> `instant-bond-lane`, proposed by draft PR
-> [#156](https://github.com/Ripe-Foundation/ripe-protocol/pull/156) against `rh`.
-> The contracts, tests, generated ABIs, and deterministic controller model are
-> implemented and validated. They are **not deployed, configured, economically
-> calibrated, or authorized for activation**. The activation manifest remains
-> fail-closed.
+> **Current status — contract candidate, not an active product.** The contracts,
+> tests, generated ABIs, and deterministic controller model are implemented and
+> validated. They are **not deployed, configured, economically calibrated, or
+> authorized for activation**. The activation manifest remains fail-closed.
 
 This README is an onboarding map, not the normative specification. If it ever
 conflicts with [`implementation-spec.md`](implementation-spec.md), the implementation
@@ -29,7 +22,7 @@ For a quick ramp-up, read in this order:
 2. [`contracts/core/InstantBondLane.vy`](../../contracts/core/InstantBondLane.vy) for
    purchase, preview, pricing, settlement, and stored state.
 3. [`contracts/config/SwitchboardFoxtrot.vy`](../../contracts/config/SwitchboardFoxtrot.vy)
-   for timelocked governance.
+   for governance.
 4. [`pricing-design.md`](pricing-design.md) for the economic rationale and risks.
 5. [`dynamic-controller-proposal.md`](dynamic-controller-proposal.md) for exact
    controller and override derivation.
@@ -43,11 +36,12 @@ For a quick ramp-up, read in this order:
 The Instant Bond Lane is a dedicated, permissionless **Buy Now lane for newly minted
 RIPE**:
 
-- a buyer pays an immutable, deployment-selected, dollar-denominated ERC-20;
+- a buyer pays a configured dollar-denominated ERC-20 (swappable only while the lane
+  is stopped);
 - payment goes directly to Endaoment Funds;
 - the Lane mints RIPE for that purchase;
-- the buyer receives RIPE unlocked, or asks the Lane to deposit it into the current
-  core RipeGov vault with a lock; and
+- the buyer receives RIPE unlocked, or the Lane deposits it into the current core
+  RipeGov vault with a lock; and
 - the next epoch's base payout rate responds to how much of the prior epoch sold and
   when that payment volume arrived.
 
@@ -86,15 +80,36 @@ flowchart LR
     GovVault -->|"shares / position for buyer"| Buyer
     Lane -.->|live topology and lock terms| MC
     Lane -.->|mint authorization| HQ
-    Gov -->|"queue config or override action"| Fox
-    Fox -->|"timelocked execution"| Lane
+    Gov -->|"config, override, start/stop, token"| Fox
+    Fox -->|"HQ id 26 lookup"| Lane
 ```
 
-The Lane and Foxtrot are nonupgradeable Vyper contracts. Foxtrot has an immutable Lane
-target. The Lane intentionally follows the protocol's broader Department trust model:
-any registered switchboard is authorized at the on-chain boundary, while Foxtrot is
-the intended semantic route. Deployment qualification must prove no other registered
-switchboard exposes an unintended generic call path to the Lane mutators.
+The Lane and Foxtrot are nonupgradeable Vyper contracts. Foxtrot does not store the
+lane address. It looks up `INSTANT_BOND_LANE_ID = 26` from RipeHq, the same way the
+other switchboards resolve Mission Control and Endaoment. The Lane follows the
+protocol's Department trust model: any registered switchboard may call its mutators.
+Foxtrot is the intended semantic route. Deployment qualification must prove no other
+registered switchboard exposes an unintended generic call path to the Lane mutators.
+
+## Lifecycle
+
+The constructor is `__init__(ripeHq, paymentToken, config)`. Deploy is paused, not
+running, `genesisBlock = 0`, and `epochState.rate = 0`. The installed config must
+already be valid, including `epochLength`.
+
+`start(genesisBlock, epochLength)` is switchboard-gated. `genesisBlock = 0` means
+`block.number`. Past and future genesis are allowed. Start writes the resolved genesis
+and `bondConfig.epochLength`, then re-validates the live config (so a payment-token
+swap with a stale cap/min fails here), sets `isRunning`, and wipes the epoch snapshot
+and any installed override.
+
+`stop()` sets `isRunning = false`, `genesisBlock = 0`, wipes `epochState`, and clears
+an installed override. It does not touch the payment token, the rest of config, or
+`cumulativeMinted`.
+
+The asset-change flow is `stop()` → `setPaymentToken` / `setConfig` → `start(0,
+length)`. Pause is a short incident switch: same genesis, same snapshot, token stays
+locked. Charlie wraps `pause` / `recoverFunds` for any department.
 
 ## A purchase from start to finish
 
@@ -108,18 +123,20 @@ previewBuyNow(paymentAmount, requestedLock)
 
 The returned `InstantBondQuote` includes:
 
-- whether the same caller appears ready to execute now;
-- projected epoch and both pricing/live config versions;
-- base rate, remaining epoch capacity, minimum payment, and remaining mint budget;
+- whether the lane currently looks available;
+- projected epoch, rate, remaining epoch capacity, minimum payment, and remaining mint
+  budget;
 - base RIPE, bonus, actual lock, and total RIPE;
 - the current core RipeGov vault ID for a locked purchase; and
 - live early-exit, exit-fee, and bad-debt-freeze disclosure.
 
-`available` is caller-specific. It checks deterministic same-state prerequisites that
-the Lane can reasonably inspect: payment size, balance, allowance, pause and mint
-controls, RIPE blacklist, Endaoment destination, mint budget, current core-vault
-identity, supported asset/deposit gates, vault validity and pause state, and migrated
-position status.
+`available` is a market-readiness flag, not a wallet or vault preflight. It is true
+only when the lane is unpaused, running, `canBuyNow`, the payment sits in the current
+cap/min window, the mint budget covers the payout, and RipeHq currently authorizes the
+lane to mint. Preview still fills rate and payout math when unavailable.
+
+It does **not** inspect wallet balance or allowance, Endaoment liveness, vault/Teller
+admission, or RIPE pause/blacklist. Those can still make `buyNow` revert.
 
 It is still a quote, not a reservation. Another transaction can consume capacity,
 change a live control, rotate a vault, update lock terms, or advance the epoch before
@@ -136,23 +153,20 @@ buyNow(
     expectedEpoch,
     minRipeOut,
     deadlineBlock,
-    expectedCoreRipeGovVaultId=0,
-    minActualLock=0,
 )
 ```
 
-The caller should normally bind:
+There is no `_minActualLock` or `_expectedCoreVaultId`. The caller should bind:
 
 - `expectedEpoch` to the previewed epoch;
-- `minRipeOut` to an acceptable payout floor;
-- `deadlineBlock` to a short validity window;
-- `expectedCoreRipeGovVaultId` to the previewed nonzero vault ID for a locked buy; and
-- `minActualLock` to the shortest acceptable realized lock.
+- `minRipeOut` to an acceptable payout floor; and
+- `deadlineBlock` to a short validity window.
 
-Zero for the last two fields opts out of those optional constraints. A nonzero
-`requestedLock` is never silently downgraded to an unlocked purchase: if the live lock
-terms cannot produce a nonzero lock, execution reverts. Callers that want unlocked
-RIPE must request zero.
+Unlocked settlement happens when the buyer asked for `0` **and**
+`config.minLockDuration == 0`, or when there is no live vault range. The vault
+minimum does not force a lock on a zero request when the lane min is `0`. Instant Bond
+then mints RIPE to the wallet and never calls Teller/RipeGov. An impossible vault
+range or zero vault max is a valid unlocked buy.
 
 Purchases are full-fill-only. The Lane never silently reduces `paymentAmount`; if
 another buyer consumes capacity first, the transaction reverts and the client must
@@ -181,24 +195,30 @@ qualified for production by default.
 
 ## Epochs and fixed pricing
 
-The Lane has its own immutable block clock:
+The lane clock is storage, not constructor immutables:
 
 ```text
-epoch = (block.number - GENESIS_BLOCK) // EPOCH_LENGTH
+epoch = (block.number - genesisBlock) // bondConfig.epochLength
 ```
+
+`start` installs genesis and cadence. `setConfig` cannot change a live
+`epochLength`; a different length is invalid once one is installed. A new cadence
+requires `stop()` then `start(..., newLength)`.
 
 There is no keeper-only initialization or rollover transaction:
 
-- before the first successful purchase, `previewBuyNow` projects `seedRate` and a
-  successful `buyNow` initializes the Lane;
+- cold start versus rollover is `epochState.rate == 0` (`MIN_BASE_RATE` is 10_000);
+- before the first successful purchase after start, `previewBuyNow` projects
+  `seedRate` and a successful `buyNow` initializes the epoch;
 - all successful purchases in one stored epoch use the same snapshotted base rate,
   payment cap, minimum payment, and maximum lock bonus;
 - `previewBuyNow` projects a later epoch without writing state; and
 - the first successful purchase in that later epoch commits the rollover.
 
-Epoch state is therefore **lazy**. Public getters such as `epochRate` describe the last
-successfully committed epoch. Consumers must use `previewBuyNow`, not reconstruct a
-current quote from stored getters.
+Epoch state is therefore **lazy**. Public `epochState()` is the last committed
+snapshot and goes stale until the next buy. `getEpochSnapshot()` is the live
+projection. Consumers must use `previewBuyNow` or `getEpochSnapshot()`, not
+reconstruct a current quote from stale stored getters.
 
 Epochs before first initialization do not create historical decay. A first
 initialization is timing-eligible only at deterministic offset zero; a partial cold-
@@ -211,8 +231,10 @@ The Lane stores an inverse payout rate:
 
 ```text
 rate = RIPE-wei paid per one whole payment token
-baseRipe = paymentAmount * rate // PAYMENT_SCALE
+baseRipe = paymentAmount * rate // paymentScale
 ```
+
+Amounts stay in native payment-token units. The lane does not PriceDesk-normalize.
 
 This direction is easy to misread:
 
@@ -225,7 +247,7 @@ For the prior stored epoch:
 utilizationBps = acceptedPayment * 10_000 // paymentCap
 ```
 
-The next successful rollover applies one of four behaviors:
+Thresholds are inclusive. The next successful rollover applies one of four behaviors:
 
 | Prior result | Signal | Next-rate behavior |
 |---|---|---|
@@ -240,7 +262,8 @@ The high branch uses both utilization strength and amount-weighted purchase timi
 For each purchase, the Lane computes its normalized block lateness and accumulates:
 
 ```text
-epochWeightedLateness += paymentAmount * latenessBps
+lateness = offset * 10_000 // (epochLength - 1)
+epochWeightedLateness += paymentAmount * lateness
 averageLateness = epochWeightedLateness // acceptedPayment
 earliness = 10_000 - averageLateness
 ```
@@ -283,31 +306,39 @@ from this summary.
 
 ## Snapshot fields versus live fields
 
-A full config write replaces all 15 fields. It does
-not rewrite the already committed epoch snapshot.
+A full config write replaces every field last-write-wins. There is no `configVersion`
+or compare-and-swap. It does not rewrite the already committed epoch snapshot, except
+that `setConfig` cannot change a live `epochLength`.
 
-| Snapshotted until initialization/rollover | Read live for each preview/purchase |
+| Snapshotted on first buy of an epoch | Always live |
 |---|---|
 | Base payout rate | `canBuyNow` |
 | Epoch payment cap | Remaining cumulative `mintBudget` |
-| Epoch minimum payment | Department, RIPE, and global mint availability |
-| Epoch maximum lock bonus | RIPE blacklist |
+| Epoch minimum payment | `minLockDuration` |
+| Epoch maximum lock bonus | Department, RIPE, and global mint availability |
 | | MissionControl lock terms and core vault ID |
 | | Address-registry destinations and Teller/vault admission |
+| | Payment token (only writable while stopped) |
 
 Changing a pricing field mid-epoch is prospective. Even lowering
 `maxEffectiveRate` does not rewrite the running epoch's rate; the new ceiling is applied
 at rollover. Emergency operators must pause or disable purchases when immediate effect
 is required. A full config change also invalidates any installed rate override.
+`setCanBuyNow` does not.
 
 ## Locking and bonus behavior
 
-An unlocked purchase uses `requestedLock=0` and mints RIPE directly to the buyer.
+Effective lock floor is `max(vault.lockTerms.minLockDuration, config.minLockDuration)`.
+Vault `maxLockDuration` is the only ceiling.
+
+- `requestedLock = 0` and `config.minLockDuration = 0` → unlocked, even if the vault
+  has a min;
+- `config.minLockDuration > 0` → a buy that can lock is clamped up to the effective
+  min;
+- no live vault range, or `maxLock < minLock`, or vault max is `0` → unlocked.
 
 For a locked purchase:
 
-- live MissionControl terms define minimum and maximum duration;
-- `actualLock = min(requestedLock, maxLock)` once the request meets the minimum;
 - the epoch's `maxLockBonus` bounds a linear duration bonus;
 - the all-in `maxEffectiveRate` ceiling reserves room for the maximum possible bonus;
   and
@@ -321,28 +352,41 @@ lots exist. Nonzero-bonus code and model cases remain tested dormant arithmetic,
 approved launch configuration.
 
 Live exit permission, exit fee, and bad-debt freeze status are disclosed by preview but
-are not transaction-bound. The current buyer-bindable settlement terms are expected
-core vault ID and minimum actual lock.
+are not transaction-bound.
 
 ## Governance and the manual rate override
 
-`SwitchboardFoxtrot` combines the repository's LocalGov and TimeLock patterns and
-queues three tagged action types:
+`SwitchboardFoxtrot` combines LocalGov and TimeLock. It resolves the lane through
+RipeHq id 26. Constructor is `(ripeHq, tempGov, minConfigTimeLock,
+maxConfigTimeLock)` — no lane address.
+
+Timelocked (once `setActionTimeLockAfterSetup` has been called; a zero time lock is
+allowed and makes confirmation immediate):
 
 1. replace the complete Instant Bond config;
 2. install one exact rate override; or
 3. cancel an override already installed in the Lane.
 
-Proposal-time validation requires governance authority, a nonzero action timelock,
-and current optimistic versions. Execution revalidates inside the Lane. If an
-intervening action makes the target stale, execution reverts atomically and the queued
-action remains available for explicit cancellation until TimeLock expiry.
+Immediate (governance only):
 
-The override is a one-shot exact **rate** target, not an implied-price value. It can be
-installed only after initialization, only when no override is installed, and only
-within `MIN_BASE_RATE..currentBaseRateCeiling`.
+- `startInstantBond` / `stopInstantBond`
+- `setInstantBondPaymentToken`
+- `setInstantBondCumulativeMinted`
+- `setCanBuyNow`
 
-Its lifecycle is intentionally narrow:
+Foxtrot pre-validates with the lane views (`isValidConfig`, `isValidRateOverride`,
+`canCancelRateOverride`, `isValidEpochLength`, `isValidPaymentToken`,
+`isValidCumulativeMinted`) and keeps the same `# dev:` strings. Execute re-validates
+before the lane call. Foxtrot does not wipe leftover pending config/override payloads
+after execute or cancel; it only clears `actionType`, matching Echo. There are no
+per-action cancel events.
+
+The override is last-write-wins. There is no `overrideVersion`. It is valid only while
+the lane is running **and** `epochState.rate != 0`. Last write wins. It is consumed on
+the next successful rollover. `setConfig`, `start`, and `stop` clear an installed
+override. `setCanBuyNow` does not.
+
+Its lifecycle:
 
 - same-epoch purchases leave it pending;
 - preview projects it without consuming it;
@@ -356,21 +400,24 @@ There is no target epoch, expiry, or maximum lead. Operators must revalidate or 
 an installed override before reopening after a long pause or disablement. The ordinary
 counterfactual `controllerRate` is emitted when an override applies.
 
+`setCanPurchaseRipeBond` stays on SwitchboardDelta for BondRoom. It is not on Foxtrot.
+
 ## Configuration at a glance
 
 The ABI-locked config struct is duplicated byte-for-byte in both contracts:
 
 | Field group | Fields | Purpose |
 |---|---|---|
-| Availability | `canBuyNow` | Live purchase switch. |
+| Availability | `canBuyNow` | Live purchase switch. Also has a dedicated immediate Foxtrot setter. |
 | Capacity | `paymentCapPerEpoch`, `minPaymentAmount` | Snapshotted epoch capacity and minimum full-fill size. |
 | Supply | `mintBudget` | Instance-local cumulative RIPE issuance ceiling. |
 | Rates | `maxEffectiveRate`, `seedRate` | All-in payout ceiling and cold-start base rate. |
-| Utilization | `uHighBps`, `uLowBps` | High, dead-band, and low branch thresholds. |
+| Utilization | `uHighBps`, `uLowBps` | Inclusive high, dead-band, and low branch thresholds. |
 | Price up | `minUpBps`, `maxUpBps` | High-demand implied-price increase range. |
 | Price down | `minDownBps`, `maxDownBps` | Low-demand implied-price decrease range. |
 | Empty time | `decayBps`, `maxDecayEpochs` | Fixed skipped-epoch response and loop cap. |
-| Locking | `maxLockBonus` | Snapshotted maximum lock bonus; production policy is zero. |
+| Locking | `maxLockBonus`, `minLockDuration` | Snapshotted max bonus (production policy is zero); live extra lock floor. |
+| Clock | `epochLength` | Cadence. Writable only through `start`, not `setConfig` once installed. |
 
 `mintBudget` is local to one Lane deployment. A replacement or concurrent Lane would
 start with separate `cumulativeMinted` state, so activation requires an external
@@ -386,31 +433,42 @@ User entry points:
 
 ```text
 previewBuyNow(paymentAmount, requestedLock) -> InstantBondQuote
-buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock,
-       minActualLock=0) -> totalRipe
+buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock)
+    -> totalRipe
 ```
 
-Governance validation and mutation:
+Governance validation and mutation (registered switchboard):
 
 ```text
-isValidConfig(config)
+start(genesisBlock, epochLength)
+stop()
 setConfig(config)
-isValidRateOverride(targetRate, expectedOverrideVersion)
-setRateOverride(targetRate, expectedOverrideVersion)
-canCancelRateOverride(expectedOverrideVersion)
-cancelRateOverride(expectedOverrideVersion)
+setCanBuyNow(canBuyNow)
+setRateOverride(targetRate)
+cancelRateOverride()
+setPaymentToken(token)
+setCumulativeMinted(amount)
+
+isValidConfig(config)
+isValidRateOverride(targetRate)
+canCancelRateOverride()
+isValidEpochLength(epochLength)
+isValidPaymentToken(token)
+isValidCumulativeMinted(amount)
 ```
 
-Important state:
+Important public state (camelCase):
 
 ```text
-config
-isInitialized / currentEpoch / epochRate
-epochPaymentCap / epochMinPaymentAmount / epochMaxLockBonus
-epochAcceptedPayment
-epochWeightedLateness / epochTimingEligible
-rateOverride / overrideVersion
-cumulativeMinted
+bondConfig()
+epochState()
+getEpochSnapshot()
+isRunning()
+genesisBlock()
+epochLength()
+paymentToken() / paymentDecimals() / paymentScale()
+rateOverride()
+cumulativeMinted()
 ```
 
 Events:
@@ -420,6 +478,11 @@ EpochInitialized
 EpochRolled
 InstantBondPurchased
 InstantBondConfigSet
+CanBuyNowSet
+InstantBondStarted
+InstantBondStopped
+PaymentTokenSet
+CumulativeMintedSet
 RateOverrideInstalled
 RateOverrideApplied
 RateOverrideCancelled
@@ -429,12 +492,20 @@ RateOverrideInvalidated
 ### SwitchboardFoxtrot
 
 ```text
-setInstantBondConfig(config)
-setInstantBondRateOverride(targetRate, expectedOverrideVersion)
-cancelInstantBondRateOverride(expectedOverrideVersion)
+setInstantBondConfig(config) -> aid
+setInstantBondRateOverride(targetRate) -> aid
+cancelInstantBondRateOverride() -> aid
 executePendingAction(actionId)
 cancelPendingAction(actionId)
+startInstantBond(genesisBlock, epochLength)
+stopInstantBond()
+setInstantBondPaymentToken(token)
+setInstantBondCumulativeMinted(amount)
+setCanBuyNow(canBuyNow)
 ```
+
+Foxtrot `InstantBondStarted` logs the raw `_genesisBlock` argument, so `0` stays `0`.
+The lane event logs the resolved block.
 
 Use the generated ABIs for exact tuple layout, overloads, output names, event field
 order, and indexing:
@@ -449,24 +520,21 @@ Anyone changing this feature should treat these as hard boundaries:
 - exact payment receipt at Endaoment Funds;
 - exact RIPE mint/Teller settlement and restoration of the Lane's preexisting RIPE
   balance;
-- dynamic `coreRipeGovVaultId()` resolution and buyer-bindable vault identity;
-- caller-specific blacklist and deterministic preview readiness;
-- no silent lock downgrade;
+- dynamic `coreRipeGovVaultId()` resolution at execution time;
+- no forced lock when the buyer asked for `0` and the lane min is `0`;
 - fixed same-epoch snapshot and correct accepted-payment/weighted-lateness
   accumulation;
 - preview purity and full transaction rollback after every downstream failure;
-- optimistic config/override versions and one-shot override consumption;
+- last-write-wins config and override; one-shot override consumption;
 - weakest-up versus downward/empty anti-ratchet bounds;
 - byte-identical Lane/Foxtrot config structs and ABI field order;
-- Foxtrot's nonzero action-timelock proposal guard; and
+- Foxtrot validation on the same lane views, including execute-time revalidation; and
 - the registered-switchboard authority model plus deployment-time route inventory.
 
-Contract size is a practical constraint. Post-remediation-integration deployed runtime
-is 12,905 bytes for Lane against a 13,000-byte project ceiling and 6,163 bytes for
-Foxtrot against 6,500 bytes. The Foxtrot increase comes from the newly integrated
-shared governance modules; the complete feature gate remains green. Recompile and
-remeasure after every production-source or imported-module change, and do not weaken a
-safety check merely to recover bytes.
+The only deploy size limit is EIP-170 (24,576 bytes). There is no local Lane/Foxtrot
+byte ceiling. Contracts compile without `# pragma optimize codesize` so call gas stays
+on the default gas optimizer. Recompile and remeasure after every production-source or
+imported-module change; do not weaken a safety check merely to recover bytes.
 
 ## What is deliberately not implemented
 
@@ -477,7 +545,8 @@ The current design excludes:
 - within-epoch price ramps or tranches;
 - partial fills or capacity reservations;
 - delegated recipients;
-- automatic override expiry or target-epoch scheduling;
+- automatic override expiry, target-epoch scheduling, or override versions;
+- buyer-bound vault ID / minimum-lock transaction fields;
 - per-epoch historical mappings; and
 - an automatic pause-clock or rebaseline after unavailable time.
 
@@ -506,7 +575,7 @@ approved. Missing categories currently include:
 - payment-token identity, code hash, depeg monitoring, pause, and reopening policy;
 - full-fill retry and override-reopening runbooks;
 - constructor parameters, realistic epoch/genesis bounds, deployed code hashes, and
-  post-deployment immutable assertions;
+  post-deployment assertions;
 - registered-switchboard selector/code-hash inventory;
 - credentialed archive-fork topology and locked/unlocked purchase qualification; and
 - indexer owner and event-schema approval.
@@ -546,19 +615,6 @@ The repository workflow additionally runs branch-aware coverage and enforces sep
 85% thresholds for Lane and Foxtrot. Keep Boa, Hypothesis, Python, pytest, XDG, and
 coverage caches outside the worktree when reproducing final evidence.
 
-Current production-source evidence is recorded in
-[`implementation-spec.md` §20.7](implementation-spec.md#207-revision-23-pr-156-remediation-authority-and-evidence).
-That section records the original revision-23 remediation checkpoint. The later
-17 August 2026 integration of `rh-audit-remediation@c9ae47e` was independently rerun
-against the merged tree: 211 tests passed, two credential-gated fork tests skipped,
-Lane coverage was 85.03%, Foxtrot coverage was 93.98%, all 57 ABI outputs and the
-source-bound controller artifact were current, and the activation draft remained
-valid and blocked.
-
-The subsequent `04c76be` remediation delta added only audit and migration records; it
-did not change production source, feature tests, workflows, generated artifacts, or
-the measurements above.
-
 ## Agent change checklist
 
 Before modifying this feature:
@@ -567,7 +623,7 @@ Before modifying this feature:
 2. Read this README, then the exact normative sections affected by the change.
 3. Preserve the config field order in both contracts.
 4. Add a regression or independent-model case before changing mechanism behavior.
-5. Recompile and measure both deployed runtimes after every meaningful contract edit.
+5. Recompile and confirm both deployed runtimes stay under EIP-170.
 6. Regenerate the Lane/Foxtrot ABIs after any ABI or event change.
 7. Regenerate the controller JSON after either production source file changes; its
    artifact binds exact source hashes.
@@ -592,9 +648,9 @@ that minimum safe on its own.
 
 ### Can governance manually set the next rate?
 
-Yes, through a timelocked, versioned, one-shot exact rate override. It applies only at
-the next successful rollover, preview does not consume it, and a full config change
-invalidates it.
+Yes, through a timelocked, last-write-wins, one-shot exact rate override. It applies
+only at the next successful rollover, preview does not consume it, and a full config
+change invalidates it.
 
 ### Can governance change the current epoch's price immediately?
 

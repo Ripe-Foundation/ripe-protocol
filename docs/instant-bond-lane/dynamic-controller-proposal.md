@@ -1,10 +1,10 @@
 # Instant Bond Lane Dynamic Controller and Manual Rate Override Design Record
 
-**Status:** Revision-23 PR #156 remediation candidate under the dated
+**Status:** Current Instant Bond controller and override design record (specification
+revision 24) under the dated
 [owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427).
-Economic calibration is explicitly **not approved**. Commit/push and draft review are
-authorized; this document is not merge, deployment, configuration, minting, or
-activation authority.
+Economic calibration is explicitly **not approved**. This document is not merge,
+deployment, configuration, minting, or activation authority.
 
 > **New to the feature?** Start with [`README.md`](README.md). This design record is
 > the detailed controller and manual-override derivation, not the onboarding entry
@@ -17,7 +17,7 @@ committed and pushed `instant-bond-lane` checkpoint
 `origin/rh` commit `36ee0db42482c3e7d6c43d045fc02655b90bebf4`. Revision 23
 begins from reviewed PR head `55a2ef9ec25412d2f7bf7a9e8547a6ccc414e0ae`.
 
-The revision-23 [`implementation-spec.md`](implementation-spec.md) is authoritative.
+The revision-24 [`implementation-spec.md`](implementation-spec.md) is authoritative.
 This document records the controller rationale and the implemented design at
 `contracts/core/InstantBondLane.vy` and
 `contracts/config/SwitchboardFoxtrot.vy`; it does not replace the normative source or
@@ -60,25 +60,28 @@ tied to an epoch boundary, or maximum lead in epochs.
 
 ## 2. Implemented authority model
 
-The Lane exposes `setConfig`, `setRateOverride`, and `cancelRateOverride` to any address
-that satisfies the protocol's existing registered-switchboard check. All three
-mutators are `@nonreentrant` defense-in-depth. `SwitchboardFoxtrot` is the intended
-timelocked route and has an immutable Lane target, but the Lane does not pin authority
-to Foxtrot. Registry-wide trust is the resolved protocol boundary, not a future design
-decision.
+The Lane exposes `setConfig`, `setCanBuyNow`, `setRateOverride`, `cancelRateOverride`,
+`start`, `stop`, `setPaymentToken`, and `setCumulativeMinted` to any address that
+satisfies the protocol's existing registered-switchboard check. Those mutators are
+`@nonreentrant` defense-in-depth. `SwitchboardFoxtrot` is the intended route and
+resolves the lane through RipeHq id 26. It does not store a lane address. The Lane
+does not pin authority to Foxtrot. Registry-wide trust is the resolved protocol
+boundary, not a future design decision.
 
 The exact manual-rate workflow is deliberately separate from ordinary configuration:
 
 - `seedRate` supplies the first initialized epoch only;
 - `setConfig` replaces persistent controller inputs but never writes the active
-  `epochRate` directly;
-- `setRateOverride` installs one exact target for the first later successful rollover;
+  epoch rate directly, and cannot change an already-installed `epochLength`;
+- `setRateOverride` last-write-wins one exact target for the first later successful
+  rollover;
 - `cancelRateOverride` removes an installed target through the same registered-
   switchboard boundary;
 - `canBuyNow`, Department pause, mint authorization, and `mintBudget` can stop sales
   but do not assign price; and
 - Foxtrot independently timelocks config replacement, override installation, and
-  installed-override cancellation as three tagged action types.
+  installed-override cancellation as three tagged action types. Start, stop,
+  payment-token, minted, and `canBuyNow` are immediate.
 
 ## 3. Terminology and units
 
@@ -99,7 +102,7 @@ B = 10_000
 C = snapshotted epoch payment cap
 A = total accepted payment in the epoch
 U = floor(A * B / C)
-L = immutable epoch length in blocks
+L = installed epoch length in blocks
 ```
 
 ## 4. Amount-weighted timing signal
@@ -132,8 +135,8 @@ sole available block. For `L>1`, the first and last offsets map exactly to `B` a
 zero.
 
 The config bound `paymentCapPerEpoch <= max_value(uint256) / B` makes
-`weightedLateness <= C * B` safe. The constructor additionally enforces
-`EPOCH_LENGTH <= max_value(uint256) / B + 1`, which makes `o_i * B` safe. The
+`weightedLateness <= C * B` safe. `isValidEpochLength` additionally enforces
+`epochLength <= max_value(uint256) / B + 1`, which makes `o_i * B` safe. The
 deterministic Python model uses unbounded integers and therefore remains supporting
 mechanism evidence rather than proof of these Vyper bounds.
 
@@ -141,7 +144,7 @@ The first initialized epoch is only partially exposed when initialization occurs
 its deterministic start. The implemented rule sets `epochTimingEligible` only when
 initialization occurs at deterministic offset zero. Timing is still recorded, but an
 ineligible first epoch forces its upward timing multiplier to zero and therefore uses
-`minUpBps`. `EPOCH_LENGTH == 1` is offset-zero and eligible. Every later stored epoch
+`minUpBps`. `epochLength == 1` is offset-zero and eligible. Every later stored epoch
 is timing-eligible.
 
 ## 5. Dynamic upward adjustment
@@ -273,6 +276,8 @@ maxDownBps
 decayBps
 maxDecayEpochs
 maxLockBonus
+minLockDuration
+epochLength
 ```
 
 Controller-specific hard validation (the implementation specification contains the
@@ -302,9 +307,10 @@ arithmetic, ceiling pre-clamp, floor, and bounded skipped decay. It does not pre
 config acceptance: revision 19 permits `uLowBps=0`, `uHighBps=B`, and some asymmetric
 step pairs that the nondegenerate dynamic formulas or round-trip inequality reject.
 
-The expanded 15-field config is mirrored byte-for-byte in `InstantBondLane` and
+The 17-field config is mirrored byte-for-byte in `InstantBondLane` and
 `SwitchboardFoxtrot`, with a source-identity guard test. Lane and Foxtrot config events
-emit every field in that same order.
+emit every field in that same order. `epochLength` is on the struct so start can
+install cadence, but `setConfig` rejects a different length once one is installed.
 
 ## 9. Implemented epoch state and observability
 
@@ -329,9 +335,9 @@ controllerRate
 ```
 
 The event also carries both epoch endpoints, old/new rate, the complete new pricing
-snapshot, prior accepted payment/cap, utilization, decay steps, and pricing config
-version. Average lateness, strength intermediates, and adjustment direction are
-deterministically reconstructable and are not separate event fields.
+snapshot, prior accepted payment/cap, utilization, and decay steps. Average lateness,
+strength intermediates, and adjustment direction are deterministically reconstructable
+and are not separate event fields. There is no pricing-config version field.
 
 ## 10. Timelocked one-shot manual rate override
 
@@ -342,43 +348,39 @@ expires, and cancels override actions through `SwitchboardFoxtrot` and the exist
 `LocalGov`/`TimeLock` model.
 
 The Lane's mutators use the existing registered-switchboard authorization check.
-Registry-wide switchboard trust is accepted for revision 20; Foxtrot is the intended
-route, not a Lane-side immutable authorization pin.
+Registry-wide switchboard trust is accepted; Foxtrot is the intended route, not a
+Lane-side immutable authorization pin.
 
 ### 10.2 Installed state
 
-The Lane stores exactly two public scalars:
+The Lane stores one public scalar:
 
 ```text
 rateOverride       # exact target; zero means none installed
-overrideVersion
 ```
 
 `rateOverride == 0` represents no installed override because every valid rate is
-strictly positive. There is no stored bound-config-version field. Foxtrot queues the
-target plus expected config and override versions; `RateOverrideInstalled` records the
-validated config version as event data. Every full config write synchronously
-invalidates an installed target, so an additional stored binding is unnecessary.
+strictly positive. There is no `overrideVersion` and no stored bound-config-version
+field. Foxtrot queues the target only. Every full config write, plus `start` and
+`stop`, synchronously invalidates an installed target.
 
-Only one installed override may exist. Replacing it requires a separately authorized
-cancel followed by a new timelocked installation. Each successful override lifecycle
-transition increments `overrideVersion` exactly once: installation, application,
-installed cancellation, or config invalidation. Preview, same-epoch purchases, failed
-execution, expired queue cleanup, and reverted settlement leave it unchanged. This
-makes two actions queued against the same version mutually exclusive.
+Last write wins. A later `setRateOverride` replaces the pending target without a
+cancel-first step. Preview, same-epoch purchases, failed execution, expired queue
+cleanup, and reverted settlement leave it unchanged.
 
 The ordinary Foxtrot TimeLock confirmation and expiration rules bound a queued action.
-There is no target epoch, target-boundary execution window, minimum pre-target window,
-or maximum lead in epochs. Once successfully installed in the Lane, the override
-persists until application, timelocked cancellation, or config invalidation.
+A zero time lock is allowed and makes confirmation immediate. There is no target epoch,
+target-boundary execution window, minimum pre-target window, or maximum lead in epochs.
+Once successfully installed in the Lane, the override persists until application,
+timelocked cancellation, or invalidation by `setConfig` / `start` / `stop`.
 
-Before initialization, governance changes `seedRate` instead. Installation on an
-initialized Lane requires:
+Before initialization (`epochState.rate == 0` or the lane is not running), governance
+changes `seedRate` instead. Installation requires:
 
 ```text
+isRunning
+epochState.rate != 0
 MIN_BASE_RATE <= targetRate <= currentBaseRateCeiling
-expectedOverrideVersion == overrideVersion
-no installed override
 ```
 
 The contract rejects an invalid rate and never silently clamps a requested manual
@@ -386,8 +388,8 @@ target.
 
 ### 10.3 Owner-selected next-successful-rollover semantics
 
-Let `S` be the Lane's stored `currentEpoch` and `E` the deterministic epoch projected
-for a purchase or preview:
+Let `S` be the Lane's stored `epochState.epoch` and `E` the deterministic epoch
+projected for a purchase or preview:
 
 ```text
 E == S: retain the override; use the already committed stored epoch rate
@@ -402,10 +404,9 @@ the valid installed target. The next ordinary rollover starts from the committed
 target rate.
 
 Preview projects the override without consuming it. A successful purchase in the
-already stored epoch leaves it pending. The first successful purchase that commits any
-later epoch clears it atomically and increments `overrideVersion`. A settlement failure
-after projection reverts consumption together with the epoch, timing, cap, and mint
-accounting writes.
+already stored epoch leaves it pending. The first successful purchase that commits any later epoch clears it atomically. A
+settlement failure after projection reverts consumption together with the epoch,
+timing, cap, and mint accounting writes.
 
 Installation is valid even when the stored epoch is already stale relative to the
 wall-clock lane epoch. In that case the next successful purchase can apply the target
@@ -415,41 +416,35 @@ rewriting an already committed epoch.
 
 ### 10.4 Config changes and cancellation
 
-Installation is validated against an exact config version, which is recorded in the
-installation event rather than stored. Executing any full config while an override is
-installed clears and invalidates the override, increments its version, and emits an
-explicit event. A stale override cannot survive a successful config write and make
-ordinary purchases revert.
+Executing any full config, `start`, or `stop` while an override is installed clears
+and invalidates the override and emits `RateOverrideInvalidated`. `setCanBuyNow` does
+not. A stale override cannot survive a successful config write and make ordinary
+purchases revert.
 
-Cancellation of a queued Foxtrot action follows existing governance cancellation.
-Cancellation of an override already installed in Lane changes a committed future
-economic rule and is itself timelocked and version-bound.
+Cancellation of a queued Foxtrot action follows Echo: `timeLock._cancelAction` plus
+clear `actionType`. It does not wipe leftover pending payloads and has no per-action
+cancel event. Cancellation of an override already installed in the Lane changes a
+committed future economic rule and is itself timelocked.
 
 ### 10.5 Events and views
 
 The implemented Foxtrot events are:
 
-- `PendingRateOverrideSet(actionId, confirmationBlock, targetRate,
-  expectedConfigVersion, expectedOverrideVersion)`;
-- `PendingRateOverrideCancellationSet(actionId, confirmationBlock,
-  expectedOverrideVersion)`;
-- `RateOverrideExecuted(actionId, newVersion)`;
-- `RateOverrideCancellationExecuted(actionId, newVersion)`; and
-- `RateOverrideActionCancelled(actionId, isCancellation)` for explicit or expired
-  queued-action cleanup.
+- `PendingRateOverrideSet(actionId, confirmationBlock, targetRate)`;
+- `PendingRateOverrideCancellationSet(actionId, confirmationBlock)`;
+- `RateOverrideExecuted(actionId)`; and
+- `RateOverrideCancellationExecuted(actionId)`.
 
 The implemented Lane events are:
 
-- `RateOverrideInstalled(newVersion indexed, targetRate,
-  boundConfigVersion indexed)`;
-- `RateOverrideApplied(newVersion indexed, fromEpoch indexed, toEpoch indexed,
-  targetRate, controllerRate)`;
-- `RateOverrideCancelled(newVersion indexed, targetRate)`; and
-- `RateOverrideInvalidated(newVersion indexed, targetRate,
-  newConfigVersion indexed)`.
+- `RateOverrideInstalled(targetRate)`;
+- `RateOverrideApplied(fromEpoch indexed, toEpoch indexed, targetRate,
+  controllerRate)`;
+- `RateOverrideCancelled(targetRate)`; and
+- `RateOverrideInvalidated(targetRate)`.
 
-The public override views are the scalar `rateOverride()` and `overrideVersion()`
-getters plus `isValidRateOverride(...)` and `canCancelRateOverride(...)`. There is no
+The public override views are the scalar `rateOverride()` getter plus
+`isValidRateOverride(targetRate)` and `canCancelRateOverride()`. There is no
 separate detailed override tuple. `previewBuyNow.rate` is authoritative for the
 projected purchase rate and does not consume an installed target.
 
@@ -460,7 +455,7 @@ If pricing is wildly wrong:
 1. pause the Lane through the established emergency path;
 2. queue any required full config change;
 3. wait and execute it;
-4. queue the exact one-shot next-rollover rate against the resulting config version;
+4. queue the exact one-shot next-rollover rate;
 5. wait and install it;
 6. verify preview, override state, ceiling, cap, and budget;
 7. unpause only when the target rate and operational checks are aligned.
@@ -481,7 +476,7 @@ The deterministic model is
 `controller-simulation-v2.json` in this directory.
 
 Canonical artifact SHA-256:
-`ea164d04a8156f18a8e03e99bf367dfa95f507fa205397e61a4e622b51a226dc`.
+`b021bb113202bd0407023db910651a8364ed336f689ce41942919b9bde16cbb7`.
 
 The checked-in pure Python companion model demonstrates:
 
@@ -495,7 +490,8 @@ The checked-in pure Python companion model demonstrates:
 - fixed, capped, dynamic-range-independent decay;
 - exact next-successful-rollover projection after one or many elapsed epochs, plus a
   pure versioned install, same-epoch retention, repeat preview, failed commit,
-  successful one-shot consumption, cancellation, and config-invalidation lifecycle;
+  successful one-shot consumption, last-write-wins replacement, cancellation, and
+  config-invalidation lifecycle;
 - floor, ceiling pre-clamp, and maximum-decay preservation; and
 - byte-identical canonical JSON across repeated runs.
 
@@ -544,10 +540,10 @@ Historical revision 19 measured 8,669 bytes for Lane against its 9,000-byte proj
 regression ceiling and 5,068 bytes for Foxtrot against 5,500 bytes. Revision 20
 measured 10,564 bytes for Lane and 6,051 bytes for Foxtrot. Revision-22 Boa
 deployments measured 10,758 and 6,051 bytes. On 15 August 2026, the owner raised only
-the Lane project ceiling to 13,000 bytes; Foxtrot remains 6,500 and EIP-170 remains
-24,576. Final revision-23 Boa deployments measure 12,905 and 6,075 bytes, leaving 95
-and 425 bytes below the project ceilings and 11,671 and 18,501 bytes below EIP-170.
-Complete frozen evidence is recorded in §20.7 of `implementation-spec.md`. The
+the Lane project ceiling to 13,000 bytes; Foxtrot remained 6,500 and EIP-170 remained
+24,576. Those local ceilings were later dropped. The only current size limit is
+EIP-170. Revision-23 measurements in §20.7 of `implementation-spec.md` are
+historical. Recompile and remeasure after every production-source change. The
 rebaseline is a source-size policy decision, not deployment or economic-calibration
 approval.
 
@@ -556,14 +552,13 @@ approval.
 Completed in the working candidate:
 
 1. owner selection of the dynamic controller and next-successful-rollover semantics;
-2. authoritative revision-23 specification reconciliation;
+2. authoritative specification reconciliation through revision 24;
 3. atomic Lane and Foxtrot implementation;
 4. controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
 5. deterministic ABI regeneration;
 6. current-RH integration and a permanent feature gate for branch, PR, merge-queue,
    and manual validation; and
-7. the dated 13,000-byte Lane and 6,500-byte Foxtrot project ceilings plus a fail-
-   closed activation manifest.
+7. the later EIP-170-only size policy plus a fail-closed activation manifest.
 
 Revision 20's bounded branch commit and push completed at `79917dd`, and revision 21's
 reviewer-remediation checkpoint was committed and pushed as `d13203d`. The owner

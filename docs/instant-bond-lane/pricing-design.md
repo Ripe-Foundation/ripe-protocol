@@ -1,8 +1,10 @@
 # Instant Bond Lane — On-Chain Pricing via a Demand Controller
 
-**Status:** Economic rationale for the revision-23 PR #156 remediation candidate.
-The dated [owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427)
-selects the operational policies and 13,000/6,500 project ceilings. Economic
+**Status:** Economic rationale for the current Instant Bond Lane implementation
+(specification revision 24). The dated
+[owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427)
+still selects the operational policies. Local 13,000/6,500 project ceilings have
+been dropped; the only size limit is EIP-170 (24,576 bytes). Economic
 calibration is explicitly **not approved**.
 
 > **New to the feature?** Start with [`README.md`](README.md) for the architecture,
@@ -15,9 +17,9 @@ calibration is explicitly **not approved**.
 > revision-23 remediation commit/push and continued draft review; this rationale does
 > not authorize merge, deployment, configuration, RIPE minting, or activation.
 
-**Prepared:** 5 August 2026 · **Revised:** 15 August 2026 for the implemented
-revision-20 controller, next-successful-rollover override, revision-21 remediation,
-revision-22 current-RH integration, and revision-23 review remediation.
+**Prepared:** 5 August 2026 · **Revised:** 22 August 2026 for the implemented
+start/stop clock, last-write-wins override, HQ-resolved Foxtrot, 17-field config,
+and EIP-170-only size policy.
 
 **Purpose:** Explain how the Instant Bond Lane sets its Buy Now rate, why the mechanism
 uses these signals, and which economic risks remain for calibration and operations.
@@ -77,7 +79,7 @@ decrease.
 
 ### 2.1 Amount-weighted timing
 
-For a purchase at zero-based deterministic epoch offset `o` and immutable epoch length
+For a purchase at zero-based deterministic epoch offset `o` and installed epoch length
 `L`:
 
 ```text
@@ -96,7 +98,7 @@ marginal tail cannot control the signal as a final-sellout timestamp would.
 A first initialized epoch is timing-eligible only when initialization occurs at its
 deterministic offset zero. A later cold start still records timing for observability but
 uses zero earliness at its first rollover, producing `minUpBps` if utilization is high.
-`EPOCH_LENGTH == 1` is offset-zero and eligible. Every later stored epoch is eligible.
+`epochLength == 1` is offset-zero and eligible. Every later stored epoch is eligible.
 
 ### 2.2 High-utilization adjustment
 
@@ -187,23 +189,21 @@ from the epoch start.
 
 ## 3. Exact manual override
 
-Revision 20 implements a one-shot recovery tool for exceptional pricing errors. The
-Lane stores only:
+The Lane stores one public scalar:
 
 ```text
 rateOverride       # exact target; zero means none installed
-overrideVersion    # independent optimistic lifecycle version
 ```
 
-There is no stored config-version binding. Every subsequent full config write
-synchronously invalidates an installed target. The override version advances
-once on installation, successful application, installed cancellation, or config
-invalidation. Preview, same-epoch purchases, failed execution, expired queued-action
-cleanup, and reverted settlement do not advance it.
+There is no `overrideVersion` and no stored config-version binding. Last write wins:
+a later `setRateOverride` replaces the pending target without a cancel-first step.
+Every subsequent full config write, plus `start` and `stop`, synchronously
+invalidates an installed target. Preview, same-epoch purchases, failed execution,
+expired queued-action cleanup, and reverted settlement leave it unchanged.
 
-Installation requires an initialized Lane, an empty override slot, the exact expected
-override version, and a target between `MIN_BASE_RATE` and the live derived
-base-rate ceiling. Invalid targets revert rather than being clamped.
+Installation is valid only while the lane is running **and** `epochState.rate != 0`.
+The target must sit between `MIN_BASE_RATE` and the live derived base-rate ceiling.
+Invalid targets revert rather than being clamped.
 
 For stored epoch `S` and projected deterministic epoch `E`:
 
@@ -218,9 +218,10 @@ a ceiling change. `RateOverrideApplied` emits the exact target and the ordinary
 counterfactual `controllerRate` for auditability.
 
 Authority uses the protocol's existing registered-switchboard trust boundary.
-`SwitchboardFoxtrot` is the intended timelocked route and has an immutable Lane target,
-but the Lane is not immutably pinned to Foxtrot. Foxtrot separately queues full config
-replacement, exact override installation, and installed-override cancellation.
+`SwitchboardFoxtrot` is the intended timelocked route and looks up the lane through
+RipeHq id 26. The Lane is not immutably pinned to Foxtrot. Foxtrot separately queues
+full config replacement, exact override installation, and installed-override
+cancellation.
 
 ---
 
@@ -251,12 +252,13 @@ bound specified in `implementation-spec.md`. A governed payment cap alone would 
 bound dilution at a low price; the all-in ceiling and lifetime mint budget provide the
 second and third boundaries.
 
-Neither the budget nor the rate ceiling is immutable. Changes are full, versioned,
+Neither the budget nor the rate ceiling is immutable. Changes are full, last-write-wins,
 timelocked config replacements through Foxtrot's intended route. A budget increase is
 an explicit governance action and economic decision, never an automatic post-sellout
 replenishment. Live `canBuyNow` and `mintBudget` changes apply immediately; rate, cap,
 minimum-payment, and maximum-bonus fields are snapshotted only at initialization or the
-next successful rollover and never rewrite the running epoch.
+next successful rollover and never rewrite the running epoch. `setCanBuyNow` is also
+an immediate Foxtrot setter and does not invalidate an installed override.
 
 `cumulativeMinted` is local to one Lane deployment. A replacement therefore needs an
 external program ledger of retired Lane issuance and must configure its new
@@ -320,19 +322,26 @@ sophistication does.
 The Lane does not follow Bond Room or Ledger epochs:
 
 ```text
-laneEpoch = (block.number - GENESIS_BLOCK) // EPOCH_LENGTH
+laneEpoch = (block.number - genesisBlock) // bondConfig.epochLength
 ```
 
-This removes cross-contract epoch handshakes and preserves deterministic history.
-Rollover is lazy inside `buyNow`; `previewBuyNow` projects the same state read-only.
-There is no external initialization or rollover transaction.
+`start` installs genesis and cadence. `setConfig` cannot change an already-installed
+`epochLength`; a new cadence requires `stop()` then `start(..., newLength)`.
+This removes cross-contract epoch handshakes and preserves deterministic history
+while the clock is running. Rollover is lazy inside `buyNow`; `previewBuyNow` and
+`getEpochSnapshot()` project the same state read-only. There is no external
+initialization or rollover transaction.
 
 ### 6.2 Flexible lock bonus
 
-The buyer may take RIPE unlocked or request a lock. Live RipeGov min/max duration terms
-select the actual deposit duration, while the epoch's `maxLockBonus` bounds a linear
-bonus. The all-in rate ceiling includes that maximum bonus. The purchase event reports
-the actual current core RipeGov vault ID used for locked settlement.
+The buyer may take RIPE unlocked or request a lock. Effective min lock is
+`max(vault.minLockDuration, config.minLockDuration)`. Vault `maxLockDuration` is the
+only ceiling. Unlocked settlement happens when the buyer asked for `0` **and** the
+lane min is `0`, or when there is no live vault range. The vault minimum does not
+force a lock on a zero request when the lane min is `0`. The epoch's `maxLockBonus`
+bounds a linear bonus on a locked purchase. The all-in rate ceiling includes that
+maximum bonus. Preview discloses the current core RipeGov vault ID; the purchase
+event does not.
 
 RipeGov combines deposits into an account-level weighted unlock. The requested deposit
 duration is not necessarily the final position unlock; this inherited behavior and its
@@ -349,9 +358,10 @@ deposit. Delegated purchases and gifting remain out of scope.
 
 ### 6.4 Configured payment-token settlement
 
-The immutable payment token is deployment-selected, dollar-denominated, and may use
-any supported decimal count. `PAYMENT_SCALE` is derived once from `decimals()`; the
-contract does not assume USDC or six decimals.
+The payment token is dollar-denominated and may use any supported decimal count.
+It is stored, not immutable, and may be swapped only while the lane is stopped.
+`paymentScale` is derived from `decimals()` at each store; the contract does not
+assume USDC or six decimals.
 
 Payment transfers directly from the buyer to Endaoment Funds. The Lane compares the
 destination balance before and after transfer and requires an exact increase, rejecting
@@ -401,9 +411,10 @@ The feature uses two nonupgradeable Vyper contracts:
 1. `contracts/core/InstantBondLane.vy` — purchase, preview, controller, settlement,
    state, and registered-switchboard mutators.
 2. `contracts/config/SwitchboardFoxtrot.vy` — LocalGov/TimeLock adapter for three
-   tagged action types.
+   tagged action types plus immediate start/stop, payment-token, minted, and
+   `canBuyNow` setters. It resolves the lane through RipeHq id 26.
 
-The 15-field config is:
+The 17-field config is:
 
 ```text
 canBuyNow
@@ -421,6 +432,8 @@ maxDownBps
 decayBps
 maxDecayEpochs
 maxLockBonus
+minLockDuration
+epochLength
 ```
 
 Key Lane views and entry points are:
@@ -428,56 +441,61 @@ Key Lane views and entry points are:
 ```text
 isValidConfig(config)
 setConfig(config)
-isValidRateOverride(targetRate, expectedOverrideVersion)
-setRateOverride(targetRate, expectedOverrideVersion)
-canCancelRateOverride(expectedOverrideVersion)
-cancelRateOverride(expectedOverrideVersion)
-buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock,
-       minActualLock=0)
+setCanBuyNow(canBuyNow)
+isValidRateOverride(targetRate)
+setRateOverride(targetRate)
+canCancelRateOverride()
+cancelRateOverride()
+start(genesisBlock, epochLength)
+stop()
+setPaymentToken(token)
+setCumulativeMinted(amount)
+buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock)
 previewBuyNow(paymentAmount, requestedLock)
-
-rateOverride
-overrideVersion
-epochWeightedLateness
-epochTimingEligible
+getEpochSnapshot()
 ```
 
-The public immutables are `PAYMENT_TOKEN`, `PAYMENT_DECIMALS`, `PAYMENT_SCALE`,
-`GENESIS_BLOCK`, and `EPOCH_LENGTH`. Public stored state is `config`,
-`isInitialized`, `currentEpoch`, `epochRate`, `epochPaymentCap`,
-`epochMinPaymentAmount`, `epochMaxLockBonus`,
-`epochAcceptedPayment`, `epochWeightedLateness`, `epochTimingEligible`,
-`rateOverride`, `overrideVersion`, and `cumulativeMinted`.
+There are no public immutables for the clock or payment token. Public stored state is
+`bondConfig`, `isRunning`, `epochState`, `paymentToken` / `paymentDecimals` /
+`paymentScale`, `genesisBlock`, `rateOverride`, and `cumulativeMinted`. Cold start
+versus rollover is `epochState.rate == 0`. There is no `isInitialized` or
+`overrideVersion`.
 
 Key Foxtrot workflows are:
 
 ```text
 setInstantBondConfig(config)
-setInstantBondRateOverride(targetRate, expectedOverrideVersion)
-cancelInstantBondRateOverride(expectedOverrideVersion)
+setInstantBondRateOverride(targetRate)
+cancelInstantBondRateOverride()
 executePendingAction(aid)
 cancelPendingAction(aid)
+startInstantBond(genesisBlock, epochLength)
+stopInstantBond()
+setInstantBondPaymentToken(token)
+setInstantBondCumulativeMinted(amount)
+setCanBuyNow(canBuyNow)
 ```
 
-Foxtrot publicly exposes immutable `LANE` plus the tagged action maps `actionType`,
-`pendingConfig`, and `pendingRateOverride`.
+Foxtrot does not store a lane address. It looks up `INSTANT_BOND_LANE_ID = 26` and
+exposes the tagged action maps `actionType`, `pendingConfig`, and
+`pendingRateOverride`. Execute and cancel clear `actionType` only.
 
 `EpochRolled` exposes the prior accepted payment, cap, weighted lateness, timing
 eligibility, utilization, applied adjustment, decay steps, ordinary `controllerRate`,
 and complete new epoch snapshot. Override installation, application, installed
-cancellation, and config invalidation have distinct Lane events; queued installation,
-queued installed-cancellation, execution, and action cleanup have distinct Foxtrot
-events.
+cancellation, and config invalidation have distinct Lane events with no version
+fields. Foxtrot has no per-action cancel events.
 
 The Lane event set is `EpochInitialized`, `EpochRolled`, `InstantBondPurchased`,
-`InstantBondConfigSet`, `RateOverrideInstalled`, `RateOverrideApplied`,
-`RateOverrideCancelled`, and `RateOverrideInvalidated`. The Foxtrot event set is
-`PendingInstantBondConfigSet`, `InstantBondConfigExecuted`,
-`InstantBondConfigCancelled`, `PendingRateOverrideSet`,
-`PendingRateOverrideCancellationSet`, `RateOverrideExecuted`,
-`RateOverrideCancellationExecuted`, and `RateOverrideActionCancelled`. Exact field
-order and indexing are normative only in `implementation-spec.md` and the generated
-ABIs.
+`InstantBondConfigSet`, `CanBuyNowSet`, `InstantBondStarted`, `InstantBondStopped`,
+`PaymentTokenSet`, `CumulativeMintedSet`, `RateOverrideInstalled`,
+`RateOverrideApplied`, `RateOverrideCancelled`, and `RateOverrideInvalidated`. The
+Foxtrot event set is `PendingInstantBondConfigSet`, `InstantBondConfigExecuted`,
+`PendingRateOverrideSet`, `PendingRateOverrideCancellationSet`,
+`RateOverrideExecuted`, `RateOverrideCancellationExecuted`, `InstantBondStarted`,
+`InstantBondCumulativeMintedSet`, `InstantBondPaymentTokenSet`, and
+`InstantBondCanBuyNowSet`. Exact field order and indexing are normative only in
+`implementation-spec.md` and the generated ABIs.
 
 ---
 
@@ -518,18 +536,18 @@ Completed in the working candidate:
 - current-RH integration and a permanent branch/PR/merge-queue/manual feature gate;
 - a fail-closed activation manifest for calibration, issuance, payment/depeg,
   constructor, switchboard, fork, override, retry, and indexer inputs; and
-- the dated 13,000-byte Lane and 6,500-byte Foxtrot project-size rebaseline.
+- the later drop of those local ceilings in favor of EIP-170 only.
 
 Revision 20's bounded branch commit and push completed at `79917dd`, and revision 21's
 reviewer-remediation checkpoint was committed and pushed as `d13203d`. The owner
 authorized revision 23 remediation, commit, branch push, and continued draft review.
-Economic calibration remains pending before any deployment or configuration proposal.
+Revision 24 is the current contract candidate. Economic calibration remains pending
+before any deployment or configuration proposal.
 
-Historical revision-18/19/20 measurements are preserved only in
-`implementation-spec.md` and must not be presented as current evidence. The exact
-revision-23 runtime sizes, hashes, selectors, layouts, coverage, and test results are
-recorded in §20.7 of `implementation-spec.md` for the frozen local remediation
-candidate.
+Historical revision-18 through 23 measurements are preserved only in
+`implementation-spec.md` and must not be presented as current evidence. Use the
+generated ABIs, `test_properties_abi.py` EIP-170 check, and a fresh compile for
+current runtime size.
 
 The completed local checks satisfy the current integration and draft-review
 prerequisites. Deployment, configuration, RIPE minting, and activation remain
@@ -539,10 +557,10 @@ separately unauthorized.
 
 ## 10. Summary
 
-The revision-23 Lane is a bounded, oracle-free cap-clearing controller. It raises price
+The current Lane is a bounded, oracle-free cap-clearing controller. It raises price
 when payment utilization is high, uses amount-weighted timing to distinguish early from
 late demand, lowers price on weak or empty demand, and keeps one base rate fixed within
-each stored epoch. A versioned, timelocked exact target gives governance a narrow
+each stored epoch. A last-write-wins, timelocked exact target gives governance a narrow
 recovery tool without rewriting the active epoch or creating a calendar scheduler.
 
 Its safety does not come from claiming fair-value discovery. It comes from the all-in

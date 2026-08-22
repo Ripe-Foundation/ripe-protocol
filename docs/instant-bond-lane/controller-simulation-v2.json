@@ -3,9 +3,9 @@
   "authority": "implemented mechanism evidence; not calibration, deployment, or integration authority",
   "bound_implementation": {
     "feature_starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
-    "instant_bond_lane_source_sha256": "c4e25ca5ca7bd4b097bbc3c2a22604a9be2a0506d277bcdc5039e31470441ebb",
+    "instant_bond_lane_source_sha256": "5323779ad444720b6bdb86a41bdd96101e433c050c927831fc5d524883aa7c6d",
     "integrated_rh_commit": "36ee0db42482c3e7d6c43d045fc02655b90bebf4",
-    "switchboard_foxtrot_source_sha256": "a84bd3f8cd48942ea65f57d0911a866998243c28e51dddaaf22c6125e9d5f2e9"
+    "switchboard_foxtrot_source_sha256": "5855e5d10d4e23432ecc3afd32df6816f2e4241a722b6b570e5ceabd981b92b1"
   },
   "calibration_status": "not_approved",
   "economic_metrics": {
@@ -72,7 +72,7 @@
     "Vyper must bound or safely decompose offset*10000",
     "first partially exposed initialized epoch is timing-ineligible",
     "pause and disable intervals remain wall-clock time",
-    "manual next-rollover target must be timelocked, version-bound, and one-shot"
+    "manual next-rollover target must be timelocked, last-write-wins, and one-shot"
   ],
   "manual_override_lifecycle": {
     "calendar_target_window_or_lead": "not_applicable",
