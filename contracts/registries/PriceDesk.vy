@@ -148,14 +148,19 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 @view
 @external
 def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256:
+    # Preserve the legacy selector without silently ignoring a requested cap.
+    if _staleTime != 0:
+        if _shouldRaise:
+            raise "caller stale time unsupported"
+        return 0
     if _asset == empty(address):
         return 0
-    return self._getPrice(_asset, _shouldRaise, _staleTime)
+    return self._getPrice(_asset, _shouldRaise)
 
 
 @view
 @internal
-def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256:
+def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     price: uint256 = 0
     mustRaiseOnZero: bool = False
     alreadyLooked: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
@@ -166,7 +171,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
     # go thru priority partners first
     for pid: uint256 in config.priorityPriceSourceIds:
         sourceStatus: uint256 = 0
-        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, _staleTime)
+        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
         if price != 0:
             break
         if sourceStatus != 0:
@@ -181,7 +186,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
                 if pid in alreadyLooked:
                     continue
                 sourceStatus: uint256 = 0
-                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, _staleTime)
+                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
                 if price != 0:
                     break
                 if sourceStatus != 0:
@@ -212,9 +217,12 @@ def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256
 @view
 @external
 def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256):
+    if _staleTime != 0:
+        return 0, 2
     # admission checks call from the candidate source itself, so no aggregate
     # fallback can mask a source that is not executable under the live stipend.
-    return self._getPriceFromSource(msg.sender, _asset, _staleTime)
+    config: PriceConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPriceConfig()
+    return self._getPriceFromSource(msg.sender, _asset, config.staleTime)
 
 
 @view

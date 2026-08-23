@@ -151,6 +151,8 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
+    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
+        return 0
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -165,6 +167,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
+    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
+        return 0, True
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -260,19 +264,21 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 @view
 @internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> (uint256, bool):
-    feedStaleTime: uint256 = _feedBound
-    if feedStaleTime == 0:
+def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (uint256, bool):
+    if _feedStaleTime != 0:
+        if _feedStaleTime > MAX_FEED_STALE_TIME:
+            return 0, False
+        return _feedStaleTime, True
+
+    globalStaleTime: uint256 = _globalStaleTime
+    if globalStaleTime == 0:
         isValid: bool = False
-        feedStaleTime, isValid = self._getGlobalStaleTime()
+        globalStaleTime, isValid = self._getGlobalStaleTime()
         if not isValid:
             return 0, False
-    elif feedStaleTime > MAX_FEED_STALE_TIME:
+    elif globalStaleTime > MAX_FEED_STALE_TIME:
         return 0, False
-
-    if _callerBound == 0:
-        return feedStaleTime, True
-    return min(_callerBound, feedStaleTime), True
+    return globalStaleTime, True
 
 
 @view

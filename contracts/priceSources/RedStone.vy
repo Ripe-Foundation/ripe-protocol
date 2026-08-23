@@ -140,6 +140,8 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
+    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
+        return 0
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk)
 
 
@@ -149,6 +151,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
+    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
+        return 0, True
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk), True
 
 
@@ -158,20 +162,20 @@ def _getPrice(
     _feed: address, 
     _decimals: uint256,
     _needsEthToUsd: bool,
-    _callerStaleTime: uint256,
+    _globalStaleTime: uint256,
     _feedStaleTime: uint256,
     _priceDesk: address,
 ) -> uint256:
-    globalStaleTime: uint256 = 0
-    hasValidGlobal: bool = False
-    if _feedStaleTime == 0:
-        globalStaleTime, hasValidGlobal = self._getGlobalStaleTime()
-        if not hasValidGlobal:
+    globalStaleTime: uint256 = _globalStaleTime
+    hasGlobalStaleTime: bool = globalStaleTime != 0
+    if _feedStaleTime == 0 and not hasGlobalStaleTime:
+        globalStaleTime, hasGlobalStaleTime = self._getGlobalStaleTime()
+        if not hasGlobalStaleTime:
             return 0
 
     staleTime: uint256 = 0
     isValidStaleTime: bool = False
-    staleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, _feedStaleTime, _callerStaleTime)
+    staleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, _feedStaleTime)
     if not isValidStaleTime:
         return 0
 
@@ -184,7 +188,7 @@ def _getPrice(
         priceDesk: address = _priceDesk
         if _priceDesk == empty(address):
             priceDesk = addys._getPriceDeskAddr()
-        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True, _callerStaleTime)
+        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True)
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
@@ -237,7 +241,7 @@ def _getGlobalStaleTime() -> (uint256, bool):
 
 @pure
 @internal
-def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256, _callerBound: uint256) -> (uint256, bool):
+def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256) -> (uint256, bool):
     feedPolicy: uint256 = _feedBound
     if feedPolicy == 0:
         if _globalBound == 0 or _globalBound > MAX_FEED_STALE_TIME:
@@ -246,9 +250,7 @@ def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256, _callerBound: 
     elif feedPolicy > MAX_FEED_STALE_TIME:
         return 0, False
 
-    if _callerBound == 0:
-        return feedPolicy, True
-    return min(feedPolicy, _callerBound), True
+    return feedPolicy, True
 
 
 #################
@@ -558,8 +560,8 @@ def _isStaleTimeOnlyTightening(
     candidateStaleTime: uint256 = 0
     isValidCurrent: bool = False
     isValidCandidate: bool = False
-    currentStaleTime, isValidCurrent = self._resolveStaleTime(globalStaleTime, currentConfig.staleTime, 0)
-    candidateStaleTime, isValidCandidate = self._resolveStaleTime(globalStaleTime, _staleTime, 0)
+    currentStaleTime, isValidCurrent = self._resolveStaleTime(globalStaleTime, currentConfig.staleTime)
+    candidateStaleTime, isValidCandidate = self._resolveStaleTime(globalStaleTime, _staleTime)
     return isValidCurrent and isValidCandidate and candidateStaleTime < currentStaleTime
 
 

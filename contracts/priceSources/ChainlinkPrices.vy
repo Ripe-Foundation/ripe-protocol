@@ -181,6 +181,8 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
+    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
+        return 0
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime)
 
 
@@ -190,6 +192,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
+    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
+        return 0, True
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime), True
 
 
@@ -200,19 +204,19 @@ def _getPrice(
     _decimals: uint256,
     _needsEthToUsd: bool,
     _needsBtcToUsd: bool,
-    _callerStaleTime: uint256,
+    _globalStaleTime: uint256,
     _feedStaleTime: uint256,
 ) -> uint256:
-    globalStaleTime: uint256 = 0
-    hasValidGlobal: bool = False
-    if _feedStaleTime == 0:
-        globalStaleTime, hasValidGlobal = self._getGlobalStaleTime()
-        if not hasValidGlobal:
+    globalStaleTime: uint256 = _globalStaleTime
+    hasGlobalStaleTime: bool = globalStaleTime != 0
+    if _feedStaleTime == 0 and not hasGlobalStaleTime:
+        globalStaleTime, hasGlobalStaleTime = self._getGlobalStaleTime()
+        if not hasGlobalStaleTime:
             return 0
 
     staleTime: uint256 = 0
     isValidStaleTime: bool = False
-    staleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, _feedStaleTime, _callerStaleTime)
+    staleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, _feedStaleTime)
     if not isValidStaleTime:
         return 0
 
@@ -223,12 +227,12 @@ def _getPrice(
     # if price needs ETH -> USD conversion
     if _needsEthToUsd:
         ethConfig: ChainlinkConfig = self.feedConfig[ETH]
-        if ethConfig.staleTime == 0 and not hasValidGlobal:
-            globalStaleTime, hasValidGlobal = self._getGlobalStaleTime()
-            if not hasValidGlobal:
+        if ethConfig.staleTime == 0 and not hasGlobalStaleTime:
+            globalStaleTime, hasGlobalStaleTime = self._getGlobalStaleTime()
+            if not hasGlobalStaleTime:
                 return 0
         ethStaleTime: uint256 = 0
-        ethStaleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, ethConfig.staleTime, _callerStaleTime)
+        ethStaleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, ethConfig.staleTime)
         if not isValidStaleTime:
             return 0
         ethUsdPrice: uint256 = self._getChainlinkData(ethConfig.feed, ethConfig.decimals, ethStaleTime)
@@ -237,12 +241,12 @@ def _getPrice(
     # if price needs BTC -> USD conversion
     elif _needsBtcToUsd:
         btcConfig: ChainlinkConfig = self.feedConfig[BTC]
-        if btcConfig.staleTime == 0 and not hasValidGlobal:
-            globalStaleTime, hasValidGlobal = self._getGlobalStaleTime()
-            if not hasValidGlobal:
+        if btcConfig.staleTime == 0 and not hasGlobalStaleTime:
+            globalStaleTime, hasGlobalStaleTime = self._getGlobalStaleTime()
+            if not hasGlobalStaleTime:
                 return 0
         btcStaleTime: uint256 = 0
-        btcStaleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, btcConfig.staleTime, _callerStaleTime)
+        btcStaleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, btcConfig.staleTime)
         if not isValidStaleTime:
             return 0
         btcUsdPrice: uint256 = self._getChainlinkData(btcConfig.feed, btcConfig.decimals, btcStaleTime)
@@ -298,7 +302,7 @@ def _getGlobalStaleTime() -> (uint256, bool):
 
 @pure
 @internal
-def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256, _callerBound: uint256) -> (uint256, bool):
+def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256) -> (uint256, bool):
     feedPolicy: uint256 = _feedBound
     if feedPolicy == 0:
         if _globalBound == 0 or _globalBound > MAX_FEED_STALE_TIME:
@@ -307,9 +311,7 @@ def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256, _callerBound: 
     elif feedPolicy > MAX_FEED_STALE_TIME:
         return 0, False
 
-    if _callerBound == 0:
-        return feedPolicy, True
-    return min(feedPolicy, _callerBound), True
+    return feedPolicy, True
 
 
 ##################
@@ -628,8 +630,8 @@ def _isStaleTimeOnlyTightening(
     candidateStaleTime: uint256 = 0
     isValidCurrent: bool = False
     isValidCandidate: bool = False
-    currentStaleTime, isValidCurrent = self._resolveStaleTime(globalStaleTime, currentConfig.staleTime, 0)
-    candidateStaleTime, isValidCandidate = self._resolveStaleTime(globalStaleTime, _staleTime, 0)
+    currentStaleTime, isValidCurrent = self._resolveStaleTime(globalStaleTime, currentConfig.staleTime)
+    candidateStaleTime, isValidCandidate = self._resolveStaleTime(globalStaleTime, _staleTime)
     return isValidCurrent and isValidCandidate and candidateStaleTime < currentStaleTime
 
 
