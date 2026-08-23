@@ -383,12 +383,12 @@ def _wouldCreateCurveDependencyCycle(_asset: address, _config: CurvePriceConfig)
     target: address = self._canonicalGreen(_asset)
     nodes: DynArray[address, MAX_CURVE_GRAPH_NODES] = []
     nodes.append(target)
-    visited: bool[51] = empty(bool[51])
+    visited: bool[MAX_CURVE_GRAPH_NODES] = empty(bool[MAX_CURVE_GRAPH_NODES])
 
     # Adding or updating a feed only changes the target's outgoing edges. A new
     # cycle therefore exists iff one of those edges can reach the target through
-    # the active Curve graph. Index zero uses the proposed config; later nodes
-    # use their active configs.
+    # the active Curve graph. Worklist position zero uses the proposed config;
+    # later nodes use their active configs.
     for i: uint256 in range(MAX_CURVE_GRAPH_NODES):
         if i >= len(nodes):
             break
@@ -788,9 +788,7 @@ def _isValidUpdateFeedStructure(_asset: address, _config: CurvePriceConfig, _pre
 @view
 @internal
 def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
-    if not self._isValidFeedStructure(_asset, _config):
-        return False
-
+    # Callers validate lifecycle and feed structure before checking priceability.
     # initial ecosystem lp deployment may be proposed before liquidity exists.
     if _config.hasEcoToken and _asset == _config.lpToken and staticcall IERC20(_config.lpToken).totalSupply() == 0:
         return True
