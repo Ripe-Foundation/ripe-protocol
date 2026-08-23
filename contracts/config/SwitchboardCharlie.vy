@@ -623,7 +623,7 @@ def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -
     naStabAsset: address = staticcall StabilityPool(vaultAddr).vaultAssets(1)
     naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(savingsGreen, savingsGreen)
     naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(savingsGreen, savingsGreen)
-    na: uint256 = staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen)
+    assert staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen) == 0 # dev: asset reserved for claims
     assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
 
     return vaultAddr, previousVaultId

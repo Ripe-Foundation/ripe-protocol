@@ -221,6 +221,7 @@ STABLESWAP_NG_FACTORY_ID: constant(uint256) = 12
 TWO_CRYPTO_NG_FACTORY_ID: constant(uint256) = 13
 
 MAX_SNAPSHOTS: constant(uint256) = 100
+MAX_CURVE_GRAPH_NODES: constant(uint256) = 51 # candidate plus PriceSourceData.MAX_ASSETS
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
@@ -351,6 +352,74 @@ def _lpUnderlyingCanonicalEquals(_asset: address, _config: CurvePriceConfig) -> 
             break
         if self._canonicalGreen(u) == canonicalAsset:
             return True
+    return False
+
+
+@view
+@internal
+def _getCurvePriceDependencies(_asset: address, _config: CurvePriceConfig) -> address[4]:
+    dependencies: address[4] = empty(address[4])
+
+    # stable/metapool LP pricing queries every underlying; crypto LP pricing
+    # only queries index zero.
+    if _asset == _config.lpToken:
+        if _config.poolType == PoolType.STABLESWAP_NG or _config.poolType == PoolType.METAPOOL:
+            return _config.underlying
+        dependencies[0] = _config.underlying[0]
+
+    # two-coin single-asset pricing queries only the alternate asset.
+    elif _config.numUnderlying == 2:
+        if _asset == _config.underlying[0]:
+            dependencies[0] = _config.underlying[1]
+        else:
+            dependencies[0] = _config.underlying[0]
+
+    return dependencies
+
+
+@view
+@internal
+def _wouldCreateCurveDependencyCycle(_asset: address, _config: CurvePriceConfig) -> bool:
+    target: address = self._canonicalGreen(_asset)
+    nodes: DynArray[address, MAX_CURVE_GRAPH_NODES] = []
+    nodes.append(target)
+    visited: bool[51] = empty(bool[51])
+
+    # Adding or updating a feed only changes the target's outgoing edges. A new
+    # cycle therefore exists iff one of those edges can reach the target through
+    # the active Curve graph. Index zero uses the proposed config; later nodes
+    # use their active configs.
+    for i: uint256 in range(MAX_CURVE_GRAPH_NODES):
+        if i >= len(nodes):
+            break
+
+        node: address = nodes[i]
+        config: CurvePriceConfig = _config
+        if i != 0:
+            config = self.curveConfig[node]
+
+        dependencies: address[4] = self._getCurvePriceDependencies(node, config)
+        for dependency: address in dependencies:
+            if dependency == empty(address):
+                break
+
+            canonicalDependency: address = self._canonicalGreen(dependency)
+            if canonicalDependency == target:
+                return True
+
+            # Only an active config can recurse back into this Curve source.
+            if self.curveConfig[canonicalDependency].pool == empty(address):
+                continue
+
+            dependencyIndex: uint256 = priceData.indexOfAsset[canonicalDependency]
+            if dependencyIndex == 0 or dependencyIndex >= MAX_CURVE_GRAPH_NODES:
+                return True # inconsistent active graph; fail closed
+            if visited[dependencyIndex]:
+                continue
+
+            visited[dependencyIndex] = True
+            nodes.append(canonicalDependency)
+
     return False
 
 
@@ -745,23 +814,14 @@ def _isValidFeedStructure(_asset: address, _config: CurvePriceConfig) -> bool:
     if _asset not in _config.underlying and _asset != _config.lpToken:
         return False
 
-    canonicalAsset: address = self._canonicalGreen(_asset)
-
     # LP route: reject if a PriceDesk-queried underlying canonicalizes to this asset
     if _asset == _config.lpToken:
         if self._lpUnderlyingCanonicalEquals(_asset, _config):
             return False
 
-    # same-pool nested alt; both admission orders
-    elif _config.numUnderlying == 2:
-        alt: address = _config.underlying[0]
-        if alt == _asset:
-            alt = _config.underlying[1]
-        canonAlt: address = self._canonicalGreen(alt)
-        if canonAlt == canonicalAsset:
-            return False
-        if alt != empty(address) and (self.curveConfig[alt].pool == _config.pool or self.curveConfig[canonAlt].pool == _config.pool):
-            return False
+    # Reject direct, same-pool, cross-pool, and transitive dependency cycles.
+    if self._wouldCreateCurveDependencyCycle(_asset, _config):
+        return False
 
     return True
 

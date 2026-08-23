@@ -1034,7 +1034,8 @@ def _redeemFromStabilityPool(
     remainingRedeemValue: uint256 = maxRedeemValue
     remainingClaimAmount: uint256 = maxClaimableAmount
     if maxClaimableAmount > actualClaimableAmount:
-        remainingRedeemValue = min(actualClaimableAmount * maxRedeemValue // maxClaimableAmount, maxRedeemValue)
+        # This branch guarantees the prorated value is below maxRedeemValue.
+        remainingRedeemValue = actualClaimableAmount * maxRedeemValue // maxClaimableAmount
         remainingClaimAmount = actualClaimableAmount
 
     greenSpent: uint256 = 0
@@ -1436,6 +1437,8 @@ def _reduceClaimableBalances(
     _prevClaimableBalance: uint256,
     _remainingUsdValue: uint256,
 ):
+    # Never reduce a claim liability while aggregate custody is deficient.
+    self._getUnreservedBalance(_claimAsset)
     newClaimableBalance: uint256 = _prevClaimableBalance - _claimAmount
     self.claimableBalances[_stabAsset][_claimAsset] = newClaimableBalance
     self.totalClaimableBalances[_claimAsset] -= _claimAmount
