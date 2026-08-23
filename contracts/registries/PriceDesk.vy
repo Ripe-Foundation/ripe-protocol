@@ -162,18 +162,11 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
 
     # config
     config: PriceConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPriceConfig()
-    staleTime: uint256 = 0
-    if _staleTime == 0:
-        staleTime = config.staleTime
-    elif config.staleTime == 0:
-        staleTime = _staleTime
-    else:
-        staleTime = min(_staleTime, config.staleTime)
 
     # go thru priority partners first
     for pid: uint256 in config.priorityPriceSourceIds:
         sourceStatus: uint256 = 0
-        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, staleTime)
+        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, _staleTime)
         if price != 0:
             break
         if sourceStatus != 0:
@@ -188,7 +181,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
                 if pid in alreadyLooked:
                     continue
                 sourceStatus: uint256 = 0
-                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, staleTime)
+                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, _staleTime)
                 if price != 0:
                     break
                 if sourceStatus != 0:

@@ -29,7 +29,6 @@ interface StorkNetwork:
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
-    def getPriceStaleTime() -> uint256: view
 
 struct StorkFeedConfig:
     feedId: bytes32
@@ -116,6 +115,7 @@ pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
 STORK: public(immutable(address))
 MAX_PRICE_UPDATES: constant(uint256) = 20
+MAX_FEED_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
 
 
 @deploy
@@ -149,7 +149,11 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
-    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
+    if not isValid:
+        return 0
     return self._getPrice(config.feedId, staleTime)
 
 
@@ -159,7 +163,11 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
-    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
+    if not isValid:
+        return 0, True
     return self._getPrice(config.feedId, staleTime), True
 
 
@@ -203,14 +211,46 @@ def addPriceSnapshot(_asset: address) -> bool:
     return False
 
 
-@pure
+@view
 @internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> (uint256, bool):
+    feedStaleTime: uint256 = _feedBound
+    if feedStaleTime == 0:
+        isValid: bool = False
+        feedStaleTime, isValid = self._getGlobalStaleTime()
+        if not isValid:
+            return 0, False
+    elif feedStaleTime > MAX_FEED_STALE_TIME:
+        return 0, False
+
     if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
+        return feedStaleTime, True
+    return min(_callerBound, feedStaleTime), True
+
+
+@view
+@internal
+def _getGlobalStaleTime() -> (uint256, bool):
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl == empty(address):
+        return 0, False
+
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        missionControl,
+        method_id("getPriceStaleTime()", output_type=Bytes[4]),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return 0, False
+
+    staleTime: uint256 = abi_decode(response, uint256)
+    if staleTime == 0 or staleTime > MAX_FEED_STALE_TIME:
+        return 0, False
+    return staleTime, True
 
 
 ################
@@ -222,7 +262,7 @@ def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
 
 
 @external
-def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
+def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
@@ -313,7 +353,7 @@ def _isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> b
 
 
 @external
-def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
+def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
@@ -391,10 +431,30 @@ def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) ->
 @view
 @internal
 def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _oldFeedId: bytes32, _staleTime: uint256) -> bool:
-    if _feedId == _oldFeedId:
-        return False
     if priceData.indexOfAsset[_asset] == 0 or _oldFeedId == empty(bytes32): # use the `addNewPriceFeed` function instead
         return False
+
+    oldConfig: StorkFeedConfig = self.feedConfig[_asset]
+    if _oldFeedId != oldConfig.feedId:
+        return False
+    if _feedId == oldConfig.feedId:
+        if _staleTime == oldConfig.staleTime:
+            return False
+
+        candidateStaleTime: uint256 = 0
+        currentStaleTime: uint256 = 0
+        isCandidateValid: bool = False
+        isCurrentValid: bool = False
+        candidateStaleTime, isCandidateValid = self._resolveStaleTime(0, _staleTime)
+        currentStaleTime, isCurrentValid = self._resolveStaleTime(0, oldConfig.staleTime)
+
+        # A stale-time-only tightening may deliberately make the current
+        # observation stale. Require the feed to be live under its current
+        # policy, while all other updates must be live under the candidate.
+        if isCandidateValid and isCurrentValid and candidateStaleTime < currentStaleTime:
+            if self._isValidFeedConfig(_asset, oldConfig.feedId, oldConfig.staleTime):
+                return True
+
     return self._isValidFeedConfig(_asset, _feedId, _staleTime)
 
 
@@ -411,13 +471,12 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
     if publishTime == 0 or publishTime > block.timestamp:
         return False
 
-    globalStaleTime: uint256 = 0
-    missionControl: address = addys._getMissionControlAddr()
-    if missionControl != empty(address):
-        globalStaleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
-
-    staleTime: uint256 = self._resolveStaleTime(globalStaleTime, _staleTime)
-    if staleTime != 0 and block.timestamp - publishTime > staleTime:
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(0, _staleTime)
+    if not isValid:
+        return False
+    if block.timestamp - publishTime > staleTime:
         return False
     return True
 

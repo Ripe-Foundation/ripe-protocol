@@ -29,9 +29,6 @@ interface ChainlinkInterface:
 interface PriceDesk:
     def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256: view
 
-interface MissionControl:
-    def getPriceStaleTime() -> uint256: view
-
 struct ChainlinkRound:
     roundId: uint80
     answer: int256
@@ -108,6 +105,7 @@ pendingUpdates: public(HashMap[address, PendingRedStoneConfig]) # asset -> pendi
 
 ETH: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
+MAX_FEED_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
 
 
 @deploy
@@ -142,8 +140,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
-    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, staleTime, _priceDesk)
+    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk)
 
 
 @view
@@ -152,8 +149,7 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
-    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, staleTime, _priceDesk), True
+    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk), True
 
 
 @view
@@ -162,10 +158,24 @@ def _getPrice(
     _feed: address, 
     _decimals: uint256,
     _needsEthToUsd: bool,
-    _staleTime: uint256,
+    _callerStaleTime: uint256,
+    _feedStaleTime: uint256,
     _priceDesk: address,
 ) -> uint256:
-    price: uint256 = self._getRedStoneData(_feed, _decimals, _staleTime)
+    globalStaleTime: uint256 = 0
+    hasValidGlobal: bool = False
+    if _feedStaleTime == 0:
+        globalStaleTime, hasValidGlobal = self._getGlobalStaleTime()
+        if not hasValidGlobal:
+            return 0
+
+    staleTime: uint256 = 0
+    isValidStaleTime: bool = False
+    staleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, _feedStaleTime, _callerStaleTime)
+    if not isValidStaleTime:
+        return 0
+
+    price: uint256 = self._getRedStoneData(_feed, _decimals, staleTime)
     if price == 0:
         return 0
 
@@ -174,7 +184,7 @@ def _getPrice(
         priceDesk: address = _priceDesk
         if _priceDesk == empty(address):
             priceDesk = addys._getPriceDeskAddr()
-        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True, _staleTime)
+        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True, _callerStaleTime)
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
@@ -200,14 +210,45 @@ def addPriceSnapshot(_asset: address) -> bool:
     return False
 
 
+@view
+@internal
+def _getGlobalStaleTime() -> (uint256, bool):
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl == empty(address):
+        return 0, False
+
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        missionControl,
+        method_id("getPriceStaleTime()", output_type=Bytes[4]),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return 0, False
+
+    staleTime: uint256 = abi_decode(response, uint256)
+    if staleTime == 0 or staleTime > MAX_FEED_STALE_TIME:
+        return 0, False
+    return staleTime, True
+
+
 @pure
 @internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256, _callerBound: uint256) -> (uint256, bool):
+    feedPolicy: uint256 = _feedBound
+    if feedPolicy == 0:
+        if _globalBound == 0 or _globalBound > MAX_FEED_STALE_TIME:
+            return 0, False
+        feedPolicy = _globalBound
+    elif feedPolicy > MAX_FEED_STALE_TIME:
+        return 0, False
+
     if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
+        return feedPolicy, True
+    return min(feedPolicy, _callerBound), True
 
 
 #################
@@ -272,7 +313,7 @@ def _getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256) ->
 def addNewPriceFeed(
     _asset: address,
     _newFeed: address,
-    _staleTime: uint256 = 60 * 60 * 24, # 1 day
+    _staleTime: uint256 = 0, # inherit MissionControl
     _needsEthToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -376,7 +417,7 @@ def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _nee
 def updatePriceFeed(
     _asset: address,
     _newFeed: address,
-    _staleTime: uint256 = 60 * 60 * 24, # 1 day
+    _staleTime: uint256 = 0, # inherit MissionControl
     _needsEthToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -463,11 +504,63 @@ def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _n
 @view
 @internal
 def _isValidUpdateFeed(_asset: address, _newFeed: address, _oldFeed: address, _decimals: uint256, _needsEthToUsd: bool, _staleTime: uint256) -> bool:
-    if _newFeed == _oldFeed:
-        return False
     if priceData.indexOfAsset[_asset] == 0 or _oldFeed == empty(address): # use the `addNewPriceFeed` function instead
         return False
+
+    currentConfig: RedStoneConfig = self.feedConfig[_asset]
+    if _oldFeed != currentConfig.feed:
+        return False
+    if (
+        _newFeed == currentConfig.feed
+        and _decimals == currentConfig.decimals
+        and _needsEthToUsd == currentConfig.needsEthToUsd
+        and _staleTime == currentConfig.staleTime
+    ):
+        return False
+
+    if self._isStaleTimeOnlyTightening(_asset, _newFeed, _decimals, _needsEthToUsd, _staleTime):
+        return self._isValidFeedConfig(
+            _asset,
+            currentConfig.feed,
+            currentConfig.decimals,
+            currentConfig.needsEthToUsd,
+            currentConfig.staleTime,
+        )
     return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _staleTime)
+
+
+@view
+@internal
+def _isStaleTimeOnlyTightening(
+    _asset: address,
+    _newFeed: address,
+    _decimals: uint256,
+    _needsEthToUsd: bool,
+    _staleTime: uint256,
+) -> bool:
+    currentConfig: RedStoneConfig = self.feedConfig[_asset]
+    if (
+        _newFeed != currentConfig.feed
+        or _decimals != currentConfig.decimals
+        or _needsEthToUsd != currentConfig.needsEthToUsd
+        or _staleTime == currentConfig.staleTime
+    ):
+        return False
+
+    globalStaleTime: uint256 = 0
+    if currentConfig.staleTime == 0 or _staleTime == 0:
+        hasValidGlobal: bool = False
+        globalStaleTime, hasValidGlobal = self._getGlobalStaleTime()
+        if not hasValidGlobal:
+            return False
+
+    currentStaleTime: uint256 = 0
+    candidateStaleTime: uint256 = 0
+    isValidCurrent: bool = False
+    isValidCandidate: bool = False
+    currentStaleTime, isValidCurrent = self._resolveStaleTime(globalStaleTime, currentConfig.staleTime, 0)
+    candidateStaleTime, isValidCandidate = self._resolveStaleTime(globalStaleTime, _staleTime, 0)
+    return isValidCurrent and isValidCandidate and candidateStaleTime < currentStaleTime
 
 
 @view
@@ -482,13 +575,7 @@ def _isValidFeedConfig(
     if empty(address) in [_asset, _feed]:
         return False
 
-    globalStaleTime: uint256 = 0
-    missionControl: address = addys._getMissionControlAddr()
-    if missionControl != empty(address):
-        globalStaleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
-
-    staleTime: uint256 = self._resolveStaleTime(globalStaleTime, _staleTime)
-    return self._getPrice(_feed, _decimals, _needsEthToUsd, staleTime, addys._getPriceDeskAddr()) != 0
+    return self._getPrice(_feed, _decimals, _needsEthToUsd, 0, _staleTime, addys._getPriceDeskAddr()) != 0
 
 
 ################
