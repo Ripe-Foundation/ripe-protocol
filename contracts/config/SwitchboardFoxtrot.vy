@@ -23,14 +23,14 @@ import contracts.modules.TimeLock as timeLock
 
 interface InstantBondLane:
     def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
-    def isValidCumulativeMinted(_amount: uint256) -> bool: view
+    def isValidCumulativeAllocated(_amount: uint256) -> bool: view
     def isValidRateOverride(_targetRate: uint256) -> bool: view
     def isValidConfig(_config: InstantBondConfig) -> bool: view
     def isValidEpochLength(_epochLength: uint256) -> bool: view
     def setConfig(_newConfig: InstantBondConfig): nonpayable
     def isValidPaymentToken(_token: address) -> bool: view
     def setRateOverride(_targetRate: uint256): nonpayable
-    def setCumulativeMinted(_amount: uint256): nonpayable
+    def setCumulativeAllocated(_amount: uint256): nonpayable
     def setPaymentToken(_token: address): nonpayable
     def setCanBuyNow(_canBuyNow: bool): nonpayable
     def bondConfig() -> InstantBondConfig: view
@@ -62,8 +62,9 @@ struct InstantBondConfig:
     maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
-    maxLockBonus: uint256
-    minLockDuration: uint256
+    maxVestingBonus: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
     epochLength: uint256
 
 event PendingInstantBondConfigSet:
@@ -83,8 +84,9 @@ event PendingInstantBondConfigSet:
     maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
-    maxLockBonus: uint256
-    minLockDuration: uint256
+    maxVestingBonus: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
     epochLength: uint256
 
 event InstantBondConfigExecuted:
@@ -109,7 +111,7 @@ event InstantBondStarted:
     genesisBlock: uint256
     epochLength: uint256
 
-event InstantBondCumulativeMintedSet:
+event InstantBondCumulativeAllocatedSet:
     amount: uint256
 
 event InstantBondPaymentTokenSet:
@@ -182,8 +184,9 @@ def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
         maxDownBps=_config.maxDownBps,
         decayBps=_config.decayBps,
         maxDecayEpochs=_config.maxDecayEpochs,
-        maxLockBonus=_config.maxLockBonus,
-        minLockDuration=_config.minLockDuration,
+        maxVestingBonus=_config.maxVestingBonus,
+        minVestingLength=_config.minVestingLength,
+        maxVestingLength=_config.maxVestingLength,
         epochLength=_config.epochLength,
     )
     return aid
@@ -273,7 +276,7 @@ def stopInstantBond():
 
 
 ####################
-# Cumulative Minted #
+# Cumulative Allocation #
 ####################
 
 
@@ -288,13 +291,13 @@ def setInstantBondPaymentToken(_token: address):
 
 
 @external
-def setInstantBondCumulativeMinted(_amount: uint256):
+def setInstantBondCumulativeAllocated(_amount: uint256):
     assert gov._canGovern(msg.sender) # dev: no perms
 
     lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isValidCumulativeMinted(_amount) # dev: exceeds mint budget
-    extcall InstantBondLane(lane).setCumulativeMinted(_amount)
-    log InstantBondCumulativeMintedSet(amount=_amount)
+    assert staticcall InstantBondLane(lane).isValidCumulativeAllocated(_amount) # dev: invalid cumulative allocation
+    extcall InstantBondLane(lane).setCumulativeAllocated(_amount)
+    log InstantBondCumulativeAllocatedSet(amount=_amount)
 
 
 #############

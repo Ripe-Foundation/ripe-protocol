@@ -40,14 +40,20 @@ interface MissionControl:
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
+interface InstantBondClaims:
+    def getRipeHq() -> address: view
+    def RIPE_TOKEN() -> address: view
+    def isPaused() -> bool: view
+    def createVestingPosition(_beneficiary: address, _ripePayout: uint256, _vestingLength: uint256) -> uint256: nonpayable
+
 interface RipeToken:
     def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
+    def ripeHq() -> address: view
+    def isPaused() -> bool: view
 
 interface RipeHq:
+    def ripeToken() -> address: view
     def canMintRipe(_addr: address) -> bool: view
-
-interface Ledger:
-    def badDebt() -> uint256: view
 
 struct InstantBondConfig:
     canBuyNow: bool
@@ -64,8 +70,9 @@ struct InstantBondConfig:
     maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
-    maxLockBonus: uint256
-    minLockDuration: uint256
+    maxVestingBonus: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
     epochLength: uint256
 
 struct InstantBondQuote:
@@ -78,12 +85,10 @@ struct InstantBondQuote:
     baseRipe: uint256
     bonusRatio: uint256
     bonusRipe: uint256
-    actualLock: uint256
-    ripeGovVaultId: uint256
+    vestingLength: uint256
+    creationBlock: uint256
+    maturityBlock: uint256
     totalRipe: uint256
-    canExitEarly: bool
-    exitFee: uint256
-    isExitFrozen: bool
 
 struct RateTransition:
     controllerRate: uint256
@@ -96,7 +101,9 @@ struct EpochSnapshot:
     rate: uint256
     paymentCap: uint256
     minPaymentAmount: uint256
-    maxLockBonus: uint256
+    maxVestingBonus: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
     acceptedPayment: uint256
     weightedLateness: uint256
     timingEligible: bool
@@ -105,7 +112,7 @@ struct PayoutData:
     baseRipe: uint256
     bonusRatio: uint256
     bonusRipe: uint256
-    actualLock: uint256
+    vestingLength: uint256
     totalRipe: uint256
 
 event EpochInitialized:
@@ -113,7 +120,9 @@ event EpochInitialized:
     rate: uint256
     paymentCap: uint256
     minPaymentAmount: uint256
-    maxLockBonus: uint256
+    maxVestingBonus: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
     timingEligible: bool
 
 event EpochRolled:
@@ -123,7 +132,9 @@ event EpochRolled:
     newRate: uint256
     newPaymentCap: uint256
     newMinPaymentAmount: uint256
-    newMaxLockBonus: uint256
+    newMaxVestingBonus: uint256
+    newMinVestingLength: uint256
+    newMaxVestingLength: uint256
     previousAcceptedPayment: uint256
     previousPaymentCap: uint256
     previousWeightedLateness: uint256
@@ -135,11 +146,14 @@ event EpochRolled:
 
 event InstantBondPurchased:
     buyer: indexed(address)
+    positionIndex: indexed(uint256)
     paymentAmount: uint256
     baseRipe: uint256
     bonusRipe: uint256
     bonusRatio: uint256
-    actualLock: uint256
+    vestingLength: uint256
+    creationBlock: uint256
+    maturityBlock: uint256
     totalRipe: uint256
     epochRate: uint256
     epoch: indexed(uint256)
@@ -159,8 +173,9 @@ event InstantBondConfigSet:
     maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
-    maxLockBonus: uint256
-    minLockDuration: uint256
+    maxVestingBonus: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
     epochLength: uint256
 
 event CanBuyNowSet:
@@ -178,7 +193,7 @@ event PaymentTokenSet:
     decimals: uint8
     scale: uint256
 
-event CumulativeMintedSet:
+event CumulativeAllocatedSet:
     amount: uint256
 
 event RateOverrideInstalled:
@@ -210,24 +225,35 @@ paymentScale: public(uint256)
 genesisBlock: public(uint256)
 
 # overall
-cumulativeMinted: public(uint256)
+cumulativeAllocated: public(uint256)
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
-MAX_LOCK_BONUS: constant(uint256) = 1000_00 # 1000.00%
+MAX_VESTING_BONUS: constant(uint256) = 1000_00 # 1000.00%
+MAX_VESTING_LENGTH: public(constant(uint256)) = 7_884_000
 MAX_PRICE_STEP_BPS: constant(uint256) = 100_00 # 100.00%
 MAX_DECAY_EPOCHS: constant(uint256) = 32
 MAX_PAYMENT_DECIMALS: constant(uint8) = 73
 MIN_BASE_RATE: constant(uint256) = 10_000
+
+CLAIMS: public(immutable(address))
 
 
 @deploy
 def __init__(
     _ripeHq: address,
     _paymentToken: address,
+    _claims: address,
     _config: InstantBondConfig,
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(True, False, True) # starts paused, can mint ripe only
+
+    assert _claims.is_contract # dev: invalid claims
+    assert staticcall InstantBondClaims(_claims).getRipeHq() == _ripeHq # dev: invalid claims hq
+    ripeToken: address = staticcall InstantBondClaims(_claims).RIPE_TOKEN()
+    assert ripeToken == staticcall RipeHq(_ripeHq).ripeToken() # dev: invalid ripe token
+    assert staticcall RipeToken(ripeToken).ripeHq() == _ripeHq # dev: invalid token hq
+    CLAIMS = _claims
 
     self._storePaymentToken(_paymentToken)
     assert self._isValidConfig(_config) # dev: invalid config
@@ -243,7 +269,8 @@ def __init__(
 @external
 def buyNow(
     _paymentAmount: uint256,
-    _requestedLock: uint256,
+    _requestedVestingLength: uint256,
+    _expectedVestingLength: uint256,
     _expectedEpoch: uint256,
     _minRipeOut: uint256,
     _deadlineBlock: uint256,
@@ -256,6 +283,7 @@ def buyNow(
     assert self._isValidConfig(config) # dev: not configured
     assert config.canBuyNow # dev: disabled
     assert block.number <= _deadlineBlock # dev: expired
+    assert self._isPurchaseReady() # dev: mint not ready
 
     # refresh epoch if necessary
     prev: EpochSnapshot = self.epochState
@@ -270,19 +298,25 @@ def buyNow(
     assert _paymentAmount >= snap.minPaymentAmount # dev: below minimum payment
     assert _paymentAmount <= availAmount # dev: exceeds available amount
 
-    # calculate payout and enforce mint budget
-    a: addys.Addys = addys._getAddys()
-    vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
-    payout: PayoutData = self._calculatePayout(_paymentAmount, snap.rate, snap.maxLockBonus, _requestedLock, config.minLockDuration, vaultConfig)
+    # calculate payout and enforce allocation budget
+    payout: PayoutData = self._calculatePayout(
+        _paymentAmount,
+        snap.rate,
+        snap.maxVestingBonus,
+        _requestedVestingLength,
+        snap.minVestingLength,
+        snap.maxVestingLength,
+    )
+    assert payout.vestingLength == _expectedVestingLength # dev: vesting length moved
 
     assert payout.totalRipe >= _minRipeOut # dev: slippage
-    budgetRemaining: uint256 = config.mintBudget - self.cumulativeMinted
+    budgetRemaining: uint256 = config.mintBudget - self.cumulativeAllocated
     assert payout.totalRipe <= budgetRemaining # dev: mint budget
 
     # consume against this epoch before the state-changing external calls below
     self.epochState.acceptedPayment += _paymentAmount
     self.epochState.weightedLateness += _paymentAmount * self._getLatenessBps(block.number)
-    self.cumulativeMinted += payout.totalRipe
+    self.cumulativeAllocated += payout.totalRipe
 
     # collect payment amount, move to endaoment funds
     endaoFunds: address = addys._getEndaomentFundsAddr()
@@ -293,34 +327,20 @@ def buyNow(
     assert paymentBalanceAfter >= paymentBalanceBefore # dev: payment receipt mismatch
     assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount # dev: payment receipt mismatch
 
-    # mint ripe to user
-    if payout.actualLock == 0:
-        assert extcall RipeToken(a.ripeToken).mint(msg.sender, payout.totalRipe) # dev: mint failed
-    
-    # deposit into core ripe gov vault
-    else:
-        ripeBalanceBefore: uint256 = staticcall IERC20(a.ripeToken).balanceOf(self)
-
-        # mint
-        assert extcall RipeToken(a.ripeToken).mint(self, payout.totalRipe) # dev: mint failed
-
-        # deposit
-        coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
-        assert extcall IERC20(a.ripeToken).approve(a.teller, payout.totalRipe, default_return_value=True) # dev: ripe approval failed
-        depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(msg.sender, coreRipeGovVaultId, a.ripeToken, payout.totalRipe, payout.actualLock, a)
-        assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
-
-        # validation
-        assert depositedAmount == payout.totalRipe # dev: deposit mismatch
-        assert staticcall IERC20(a.ripeToken).balanceOf(self) == ripeBalanceBefore # dev: ripe settlement mismatch
+    # record one persistent vesting position; no ripe is minted at purchase
+    positionIndex: uint256 = extcall InstantBondClaims(CLAIMS).createVestingPosition(msg.sender, payout.totalRipe, payout.vestingLength)
+    assert positionIndex != 0 # dev: invalid position
 
     log InstantBondPurchased(
         buyer=msg.sender,
+        positionIndex=positionIndex,
         paymentAmount=_paymentAmount,
         baseRipe=payout.baseRipe,
         bonusRipe=payout.bonusRipe,
         bonusRatio=payout.bonusRatio,
-        actualLock=payout.actualLock,
+        vestingLength=payout.vestingLength,
+        creationBlock=block.number,
+        maturityBlock=block.number + payout.vestingLength,
         totalRipe=payout.totalRipe,
         epochRate=snap.rate,
         epoch=snap.epoch,
@@ -336,34 +356,114 @@ def buyNow(
 def _calculatePayout(
     _paymentAmount: uint256,
     _rate: uint256,
-    _maxLockBonus: uint256,
-    _requestedLock: uint256,
-    _minLockDuration: uint256,
-    _vaultConfig: cs.RipeGovVaultConfig,
+    _maxVestingBonus: uint256,
+    _requestedVestingLength: uint256,
+    _minVestingLength: uint256,
+    _maxVestingLength: uint256,
 ) -> PayoutData:
     baseRipe: uint256 = _paymentAmount * _rate // self.paymentScale
-    minLock: uint256 = max(_vaultConfig.lockTerms.minLockDuration, _minLockDuration)
-    maxLock: uint256 = _vaultConfig.lockTerms.maxLockDuration
+    vestingLength: uint256 = _minVestingLength
+    if _requestedVestingLength != 0:
+        vestingLength = min(max(_requestedVestingLength, _minVestingLength), _maxVestingLength)
 
-    # unlocked if they asked for it and the lane has no floor, or there is no live range
-    actualLock: uint256 = 0
-    if (_requestedLock != 0 or _minLockDuration != 0) and maxLock != 0 and maxLock >= minLock:
-        actualLock = min(max(_requestedLock, minLock), maxLock)
-
-    bonusRatio: uint256 = 0
-    if actualLock != 0:
-        bonusRatio = _maxLockBonus
-        if maxLock != minLock:
-            bonusRatio = _maxLockBonus * (actualLock - minLock) // (maxLock - minLock)
+    bonusRatio: uint256 = _maxVestingBonus
+    if _maxVestingLength != _minVestingLength:
+        bonusRatio = _maxVestingBonus * (vestingLength - _minVestingLength) // (_maxVestingLength - _minVestingLength)
 
     bonusRipe: uint256 = baseRipe * bonusRatio // HUNDRED_PERCENT
     return PayoutData(
         baseRipe=baseRipe,
         bonusRatio=bonusRatio,
         bonusRipe=bonusRipe,
-        actualLock=actualLock,
+        vestingLength=vestingLength,
         totalRipe=baseRipe + bonusRipe,
     )
+
+
+####################
+# Claim Settlement #
+####################
+
+
+@nonreentrant
+@external
+def settleVestedRipe(
+    _beneficiary: address,
+    _amount: uint256,
+    _autoDeposit: bool,
+    _lockDuration: uint256,
+) -> bool:
+    assert msg.sender == CLAIMS # dev: invalid claims
+    assert addys._getInstantBondLaneAddr() == self # dev: retired lane
+    assert _beneficiary != empty(address) and _amount != 0 # dev: invalid settlement
+
+    if _autoDeposit:
+        assert _lockDuration != 0 # dev: invalid lock duration
+    else:
+        assert _lockDuration == 0 # dev: invalid lock duration
+
+    ripeHq: address = addys._getRipeHq()
+    assert staticcall RipeHq(ripeHq).canMintRipe(self) # dev: cannot mint ripe
+    ripeToken: address = staticcall InstantBondClaims(CLAIMS).RIPE_TOKEN()
+    assert staticcall RipeHq(ripeHq).ripeToken() == ripeToken # dev: invalid ripe token
+    assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
+    assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe token paused
+
+    if not _autoDeposit:
+        balanceBefore: uint256 = staticcall IERC20(ripeToken).balanceOf(_beneficiary)
+        assert extcall RipeToken(ripeToken).mint(_beneficiary, _amount) # dev: mint failed
+        balanceAfter: uint256 = staticcall IERC20(ripeToken).balanceOf(_beneficiary)
+        assert balanceAfter >= balanceBefore # dev: ripe receipt mismatch
+        assert balanceAfter - balanceBefore == _amount # dev: ripe receipt mismatch
+
+    else:
+        a: addys.Addys = addys._getAddys()
+        coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+        assert coreRipeGovVaultId != 0 # dev: invalid ripe gov vault
+
+        vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(ripeToken)
+        minLockDuration: uint256 = vaultConfig.lockTerms.minLockDuration
+        maxLockDuration: uint256 = vaultConfig.lockTerms.maxLockDuration
+        assert maxLockDuration != 0 and maxLockDuration >= minLockDuration # dev: no lock terms
+        assert _lockDuration >= minLockDuration and _lockDuration <= maxLockDuration # dev: invalid lock duration
+
+        ripeBalanceBefore: uint256 = staticcall IERC20(ripeToken).balanceOf(self)
+        assert extcall RipeToken(ripeToken).mint(self, _amount) # dev: mint failed
+        ripeBalanceAfter: uint256 = staticcall IERC20(ripeToken).balanceOf(self)
+        assert ripeBalanceAfter >= ripeBalanceBefore # dev: ripe receipt mismatch
+        assert ripeBalanceAfter - ripeBalanceBefore == _amount # dev: ripe receipt mismatch
+
+        assert extcall IERC20(ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
+        depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(_beneficiary, coreRipeGovVaultId, ripeToken, _amount, _lockDuration, a)
+        assert depositedAmount == _amount # dev: deposit mismatch
+        assert extcall IERC20(ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
+        assert staticcall IERC20(ripeToken).balanceOf(self) == ripeBalanceBefore # dev: ripe settlement mismatch
+
+    return True
+
+
+@view
+@internal
+def _isPurchaseReady() -> bool:
+    if addys._getInstantBondLaneAddr() != self:
+        return False
+
+    claims: address = CLAIMS
+    if staticcall InstantBondClaims(claims).isPaused():
+        return False
+
+    ripeHq: address = addys._getRipeHq()
+    if staticcall InstantBondClaims(claims).getRipeHq() != ripeHq:
+        return False
+
+    ripeToken: address = staticcall InstantBondClaims(claims).RIPE_TOKEN()
+    if staticcall RipeHq(ripeHq).ripeToken() != ripeToken:
+        return False
+    if staticcall RipeToken(ripeToken).ripeHq() != ripeHq:
+        return False
+    if staticcall RipeToken(ripeToken).isPaused():
+        return False
+    return staticcall RipeHq(ripeHq).canMintRipe(self)
 
 
 # next rate
@@ -376,7 +476,7 @@ def _nextRate(
     _elapsed: uint256,
     _config: InstantBondConfig,
 ) -> RateTransition:
-    ceiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxLockBonus)
+    ceiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxVestingBonus)
     rate: uint256 = min(_prev.rate, ceiling)
     utilizationBps: uint256 = 0
     adjustmentBps: uint256 = 0
@@ -477,7 +577,9 @@ def _openEpoch(
         rate=_rate,
         paymentCap=_config.paymentCapPerEpoch,
         minPaymentAmount=_config.minPaymentAmount,
-        maxLockBonus=_config.maxLockBonus,
+        maxVestingBonus=_config.maxVestingBonus,
+        minVestingLength=_config.minVestingLength,
+        maxVestingLength=_config.maxVestingLength,
         acceptedPayment=0,
         weightedLateness=0,
         timingEligible=_timingEligible,
@@ -504,7 +606,9 @@ def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: Ra
             rate=_snap.rate,
             paymentCap=_snap.paymentCap,
             minPaymentAmount=_snap.minPaymentAmount,
-            maxLockBonus=_snap.maxLockBonus,
+            maxVestingBonus=_snap.maxVestingBonus,
+            minVestingLength=_snap.minVestingLength,
+            maxVestingLength=_snap.maxVestingLength,
             timingEligible=_snap.timingEligible,
         )
         return
@@ -527,7 +631,9 @@ def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: Ra
         newRate=_snap.rate,
         newPaymentCap=_snap.paymentCap,
         newMinPaymentAmount=_snap.minPaymentAmount,
-        newMaxLockBonus=_snap.maxLockBonus,
+        newMaxVestingBonus=_snap.maxVestingBonus,
+        newMinVestingLength=_snap.minVestingLength,
+        newMaxVestingLength=_snap.maxVestingLength,
         previousAcceptedPayment=_prev.acceptedPayment,
         previousPaymentCap=_prev.paymentCap,
         previousWeightedLateness=_prev.weightedLateness,
@@ -640,8 +746,9 @@ def setConfig(_newConfig: InstantBondConfig):
         maxDownBps=_newConfig.maxDownBps,
         decayBps=_newConfig.decayBps,
         maxDecayEpochs=_newConfig.maxDecayEpochs,
-        maxLockBonus=_newConfig.maxLockBonus,
-        minLockDuration=_newConfig.minLockDuration,
+        maxVestingBonus=_newConfig.maxVestingBonus,
+        minVestingLength=_newConfig.minVestingLength,
+        maxVestingLength=_newConfig.maxVestingLength,
         epochLength=_newConfig.epochLength,
     )
 
@@ -726,7 +833,7 @@ def _isValidRateOverride(_targetRate: uint256) -> bool:
     if not self.isRunning or self.epochState.rate == 0:
         return False
     config: InstantBondConfig = self.bondConfig
-    ceiling: uint256 = self._baseRateCeiling(config.maxEffectiveRate, config.maxLockBonus)
+    ceiling: uint256 = self._baseRateCeiling(config.maxEffectiveRate, config.maxVestingBonus)
     return _targetRate >= MIN_BASE_RATE and _targetRate <= ceiling
 
 
@@ -777,17 +884,17 @@ def _isValidPaymentToken(_token: address) -> bool:
 
 
 ###############
-# Mint Budget #
+# Allocation Budget #
 ###############
 
 
 @nonreentrant
 @external
-def setCumulativeMinted(_amount: uint256):
+def setCumulativeAllocated(_amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert self._isValidCumulativeMinted(_amount) # dev: exceeds mint budget
-    self.cumulativeMinted = _amount
-    log CumulativeMintedSet(amount=_amount)
+    assert self._isValidCumulativeAllocated(_amount) # dev: invalid cumulative allocation
+    self.cumulativeAllocated = _amount
+    log CumulativeAllocatedSet(amount=_amount)
 
 
 # validation
@@ -795,14 +902,14 @@ def setCumulativeMinted(_amount: uint256):
 
 @view
 @external
-def isValidCumulativeMinted(_amount: uint256) -> bool:
-    return self._isValidCumulativeMinted(_amount)
+def isValidCumulativeAllocated(_amount: uint256) -> bool:
+    return self._isValidCumulativeAllocated(_amount)
 
 
 @view
 @internal
-def _isValidCumulativeMinted(_amount: uint256) -> bool:
-    return _amount <= self.bondConfig.mintBudget
+def _isValidCumulativeAllocated(_amount: uint256) -> bool:
+    return _amount >= self.cumulativeAllocated and _amount <= self.bondConfig.mintBudget
 
 
 ##############
@@ -868,26 +975,32 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
     if _config.maxEffectiveRate > max_value(uint256) // _config.paymentCapPerEpoch:
         return False
 
-    # lock bonus stays inside the hard cap
-    if _config.maxLockBonus > MAX_LOCK_BONUS:
+    # vesting bonus stays inside the hard cap
+    if _config.maxVestingBonus > MAX_VESTING_BONUS:
+        return False
+
+    # every purchase has a positive, bounded vesting duration
+    if _config.minVestingLength == 0 or _config.maxVestingLength < _config.minVestingLength:
+        return False
+    if _config.maxVestingLength > MAX_VESTING_LENGTH:
         return False
 
     # implied max base rate must still be a legal rate
-    baseRateCeiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxLockBonus)
+    baseRateCeiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxVestingBonus)
     if baseRateCeiling < MIN_BASE_RATE:
         return False
 
     # full-cap bonus ripe cannot overflow
     maxBaseRipe: uint256 = _config.paymentCapPerEpoch * baseRateCeiling // paymentScale
-    if _config.maxLockBonus != 0 and maxBaseRipe > max_value(uint256) // _config.maxLockBonus:
+    if _config.maxVestingBonus != 0 and maxBaseRipe > max_value(uint256) // _config.maxVestingBonus:
         return False
 
     # seed must sit in [min base rate, implied ceiling]
     if _config.seedRate < MIN_BASE_RATE or _config.seedRate > baseRateCeiling:
         return False
 
-    # cannot cut the mint budget below RIPE already issued
-    if _config.mintBudget < self.cumulativeMinted:
+    # cannot cut the mint budget below RIPE already allocated
+    if _config.mintBudget < self.cumulativeAllocated:
         return False
 
     # epoch length must be a valid clock
@@ -907,8 +1020,8 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
 
 @pure
 @internal
-def _baseRateCeiling(_maxEffectiveRate: uint256, _maxLockBonus: uint256) -> uint256:
-    return _maxEffectiveRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _maxLockBonus)
+def _baseRateCeiling(_maxEffectiveRate: uint256, _maxVestingBonus: uint256) -> uint256:
+    return _maxEffectiveRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _maxVestingBonus)
 
 
 ###########
@@ -918,7 +1031,7 @@ def _baseRateCeiling(_maxEffectiveRate: uint256, _maxLockBonus: uint256) -> uint
 
 @view
 @external
-def previewBuyNow(_paymentAmount: uint256, _requestedLock: uint256) -> InstantBondQuote:
+def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> InstantBondQuote:
     quote: InstantBondQuote = empty(InstantBondQuote)
     if block.number < self.genesisBlock:
         return quote
@@ -932,7 +1045,7 @@ def previewBuyNow(_paymentAmount: uint256, _requestedLock: uint256) -> InstantBo
     transition: RateTransition = empty(RateTransition)
     snap, transition = self._getEpochSnapshot(self.epochState, config)
     remainingPayment: uint256 = snap.paymentCap - snap.acceptedPayment
-    budgetRemaining: uint256 = config.mintBudget - self.cumulativeMinted
+    budgetRemaining: uint256 = config.mintBudget - self.cumulativeAllocated
 
     quote.epoch = snap.epoch
     quote.rate = snap.rate
@@ -944,32 +1057,30 @@ def previewBuyNow(_paymentAmount: uint256, _requestedLock: uint256) -> InstantBo
         return quote
 
     # payout
-    a: addys.Addys = addys._getAddys()
-    vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
-    payout: PayoutData = self._calculatePayout(_paymentAmount, snap.rate, snap.maxLockBonus, _requestedLock, config.minLockDuration, vaultConfig)
+    payout: PayoutData = self._calculatePayout(
+        _paymentAmount,
+        snap.rate,
+        snap.maxVestingBonus,
+        _requestedVestingLength,
+        snap.minVestingLength,
+        snap.maxVestingLength,
+    )
 
     quote.baseRipe = payout.baseRipe
     quote.bonusRatio = payout.bonusRatio
     quote.bonusRipe = payout.bonusRipe
-    quote.actualLock = payout.actualLock
+    quote.vestingLength = payout.vestingLength
+    quote.creationBlock = block.number
+    quote.maturityBlock = block.number + payout.vestingLength
     quote.totalRipe = payout.totalRipe
-
-    # lock terms (disclosure only)
-    if payout.actualLock != 0:
-        quote.ripeGovVaultId = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
-        quote.canExitEarly = vaultConfig.lockTerms.canExit
-        quote.exitFee = vaultConfig.lockTerms.exitFee
-        if vaultConfig.shouldFreezeWhenBadDebt:
-            quote.isExitFrozen = staticcall Ledger(a.ledger).badDebt() != 0
 
     # same gates as buyNow, minus deadline / expectedEpoch / slippage
     if deptBasics.isPaused or not self.isRunning or not config.canBuyNow:
         return quote
     if payout.totalRipe > budgetRemaining:
         return quote
-    if not staticcall RipeHq(addys._getRipeHq()).canMintRipe(self):
+    if not self._isPurchaseReady():
         return quote
 
     quote.available = True
     return quote
-
