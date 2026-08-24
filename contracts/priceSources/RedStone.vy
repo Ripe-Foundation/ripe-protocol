@@ -420,8 +420,28 @@ def updatePriceFeed(
     decimals: uint256 = 0
     if _newFeed != empty(address):
         decimals = convert(staticcall ChainlinkInterface(_newFeed).decimals(), uint256)
+    return self._initiatePriceFeedUpdate(_asset, _newFeed, decimals, _needsEthToUsd, _staleTime)
+
+
+@external
+def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+
+    config: RedStoneConfig = self.feedConfig[_asset]
+    return self._initiatePriceFeedUpdate(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime)
+
+
+@internal
+def _initiatePriceFeedUpdate(
+    _asset: address,
+    _newFeed: address,
+    _decimals: uint256,
+    _needsEthToUsd: bool,
+    _staleTime: uint256,
+) -> bool:
     oldFeed: address = self.feedConfig[_asset].feed
-    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _staleTime) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, _decimals, _needsEthToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -429,7 +449,7 @@ def updatePriceFeed(
         actionId=aid,
         config=RedStoneConfig(
             feed=_newFeed,
-            decimals=decimals,
+            decimals=_decimals,
             needsEthToUsd=_needsEthToUsd,
             staleTime=_staleTime,
         ),

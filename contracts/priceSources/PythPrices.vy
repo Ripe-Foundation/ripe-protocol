@@ -399,6 +399,21 @@ def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) 
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
+    return self._initiatePriceFeedUpdate(_asset, _feedId, _staleTime)
+
+
+@external
+def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+
+    config: PythFeedConfig = self.feedConfig[_asset]
+    return self._initiatePriceFeedUpdate(_asset, config.feedId, _staleTime)
+
+
+@internal
+def _initiatePriceFeedUpdate(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     assert self._isValidUpdateFeed(_asset, _feedId, oldFeedId, _staleTime) # dev: invalid feed
