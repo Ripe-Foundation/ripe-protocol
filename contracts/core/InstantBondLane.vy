@@ -36,28 +36,29 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
+interface InstantBondClaims:
+    def createVestingPosition(_beneficiary: address, _ripePayout: uint256, _vestingLength: uint256) -> uint256: nonpayable
+    def recordClaim(_beneficiary: address, _positionId: uint256) -> (uint256, uint256, uint256): nonpayable
+    def remainingAllocationBudget() -> uint256: view
+    def getRipeHq() -> address: view
+    def isPaused() -> bool: view
+
+interface RipeToken:
+    def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
+    def blacklisted(_addr: address) -> bool: view
+    def ripeHq() -> address: view
+    def isPaused() -> bool: view
+
 interface MissionControl:
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
     def coreRipeGovVaultId() -> uint256: view
 
-interface Teller:
-    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-
-interface InstantBondClaims:
-    def getRipeHq() -> address: view
-    def isPaused() -> bool: view
-    def remainingAllocationBudget() -> uint256: view
-    def createVestingPosition(_beneficiary: address, _ripePayout: uint256, _vestingLength: uint256) -> uint256: nonpayable
-
-interface RipeToken:
-    def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
-    def ripeHq() -> address: view
-    def isPaused() -> bool: view
-    def blacklisted(_addr: address) -> bool: view
-
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
     def canMintRipe(_addr: address) -> bool: view
+
+interface Teller:
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 struct InstantBondConfig:
     paymentCapPerEpoch: uint256
@@ -169,6 +170,15 @@ event InstantBondPurchased:
     rateSource: uint256
     epoch: indexed(uint256)
 
+event InstantBondClaimed:
+    beneficiary: indexed(address)
+    positionIndex: indexed(uint256)
+    amountClaimed: uint256
+    totalClaimedForPosition: uint256
+    ripePayout: uint256
+    autoDeposited: bool
+    lockDuration: uint256
+
 event InstantBondConfigSet:
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
@@ -244,6 +254,7 @@ genesisBlock: public(uint256)
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_VESTING_BONUS: constant(uint256) = 1000_00 # 1000.00%
 MAX_VESTING_LENGTH: public(constant(uint256)) = 7_884_000
+MAX_BATCH_CLAIMS: public(constant(uint256)) = 20
 MAX_PRICE_STEP_BPS: constant(uint256) = 100_00 # 100.00%
 MAX_DECAY_EPOCHS: constant(uint256) = 32
 MAX_PAYMENT_DECIMALS: constant(uint8) = 73
@@ -435,20 +446,69 @@ def _isWithinMaxAllInPayoutRate(_paymentAmount: uint256, _totalRipe: uint256, _m
     return _totalRipe <= _paymentAmount * _maxAllInPayoutRate // self.paymentScale
 
 
-####################
-# Claim Settlement #
-####################
+##########
+# Claims #
+##########
 
 
 @nonreentrant
 @external
-def settleVestedRipe(
+def claimVestedRipe(
+    _positionId: uint256,
+    _autoDeposit: bool,
+    _lockDuration: uint256,
+) -> uint256:
+    return self._claimVestedRipe([_positionId], _autoDeposit, _lockDuration)
+
+
+@nonreentrant
+@external
+def claimVestedRipeMany(
+    _positionIds: DynArray[uint256, MAX_BATCH_CLAIMS],
+    _autoDeposit: bool,
+    _lockDuration: uint256,
+) -> uint256:
+    return self._claimVestedRipe(_positionIds, _autoDeposit, _lockDuration)
+
+
+@internal
+def _claimVestedRipe(
+    _positionIds: DynArray[uint256, MAX_BATCH_CLAIMS],
+    _autoDeposit: bool,
+    _lockDuration: uint256,
+) -> uint256:
+    assert len(_positionIds) != 0 # dev: empty positions
+    assert self._isClaimReady() # dev: claim not ready
+
+    claims: address = self._getClaimsAddr()
+    totalClaimedRipe: uint256 = 0
+    for i: uint256 in range(len(_positionIds), bound=MAX_BATCH_CLAIMS):
+        amountClaimed: uint256 = 0
+        totalClaimedForPosition: uint256 = 0
+        ripePayout: uint256 = 0
+        amountClaimed, totalClaimedForPosition, ripePayout = extcall InstantBondClaims(claims).recordClaim(msg.sender, _positionIds[i])
+        totalClaimedRipe += amountClaimed
+        log InstantBondClaimed(
+            beneficiary=msg.sender,
+            positionIndex=_positionIds[i],
+            amountClaimed=amountClaimed,
+            totalClaimedForPosition=totalClaimedForPosition,
+            ripePayout=ripePayout,
+            autoDeposited=_autoDeposit,
+            lockDuration=_lockDuration,
+        )
+
+    self._settleVestedRipe(msg.sender, totalClaimedRipe, _autoDeposit, _lockDuration)
+    return totalClaimedRipe
+
+
+@internal
+def _settleVestedRipe(
     _beneficiary: address,
     _amount: uint256,
     _autoDeposit: bool,
     _lockDuration: uint256,
-) -> bool:
-    assert self._isClaimsSettlementCompatible(msg.sender) # dev: invalid claims
+):
     assert _beneficiary != empty(address) and _amount != 0 # dev: invalid settlement
 
     if _autoDeposit:
@@ -469,40 +529,34 @@ def settleVestedRipe(
         balanceAfter: uint256 = staticcall IERC20(ripeToken).balanceOf(_beneficiary)
         assert balanceAfter >= balanceBefore # dev: ripe receipt mismatch
         assert balanceAfter - balanceBefore == _amount # dev: ripe receipt mismatch
+        return
 
-    else:
-        a: addys.Addys = addys._getAddys()
-        coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
-        assert coreRipeGovVaultId != 0 # dev: invalid ripe gov vault
+    a: addys.Addys = addys._getAddys()
+    coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+    assert coreRipeGovVaultId != 0 # dev: invalid ripe gov vault
 
-        vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(ripeToken)
-        minLockDuration: uint256 = vaultConfig.lockTerms.minLockDuration
-        maxLockDuration: uint256 = vaultConfig.lockTerms.maxLockDuration
-        assert maxLockDuration != 0 and maxLockDuration >= minLockDuration # dev: no lock terms
-        assert _lockDuration >= minLockDuration and _lockDuration <= maxLockDuration # dev: invalid lock duration
+    vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(ripeToken)
+    minLockDuration: uint256 = vaultConfig.lockTerms.minLockDuration
+    maxLockDuration: uint256 = vaultConfig.lockTerms.maxLockDuration
+    assert maxLockDuration != 0 and maxLockDuration >= minLockDuration # dev: no lock terms
+    assert _lockDuration >= minLockDuration and _lockDuration <= maxLockDuration # dev: invalid lock duration
 
-        ripeBalanceBefore: uint256 = staticcall IERC20(ripeToken).balanceOf(self)
-        assert extcall RipeToken(ripeToken).mint(self, _amount) # dev: mint failed
-        ripeBalanceAfter: uint256 = staticcall IERC20(ripeToken).balanceOf(self)
-        assert ripeBalanceAfter >= ripeBalanceBefore # dev: ripe receipt mismatch
-        assert ripeBalanceAfter - ripeBalanceBefore == _amount # dev: ripe receipt mismatch
+    ripeBalanceBefore: uint256 = staticcall IERC20(ripeToken).balanceOf(self)
+    assert extcall RipeToken(ripeToken).mint(self, _amount) # dev: mint failed
+    ripeBalanceAfter: uint256 = staticcall IERC20(ripeToken).balanceOf(self)
+    assert ripeBalanceAfter >= ripeBalanceBefore # dev: ripe receipt mismatch
+    assert ripeBalanceAfter - ripeBalanceBefore == _amount # dev: ripe receipt mismatch
 
-        assert extcall IERC20(ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
-        depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(_beneficiary, coreRipeGovVaultId, ripeToken, _amount, _lockDuration, a)
-        assert depositedAmount == _amount # dev: deposit mismatch
-        assert extcall IERC20(ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
-        assert staticcall IERC20(ripeToken).balanceOf(self) == ripeBalanceBefore # dev: ripe settlement mismatch
-
-    return True
+    assert extcall IERC20(ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
+    depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(_beneficiary, coreRipeGovVaultId, ripeToken, _amount, _lockDuration, a)
+    assert depositedAmount == _amount # dev: deposit mismatch
+    assert extcall IERC20(ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
+    assert staticcall IERC20(ripeToken).balanceOf(self) == ripeBalanceBefore # dev: ripe settlement mismatch
 
 
 @view
 @internal
-def _isPurchaseReady() -> bool:
-    endaoFunds: address = addys._getEndaomentFundsAddr()
-    if endaoFunds == empty(address) or not endaoFunds.is_contract:
-        return False
-
+def _isClaimReady() -> bool:
     claims: address = self._getClaimsAddr()
     if claims == empty(address) or not claims.is_contract:
         return False
@@ -520,6 +574,15 @@ def _isPurchaseReady() -> bool:
     if staticcall RipeToken(ripeToken).isPaused():
         return False
     return True
+
+
+@view
+@internal
+def _isPurchaseReady() -> bool:
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    if endaoFunds == empty(address) or not endaoFunds.is_contract:
+        return False
+    return self._isClaimReady()
 
 
 @view

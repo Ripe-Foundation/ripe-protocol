@@ -8,7 +8,17 @@
         "indexed": true
       },
       {
-        "name": "rate",
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "basePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "rateSource",
         "type": "uint256",
         "indexed": false
       },
@@ -23,7 +33,17 @@
         "indexed": false
       },
       {
-        "name": "maxLockBonus",
+        "name": "maxVestingBonus",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxVestingLength",
         "type": "uint256",
         "indexed": false
       },
@@ -50,12 +70,22 @@
         "indexed": true
       },
       {
-        "name": "oldRate",
+        "name": "oldBasePayoutRate",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "newRate",
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "rateSource",
         "type": "uint256",
         "indexed": false
       },
@@ -70,7 +100,17 @@
         "indexed": false
       },
       {
-        "name": "newMaxLockBonus",
+        "name": "newMaxVestingBonus",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMinVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMaxVestingLength",
         "type": "uint256",
         "indexed": false
       },
@@ -108,11 +148,6 @@
         "name": "decaySteps",
         "type": "uint256",
         "indexed": false
-      },
-      {
-        "name": "controllerRate",
-        "type": "uint256",
-        "indexed": false
       }
     ],
     "anonymous": false,
@@ -124,6 +159,11 @@
       {
         "name": "buyer",
         "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "positionIndex",
+        "type": "uint256",
         "indexed": true
       },
       {
@@ -147,7 +187,17 @@
         "indexed": false
       },
       {
-        "name": "actualLock",
+        "name": "vestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "creationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maturityBlock",
         "type": "uint256",
         "indexed": false
       },
@@ -157,7 +207,17 @@
         "indexed": false
       },
       {
-        "name": "epochRate",
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "basePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "rateSource",
         "type": "uint256",
         "indexed": false
       },
@@ -171,13 +231,50 @@
     "type": "event"
   },
   {
-    "name": "InstantBondConfigSet",
+    "name": "InstantBondClaimed",
     "inputs": [
       {
-        "name": "canBuyNow",
+        "name": "beneficiary",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "positionIndex",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "amountClaimed",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "totalClaimedForPosition",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "ripePayout",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "autoDeposited",
         "type": "bool",
         "indexed": false
       },
+      {
+        "name": "lockDuration",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "InstantBondConfigSet",
+    "inputs": [
       {
         "name": "paymentCapPerEpoch",
         "type": "uint256",
@@ -189,17 +286,12 @@
         "indexed": false
       },
       {
-        "name": "mintBudget",
+        "name": "maxAllInPayoutRate",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "maxEffectiveRate",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "seedRate",
+        "name": "seedBasePayoutRate",
         "type": "uint256",
         "indexed": false
       },
@@ -244,12 +336,17 @@
         "indexed": false
       },
       {
-        "name": "maxLockBonus",
+        "name": "maxVestingBonus",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "minLockDuration",
+        "name": "minVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxVestingLength",
         "type": "uint256",
         "indexed": false
       },
@@ -326,22 +423,15 @@
     "type": "event"
   },
   {
-    "name": "CumulativeMintedSet",
-    "inputs": [
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "RateOverrideInstalled",
     "inputs": [
       {
-        "name": "targetRate",
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
         "type": "uint256",
         "indexed": false
       }
@@ -363,12 +453,39 @@
         "indexed": true
       },
       {
-        "name": "targetRate",
+        "name": "targetBasePayoutRate",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "controllerRate",
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideMissed",
+    "inputs": [
+      {
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "committedEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "controllerBasePayoutRate",
         "type": "uint256",
         "indexed": false
       }
@@ -380,7 +497,12 @@
     "name": "RateOverrideCancelled",
     "inputs": [
       {
-        "name": "targetRate",
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
         "type": "uint256",
         "indexed": false
       }
@@ -392,7 +514,12 @@
     "name": "RateOverrideInvalidated",
     "inputs": [
       {
-        "name": "targetRate",
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
         "type": "uint256",
         "indexed": false
       }
@@ -622,7 +749,11 @@
         "type": "uint256"
       },
       {
-        "name": "_requestedLock",
+        "name": "_requestedVestingLength",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedVestingLength",
         "type": "uint256"
       },
       {
@@ -646,6 +777,85 @@
     ]
   },
   {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimVestedRipe",
+    "inputs": [
+      {
+        "name": "_positionId",
+        "type": "uint256"
+      },
+      {
+        "name": "_autoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_lockDuration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimVestedRipeMany",
+    "inputs": [
+      {
+        "name": "_positionIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_autoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_lockDuration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getInstantBondClaimsAddr",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isClaimsSettlementCompatible",
+    "inputs": [
+      {
+        "name": "_claims",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
     "stateMutability": "view",
     "type": "function",
     "name": "getEpochSnapshot",
@@ -660,7 +870,15 @@
             "type": "uint256"
           },
           {
-            "name": "rate",
+            "name": "controllerBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "basePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "rateSource",
             "type": "uint256"
           },
           {
@@ -672,7 +890,15 @@
             "type": "uint256"
           },
           {
-            "name": "maxLockBonus",
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
             "type": "uint256"
           },
           {
@@ -753,10 +979,6 @@
         "type": "tuple",
         "components": [
           {
-            "name": "canBuyNow",
-            "type": "bool"
-          },
-          {
             "name": "paymentCapPerEpoch",
             "type": "uint256"
           },
@@ -765,15 +987,11 @@
             "type": "uint256"
           },
           {
-            "name": "mintBudget",
+            "name": "maxAllInPayoutRate",
             "type": "uint256"
           },
           {
-            "name": "maxEffectiveRate",
-            "type": "uint256"
-          },
-          {
-            "name": "seedRate",
+            "name": "seedBasePayoutRate",
             "type": "uint256"
           },
           {
@@ -809,11 +1027,15 @@
             "type": "uint256"
           },
           {
-            "name": "maxLockBonus",
+            "name": "maxVestingBonus",
             "type": "uint256"
           },
           {
-            "name": "minLockDuration",
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
             "type": "uint256"
           },
           {
@@ -843,11 +1065,20 @@
     "name": "setRateOverride",
     "inputs": [
       {
-        "name": "_targetRate",
+        "name": "_targetBasePayoutRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetEpoch",
         "type": "uint256"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
   },
   {
     "stateMutability": "view",
@@ -874,7 +1105,11 @@
     "name": "isValidRateOverride",
     "inputs": [
       {
-        "name": "_targetRate",
+        "name": "_targetBasePayoutRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetEpoch",
         "type": "uint256"
       }
     ],
@@ -915,35 +1150,6 @@
     ]
   },
   {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "setCumulativeMinted",
-    "inputs": [
-      {
-        "name": "_amount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": []
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "isValidCumulativeMinted",
-    "inputs": [
-      {
-        "name": "_amount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
     "stateMutability": "view",
     "type": "function",
     "name": "isValidConfig",
@@ -953,10 +1159,6 @@
         "type": "tuple",
         "components": [
           {
-            "name": "canBuyNow",
-            "type": "bool"
-          },
-          {
             "name": "paymentCapPerEpoch",
             "type": "uint256"
           },
@@ -965,15 +1167,11 @@
             "type": "uint256"
           },
           {
-            "name": "mintBudget",
+            "name": "maxAllInPayoutRate",
             "type": "uint256"
           },
           {
-            "name": "maxEffectiveRate",
-            "type": "uint256"
-          },
-          {
-            "name": "seedRate",
+            "name": "seedBasePayoutRate",
             "type": "uint256"
           },
           {
@@ -1009,11 +1207,15 @@
             "type": "uint256"
           },
           {
-            "name": "maxLockBonus",
+            "name": "maxVestingBonus",
             "type": "uint256"
           },
           {
-            "name": "minLockDuration",
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
             "type": "uint256"
           },
           {
@@ -1040,7 +1242,7 @@
         "type": "uint256"
       },
       {
-        "name": "_requestedLock",
+        "name": "_requestedVestingLength",
         "type": "uint256"
       }
     ],
@@ -1058,7 +1260,15 @@
             "type": "uint256"
           },
           {
-            "name": "rate",
+            "name": "controllerBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "basePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "rateSource",
             "type": "uint256"
           },
           {
@@ -1086,28 +1296,20 @@
             "type": "uint256"
           },
           {
-            "name": "actualLock",
+            "name": "vestingLength",
             "type": "uint256"
           },
           {
-            "name": "ripeGovVaultId",
+            "name": "creationBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "maturityBlock",
             "type": "uint256"
           },
           {
             "name": "totalRipe",
             "type": "uint256"
-          },
-          {
-            "name": "canExitEarly",
-            "type": "bool"
-          },
-          {
-            "name": "exitFee",
-            "type": "uint256"
-          },
-          {
-            "name": "isExitFrozen",
-            "type": "bool"
           }
         ]
       }
@@ -1124,10 +1326,6 @@
         "type": "tuple",
         "components": [
           {
-            "name": "canBuyNow",
-            "type": "bool"
-          },
-          {
             "name": "paymentCapPerEpoch",
             "type": "uint256"
           },
@@ -1136,15 +1334,11 @@
             "type": "uint256"
           },
           {
-            "name": "mintBudget",
+            "name": "maxAllInPayoutRate",
             "type": "uint256"
           },
           {
-            "name": "maxEffectiveRate",
-            "type": "uint256"
-          },
-          {
-            "name": "seedRate",
+            "name": "seedBasePayoutRate",
             "type": "uint256"
           },
           {
@@ -1180,11 +1374,15 @@
             "type": "uint256"
           },
           {
-            "name": "maxLockBonus",
+            "name": "maxVestingBonus",
             "type": "uint256"
           },
           {
-            "name": "minLockDuration",
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
             "type": "uint256"
           },
           {
@@ -1198,12 +1396,36 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "rateOverride",
+    "name": "overrideTargetBasePayoutRate",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "overrideTargetEpoch",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canBuyNow",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
       }
     ]
   },
@@ -1234,7 +1456,15 @@
             "type": "uint256"
           },
           {
-            "name": "rate",
+            "name": "controllerBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "basePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "rateSource",
             "type": "uint256"
           },
           {
@@ -1246,7 +1476,15 @@
             "type": "uint256"
           },
           {
-            "name": "maxLockBonus",
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
             "type": "uint256"
           },
           {
@@ -1316,7 +1554,55 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "cumulativeMinted",
+    "name": "MAX_VESTING_LENGTH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "MAX_BATCH_CLAIMS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "RATE_SOURCE_SEED",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "RATE_SOURCE_CONTROLLER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "RATE_SOURCE_OVERRIDE",
     "inputs": [],
     "outputs": [
       {
@@ -1342,10 +1628,6 @@
         "type": "tuple",
         "components": [
           {
-            "name": "canBuyNow",
-            "type": "bool"
-          },
-          {
             "name": "paymentCapPerEpoch",
             "type": "uint256"
           },
@@ -1354,15 +1636,11 @@
             "type": "uint256"
           },
           {
-            "name": "mintBudget",
+            "name": "maxAllInPayoutRate",
             "type": "uint256"
           },
           {
-            "name": "maxEffectiveRate",
-            "type": "uint256"
-          },
-          {
-            "name": "seedRate",
+            "name": "seedBasePayoutRate",
             "type": "uint256"
           },
           {
@@ -1398,11 +1676,15 @@
             "type": "uint256"
           },
           {
-            "name": "maxLockBonus",
+            "name": "maxVestingBonus",
             "type": "uint256"
           },
           {
-            "name": "minLockDuration",
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
             "type": "uint256"
           },
           {

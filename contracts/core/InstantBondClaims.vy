@@ -24,59 +24,34 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 
-from ethereum.ercs import IERC20
-
-interface RipeToken:
-    def ripeHq() -> address: view
-    def isPaused() -> bool: view
-    def blacklisted(_addr: address) -> bool: view
-
-interface RipeHq:
-    def getAddr(_regId: uint256) -> address: view
-    def canMintRipe(_addr: address) -> bool: view
-
-interface InstantBondLane:
-    def settleVestedRipe(_beneficiary: address, _amount: uint256, _autoDeposit: bool, _lockDuration: uint256) -> bool: nonpayable
-    def getRipeHq() -> address: view
-    def getInstantBondClaimsAddr() -> address: view
-    def isClaimsSettlementCompatible(_claims: address) -> bool: view
-
 struct VestingPosition:
+    id: uint256
     ripePayout: uint256
     ripeClaimed: uint256
     creationBlock: uint256
     maturityBlock: uint256
 
 event VestingPositionCreated:
-    beneficiary: indexed(address)
+    user: indexed(address)
     positionIndex: indexed(uint256)
     sourceLane: indexed(address)
     ripePayout: uint256
     creationBlock: uint256
     maturityBlock: uint256
 
-event VestedRipeClaimed:
-    beneficiary: indexed(address)
-    positionIndex: indexed(uint256)
-    amountClaimed: uint256
-    totalClaimedForPosition: uint256
-    ripePayout: uint256
-    autoDeposited: bool
-    lockDuration: uint256
-
 event RemainingAllocationBudgetSet:
     amount: uint256
 
-positions: public(HashMap[address, HashMap[uint256, VestingPosition]])
-positionCount: public(HashMap[address, uint256])
+# claim positions
+positions: public(HashMap[address, HashMap[uint256, VestingPosition]]) # user -> index -> position
+indexOfPosition: public(HashMap[address, HashMap[uint256, uint256]]) # user -> position id -> index
+numUserPositions: public(HashMap[address, uint256]) # user -> num positions
+nextPositionId: public(uint256)
+
+# global state
 totalAllocatedRipe: public(uint256)
 totalClaimedRipe: public(uint256)
 remainingAllocationBudget: public(uint256)
-
-RIPE_TOKEN_ID: constant(uint256) = 3
-INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
-MAX_VESTING_LENGTH: public(constant(uint256)) = 7_884_000
-MAX_BATCH_CLAIMS: public(constant(uint256)) = 20
 
 
 @deploy
@@ -94,7 +69,6 @@ def __init__(_ripeHq: address):
 @external
 def setRemainingAllocationBudget(_amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert staticcall RipeHq(addys._getRipeHq()).getAddr(INSTANT_BOND_CLAIMS_ID) == self # dev: retired claims
     self.remainingAllocationBudget = _amount
     log RemainingAllocationBudgetSet(amount=_amount)
 
@@ -107,209 +81,118 @@ def setRemainingAllocationBudget(_amount: uint256):
 @nonreentrant
 @external
 def createVestingPosition(
-    _beneficiary: address,
+    _user: address,
     _ripePayout: uint256,
     _vestingLength: uint256,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: paused
+    assert msg.sender == addys._getInstantBondLaneAddr() # dev: invalid lane
 
-    lane: address = addys._getInstantBondLaneAddr()
-    assert msg.sender == lane # dev: invalid lane
-
-    ripeHq: address = addys._getRipeHq()
-    assert staticcall RipeHq(ripeHq).getAddr(INSTANT_BOND_CLAIMS_ID) == self # dev: retired claims
-    assert self._isCompatibleLane(lane, ripeHq) # dev: incompatible lane
-    ripeToken: address = staticcall RipeHq(ripeHq).getAddr(RIPE_TOKEN_ID)
-    assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
-    assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
-    assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe token paused
-
-    assert _beneficiary != empty(address) # dev: invalid beneficiary
+    # basic validation
+    assert _user != empty(address) # dev: invalid user
     assert _ripePayout != 0 # dev: invalid payout
-    assert _vestingLength != 0 and _vestingLength <= MAX_VESTING_LENGTH # dev: invalid vesting length
-    assert _vestingLength <= max_value(uint256) - block.number # dev: maturity overflow
     assert _ripePayout <= self.remainingAllocationBudget # dev: allocation budget
 
-    positionIndex: uint256 = self.positionCount[_beneficiary] + 1
+    # create position
     creationBlock: uint256 = block.number
     maturityBlock: uint256 = creationBlock + _vestingLength
-
-    self.positionCount[_beneficiary] = positionIndex
-    self.positions[_beneficiary][positionIndex] = VestingPosition(
+    position: VestingPosition = VestingPosition(
+        id=self.nextPositionId + 1,
         ripePayout=_ripePayout,
         ripeClaimed=0,
         creationBlock=creationBlock,
         maturityBlock=maturityBlock,
     )
+    self._addPositionToUser(_user, position)
+
+    # global state
     self.remainingAllocationBudget -= _ripePayout
     self.totalAllocatedRipe += _ripePayout
+    self.nextPositionId = position.id
 
     log VestingPositionCreated(
-        beneficiary=_beneficiary,
-        positionIndex=positionIndex,
+        user=_user,
+        positionIndex=position.id,
         sourceLane=msg.sender,
         ripePayout=_ripePayout,
         creationBlock=creationBlock,
         maturityBlock=maturityBlock,
     )
-    return positionIndex
+    return position.id
 
 
-##########
-# Claims #
-##########
+# add position
+
+
+@internal
+def _addPositionToUser(_user: address, _position: VestingPosition):
+    if self.indexOfPosition[_user][_position.id] != 0:
+        return
+
+    pid: uint256 = self.numUserPositions[_user]
+    if pid == 0:
+        pid = 1 # not using 0 index
+
+    self.positions[_user][pid] = _position
+    self.indexOfPosition[_user][_position.id] = pid
+    self.numUserPositions[_user] = pid + 1
+
+
+# remove position
+
+
+@internal
+def _removePositionFromUser(_user: address, _positionId: uint256):
+    numUserPositions: uint256 = self.numUserPositions[_user]
+    if numUserPositions == 0:
+        return
+
+    targetIndex: uint256 = self.indexOfPosition[_user][_positionId]
+    if targetIndex == 0:
+        return
+
+    lastIndex: uint256 = numUserPositions - 1
+    self.numUserPositions[_user] = lastIndex
+    self.indexOfPosition[_user][_positionId] = 0
+
+    if targetIndex != lastIndex:
+        lastPosition: VestingPosition = self.positions[_user][lastIndex]
+        self.positions[_user][targetIndex] = lastPosition
+        self.indexOfPosition[_user][lastPosition.id] = targetIndex
+
+
+#################
+# Record Claims #
+#################
 
 
 @nonreentrant
 @external
-def claimVestedRipe(
-    _positionIndex: uint256,
-    _autoDeposit: bool,
-    _lockDuration: uint256,
-) -> uint256:
+def recordClaim(_user: address, _positionId: uint256) -> (uint256, uint256, uint256):
     assert not deptBasics.isPaused # dev: paused
-    lane: address = empty(address)
-    ripeToken: address = empty(address)
-    balanceBefore: uint256 = 0
-    lane, ripeToken, balanceBefore = self._prepareClaimSettlement(msg.sender, _autoDeposit, _lockDuration)
+    assert msg.sender == addys._getInstantBondLaneAddr() # dev: invalid lane
+    assert _user != empty(address) # dev: invalid user
 
-    claimableRipe: uint256 = self._consumeClaimablePosition(msg.sender, _positionIndex)
-    self.totalClaimedRipe += claimableRipe
+    # validate position exists
+    index: uint256 = self.indexOfPosition[_user][_positionId]
+    assert index != 0 # dev: invalid position
 
-    self._settleVestedRipe(lane, ripeToken, msg.sender, claimableRipe, _autoDeposit, _lockDuration, balanceBefore)
-
-    position: VestingPosition = self.positions[msg.sender][_positionIndex]
-    log VestedRipeClaimed(
-        beneficiary=msg.sender,
-        positionIndex=_positionIndex,
-        amountClaimed=claimableRipe,
-        totalClaimedForPosition=position.ripeClaimed,
-        ripePayout=position.ripePayout,
-        autoDeposited=_autoDeposit,
-        lockDuration=_lockDuration,
-    )
-    return claimableRipe
-
-
-@nonreentrant
-@external
-def claimVestedRipeMany(
-    _positionIndexes: DynArray[uint256, MAX_BATCH_CLAIMS],
-    _autoDeposit: bool,
-    _lockDuration: uint256,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: paused
-    assert len(_positionIndexes) != 0 # dev: empty positions
-
-    lane: address = empty(address)
-    ripeToken: address = empty(address)
-    balanceBefore: uint256 = 0
-    lane, ripeToken, balanceBefore = self._prepareClaimSettlement(msg.sender, _autoDeposit, _lockDuration)
-
-    claimableAmounts: DynArray[uint256, MAX_BATCH_CLAIMS] = []
-    totalClaimableRipe: uint256 = 0
-    for i: uint256 in range(len(_positionIndexes), bound=MAX_BATCH_CLAIMS):
-        positionIndex: uint256 = _positionIndexes[i]
-        for j: uint256 in range(i, bound=MAX_BATCH_CLAIMS):
-            assert _positionIndexes[j] != positionIndex # dev: duplicate position
-
-        claimableRipe: uint256 = self._consumeClaimablePosition(msg.sender, positionIndex)
-        claimableAmounts.append(claimableRipe)
-        totalClaimableRipe += claimableRipe
-
-    self.totalClaimedRipe += totalClaimableRipe
-    self._settleVestedRipe(lane, ripeToken, msg.sender, totalClaimableRipe, _autoDeposit, _lockDuration, balanceBefore)
-
-    for i: uint256 in range(len(_positionIndexes), bound=MAX_BATCH_CLAIMS):
-        positionIndex: uint256 = _positionIndexes[i]
-        position: VestingPosition = self.positions[msg.sender][positionIndex]
-        log VestedRipeClaimed(
-            beneficiary=msg.sender,
-            positionIndex=positionIndex,
-            amountClaimed=claimableAmounts[i],
-            totalClaimedForPosition=position.ripeClaimed,
-            ripePayout=position.ripePayout,
-            autoDeposited=_autoDeposit,
-            lockDuration=_lockDuration,
-        )
-
-    return totalClaimableRipe
-
-
-@view
-@internal
-def _prepareClaimSettlement(
-    _beneficiary: address,
-    _autoDeposit: bool,
-    _lockDuration: uint256,
-) -> (address, address, uint256):
-    if _autoDeposit:
-        assert _lockDuration != 0 # dev: invalid lock duration
-    else:
-        assert _lockDuration == 0 # dev: invalid lock duration
-
-    ripeHq: address = addys._getRipeHq()
-    assert staticcall RipeHq(ripeHq).getAddr(INSTANT_BOND_CLAIMS_ID) == self # dev: retired claims
-
-    lane: address = addys._getInstantBondLaneAddr()
-    assert self._isCompatibleLane(lane, ripeHq) # dev: incompatible lane
-
-    ripeToken: address = staticcall RipeHq(ripeHq).getAddr(RIPE_TOKEN_ID)
-    assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
-    assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
-    assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe token paused
-    assert not staticcall RipeToken(ripeToken).blacklisted(_beneficiary) # dev: blacklisted
-
-    balanceBefore: uint256 = 0
-    if not _autoDeposit:
-        balanceBefore = staticcall IERC20(ripeToken).balanceOf(_beneficiary)
-    return lane, ripeToken, balanceBefore
-
-
-@view
-@internal
-def _isCompatibleLane(_lane: address, _ripeHq: address) -> bool:
-    if _lane == empty(address) or not _lane.is_contract:
-        return False
-    if staticcall InstantBondLane(_lane).getRipeHq() != _ripeHq:
-        return False
-    if staticcall InstantBondLane(_lane).getInstantBondClaimsAddr() != self:
-        return False
-    if not staticcall InstantBondLane(_lane).isClaimsSettlementCompatible(self):
-        return False
-    return staticcall RipeHq(_ripeHq).canMintRipe(_lane)
-
-
-@internal
-def _consumeClaimablePosition(_beneficiary: address, _positionIndex: uint256) -> uint256:
-    assert _positionIndex != 0 and _positionIndex <= self.positionCount[_beneficiary] # dev: invalid position
-
-    position: VestingPosition = self.positions[_beneficiary][_positionIndex]
-    vestedRipe: uint256 = self._getVestedRipe(position)
-    claimableRipe: uint256 = vestedRipe - position.ripeClaimed
+    # check claimable ripe
+    position: VestingPosition = self.positions[_user][index]
+    claimableRipe: uint256 = self._getVestedRipe(position) - position.ripeClaimed
     assert claimableRipe != 0 # dev: nothing to claim
 
+    # update position
     position.ripeClaimed += claimableRipe
-    self.positions[_beneficiary][_positionIndex] = position
-    return claimableRipe
+    self.positions[_user][index] = position
 
+    # remove position if fully claimed
+    if position.ripeClaimed == position.ripePayout:
+        self._removePositionFromUser(_user, position.id)
 
-@internal
-def _settleVestedRipe(
-    _lane: address,
-    _ripeToken: address,
-    _beneficiary: address,
-    _amount: uint256,
-    _autoDeposit: bool,
-    _lockDuration: uint256,
-    _balanceBefore: uint256,
-):
-    assert extcall InstantBondLane(_lane).settleVestedRipe(_beneficiary, _amount, _autoDeposit, _lockDuration) # dev: settlement failed
-
-    if not _autoDeposit:
-        balanceAfter: uint256 = staticcall IERC20(_ripeToken).balanceOf(_beneficiary)
-        assert balanceAfter >= _balanceBefore # dev: ripe receipt mismatch
-        assert balanceAfter - _balanceBefore == _amount # dev: ripe receipt mismatch
+    # global state
+    self.totalClaimedRipe += claimableRipe
+    return claimableRipe, position.ripeClaimed, position.ripePayout
 
 
 #################
@@ -319,18 +202,20 @@ def _settleVestedRipe(
 
 @view
 @external
-def getVestedRipe(_beneficiary: address, _positionIndex: uint256) -> uint256:
-    if _positionIndex == 0 or _positionIndex > self.positionCount[_beneficiary]:
+def getNumUserPositions(_user: address) -> uint256:
+    numPositions: uint256 = self.numUserPositions[_user]
+    if numPositions == 0:
         return 0
-    return self._getVestedRipe(self.positions[_beneficiary][_positionIndex])
+    return numPositions - 1
 
 
 @view
 @external
-def getClaimableRipe(_beneficiary: address, _positionIndex: uint256) -> uint256:
-    if _positionIndex == 0 or _positionIndex > self.positionCount[_beneficiary]:
+def getClaimableRipe(_user: address, _positionId: uint256) -> uint256:
+    index: uint256 = self.indexOfPosition[_user][_positionId]
+    if index == 0:
         return 0
-    position: VestingPosition = self.positions[_beneficiary][_positionIndex]
+    position: VestingPosition = self.positions[_user][index]
     return self._getVestedRipe(position) - position.ripeClaimed
 
 
@@ -342,8 +227,11 @@ def totalOutstandingRipe() -> uint256:
 
 @view
 @external
-def canRetire() -> bool:
-    return deptBasics.isPaused and self.totalAllocatedRipe - self.totalClaimedRipe == 0
+def getVestedRipe(_user: address, _positionId: uint256) -> uint256:
+    index: uint256 = self.indexOfPosition[_user][_positionId]
+    if index == 0:
+        return 0
+    return self._getVestedRipe(self.positions[_user][index])
 
 
 @view

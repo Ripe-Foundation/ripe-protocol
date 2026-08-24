@@ -63,6 +63,7 @@ RIPE_CCIP_POOL_ID: constant(uint256) = 23
 GREEN_CCIP_POOL_ID: constant(uint256) = 24
 VAULT_MIGRATOR_ID: constant(uint256) = 25
 INSTANT_BOND_LANE_ID: constant(uint256) = 26
+INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
 
 
 @deploy
@@ -511,3 +512,18 @@ def _getInstantBondLaneId() -> uint256:
 @internal
 def _getInstantBondLaneAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(INSTANT_BOND_LANE_ID)
+
+
+# instant bond claims
+
+
+@view
+@internal
+def _getInstantBondClaimsId() -> uint256:
+    return INSTANT_BOND_CLAIMS_ID
+
+
+@view
+@internal
+def _getInstantBondClaimsAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(INSTANT_BOND_CLAIMS_ID)
