@@ -59,18 +59,7 @@ def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(True, False, False) # starts paused; no mint capability
 
-
-#####################
-# Allocation Budget #
-#####################
-
-
-@nonreentrant
-@external
-def setRemainingAllocationBudget(_amount: uint256):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.remainingAllocationBudget = _amount
-    log RemainingAllocationBudgetSet(amount=_amount)
+    self.nextPositionId = 1
 
 
 #############
@@ -96,8 +85,9 @@ def createVestingPosition(
     # create position
     creationBlock: uint256 = block.number
     maturityBlock: uint256 = creationBlock + _vestingLength
+    nextPositionId: uint256 = self.nextPositionId
     position: VestingPosition = VestingPosition(
-        id=self.nextPositionId + 1,
+        id=nextPositionId,
         ripePayout=_ripePayout,
         ripeClaimed=0,
         creationBlock=creationBlock,
@@ -108,7 +98,7 @@ def createVestingPosition(
     # global state
     self.remainingAllocationBudget -= _ripePayout
     self.totalAllocatedRipe += _ripePayout
-    self.nextPositionId = position.id
+    self.nextPositionId = nextPositionId + 1
 
     log VestingPositionCreated(
         user=_user,
@@ -247,3 +237,16 @@ def _getVestedRipe(_position: VestingPosition) -> uint256:
     quotient: uint256 = _position.ripePayout // duration
     remainder: uint256 = _position.ripePayout % duration
     return quotient * elapsed + remainder * elapsed // duration
+
+
+#####################
+# Allocation Budget #
+#####################
+
+
+@nonreentrant
+@external
+def setRemainingAllocationBudget(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.remainingAllocationBudget = _amount
+    log RemainingAllocationBudgetSet(amount=_amount)
