@@ -3,6 +3,8 @@ from pathlib import Path
 import boa
 import pytest
 
+from config.robinhood_launch import STALE_WINDOW_GLOBAL
+from conf_utils import advance_timelock_blocks
 from constants import (
     BLUE_CHIP_PROTOCOL_MORPHO,
     BLUE_CHIP_PROTOCOL_MORPHO_V2,
@@ -23,6 +25,22 @@ PRODUCTION_PRICE_SOURCES = {
     "UniswapV2Prices.vy",
     "wsuperOETHbPrices.vy",
 }
+QUALIFIED_GLOBAL_STALE_TIME = 86_400
+
+if STALE_WINDOW_GLOBAL != QUALIFIED_GLOBAL_STALE_TIME:
+    raise RuntimeError(
+        "Robinhood global stale-time policy changed; rerun PriceDesk gas "
+        "qualification before updating QUALIFIED_GLOBAL_STALE_TIME"
+    )
+
+
+@pytest.fixture(autouse=True)
+def valid_global_stale_time(setGeneralConfig):
+    """Run gas qualifications with the production one-day global policy."""
+
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=STALE_WINDOW_GLOBAL)
+        yield
 
 
 FOUR_COIN_CURVE_SYSTEM = """# @version 0.4.3
@@ -164,7 +182,7 @@ def _configure_max_bluechip_feed(
         0,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(blue_chip_prices.actionTimeLock() + 1)
     assert blue_chip_prices.confirmNewPriceFeed(vault, sender=governance.address)
     for _ in range(24):
         boa.env.time_travel(seconds=1)
@@ -208,7 +226,7 @@ def test_price_source_inventory_and_flat_operation_gas(
     assert pyth_prices.addNewPriceFeed(
         alpha_token, pyth_id, 0, sender=governance.address
     )
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
     _set_priorities(mission_control, switchboard_alpha, [4])
     expected_pyth = pyth_prices.getPrice(alpha_token)
@@ -221,7 +239,7 @@ def test_price_source_inventory_and_flat_operation_gas(
     assert stork_prices.addNewPriceFeed(
         bravo_token, stork_id, 0, sender=governance.address
     )
-    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmNewPriceFeed(bravo_token, sender=governance.address)
     _set_priorities(mission_control, switchboard_alpha, [5])
     expected_stork = stork_prices.getPrice(bravo_token)
@@ -263,7 +281,7 @@ def test_redstone_flat_and_nested_cross_asset_price_gas(
         False,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+    advance_timelock_blocks(chainlink.actionTimeLock() + 1)
     assert chainlink.confirmNewPriceFeed(eth, sender=governance.address)
 
     assert redstone.addNewPriceFeed(
@@ -280,7 +298,7 @@ def test_redstone_flat_and_nested_cross_asset_price_gas(
         True,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=redstone.actionTimeLock() + 1)
+    advance_timelock_blocks(redstone.actionTimeLock() + 1)
     assert redstone.confirmNewPriceFeed(alpha_token, sender=governance.address)
     assert redstone.confirmNewPriceFeed(bravo_token, sender=governance.address)
 
@@ -336,7 +354,7 @@ def test_bluechip_and_undy_max_snapshot_nested_price_and_snapshot_gas(
         0,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(blue_chip_prices.actionTimeLock() + 1)
     assert blue_chip_prices.confirmNewPriceFeed(
         alpha_token_vault,
         sender=governance.address,
@@ -381,7 +399,7 @@ def test_bluechip_and_undy_max_snapshot_nested_price_and_snapshot_gas(
         0,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=undy_vault_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(undy_vault_prices.actionTimeLock() + 1)
     assert undy_vault_prices.confirmNewPriceFeed(
         bravo_token_vault,
         sender=governance.address,
@@ -438,7 +456,7 @@ def test_selected_morpho_v2_full_ring_nested_pricedesk_gas(
         False,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+    advance_timelock_blocks(chainlink.actionTimeLock() + 1)
     assert chainlink.confirmNewPriceFeed(alpha_token, sender=governance.address)
     factory = boa.load(
         "contracts/mock/MockMorphoV2Factory.vy",
@@ -492,18 +510,25 @@ def test_selected_morpho_v2_full_ring_nested_pricedesk_gas(
         deploy3r,
         [chainlink, curve_prices, blue_chip],
     )
-    # Candidate snapshot authorization accepts any registered Ripe department.
-    # Register this isolated three-slot desk solely for the test transaction.
-    assert ripe_hq.startAddNewAddressToRegistry(
+    # Install the isolated three-slot desk at canonical PriceDesk ID 7. The
+    # sources intentionally reject forwarded global policy from any other
+    # caller, so merely appending the desk to RipeHq is not production-shaped.
+    assert ripe_hq.startAddressUpdateToRegistry(
+        7,
         desk,
-        "Morpho V2 gas desk",
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
-    assert ripe_hq.confirmNewAddressToRegistry(desk, sender=governance.address)
-    # The registry timelock advances past the configured feed/snapshot stale
-    # windows; refresh both without changing the already-filled ring capacity.
+    advance_timelock_blocks(ripe_hq.registryChangeTimeLock() + 1)
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        7,
+        sender=governance.address,
+    )
+    assert ripe_hq.getAddr(7) == desk.address
+    # The block-only registry timelock leaves the wall clock unchanged. Move it
+    # forward before replacing the newest ring entry: BlueChip correctly
+    # rejects two snapshots with the same timestamp.
     mock_chainlink_feed_one.setMockData(10**8)
+    boa.env.time_travel(seconds=1)
     assert blue_chip.addPriceSnapshot(vault, sender=teller.address)
     _set_priorities(mission_control, switchboard_alpha, [1, 2])
     assert desk.numAddrs() - 1 == 3

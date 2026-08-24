@@ -314,6 +314,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
+      - name: Verify production ABI exports
+        run: python scripts/export_abis.py --check
+
       - name: Run deployment control suites
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
@@ -394,7 +397,9 @@ jobs:
             -m gas \
             tests/priceSources/blueChip/test_bluechip_local.py \
             tests/priceSources/curve/test_robinhood_launch_route.py \
-            tests/core/test_sc24_gas_matrix.py
+            tests/core/test_sc24_gas_matrix.py \
+            tests/registries/test_price_desk_gas.py \
+            'tests/registries/test_price_desk_aggregate_protocol_gas.py::test_aggregate_protocol_gas[valuation-intended_prompt]'
 
   rh-pr-gate:
     name: rh-pr-gate

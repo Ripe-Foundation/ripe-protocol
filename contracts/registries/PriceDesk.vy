@@ -42,6 +42,7 @@ from interfaces import Department
 
 interface MissionControl:
     def getPriceConfig() -> PriceConfig: view
+    def getPriceStaleTime() -> uint256: view
     def underscoreRegistry() -> address: view
 
 interface UnderscoreRegistry:
@@ -150,30 +151,28 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256:
     if _asset == empty(address):
         return 0
-    return self._getPrice(_asset, _shouldRaise, _staleTime)
+    # Preserve the selector while rejecting the retired caller cap for real assets.
+    if _staleTime != 0:
+        if _shouldRaise:
+            raise "caller stale time unsupported"
+        return 0
+    return self._getPrice(_asset, _shouldRaise)
 
 
 @view
 @internal
-def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256:
+def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     price: uint256 = 0
     mustRaiseOnZero: bool = False
     alreadyLooked: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
 
     # config
     config: PriceConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPriceConfig()
-    staleTime: uint256 = 0
-    if _staleTime == 0:
-        staleTime = config.staleTime
-    elif config.staleTime == 0:
-        staleTime = _staleTime
-    else:
-        staleTime = min(_staleTime, config.staleTime)
 
     # go thru priority partners first
     for pid: uint256 in config.priorityPriceSourceIds:
         sourceStatus: uint256 = 0
-        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, staleTime)
+        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
         if price != 0:
             break
         if sourceStatus != 0:
@@ -188,7 +187,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
                 if pid in alreadyLooked:
                     continue
                 sourceStatus: uint256 = 0
-                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, staleTime)
+                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
                 if price != 0:
                     break
                 if sourceStatus != 0:
@@ -207,26 +206,29 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
 
 @view
 @internal
-def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256) -> (uint256, uint256):
+def _getPriceFromPriceSource(_pid: uint256, _asset: address, _globalStaleTime: uint256) -> (uint256, uint256):
     # status: 0 = valid/no feed, 1 = valid/feed, 2 = failed or malformed
     priceSource: address = registry._getAddr(_pid)
     if priceSource == empty(address):
         return 0, 0
 
-    return self._getPriceFromSource(priceSource, _asset, _staleTime)
+    return self._getPriceFromSource(priceSource, _asset, _globalStaleTime)
 
 
 @view
 @external
 def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256):
+    if _staleTime != 0:
+        return 0, 2
     # admission checks call from the candidate source itself, so no aggregate
     # fallback can mask a source that is not executable under the live stipend.
-    return self._getPriceFromSource(msg.sender, _asset, _staleTime)
+    globalStaleTime: uint256 = staticcall MissionControl(addys._getMissionControlAddr()).getPriceStaleTime()
+    return self._getPriceFromSource(msg.sender, _asset, globalStaleTime)
 
 
 @view
 @internal
-def _getPriceFromSource(_priceSource: address, _asset: address, _staleTime: uint256) -> (uint256, uint256):
+def _getPriceFromSource(_priceSource: address, _asset: address, _globalStaleTime: uint256) -> (uint256, uint256):
     # status: 0 = valid/no feed, 1 = valid/feed, 2 = failed or malformed
 
     success: bool = False
@@ -235,7 +237,7 @@ def _getPriceFromSource(_priceSource: address, _asset: address, _staleTime: uint
         _priceSource,
         abi_encode(
             _asset,
-            _staleTime,
+            _globalStaleTime,
             self,
             method_id=method_id("getPriceAndHasFeed(address,uint256,address)"),
         ),

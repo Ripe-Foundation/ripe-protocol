@@ -17,6 +17,7 @@ struct TemporalNumericValueInput:
 
 
 priceFeeds: public(HashMap[bytes32, TemporalNumericValue])
+allowZeroTimestamp: HashMap[bytes32, bool]
 
 
 @deploy
@@ -34,7 +35,7 @@ def __init__():
 @external
 def getTemporalNumericValueUnsafeV1(_priceFeedId: bytes32) -> TemporalNumericValue:
     value: TemporalNumericValue = self.priceFeeds[_priceFeedId]
-    if value.timestampNs == 0:
+    if value.timestampNs == 0 and not self.allowZeroTimestamp[_priceFeedId]:
         raw_revert(method_id("NotFound()"))
     return value
 
@@ -53,6 +54,22 @@ def updateTemporalNumericValuesV1(_payLoad: DynArray[TemporalNumericValueInput, 
 
     for inputData: TemporalNumericValueInput in _payLoad:
         self.priceFeeds[inputData.id] = inputData.temporalNumericValue
+        self.allowZeroTimestamp[inputData.id] = False
+
+
+@external
+def setMockTemporalNumericValue(
+    _id: bytes32,
+    _price: int192,
+    _timestampNs: uint64,
+):
+    # Test-only escape hatch for oracle responses that the production Stork
+    # contract normally represents as NotFound(), including timestampNs == 0.
+    self.priceFeeds[_id] = TemporalNumericValue(
+        timestampNs=_timestampNs,
+        quantizedValue=_price,
+    )
+    self.allowZeroTimestamp[_id] = _timestampNs == 0
 
 
 @pure
