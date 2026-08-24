@@ -293,6 +293,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.config.feedId != empty(bytes32) # dev: no pending new feed
+    assert self.feedConfig[_asset].feedId == empty(bytes32) # dev: no pending new feed
     if not self._isValidNewFeed(_asset, d.config.feedId, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
@@ -318,6 +319,9 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingStorkFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending new feed
+    assert d.config.feedId != empty(bytes32) # dev: no pending new feed
+    assert self.feedConfig[_asset].feedId == empty(bytes32) # dev: no pending new feed
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
     log NewStorkFeedCancelled(asset=_asset, feedId=d.config.feedId)
     return True
@@ -403,6 +407,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.config.feedId != empty(bytes32) # dev: no pending update feed
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
+    assert oldFeedId != empty(bytes32) # dev: no pending update feed
     if not self._isValidUpdateFeed(_asset, d.config.feedId, d.config.staleTime):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
@@ -427,6 +432,9 @@ def cancelPriceFeedUpdate(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingStorkFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending update feed
+    assert d.config.feedId != empty(bytes32) # dev: no pending update feed
+    assert self.feedConfig[_asset].feedId != empty(bytes32) # dev: no pending update feed
     self._cancelPriceFeedUpdate(_asset, d.actionId)
     log StorkFeedUpdateCancelled(asset=_asset, feedId=d.config.feedId, oldFeedId=self.feedConfig[_asset].feedId)
     return True
@@ -533,6 +541,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
     assert d.config.feedId == empty(bytes32) # dev: no pending disable feed
+    assert oldFeedId != empty(bytes32) # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeedId):
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False
@@ -557,7 +566,11 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    self._cancelDisablePriceFeed(_asset, self.pendingUpdates[_asset].actionId)
+    d: PendingStorkFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feedId == empty(bytes32) # dev: no pending disable feed
+    assert self.feedConfig[_asset].feedId != empty(bytes32) # dev: no pending disable feed
+    self._cancelDisablePriceFeed(_asset, d.actionId)
     log DisableStorkFeedCancelled(asset=_asset, feedId=self.feedConfig[_asset].feedId)
     return True
 

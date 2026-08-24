@@ -2,6 +2,8 @@
 
 from eth_utils import keccak
 
+from config.robinhood_launch import STALE_WINDOW_GLOBAL
+
 
 QUALIFIED_BORROWER_ASSET_COUNT = 9
 QUALIFIED_PRICE_DESK_SOURCE_COUNT = 3
@@ -28,10 +30,21 @@ QUALIFIED_DIRECT_PRICE_LTV_ASSET_ADDRESSES = frozenset(
 ROBINHOOD_MAX_TX_GAS = 32_000_000
 ROBINHOOD_GAS_LIMIT_OBSERVED_BLOCK = 38_402_845
 
-# DefaultsRobinhood uses this value. The prompt-faithful Chainlink lanes cover
-# its timestamp checks; the synthetic saturated source accepts the ABI argument
-# but intentionally isolates stipend exhaustion from oracle-freshness behavior.
-ROBINHOOD_PRICE_STALE_TIME = 86_400
+# Independent qualification literal: changing the production configuration must
+# fail collection until the PriceDesk gas profile has been rerun and this value
+# is deliberately updated.
+QUALIFIED_ROBINHOOD_PRICE_STALE_TIME = 86_400
+if STALE_WINDOW_GLOBAL != QUALIFIED_ROBINHOOD_PRICE_STALE_TIME:
+    raise RuntimeError(
+        "Robinhood global stale-time policy changed; rerun aggregate PriceDesk "
+        "gas qualification before updating QUALIFIED_ROBINHOOD_PRICE_STALE_TIME"
+    )
+
+# The prompt-faithful Chainlink lanes consume the production value after the
+# independent literal above proves that this is still the qualified profile.
+# The synthetic saturated source accepts the ABI argument but intentionally
+# isolates stipend exhaustion from oracle-freshness behavior.
+ROBINHOOD_PRICE_STALE_TIME = STALE_WINDOW_GLOBAL
 
 # These ABI maxima are not themselves safe batch sizes. The focused gas suite
 # measures smaller keeper/operator limits, and larger batches remain a manual

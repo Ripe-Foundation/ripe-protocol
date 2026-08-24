@@ -5,6 +5,7 @@ import boa
 import pytest
 
 from config.BluePrint import ROBINHOOD_REGISTRY_TOPOLOGY
+from config.robinhood_launch import STALE_WINDOW_GLOBAL
 from registries.price_desk_aggregate_qualification import (
     DELEVERAGE_MANY_API_MAX,
     LIQUIDATE_MANY_API_MAX,
@@ -12,10 +13,12 @@ from registries.price_desk_aggregate_qualification import (
     QUALIFIED_DIRECT_PRICE_LTV_ASSET_ADDRESSES,
     QUALIFIED_PRICE_DESK_SOURCE_COUNT,
     QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND,
+    QUALIFIED_ROBINHOOD_PRICE_STALE_TIME,
     QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE,
     QUALIFIED_SATURATED_LIQUIDATION_BATCH_SIZE,
     ROBINHOOD_LIVE_PRICE_DESK_SLOT_3,
     ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS,
+    ROBINHOOD_PRICE_STALE_TIME,
 )
 
 
@@ -60,6 +63,15 @@ def test_robinhood_price_desk_source_count_requires_gas_requalification_on_growt
     ], (
         "Robinhood PriceDesk source composition changed; aggregate protocol-gas "
         "requalification is required before activation"
+    )
+
+
+def test_robinhood_stale_time_policy_is_the_independently_qualified_gas_profile():
+    assert QUALIFIED_ROBINHOOD_PRICE_STALE_TIME == 86_400
+    assert (
+        ROBINHOOD_PRICE_STALE_TIME
+        == STALE_WINDOW_GLOBAL
+        == QUALIFIED_ROBINHOOD_PRICE_STALE_TIME
     )
 
 

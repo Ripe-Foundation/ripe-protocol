@@ -67,7 +67,9 @@ def test_chainlink_new_confirm_and_read_use_cached_decimals_after_live_change(
     src = _load_chainlink(ripe_hq, fork)
     assert src.setActionTimeLockAfterSetup(sender=governance.address)
     _fresh_round(feed)
-    assert src.addNewPriceFeed(charlie_token, feed, sender=governance.address)
+    assert src.addNewPriceFeed(
+        charlie_token, feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     pending = src.pendingUpdates(charlie_token)
     assert pending.config.decimals == 8
 
@@ -92,14 +94,18 @@ def test_chainlink_update_confirm_and_active_read_keep_cached_decimals(
     src = _load_chainlink(ripe_hq, fork)
     assert src.setActionTimeLockAfterSetup(sender=governance.address)
     _fresh_round(feed)
-    assert src.addNewPriceFeed(charlie_token, feed, sender=governance.address)
+    assert src.addNewPriceFeed(
+        charlie_token, feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     boa.env.time_travel(blocks=src.actionTimeLock() + 1)
     _fresh_round(feed)
     assert src.confirmNewPriceFeed(charlie_token, sender=governance.address)
 
     new_feed = boa.load("contracts/mock/MockChainlinkFeed.vy", EIGHTEEN_DECIMALS)
     _fresh_round(new_feed)
-    assert src.updatePriceFeed(charlie_token, new_feed, sender=governance.address)
+    assert src.updatePriceFeed(
+        charlie_token, new_feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     assert src.pendingUpdates(charlie_token).config.decimals == 8
     # Timelock-window drift: confirm admits cached 8, it does not cancel.
     new_feed.setDecimals(6)
@@ -127,7 +133,9 @@ def test_redstone_new_confirm_and_read_use_cached_decimals_after_live_change(
     src = _load_redstone(ripe_hq, fork)
     assert src.setActionTimeLockAfterSetup(sender=governance.address)
     _fresh_round(feed)
-    assert src.addNewPriceFeed(charlie_token, feed, sender=governance.address)
+    assert src.addNewPriceFeed(
+        charlie_token, feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     assert src.pendingUpdates(charlie_token).config.decimals == 8
 
     # Timelock-window drift: confirm admits cached 8, it does not cancel.
@@ -150,14 +158,18 @@ def test_redstone_update_confirm_and_active_read_keep_cached_decimals(
     src = _load_redstone(ripe_hq, fork)
     assert src.setActionTimeLockAfterSetup(sender=governance.address)
     _fresh_round(feed)
-    assert src.addNewPriceFeed(charlie_token, feed, sender=governance.address)
+    assert src.addNewPriceFeed(
+        charlie_token, feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     boa.env.time_travel(blocks=src.actionTimeLock() + 1)
     _fresh_round(feed)
     assert src.confirmNewPriceFeed(charlie_token, sender=governance.address)
 
     new_feed = boa.load("contracts/mock/MockChainlinkFeed.vy", EIGHTEEN_DECIMALS)
     _fresh_round(new_feed)
-    assert src.updatePriceFeed(charlie_token, new_feed, sender=governance.address)
+    assert src.updatePriceFeed(
+        charlie_token, new_feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     # Timelock-window drift: confirm admits cached 8, it does not cancel.
     new_feed.setDecimals(6)
     boa.env.time_travel(blocks=src.actionTimeLock() + 1)
@@ -177,7 +189,9 @@ def test_redstone_update_confirm_and_active_read_keep_cached_decimals(
 def _confirm_eight_decimal_feed(src, token, feed, governance):
     assert src.setActionTimeLockAfterSetup(sender=governance.address)
     _fresh_round(feed)
-    assert src.addNewPriceFeed(token, feed, sender=governance.address)
+    assert src.addNewPriceFeed(
+        token, feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     boa.env.time_travel(blocks=src.actionTimeLock() + 1)
     # Timelock-window drift: confirm admits cached 8, it does not cancel.
     feed.setDecimals(18)

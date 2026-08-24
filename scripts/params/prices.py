@@ -25,6 +25,7 @@ from params_utils import (
     RIPE_HQ,
     RPC_DELAY,
     ZERO_ADDRESS,
+    MISSION_CONTROL_ID,
     PRICE_DESK_ID,
     PROTOCOL_NAMES,
     format_address,
@@ -52,7 +53,9 @@ class PriceState:
 
     def __init__(self):
         self.hq = None
+        self.mc = None
         self.pd = None
+        self.mission_control_stale_time = None
         self.price_sources = {}  # reg_id -> {addr, description, contract}
 
     def get_known_addresses(self) -> dict:
@@ -80,6 +83,23 @@ def initialize_prices():
     # Load HQ and PriceDesk
     state.hq = boa.from_etherscan(RIPE_HQ, name="RipeHQ")
     time.sleep(RPC_DELAY)
+
+    state.mc = None
+    state.mission_control_stale_time = None
+    try:
+        mc_addr = state.hq.getAddr(MISSION_CONTROL_ID)
+        if str(mc_addr) != ZERO_ADDRESS:
+            state.mc = boa.from_etherscan(mc_addr, name="MissionControl")
+            state.mission_control_stale_time = _read_mission_control_stale_time(
+                state.mc
+            )
+            time.sleep(RPC_DELAY)
+    except Exception:
+        print(
+            "  MissionControl stale-time policy unavailable; inherited feed "
+            "values will be labeled without an effective value.",
+            file=sys.stderr,
+        )
 
     pd_addr = state.hq.getAddr(PRICE_DESK_ID)
     state.pd = boa.from_etherscan(pd_addr, name="PriceDesk")
@@ -111,6 +131,151 @@ def initialize_prices():
 # ============================================================================
 # Output Functions
 # ============================================================================
+
+
+def _read_mission_control_stale_time(mission_control):
+    """Read the global price policy across old and current MissionControl ABIs."""
+    if mission_control is None:
+        return None
+
+    try:
+        if hasattr(mission_control, "getPriceStaleTime"):
+            return int(mission_control.getPriceStaleTime())
+    except Exception:
+        pass
+
+    try:
+        config = mission_control.genConfig()
+        if hasattr(config, "priceStaleTime"):
+            return int(config.priceStaleTime)
+        return int(config[2])
+    except Exception:
+        return None
+
+
+def _format_price_feed_stale_time(stored_stale_time, global_stale_time=None):
+    """Render feed overrides without misrepresenting the zero sentinel."""
+    stored = int(stored_stale_time)
+    if stored != 0:
+        return f"{stored}s"
+    if global_stale_time is None:
+        return "inherit MissionControl (stored 0; effective value unavailable)"
+    return (
+        "inherit MissionControl "
+        f"(stored 0; effective {int(global_stale_time)}s)"
+    )
+
+
+def _matching_cross_source_eth_usd_feeds(
+    primary_feed,
+    needs_eth_to_usd,
+    discovered_eth_usd_feeds,
+):
+    """Return source labels only for an exact cross-source feed-address match."""
+    if not needs_eth_to_usd:
+        return ()
+    feed = str(primary_feed).lower()
+    if feed == ZERO_ADDRESS:
+        return ()
+    return tuple(discovered_eth_usd_feeds.get(feed, ()))
+
+
+def _is_redstone_source(source, source_name):
+    normalized_name = str(source_name).lower().replace(" ", "")
+    return "redstone" in normalized_name or hasattr(source, "getRedStoneData")
+
+
+def _discover_direct_eth_usd_feeds(excluded_source=None):
+    """Best-effort direct ETH/USD feed inventory and unreadable RPC surfaces."""
+    discovered = {}
+    incomplete_reads = set()
+    excluded_address = str(getattr(excluded_source, "address", "")).lower()
+    price_desk_eth = None
+    try:
+        if state.pd is not None:
+            price_desk_eth = state.pd.ETH()
+        else:
+            incomplete_reads.add("PriceDesk.ETH (not loaded)")
+    except Exception:
+        incomplete_reads.add("PriceDesk.ETH")
+
+    for reg_id, source_info in state.price_sources.items():
+        source = source_info["contract"]
+        source_address = str(getattr(source, "address", "")).lower()
+        is_excluded_address = (
+            excluded_address
+            and source_address
+            and source_address == excluded_address
+        )
+        if (
+            source is excluded_source
+            or is_excluded_address
+            or not hasattr(source, "feedConfig")
+        ):
+            continue
+
+        eth_assets = []
+        if price_desk_eth is not None:
+            eth_assets.append(price_desk_eth)
+        try:
+            if hasattr(source, "ETH"):
+                eth_assets.append(source.ETH())
+        except Exception:
+            label = f"{source_info['description']} (registry {reg_id}).ETH"
+            incomplete_reads.add(label)
+
+        checked_assets = set()
+        for eth_asset in eth_assets:
+            normalized_asset = str(eth_asset).lower()
+            if normalized_asset in checked_assets:
+                continue
+            checked_assets.add(normalized_asset)
+            try:
+                config = source.feedConfig(eth_asset)
+            except Exception:
+                label = (
+                    f"{source_info['description']} "
+                    f"(registry {reg_id}).feedConfig"
+                )
+                incomplete_reads.add(label)
+                continue
+
+            # Feed-id sources cannot match RedStone's address-valued feed.
+            if not hasattr(config, "feed"):
+                continue
+            feed = str(config.feed).lower()
+            if feed == ZERO_ADDRESS:
+                continue
+            # Only a direct USD anchor is evidence for this diagnostic.
+            if getattr(config, "needsEthToUsd", False) or getattr(
+                config,
+                "needsBtcToUsd",
+                False,
+            ):
+                continue
+
+            label = f"{source_info['description']} (registry {reg_id})"
+            discovered.setdefault(feed, set()).add(label)
+
+    return (
+        {
+            feed: tuple(sorted(labels))
+            for feed, labels in discovered.items()
+        },
+        tuple(sorted(incomplete_reads)),
+    )
+
+
+def _print_incomplete_cross_source_discovery(incomplete_reads):
+    if not incomplete_reads:
+        return
+    reads = ", ".join(f"`{read}`" for read in incomplete_reads)
+    print("\n#### ⚠️ RedStone Cross-Source Diagnostic Incomplete")
+    print(
+        f"- Could not read {reads}. This is nonfatal, but absence of a "
+        "self-conversion warning is not conclusive; retry the report before "
+        "confirmation or activation."
+    )
 
 
 def print_table_of_contents():
@@ -197,7 +362,7 @@ def print_price_source_config(reg_id: int, source_info: dict):
 
     # Pending price feed changes
     if num_assets > 1:
-        _print_pending_price_changes(source, num_assets)
+        _print_pending_price_changes(source, source_name, num_assets)
 
 
 def _print_green_ref_pool_config(source):
@@ -254,7 +419,7 @@ def _print_green_ref_pool_config(source):
         print(f"  - Update: {data.lastSnapshot.update} ({time_ago})")
 
 
-def _print_pending_price_changes(source, num_assets: int):
+def _print_pending_price_changes(source, source_name: str, num_assets: int):
     """Print pending price feed updates for a price source."""
     # Check if source has pending update checking method
     if not hasattr(source, 'hasPendingPriceFeedUpdate'):
@@ -284,7 +449,16 @@ def _print_pending_price_changes(source, num_assets: int):
     if not pending_assets:
         return
 
+    cross_source_eth_usd_feeds = {}
+    incomplete_cross_source_reads = ()
+    if _is_redstone_source(source, source_name):
+        (
+            cross_source_eth_usd_feeds,
+            incomplete_cross_source_reads,
+        ) = _discover_direct_eth_usd_feeds(source)
+
     print(f"\n#### ⏳ Pending Price Feed Updates ({len(pending_assets)})")
+    _print_incomplete_cross_source_discovery(incomplete_cross_source_reads)
 
     for item in pending_assets:
         asset_name = item["asset"]
@@ -311,10 +485,31 @@ def _print_pending_price_changes(source, num_assets: int):
                         config = pending.config
                         if hasattr(config, 'feed') and str(config.feed) != ZERO_ADDRESS:
                             print(f"- Pending Feed: `{config.feed}`")
+                            matching_sources = (
+                                _matching_cross_source_eth_usd_feeds(
+                                    config.feed,
+                                    getattr(config, 'needsEthToUsd', False),
+                                    cross_source_eth_usd_feeds,
+                                )
+                            )
+                            if matching_sources:
+                                sources = ", ".join(matching_sources)
+                                print(
+                                    "- ⚠️ Cross-source ETH conversion warning: "
+                                    "`needsEthToUsd=True`, but pending feed "
+                                    f"`{config.feed}` is also a direct ETH/USD "
+                                    f"feed in {sources}. PriceDesk resolves the "
+                                    "ETH conversion outside RedStone; investigate "
+                                    "before confirmation or activation."
+                                )
                         if hasattr(config, 'feedId') and config.feedId:
                             print(f"- Pending Feed ID: `0x{config.feedId.hex()}`")
                         if hasattr(config, 'staleTime'):
-                            print(f"- Pending Stale Time: {config.staleTime}s")
+                            stale_time = _format_price_feed_stale_time(
+                                config.staleTime,
+                                state.mission_control_stale_time,
+                            )
+                            print(f"- Pending Stale Time: {stale_time}")
                         if hasattr(config, 'pool') and str(config.pool) != ZERO_ADDRESS:
                             print(f"- Pending Pool: `{config.pool}`")
 
@@ -353,6 +548,14 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
     pyth_configs = []
     stork_configs = []
     aero_configs = []  # AeroRipePrices (priceConfigs without underlyingAsset)
+    redstone_warnings = []
+    cross_source_eth_usd_feeds = {}
+    incomplete_cross_source_reads = ()
+    if _is_redstone_source(source, source_name):
+        (
+            cross_source_eth_usd_feeds,
+            incomplete_cross_source_reads,
+        ) = _discover_direct_eth_usd_feeds(source)
 
     for j in range(1, num_assets):
         time.sleep(RPC_DELAY)
@@ -371,11 +574,23 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
                 needs_eth = getattr(config, 'needsEthToUsd', False)
                 needs_btc = getattr(config, 'needsBtcToUsd', False)
                 stale = getattr(config, 'staleTime', 0)
+                matching_sources = _matching_cross_source_eth_usd_feeds(
+                    config.feed,
+                    needs_eth,
+                    cross_source_eth_usd_feeds,
+                )
+                if matching_sources:
+                    redstone_warnings.append(
+                        (asset_name, str(config.feed), matching_sources)
+                    )
                 asset_rows.append([
                     asset_name,
                     feed_addr,
                     f"ETH:{needs_eth}, BTC:{needs_btc}",
-                    f"{stale}s"
+                    _format_price_feed_stale_time(
+                        stale,
+                        state.mission_control_stale_time,
+                    )
                 ])
             elif hasattr(config, 'feedId'):
                 # Pyth or Stork: feedId, staleTime
@@ -428,6 +643,19 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
         print(f"| {' | '.join(['---' for _ in headers])} |")
         for row in asset_rows:
             print(f"| {' | '.join(str(cell) for cell in row)} |")
+
+    _print_incomplete_cross_source_discovery(incomplete_cross_source_reads)
+
+    if redstone_warnings:
+        print("\n#### ⚠️ RedStone Cross-Source ETH Conversion Warnings")
+        for asset_name, feed, matching_sources in redstone_warnings:
+            sources = ", ".join(matching_sources)
+            print(
+                f"- **{asset_name}**: `needsEthToUsd=True`, but primary feed "
+                f"`{feed}` is also a direct ETH/USD feed in {sources}. "
+                "PriceDesk resolves the ETH conversion outside RedStone; "
+                "investigate this self-conversion hazard before activation."
+            )
 
     # Curve configs - display separately in cleaner format
     if curve_configs:
@@ -515,7 +743,13 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
             print(f"\n**{asset_name}**")
             print(f"- Asset Address: `{asset_addr}`")
             print(f"- Feed ID: `0x{feed_id}`")
-            print(f"- Stale Time: {stale}s")
+            print(
+                "- Stale Time: "
+                + _format_price_feed_stale_time(
+                    stale,
+                    state.mission_control_stale_time,
+                )
+            )
 
     # Stork configs - display in list format
     if stork_configs:
@@ -531,7 +765,13 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
             print(f"\n**{asset_name}**")
             print(f"- Asset Address: `{asset_addr}`")
             print(f"- Feed ID: `0x{feed_id}`")
-            print(f"- Stale Time: {stale}s")
+            print(
+                "- Stale Time: "
+                + _format_price_feed_stale_time(
+                    stale,
+                    state.mission_control_stale_time,
+                )
+            )
 
     # AeroRipe configs - display in list format
     if aero_configs:

@@ -2,10 +2,16 @@ import boa
 import pytest
 
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, advance_timelock_blocks
 from config.BluePrint import CORE_TOKENS
 
 MONTH_IN_SECONDS = 30 * 24 * 60 * 60
+MAX_FEED_STALE_TIME = 7 * 24 * 60 * 60
+
+
+@pytest.fixture(autouse=True)
+def default_price_stale_time(setGeneralConfig):
+    setGeneralConfig(_priceStaleTime=24 * 60 * 60)
 
 
 @pytest.fixture(scope="module")
@@ -14,8 +20,10 @@ def addPythFeed(pyth_prices, governance):
         if pyth_prices.hasPriceFeed(_asset):
             return
         assert pyth_prices.addNewPriceFeed(_asset, _feed_id, _stale_time, sender=governance.address)
-        boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+        advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
         assert pyth_prices.confirmNewPriceFeed(_asset, sender=governance.address)
+        # MockPyth ignores updates whose publish time is not strictly newer.
+        boa.env.time_travel(seconds=1)
     yield addPythFeed
 
 
@@ -23,7 +31,7 @@ def addPythFeed(pyth_prices, governance):
 def authorized_caller(switchboard_alpha, mission_control, governance, bob):
     """Grant canPerformLiteAction permission to bob for oracle updates"""
     action_id = switchboard_alpha.setCanPerformLiteAction(bob, True, sender=governance.address)
-    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    advance_timelock_blocks(switchboard_alpha.actionTimeLock())
     switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     assert mission_control.canPerformLiteAction(bob)
     return bob
@@ -402,11 +410,11 @@ def test_pyth_get_price_stale(
     authorized_caller,
     addPythFeed,
 ):
-    boa.env.evm.patch.timestamp += MONTH_IN_SECONDS
-
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
-    addPythFeed(alpha_token, data_feed_id)
+    addPythFeed(alpha_token, data_feed_id, 3600)
     assert pyth_prices.getPrice(alpha_token) != 0
+
+    boa.env.time_travel(seconds=MONTH_IN_SECONDS)
 
     # get payload
     publish_time = boa.env.evm.patch.timestamp - 3601 # 1 hour and 1 second ago, > stale time (3600s)
@@ -425,7 +433,7 @@ def test_pyth_get_price_stale(
     assert pyth_prices.updatePythPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # price should be 0 due to staleness
-    assert pyth_prices.getPrice(alpha_token, 3600) == 0
+    assert pyth_prices.getPrice(alpha_token) == 0
 
 
 def test_pyth_price_stale_with_feed_config(
@@ -438,36 +446,32 @@ def test_pyth_price_stale_with_feed_config(
     stale_time = 3600  # 1 hour
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
     
-    # Refresh the feed's timestamp to current time
-    payload = mock_pyth.createPriceFeedUpdateData(data_feed_id, 98000000, 50000, -8, boa.env.evm.patch.timestamp)
-    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_pyth.updatePriceFeeds([payload], value=1)
-    
-    # Add feed with custom stale time (use 0 first to avoid validation issues)
-    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, 0, sender=governance.address)
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    # Add and confirm an exact per-feed override.
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, stale_time, sender=governance.address)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+    boa.env.time_travel(seconds=1)
+    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
     # Verify event has stale time
     log = filter_logs(pyth_prices, "NewPythFeedAdded")[0]
     assert log.asset == alpha_token.address
     assert log.feedId == data_feed_id
-    assert log.staleTime == 0  # We used 0 as stale time
+    assert log.staleTime == stale_time
 
     # Test price with feed's stale time (should have price data from earlier setup)
     assert pyth_prices.getPrice(alpha_token) != 0
 
-    # Test price with additional stale time parameter (should use max of both)
-    # The price should be 0 because the feed's publishTime is old enough to be stale with 1 hour stale time
-    assert pyth_prices.getPrice(alpha_token, stale_time) == 0  # 1 hour stale time
-
-    # Test price with larger stale time parameter (should also be stale)
-    assert pyth_prices.getPrice(alpha_token, 7200) == 0  # 2 hours > 1 hour
+    # Equality at the configured age is valid; one second beyond is stale.
+    boa.env.time_travel(seconds=stale_time)
+    assert pyth_prices.getPrice(alpha_token) != 0
+    boa.env.time_travel(seconds=1)
+    assert pyth_prices.getPrice(alpha_token) == 0
 
     # Test that the feed config structure works correctly
     config = pyth_prices.feedConfig(alpha_token)
     assert config.feedId == data_feed_id
-    assert config.staleTime == 0  # We used 0 as stale time
+    assert config.staleTime == stale_time
 
 
 def test_pyth_is_valid_feed(
@@ -532,7 +536,7 @@ def test_pyth_add_price_feed(
         pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
     # Travel past time lock
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
 
     # Test confirming
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
@@ -550,7 +554,7 @@ def test_pyth_add_price_feed(
     assert not pyth_prices.hasPendingPriceFeedUpdate(alpha_token)
 
     # Test canceling non-existent feed
-    with boa.reverts("cannot cancel action"):
+    with boa.reverts("no pending new feed"):
         pyth_prices.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
 
     # Test adding feed for existing asset
@@ -610,9 +614,10 @@ def test_pyth_add_price_feed_validation_during_confirm(
     assert pyth_prices.addNewPriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
     
     # Travel past time lock
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
 
     # Now update the feed with invalid price (0) to make validation fail
+    boa.env.time_travel(seconds=1)
     invalid_payload = mock_pyth.createPriceFeedUpdateData(invalid_feed_id, 0, 50000, -8, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
     mock_pyth.updatePriceFeeds([invalid_payload], value=1)
@@ -681,7 +686,7 @@ def test_pyth_update_price_feed(
         pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
     # Travel past time lock
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
 
     # Test confirming
     assert pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
@@ -699,7 +704,7 @@ def test_pyth_update_price_feed(
     assert pyth_prices.getPrice(alpha_token) != 0
 
     # Test canceling non-existent update
-    with boa.reverts("cannot cancel action"):
+    with boa.reverts("no pending update feed"):
         pyth_prices.cancelPriceFeedUpdate(alpha_token, sender=governance.address)
 
 
@@ -814,7 +819,7 @@ def test_pyth_disable_price_feed(
         pyth_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
 
     # Travel past time lock
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
 
     # Test confirming
     assert pyth_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
@@ -830,7 +835,7 @@ def test_pyth_disable_price_feed(
     assert pyth_prices.feedConfig(alpha_token).feedId == bytes(32)
 
     # Test canceling non-existent disable
-    with boa.reverts("cannot cancel action"):
+    with boa.reverts("no pending disable feed"):
         pyth_prices.cancelDisablePriceFeed(alpha_token, sender=governance.address)
 
 
@@ -899,7 +904,7 @@ def test_pyth_price_stale_edge_cases(
     addPythFeed,
 ):
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
-    addPythFeed(alpha_token, data_feed_id)
+    addPythFeed(alpha_token, data_feed_id, 1)
 
     # Give switchboard enough ETH for all tests
     boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
@@ -910,22 +915,13 @@ def test_pyth_price_stale_edge_cases(
     assert pyth_prices.updatePythPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # Test price just at stale boundary (should still be valid)
-    assert pyth_prices.getPrice(alpha_token, 0) != 0
+    assert pyth_prices.getPrice(alpha_token) != 0
     boa.env.time_travel(seconds=1)
-    assert pyth_prices.getPrice(alpha_token, 1) != 0
+    assert pyth_prices.getPrice(alpha_token) != 0
 
     # Test price just over stale boundary
     boa.env.time_travel(seconds=1)
-    assert pyth_prices.getPrice(alpha_token, 1) == 0
-
-    # Test with maximum uint256 stale time
-    payload = mock_pyth.createPriceFeedUpdateData(data_feed_id, 98000000, 50000, -8, boa.env.evm.patch.timestamp)
-    assert pyth_prices.updatePythPrice([payload], sender=authorized_caller, value=EIGHTEEN_DECIMALS)
-    assert pyth_prices.getPrice(alpha_token, 2**256 - 1) != 0
-
-    # Test with zero stale time (never stale)
-    boa.env.time_travel(seconds=100000)
-    assert pyth_prices.getPrice(alpha_token, 0) != 0
+    assert pyth_prices.getPrice(alpha_token) == 0
 
 
 def test_pyth_time_lock_edge_cases(
@@ -945,27 +941,27 @@ def test_pyth_time_lock_edge_cases(
 
     # Test confirming just before time lock boundary
     assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() - 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() - 1)
     with boa.reverts("time lock not reached"):
         pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
     # Test confirming at time lock boundary
-    boa.env.time_travel(blocks=1)
+    advance_timelock_blocks(1)
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
     # Test multiple time lock actions in sequence
     assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
     
     assert pyth_prices.disablePriceFeed(alpha_token, sender=governance.address)
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
 
     # Test with different time lock values
     pyth_prices.setActionTimeLock(302400, sender=governance.address)  # 7 days in blocks
     assert pyth_prices.addNewPriceFeed(bravo_token, data_feed_id_1, 0, sender=governance.address)
-    boa.env.time_travel(blocks=302400)
+    advance_timelock_blocks(302400)
     assert pyth_prices.confirmNewPriceFeed(bravo_token, sender=governance.address)
 
 
@@ -988,10 +984,10 @@ def test_pyth_governance_edge_cases(
     assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     assert pyth_prices.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
     assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
     assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
     # Test governance actions during pause (using switchboard address)
@@ -1001,13 +997,17 @@ def test_pyth_governance_edge_cases(
     with boa.reverts("contract paused"):
         pyth_prices.updatePriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     with boa.reverts("contract paused"):
+        pyth_prices.updateStaleTime(
+            alpha_token, 3_600, sender=governance.address
+        )
+    with boa.reverts("contract paused"):
         pyth_prices.disablePriceFeed(alpha_token, sender=governance.address)
 
     # Test governance actions after unpause
     pyth_prices.pause(False, sender=switchboard_alpha.address)
     # First disable the existing feed
     assert pyth_prices.disablePriceFeed(alpha_token, sender=governance.address)
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
     # Now we can add a new feed
     assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
@@ -1029,11 +1029,11 @@ def test_pyth_feed_validation_edge_cases(
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
     mock_pyth.updatePriceFeeds([payload], value=1)
 
-    # Should work regardless of timestamp since staleness check is removed for adding feeds
+    # Fresh data is valid under the inherited global stale-time policy.
     assert pyth_prices.addNewPriceFeed(alpha_token, new_feed_id, 0, sender=governance.address)
     
     # Travel past time lock and confirm
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
     
     # Verify feed is active
@@ -1084,12 +1084,19 @@ def test_set_pyth_feed_aero(
 SC20_PYTH_FEED_ID = bytes.fromhex(
     "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
 )
+SC20_PYTH_ALT_FEED_ID = bytes.fromhex(
+    "baa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94b"
+)
 SC20_PYTH_PRICE = (98_000_000 - 50_000) * 10**10
 
 
-def _set_sc20_pyth_price(mock_pyth, publish_time):
+def _set_sc20_pyth_price(
+    mock_pyth,
+    publish_time,
+    feed_id=SC20_PYTH_FEED_ID,
+):
     payload = mock_pyth.createPriceFeedUpdateData(
-        SC20_PYTH_FEED_ID,
+        feed_id,
         98_000_000,
         50_000,
         -8,
@@ -1105,140 +1112,718 @@ def _add_sc20_pyth_feed(
     asset,
     governance,
     stale_time,
+    feed_id=SC20_PYTH_FEED_ID,
 ):
-    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp, feed_id)
     assert pyth_prices.addNewPriceFeed(
         asset,
-        SC20_PYTH_FEED_ID,
+        feed_id,
         stale_time,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
-    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+    advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+    boa.env.time_travel(seconds=1)
+    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp, feed_id)
     assert pyth_prices.confirmNewPriceFeed(asset, sender=governance.address)
 
 
-def _set_sc20_pyth_global_bound(
-    switchboard_alpha,
+def test_pyth_omitted_add_and_update_stale_time_inherit_global(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
     governance,
-    mission_control,
-    stale_time=7_200,
+    setGeneralConfig,
 ):
-    action_id = switchboard_alpha.setStaleTime(
-        stale_time, sender=governance.address
-    )
-    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
-    assert switchboard_alpha.executePendingAction(
-        action_id, sender=governance.address
-    )
-    assert mission_control.getPriceStaleTime() == stale_time
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        assert pyth_prices.addNewPriceFeed(
+            alpha_token,
+            SC20_PYTH_FEED_ID,
+            sender=governance.address,
+        )
+        assert pyth_prices.pendingUpdates(alpha_token).config.staleTime == 0
+
+        advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+        boa.env.time_travel(seconds=1)
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        assert pyth_prices.confirmNewPriceFeed(
+            alpha_token, sender=governance.address
+        )
+        assert pyth_prices.feedConfig(alpha_token).staleTime == 0
+
+        _set_sc20_pyth_price(
+            mock_pyth,
+            boa.env.timestamp,
+            SC20_PYTH_ALT_FEED_ID,
+        )
+        assert pyth_prices.updatePriceFeed(
+            alpha_token,
+            SC20_PYTH_ALT_FEED_ID,
+            sender=governance.address,
+        )
+        assert pyth_prices.pendingUpdates(alpha_token).config.staleTime == 0
+
+        advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+        boa.env.time_travel(seconds=1)
+        _set_sc20_pyth_price(
+            mock_pyth,
+            boa.env.timestamp,
+            SC20_PYTH_ALT_FEED_ID,
+        )
+        assert pyth_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        stored = pyth_prices.feedConfig(alpha_token)
+        assert stored.feedId == SC20_PYTH_ALT_FEED_ID
+        assert stored.staleTime == 0
+
+        boa.env.time_travel(seconds=100)
+        assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
+        boa.env.time_travel(seconds=1)
+        assert pyth_prices.getPrice(alpha_token) == 0
 
 
 @pytest.mark.parametrize(
-    "caller_bound,feed_bound,age,expected_valid",
+    "feed_bound,global_bound,age,expected_valid",
     [
-        (0, 0, 100_000, True),
-        (20, 0, 21, False),
-        (0, 20, 21, False),
-        (10, 20, 11, False),
-        (20, 10, 11, False),
-        (10, 10, 5, True),
-        (10, 20, 10, True),
+        (0, 100, 100, True),
+        (0, 100, 101, False),
+        (200, 100, 150, True),
+        (50, 100, 75, False),
+        (50, 0, 50, True),
+        (50, 0, 51, False),
+        (50, MAX_FEED_STALE_TIME + 1, 50, True),
+        (MAX_FEED_STALE_TIME, 0, MAX_FEED_STALE_TIME, True),
+        (MAX_FEED_STALE_TIME, 100, MAX_FEED_STALE_TIME + 1, False),
+        (0, 0, 0, False),
+        (0, MAX_FEED_STALE_TIME + 1, 0, False),
     ],
 )
-def test_sc20_pyth_stale_resolver_matrix(
+def test_pyth_exact_override_and_global_inheritance_matrix(
     pyth_prices,
     mock_pyth,
     alpha_token,
     bravo_token,
     governance,
-    caller_bound,
+    price_desk,
+    setGeneralConfig,
     feed_bound,
+    global_bound,
     age,
     expected_valid,
 ):
-    assert pyth_prices.getPriceAndHasFeed(bravo_token) == (0, False)
-    _add_sc20_pyth_feed(
-        pyth_prices,
-        mock_pyth,
-        alpha_token,
-        governance,
-        feed_bound,
-    )
-    boa.env.time_travel(seconds=age)
+    with boa.env.anchor():
+        assert pyth_prices.getPriceAndHasFeed(bravo_token) == (0, False)
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices,
+            mock_pyth,
+            alpha_token,
+            governance,
+            feed_bound,
+        )
+        setGeneralConfig(_priceStaleTime=global_bound)
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        boa.env.time_travel(seconds=age)
 
-    expected_price = SC20_PYTH_PRICE if expected_valid else 0
-    assert pyth_prices.getPrice(alpha_token, caller_bound) == expected_price
-    assert pyth_prices.getPriceAndHasFeed(alpha_token, caller_bound) == (
-        expected_price,
-        True,
-    )
+        expected_price = SC20_PYTH_PRICE if expected_valid else 0
+        assert pyth_prices.getPrice(alpha_token) == expected_price
+        assert pyth_prices.getPriceAndHasFeed(alpha_token) == (
+            expected_price,
+            True,
+        )
+        assert price_desk.getPrice(alpha_token) == expected_price
 
 
-def test_sc20_pyth_validation_uses_stricter_candidate_bound(
+def test_pyth_forwarded_global_requires_canonical_price_desk(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    mission_control,
-    switchboard_alpha,
     governance,
+    price_desk,
+    setGeneralConfig,
 ):
     with boa.env.anchor():
-        _set_sc20_pyth_global_bound(
-            switchboard_alpha, governance, mission_control
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 0
         )
         _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
-        boa.env.time_travel(seconds=5_400)
-        assert pyth_prices.isValidNewFeed(
+
+        assert price_desk.getPrice(alpha_token) == SC20_PYTH_PRICE
+        assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
+
+        assert pyth_prices.getPrice(
+            alpha_token, 100, price_desk.address
+        ) == 0
+        assert pyth_prices.getPriceAndHasFeed(
+            alpha_token, 100, price_desk.address
+        ) == (0, True)
+        assert pyth_prices.getPrice(
+            alpha_token, 100, ZERO_ADDRESS, sender=price_desk.address
+        ) == 0
+        assert pyth_prices.getPriceAndHasFeed(
+            alpha_token, 100, ZERO_ADDRESS, sender=price_desk.address
+        ) == (0, True)
+
+        assert pyth_prices.getPrice(
             alpha_token,
-            SC20_PYTH_FEED_ID,
-            7_200,
-        )
-        assert not pyth_prices.isValidNewFeed(
+            100,
+            price_desk.address,
+            sender=price_desk.address,
+        ) == SC20_PYTH_PRICE
+        assert pyth_prices.getPriceAndHasFeed(
             alpha_token,
-            SC20_PYTH_FEED_ID,
-            3_600,
-        )
+            100,
+            price_desk.address,
+            sender=price_desk.address,
+        ) == (SC20_PYTH_PRICE, True)
 
 
-@pytest.mark.parametrize("stale_bound", [0, 1_000])
-def test_sc21_pyth_future_timestamp_is_fail_soft_and_recovers(
+def test_pyth_invalid_stale_bounds_fail_closed_at_admission_and_runtime(
     pyth_prices,
     mock_pyth,
     alpha_token,
     governance,
-    stale_bound,
+    setGeneralConfig,
+):
+    with boa.env.anchor():
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        assert not pyth_prices.isValidNewFeed(
+            alpha_token, SC20_PYTH_FEED_ID, MAX_FEED_STALE_TIME + 1
+        )
+        with boa.reverts("invalid feed"):
+            pyth_prices.addNewPriceFeed(
+                alpha_token,
+                SC20_PYTH_FEED_ID,
+                MAX_FEED_STALE_TIME + 1,
+                sender=governance.address,
+            )
+
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 0
+        )
+        for invalid_global in (0, MAX_FEED_STALE_TIME + 1):
+            setGeneralConfig(_priceStaleTime=invalid_global)
+            assert pyth_prices.getPrice(alpha_token) == 0
+            assert pyth_prices.getPriceAndHasFeed(alpha_token) == (0, True)
+
+        assert not pyth_prices.isValidStaleTimeUpdate(
+            alpha_token, MAX_FEED_STALE_TIME + 1
+        )
+        with boa.reverts("invalid feed"):
+            pyth_prices.updateStaleTime(
+                alpha_token,
+                MAX_FEED_STALE_TIME + 1,
+                sender=governance.address,
+            )
+
+        setGeneralConfig(_priceStaleTime=100)
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        pyth_prices.eval(
+            f"self.feedConfig[{alpha_token.address}].staleTime = "
+            f"{MAX_FEED_STALE_TIME + 1}"
+        )
+        assert pyth_prices.getPrice(alpha_token) == 0
+        assert pyth_prices.getPriceAndHasFeed(alpha_token) == (0, True)
+
+
+def test_pyth_stale_time_update_lifecycle_noop_cancel_and_liveness(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    bravo_token,
+    governance,
+    bob,
+    setGeneralConfig,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        assert not pyth_prices.hasPriceFeed(bravo_token)
+        assert not pyth_prices.isValidStaleTimeUpdate(bravo_token, 200)
+        with boa.reverts("invalid feed"):
+            pyth_prices.updateStaleTime(
+                bravo_token, 200, sender=governance.address
+            )
+        assert pyth_prices.pendingUpdates(bravo_token).actionId == 0
+
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 100
+        )
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+
+        with boa.reverts("no perms"):
+            pyth_prices.updateStaleTime(alpha_token, 200, sender=bob)
+
+        assert pyth_prices.updateStaleTime(
+            alpha_token, 200, sender=governance.address
+        )
+        pending = pyth_prices.pendingUpdates(alpha_token)
+        assert pending.actionId != 0
+        assert pending.config.feedId == SC20_PYTH_FEED_ID
+        assert pending.config.staleTime == 200
+        assert pyth_prices.feedConfig(alpha_token).staleTime == 100
+        assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
+
+        with boa.reverts("time lock not reached"):
+            pyth_prices.confirmPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+        advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        assert pyth_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert pyth_prices.feedConfig(alpha_token).staleTime == 200
+
+        assert not pyth_prices.isValidStaleTimeUpdate(alpha_token, 200)
+        with boa.reverts("invalid feed"):
+            pyth_prices.updateStaleTime(
+                alpha_token, 200, sender=governance.address
+            )
+
+        assert pyth_prices.updateStaleTime(
+            alpha_token, 0, sender=governance.address
+        )
+        assert pyth_prices.cancelPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert pyth_prices.feedConfig(alpha_token).staleTime == 200
+        assert pyth_prices.pendingUpdates(alpha_token).actionId == 0
+
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 100
+        )
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        assert pyth_prices.updateStaleTime(
+            alpha_token, 10, sender=governance.address
+        )
+        advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+        boa.env.time_travel(seconds=11)
+
+        assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
+        assert not pyth_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert pyth_prices.feedConfig(alpha_token).staleTime == 100
+        assert pyth_prices.pendingUpdates(alpha_token).actionId == 0
+
+
+def test_pyth_stale_time_update_to_zero_confirms_global_inheritance(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    setGeneralConfig,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 200
+        )
+
+        assert pyth_prices.updateStaleTime(
+            alpha_token, 0, sender=governance.address
+        )
+        pending = pyth_prices.pendingUpdates(alpha_token)
+        assert pending.actionId != 0
+        assert pending.config.feedId == SC20_PYTH_FEED_ID
+        assert pending.config.staleTime == 0
+        assert pyth_prices.feedConfig(alpha_token).staleTime == 200
+
+        advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+        boa.env.time_travel(seconds=1)
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        assert pyth_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        stored = pyth_prices.feedConfig(alpha_token)
+        assert stored.feedId == SC20_PYTH_FEED_ID
+        assert stored.staleTime == 0
+        assert pyth_prices.pendingUpdates(alpha_token).actionId == 0
+
+        boa.env.time_travel(seconds=100)
+        assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
+        assert pyth_prices.getPriceAndHasFeed(alpha_token) == (
+            SC20_PYTH_PRICE,
+            True,
+        )
+        boa.env.time_travel(seconds=1)
+        assert pyth_prices.getPrice(alpha_token) == 0
+        assert pyth_prices.getPriceAndHasFeed(alpha_token) == (0, True)
+
+
+@pytest.mark.parametrize(
+    "invalid_global", [0, MAX_FEED_STALE_TIME + 1]
+)
+@pytest.mark.parametrize(
+    "pending_stale_time,should_confirm", [(0, False), (200, True)]
+)
+def test_pyth_stale_time_confirmation_revalidates_inherited_policy(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    setGeneralConfig,
+    invalid_global,
+    pending_stale_time,
+    should_confirm,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 300
+        )
+        assert pyth_prices.updateStaleTime(
+            alpha_token,
+            pending_stale_time,
+            sender=governance.address,
+        )
+        pending = pyth_prices.pendingUpdates(alpha_token)
+        assert pending.actionId != 0
+        assert pending.config.feedId == SC20_PYTH_FEED_ID
+        assert pending.config.staleTime == pending_stale_time
+
+        setGeneralConfig(_priceStaleTime=invalid_global)
+        advance_timelock_blocks(pyth_prices.actionTimeLock() + 1)
+        boa.env.time_travel(seconds=1)
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+
+        assert pyth_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        ) is should_confirm
+        stored = pyth_prices.feedConfig(alpha_token)
+        assert stored.feedId == SC20_PYTH_FEED_ID
+        assert stored.staleTime == (200 if should_confirm else 300)
+        cleared = pyth_prices.pendingUpdates(alpha_token)
+        assert cleared.actionId == 0
+        assert cleared.config.feedId == bytes(32)
+        assert cleared.config.staleTime == 0
+        assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
+        assert pyth_prices.getPriceAndHasFeed(alpha_token) == (
+            SC20_PYTH_PRICE,
+            True,
+        )
+
+
+def test_pyth_inherited_policy_fails_closed_without_mission_control(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    ripe_hq,
+    setGeneralConfig,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 0
+        )
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
+
+        assert ripe_hq.getAddr(5) != ZERO_ADDRESS
+        ripe_hq.eval("registry.addrInfo[5].addr = empty(address)")
+        assert ripe_hq.getAddr(5) == ZERO_ADDRESS
+        assert pyth_prices.getPrice(alpha_token) == 0
+        assert pyth_prices.getPriceAndHasFeed(alpha_token) == (0, True)
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [0, 1, 100, MAX_FEED_STALE_TIME, MAX_FEED_STALE_TIME + 1],
+)
+def test_pyth_stale_time_preflight_matches_initiation(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    setGeneralConfig,
+    candidate,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 100
+        )
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        expected = candidate not in (100, MAX_FEED_STALE_TIME + 1)
+        assert pyth_prices.isValidStaleTimeUpdate(
+            alpha_token, candidate
+        ) is expected
+        with boa.env.anchor():
+            if expected:
+                assert pyth_prices.updateStaleTime(
+                    alpha_token, candidate, sender=governance.address
+                )
+            else:
+                with boa.reverts("invalid feed"):
+                    pyth_prices.updateStaleTime(
+                        alpha_token, candidate, sender=governance.address
+                    )
+
+
+def test_pyth_inherited_zero_preflight_rejects_zero_global(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    setGeneralConfig,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 100
+        )
+        setGeneralConfig(_priceStaleTime=0)
+        assert not pyth_prices.isValidStaleTimeUpdate(alpha_token, 0)
+        with boa.reverts("invalid feed"):
+            pyth_prices.updateStaleTime(
+                alpha_token, 0, sender=governance.address
+            )
+
+
+def _start_pyth_pending_action(
+    kind,
+    pyth_prices,
+    mock_pyth,
+    asset,
+    governance,
+):
+    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+    _set_sc20_pyth_price(
+        mock_pyth, boa.env.timestamp, SC20_PYTH_ALT_FEED_ID
+    )
+    if kind == "add":
+        assert pyth_prices.addNewPriceFeed(
+            asset, SC20_PYTH_FEED_ID, 100, sender=governance.address
+        )
+        return
+
+    _add_sc20_pyth_feed(
+        pyth_prices, mock_pyth, asset, governance, 100
+    )
+    if kind == "update":
+        assert pyth_prices.updatePriceFeed(
+            asset,
+            SC20_PYTH_ALT_FEED_ID,
+            100,
+            sender=governance.address,
+        )
+    elif kind == "stale":
+        assert pyth_prices.updateStaleTime(
+            asset, 200, sender=governance.address
+        )
+    else:
+        assert kind == "disable"
+        assert pyth_prices.disablePriceFeed(
+            asset, sender=governance.address
+        )
+
+
+def _pyth_action_state(source, asset):
+    pending = source.pendingUpdates(asset)
+    active = source.feedConfig(asset)
+    return (
+        source.hasPendingPriceFeedUpdate(asset),
+        pending.actionId,
+        pending.config.feedId,
+        pending.config.staleTime,
+        source.hasPriceFeed(asset),
+        active.feedId,
+        active.staleTime,
+    )
+
+
+def _pyth_wrong_action_selectors(pending_kind):
+    if pending_kind == "add":
+        return (
+            ("no pending update feed", "confirmPriceFeedUpdate"),
+            ("no pending update feed", "cancelPriceFeedUpdate"),
+            ("no pending disable feed", "confirmDisablePriceFeed"),
+            ("no pending disable feed", "cancelDisablePriceFeed"),
+        )
+    if pending_kind in ("update", "stale"):
+        return (
+            ("no pending new feed", "confirmNewPriceFeed"),
+            ("no pending new feed", "cancelNewPendingPriceFeed"),
+            ("no pending disable feed", "confirmDisablePriceFeed"),
+            ("no pending disable feed", "cancelDisablePriceFeed"),
+        )
+    assert pending_kind == "disable"
+    return (
+        ("no pending new feed", "confirmNewPriceFeed"),
+        ("no pending new feed", "cancelNewPendingPriceFeed"),
+        ("no pending update feed", "confirmPriceFeedUpdate"),
+        ("no pending update feed", "cancelPriceFeedUpdate"),
+    )
+
+
+@pytest.mark.parametrize("pending_kind", ["add", "update", "stale", "disable"])
+def test_pyth_pending_action_blocks_initiators_and_wrong_selectors(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    setGeneralConfig,
+    pending_kind,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _start_pyth_pending_action(
+            pending_kind,
+            pyth_prices,
+            mock_pyth,
+            alpha_token,
+            governance,
+        )
+        before = _pyth_action_state(pyth_prices, alpha_token)
+
+        attempts = (
+            lambda: pyth_prices.addNewPriceFeed(
+                alpha_token,
+                SC20_PYTH_FEED_ID,
+                100,
+                sender=governance.address,
+            ),
+            lambda: pyth_prices.updatePriceFeed(
+                alpha_token,
+                SC20_PYTH_ALT_FEED_ID,
+                100,
+                sender=governance.address,
+            ),
+            lambda: pyth_prices.updateStaleTime(
+                alpha_token, 300, sender=governance.address
+            ),
+            lambda: pyth_prices.disablePriceFeed(
+                alpha_token, sender=governance.address
+            ),
+        )
+        for attempt in attempts:
+            with boa.reverts("pending feed action"):
+                attempt()
+            assert _pyth_action_state(pyth_prices, alpha_token) == before
+
+        for reason, selector in _pyth_wrong_action_selectors(pending_kind):
+            with boa.reverts(reason):
+                getattr(pyth_prices, selector)(
+                    alpha_token, sender=governance.address
+                )
+            assert _pyth_action_state(pyth_prices, alpha_token) == before
+
+
+@pytest.mark.parametrize("pending_kind", ["add", "update", "stale", "disable"])
+def test_pyth_expired_pending_action_requires_cleanup(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    setGeneralConfig,
+    pending_kind,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        _start_pyth_pending_action(
+            pending_kind,
+            pyth_prices,
+            mock_pyth,
+            alpha_token,
+            governance,
+        )
+        advance_timelock_blocks(
+            pyth_prices.actionTimeLock() + pyth_prices.expiration()
+        )
+        assert pyth_prices.hasPendingPriceFeedUpdate(alpha_token)
+        with boa.reverts("pending feed action"):
+            pyth_prices.updateStaleTime(
+                alpha_token, 300, sender=governance.address
+            )
+
+        if pending_kind == "add":
+            assert pyth_prices.cancelNewPendingPriceFeed(
+                alpha_token, sender=governance.address
+            )
+            assert pyth_prices.addNewPriceFeed(
+                alpha_token,
+                SC20_PYTH_FEED_ID,
+                100,
+                sender=governance.address,
+            )
+        elif pending_kind in ("update", "stale"):
+            assert pyth_prices.cancelPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+            assert pyth_prices.updateStaleTime(
+                alpha_token, 300, sender=governance.address
+            )
+        else:
+            assert pyth_prices.cancelDisablePriceFeed(
+                alpha_token, sender=governance.address
+            )
+            assert pyth_prices.disablePriceFeed(
+                alpha_token, sender=governance.address
+            )
+
+
+def test_pyth_raw_accessor_ignores_staleness_but_not_future_data(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    setGeneralConfig,
+):
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=10)
+        _add_sc20_pyth_feed(
+            pyth_prices, mock_pyth, alpha_token, governance, 0
+        )
+        publish_time = boa.env.timestamp
+        _set_sc20_pyth_price(mock_pyth, publish_time)
+        boa.env.time_travel(seconds=11)
+
+        assert pyth_prices.getPrice(alpha_token) == 0
+        assert pyth_prices.getPriceAndHasFeed(alpha_token) == (0, True)
+        assert pyth_prices.getLastPriceAndLastUpdate(alpha_token) == (
+            SC20_PYTH_PRICE,
+            publish_time,
+        )
+
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp + 1)
+        assert pyth_prices.getLastPriceAndLastUpdate(alpha_token) == (0, 0)
+
+
+def test_pyth_future_timestamp_is_fail_soft_and_recovers(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
 ):
     _add_sc20_pyth_feed(
-        pyth_prices,
-        mock_pyth,
-        alpha_token,
-        governance,
-        0,
+        pyth_prices, mock_pyth, alpha_token, governance, 100
     )
     future_time = boa.env.timestamp + 100
     _set_sc20_pyth_price(mock_pyth, future_time)
 
-    assert pyth_prices.getPrice(alpha_token, stale_bound) == 0
-    assert pyth_prices.getPriceAndHasFeed(alpha_token, stale_bound) == (0, True)
+    assert pyth_prices.getPrice(alpha_token) == 0
+    assert pyth_prices.getPriceAndHasFeed(alpha_token) == (0, True)
     assert pyth_prices.getLastPriceAndLastUpdate(alpha_token) == (0, 0)
 
     boa.env.time_travel(seconds=100)
-    assert pyth_prices.getPrice(alpha_token, stale_bound) == SC20_PYTH_PRICE
+    assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
 
 
-def test_sc21_pyth_current_timestamp_is_valid(
+def test_pyth_current_timestamp_is_valid(
     pyth_prices,
     mock_pyth,
     alpha_token,
     governance,
 ):
     _add_sc20_pyth_feed(
-        pyth_prices,
-        mock_pyth,
-        alpha_token,
-        governance,
-        0,
+        pyth_prices, mock_pyth, alpha_token, governance, 1
     )
     _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
-    assert pyth_prices.getPrice(alpha_token, 1) == SC20_PYTH_PRICE
+    assert pyth_prices.getPrice(alpha_token) == SC20_PYTH_PRICE
