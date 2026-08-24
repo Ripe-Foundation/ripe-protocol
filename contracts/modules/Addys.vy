@@ -166,7 +166,7 @@ def _getRipeHq() -> address:
 @internal
 def _isValidRipeAddr(_addr: address) -> bool:
     hq: address = RIPE_HQ_FOR_ADDYS
-    
+
     # core departments
     if staticcall RipeHq(hq).isValidAddr(_addr):
         return True

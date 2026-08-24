@@ -370,6 +370,11 @@ PAYMENT_CAP_EXCEEDED: constant(uint256) = 1024
 LINEAGE_CAP_EXCEEDED: constant(uint256) = 2048
 OUTSTANDING_CAP_EXCEEDED: constant(uint256) = 4096
 
+# active-limit directions
+ACTIVE_LIMIT_INVALID: constant(uint8) = 0
+ACTIVE_LIMIT_REDUCTION: constant(uint8) = 1
+ACTIVE_LIMIT_RAISE: constant(uint8) = 2
+
 # fixed rate sources
 RATE_SOURCE_NONE: constant(uint8) = 0
 RATE_SOURCE_SEED: constant(uint8) = 1
@@ -678,7 +683,7 @@ def setEngineEnabled(_shouldEnable: bool, _expectedClosureNonce: uint256):
 @view
 @external
 def isValidActiveLimits(_newLineageLimit: uint256, _newOutstandingLimit: uint256) -> bool:
-    return self._activeLimitDirection(_newLineageLimit, _newOutstandingLimit) != 0
+    return self._activeLimitDirection(_newLineageLimit, _newOutstandingLimit) != ACTIVE_LIMIT_INVALID
 
 
 @nonreentrant
@@ -696,8 +701,8 @@ def setActiveLimits(
     assert _expectedCapacityReductionNonce == self.capacityReductionNonce # dev: capacity moved
 
     direction: uint8 = self._activeLimitDirection(_newLineageLimit, _newOutstandingLimit)
-    assert direction != 0 # dev: invalid limit direction
-    if direction == 1:
+    assert direction != ACTIVE_LIMIT_INVALID # dev: invalid limit direction
+    if direction == ACTIVE_LIMIT_REDUCTION:
         self.capacityReductionNonce += 1
 
     self.activeLineageAllocationLimit = _newLineageLimit
@@ -713,7 +718,7 @@ def setActiveLimits(
 @internal
 def _activeLimitDirection(_newLineageLimit: uint256, _newOutstandingLimit: uint256) -> uint8:
     if _newLineageLimit > HARD_LINEAGE_ALLOCATION_CAP:
-        return 0
+        return ACTIVE_LIMIT_INVALID
 
     currentLineage: uint256 = self.activeLineageAllocationLimit
     currentOutstanding: uint256 = self.activeOutstandingRipeLimit
@@ -723,14 +728,14 @@ def _activeLimitDirection(_newLineageLimit: uint256, _newOutstandingLimit: uint2
         and (_newLineageLimit < currentLineage or _newOutstandingLimit < currentOutstanding)
     )
     if isReduction:
-        return 1
+        return ACTIVE_LIMIT_REDUCTION
 
     isRaise: bool = (
         _newLineageLimit >= currentLineage
         and _newOutstandingLimit >= currentOutstanding
         and (_newLineageLimit > currentLineage or _newOutstandingLimit > currentOutstanding)
     )
-    return 2 if isRaise else 0
+    return ACTIVE_LIMIT_RAISE if isRaise else ACTIVE_LIMIT_INVALID
 
 
 @view
@@ -741,7 +746,8 @@ def isValidStart(_genesisBlock: uint256) -> bool:
     decimals: uint8 = 0
     scale: uint256 = 0
     validPayment, decimals, scale = self._paymentDetails(terms.paymentToken)
-    return self._isValidStart(_genesisBlock, terms, validPayment, scale)
+    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
+    return self._isValidStart(_genesisBlock, terms, validPayment, scale, slot)
 
 
 @nonreentrant
@@ -767,7 +773,7 @@ def start(
 
     slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
     assert slot.addr == self and slot.version == _expectedRegistryVersion # dev: engine identity moved
-    assert self._isValidStart(_genesisBlock, terms, validPayment, scale) # dev: invalid start
+    assert self._isValidStart(_genesisBlock, terms, validPayment, scale, slot) # dev: invalid start
 
     self._terminateInstalledOverride(OVERRIDE_NEW_RUN)
     self.runId += 1
@@ -977,6 +983,8 @@ def _isValidRunTermsCore(_runTerms: ire.ReserveEngineRunTerms) -> bool:
             return False
         margin: uint256 = left - right
         required: uint256 = HUNDRED_PERCENT * linearTwo
+        # If MIN_BASE_ALLOCATION * margin would overflow, its mathematical value
+        # already exceeds bounded `required`.
         if MIN_BASE_ALLOCATION <= max_value(uint256) // margin:
             if MIN_BASE_ALLOCATION * margin < required:
                 return False
@@ -991,16 +999,14 @@ def _isValidStart(
     _terms: ire.ReserveEngineRunTerms,
     _validPayment: bool,
     _paymentScale: uint256,
+    _slot: AddressInfo,
 ) -> bool:
     if self.isRunning:
-        return False
-    if self.installedRateOverride.targetBasePayoutRate != 0:
         return False
     if _genesisBlock > block.number and _genesisBlock - block.number > MAX_GENESIS_LEAD_BLOCKS:
         return False
 
-    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
-    if slot.addr != self or slot.version == 0:
+    if _slot.addr != self or _slot.version == 0:
         return False
     if staticcall RipeHq(ripeHq).ripeToken() != pinnedRipe:
         return False
@@ -1012,7 +1018,8 @@ def _isValidStart(
 
 @view
 @internal
-def _hasValidActiveState() -> bool:
+def _hasCoherentActiveRunBinding() -> bool:
+    # Full config and run qualification is maintained by constructor and governed transitions.
     if self.runId == 0 or self.runRegistryVersion == 0:
         return False
     if self.currentConfigVersion == 0 or self.runTermsVersion == 0:
@@ -1127,7 +1134,7 @@ def isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -
 def _isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> bool:
     if not self.isRunning or not self.isEngineEnabled or deptBasics.isPaused:
         return False
-    if not self._hasValidActiveState():
+    if not self._hasCoherentActiveRunBinding():
         return False
     if self.installedRateOverride.targetBasePayoutRate != 0:
         return False
@@ -1674,7 +1681,7 @@ def _previewAcquireRipe(
     if block.number < self.genesisBlock:
         quote.reasonFlags |= BEFORE_GENESIS
 
-    if not self._hasValidActiveState():
+    if not self._hasCoherentActiveRunBinding():
         quote.reasonFlags |= INVALID_CONFIGURATION
 
     if staticcall RipeHq(ripeHq).ripeToken() != pinnedRipe:
@@ -1812,24 +1819,81 @@ def acquireRipe(
     _selectedFullVestingBlocks: uint256,
     _constraints: AcquisitionConstraints,
 ) -> (uint256, uint256):
-    quote: ReserveEngineQuote = self._previewAcquireRipe(
-        _paymentAmount,
-        _selectedFullVestingBlocks,
-    )
-
-    stageOneReasons: uint256 = (
-        NOT_RUNNING
-        | ENGINE_DISABLED
-        | ENGINE_PAUSED
-        | BEFORE_GENESIS
-        | INVALID_CONFIGURATION
-        | NOT_CURRENT_INSTANCE
-        | NO_MINT_AUTHORIZATION
-        | ESCROW_COVERAGE_DEFICIT
-        | INVALID_DURATION
-    )
-    assert (quote.reasonFlags & stageOneReasons) == 0 # dev: acquisition unavailable
+    assert self.isRunning # dev: acquisition unavailable
+    assert self.isEngineEnabled # dev: acquisition unavailable
+    assert not deptBasics.isPaused # dev: acquisition unavailable
+    assert block.number >= self.genesisBlock # dev: acquisition unavailable
     assert block.number <= _constraints.deadlineBlock # dev: deadline passed
+    assert staticcall RipeHq(ripeHq).ripeToken() == pinnedRipe # dev: invalid configuration
+
+    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
+    assert slot.addr == self and slot.version == self.runRegistryVersion # dev: engine identity moved
+    assert self._hasCoherentActiveRunBinding() # dev: invalid configuration
+    assert staticcall RipeHq(ripeHq).canMintRipe(self) # dev: no mint authorization
+
+    proceedsRecipient: address = addys._getEndaomentFundsAddr()
+    assert proceedsRecipient != empty(address) # dev: invalid configuration
+
+    terms: ire.ReserveEngineRunTerms = self.activeRunTerms
+    assert self._isValidDurationFor(_selectedFullVestingBlocks, terms) # dev: invalid duration
+
+    covered: bool = False
+    deficit: uint256 = 0
+    surplus: uint256 = 0
+    covered, deficit, surplus = self._escrowData()
+    assert covered # dev: escrow coverage deficit
+
+    previous: ire.EpochSnapshot = self.epochState
+    snapshot: ire.EpochSnapshot = empty(ire.EpochSnapshot)
+    transition: RateTransition = empty(RateTransition)
+    terminalReason: uint8 = 0
+    appliesOverride: bool = False
+    snapshot, transition, terminalReason, appliesOverride = self._projectEpoch(
+        previous,
+        self.currentConfig,
+    )
+    assert snapshot.basePayoutRate != 0 # dev: invalid configuration
+    assert snapshot.acceptedPayment <= snapshot.paymentCap # dev: invalid configuration
+    hasEpochEnd: bool = False
+    epochEndBlock: uint256 = 0
+    hasEpochEnd, epochEndBlock = self._epochEndBlock(snapshot.epoch)
+    assert hasEpochEnd and block.number < epochEndBlock # dev: invalid configuration
+
+    # Build only the settlement fields bound by constraints or persisted below.
+    quote: ReserveEngineQuote = empty(ReserveEngineQuote)
+    quote.runId = self.runId
+    quote.runRegistryVersion = self.runRegistryVersion
+    quote.epochConfigVersion = snapshot.epochConfigVersion
+    quote.closureNonce = self.closureNonce
+    quote.capacityReductionNonce = self.capacityReductionNonce
+    quote.epoch = snapshot.epoch
+    quote.paymentToken = self.paymentToken
+    quote.proceedsRecipient = proceedsRecipient
+    quote.controllerBasePayoutRate = snapshot.controllerBasePayoutRate
+    quote.basePayoutRate = snapshot.basePayoutRate
+    quote.rateSource = snapshot.rateSource
+    quote.rateNonce = snapshot.rateNonce
+    quote.durationAdjustmentBps = self._durationAdjustmentForTerms(
+        _selectedFullVestingBlocks,
+        terms,
+    )
+    assert block.number <= max_value(uint256) - terms.claimCliffBlocks # dev: invalid configuration
+    assert block.number <= max_value(uint256) - _selectedFullVestingBlocks # dev: invalid configuration
+    quote.projectedClaimStartBlock = block.number + terms.claimCliffBlocks
+    quote.projectedFullyVestedBlock = block.number + _selectedFullVestingBlocks
+    quote.remainingPaymentCapacity = snapshot.paymentCap - snapshot.acceptedPayment
+
+    # Preserve preview parity while binding expectedTotalAllocation before payment rails.
+    if (
+        _paymentAmount >= snapshot.minPaymentAmount
+        and _paymentAmount <= quote.remainingPaymentCapacity
+    ):
+        quote.baseAllocation, quote.adjustmentAllocation, quote.totalAllocation = self._calculateAllocation(
+            _paymentAmount,
+            snapshot.basePayoutRate,
+            self.paymentScale,
+            quote.durationAdjustmentBps,
+        )
 
     assert _constraints.expectedRunId == quote.runId # dev: run moved
     assert _constraints.expectedRunRegistryVersion == quote.runRegistryVersion # dev: registry identity moved
@@ -1845,28 +1909,15 @@ def acquireRipe(
     assert _constraints.expectedDurationAdjustmentBps == quote.durationAdjustmentBps # dev: duration terms moved
     assert _constraints.expectedTotalAllocation == quote.totalAllocation # dev: allocation moved
 
-    assert (quote.reasonFlags & BELOW_MINIMUM_PAYMENT) == 0 # dev: below minimum payment
-    assert (quote.reasonFlags & PAYMENT_CAP_EXCEEDED) == 0 # dev: payment cap exceeded
+    assert _paymentAmount >= snapshot.minPaymentAmount # dev: below minimum payment
+    assert _paymentAmount <= quote.remainingPaymentCapacity # dev: payment cap exceeded
 
     assert quote.baseAllocation >= MIN_BASE_ALLOCATION # dev: allocation below floor
     assert quote.totalAllocation != 0 # dev: invalid allocation
+    quote.remainingLineageCapacity = self._remainingLineageCapacity()
+    quote.remainingOutstandingCapacity = self._remainingOutstandingCapacity()
     assert quote.totalAllocation <= quote.remainingLineageCapacity # dev: lineage or hard cap exceeded
     assert quote.totalAllocation <= quote.remainingOutstandingCapacity # dev: outstanding cap exceeded
-    assert quote.available # dev: acquisition unavailable
-
-    previous: ire.EpochSnapshot = self.epochState
-    snapshot: ire.EpochSnapshot = empty(ire.EpochSnapshot)
-    transition: RateTransition = empty(RateTransition)
-    terminalReason: uint8 = 0
-    appliesOverride: bool = False
-    snapshot, transition, terminalReason, appliesOverride = self._projectEpoch(
-        previous,
-        self.currentConfig,
-    )
-    assert snapshot.epoch == quote.epoch # dev: epoch moved
-    assert snapshot.epochConfigVersion == quote.epochConfigVersion # dev: config moved
-    assert snapshot.basePayoutRate == quote.basePayoutRate # dev: rate moved
-    assert snapshot.rateSource == quote.rateSource and snapshot.rateNonce == quote.rateNonce # dev: rate identity moved
 
     self._storeEpochState(
         previous,
@@ -1920,9 +1971,6 @@ def acquireRipe(
     assert ripeBalanceAfter >= ripeBalanceBefore # dev: ripe mint mismatch
     assert ripeBalanceAfter - ripeBalanceBefore == quote.totalAllocation # dev: ripe mint mismatch
 
-    covered: bool = False
-    deficit: uint256 = 0
-    surplus: uint256 = 0
     covered, deficit, surplus = self._escrowData()
     assert covered # dev: escrow coverage deficit
 
@@ -2234,6 +2282,8 @@ def _terminateRecoveryForPosition(_positionId: uint256, _reason: uint8):
     pending: ire.PendingRipeRecovery = self.pendingRipeRecoveries[actionId]
     if pending.actionId != 0:
         self._terminatePendingRecovery(pending, _reason)
+    else:
+        self.pendingRecoveryForPosition[_positionId] = 0
 
 
 @internal

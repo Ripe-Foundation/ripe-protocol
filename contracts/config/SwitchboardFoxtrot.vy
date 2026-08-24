@@ -1,5 +1,8 @@
-# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2026
+#     Switchboard Foxtrot
+#     RIPE Reserve Engine governance and recovery routing
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -147,6 +150,7 @@ event ReserveEngineRunTermsQueued:
     runTermsHash: bytes32
 
 
+# genesisBlock and config/run-version fields are START-only; ENABLE/UNPAUSE emit zero for them.
 event ReserveEngineLifecycleQueued:
     actionId: indexed(uint256)
     operation: uint8
@@ -244,9 +248,10 @@ def __init__(
 
 
 @internal
-def _observeCurrentReserveEngine() -> AddressInfo:
+def _recordCurrentReserveEngine() -> AddressInfo:
     info: AddressInfo = staticcall RipeHq(gov._getRipeHqFromGov()).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
     if info.addr != empty(address):
+        # Record before target Engine calls so slot replacement can stale old actions without ABI dependence.
         self.knownReserveEngines[info.addr] = True
         self.knownEngineRegistryVersion[info.addr] = info.version
     return info
@@ -254,7 +259,7 @@ def _observeCurrentReserveEngine() -> AddressInfo:
 
 @internal
 def _requireCurrentReserveEngine() -> AddressInfo:
-    info: AddressInfo = self._observeCurrentReserveEngine()
+    info: AddressInfo = self._recordCurrentReserveEngine()
     assert info.addr != empty(address) # dev: invalid reserve engine
     assert staticcall ire(info.addr).ripeHq() == gov._getRipeHqFromGov() # dev: invalid reserve engine
     return info
@@ -432,7 +437,7 @@ def _runTermsHash(_runTerms: ire.ReserveEngineRunTerms) -> bytes32:
 
 @view
 @internal
-def _targetEpochEndBlock(_targetEngine: address, _targetEpoch: uint256) -> uint256:
+def _targetEpochEndExclusiveBlock(_targetEngine: address, _targetEpoch: uint256) -> uint256:
     genesisBlock: uint256 = staticcall ire(_targetEngine).genesisBlock()
     runTerms: ire.ReserveEngineRunTerms = staticcall ire(_targetEngine).getActiveRunTerms()
     if runTerms.epochLength == 0 or _targetEpoch == max_value(uint256):
@@ -821,8 +826,14 @@ def setReserveEngineRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: u
     confirmationBlock: uint256 = 0
     actionId, confirmationBlock = self._initAction(ACTION_RATE_OVERRIDE_INSTALL)
 
-    targetEpochEndBlock: uint256 = self._targetEpochEndBlock(info.addr, _targetEpoch)
-    assert targetEpochEndBlock != 0 and confirmationBlock < targetEpochEndBlock # dev: override confirmation misses epoch
+    targetEpochEndExclusiveBlock: uint256 = self._targetEpochEndExclusiveBlock(
+        info.addr,
+        _targetEpoch,
+    )
+    assert (
+        targetEpochEndExclusiveBlock != 0
+        and confirmationBlock < targetEpochEndExclusiveBlock
+    ) # dev: override confirmation misses epoch
 
     self.rateOverrideInstallActions[actionId] = RateOverrideInstallAction(
         targetEngine=info.addr,
@@ -871,6 +882,7 @@ def setReserveEngineRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: u
 
 @external
 def cancelReserveEngineRateOverride():
+    # This cancels an installed Engine override; cancelPendingAction handles queued installs.
     assert gov._canGovern(msg.sender) # dev: no perms
     info: AddressInfo = self._requireCurrentReserveEngine()
     assert staticcall ire(info.addr).canCancelRateOverride() # dev: no rate override
@@ -885,6 +897,7 @@ def cancelReserveEngineRateOverride():
 @external
 def recoverReserveEngineRipeSurplus(_targetEngine: address, _amount: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
+    # Known retired Engines remain eligible without occupying the current registry slot.
     assert self._isKnownReserveEngine(_targetEngine) # dev: unknown reserve engine
     assert _amount > 0 and _amount <= staticcall ire(_targetEngine).escrowSurplus() # dev: invalid surplus amount
 
@@ -969,7 +982,9 @@ def executeReserveEngineRipeRecovery(_routeId: uint256) -> bool:
         )
         return False
 
-    recovery: ire.PendingRipeRecovery = staticcall ire(route.targetEngine).pendingRipeRecoveries(route.engineRecoveryActionId)
+    recovery: ire.PendingRipeRecovery = staticcall ire(route.targetEngine).pendingRipeRecoveries(
+        route.engineRecoveryActionId,
+    )
     executed: bool = extcall ire(route.targetEngine).executeRipeRecovery(route.engineRecoveryActionId)
     if executed:
         self.ripeRecoveryRoutes[_routeId] = empty(RipeRecoveryRoute)
@@ -1068,7 +1083,7 @@ def executePendingAction(_actionId: uint256) -> bool:
 
     if actionType == ACTION_CONFIG:
         action: ConfigAction = self.configActions[_actionId]
-        currentInfo: AddressInfo = self._observeCurrentReserveEngine()
+        currentInfo: AddressInfo = self._recordCurrentReserveEngine()
         stale: bool = not self._isCurrentTarget(currentInfo, action.targetEngine, action.targetRegistryVersion)
         if not stale and staticcall ire(action.targetEngine).currentConfigVersion() != action.expectedCurrentConfigVersion:
             stale = True
@@ -1095,7 +1110,7 @@ def executePendingAction(_actionId: uint256) -> bool:
 
     elif actionType == ACTION_RUN_TERMS:
         action: RunTermsAction = self.runTermsActions[_actionId]
-        currentInfo: AddressInfo = self._observeCurrentReserveEngine()
+        currentInfo: AddressInfo = self._recordCurrentReserveEngine()
         stale: bool = not self._isCurrentTarget(currentInfo, action.targetEngine, action.targetRegistryVersion)
         if not stale and staticcall ire(action.targetEngine).currentConfigVersion() != action.expectedCurrentConfigVersion:
             stale = True
@@ -1124,7 +1139,7 @@ def executePendingAction(_actionId: uint256) -> bool:
 
     elif actionType == ACTION_ENABLE:
         action: EnableAction = self.enableActions[_actionId]
-        currentInfo: AddressInfo = self._observeCurrentReserveEngine()
+        currentInfo: AddressInfo = self._recordCurrentReserveEngine()
         stale: bool = not self._isCurrentTarget(currentInfo, action.targetEngine, action.targetRegistryVersion)
         if not stale and staticcall ire(action.targetEngine).closureNonce() != action.expectedClosureNonce:
             stale = True
@@ -1144,7 +1159,7 @@ def executePendingAction(_actionId: uint256) -> bool:
 
     elif actionType == ACTION_START:
         action: StartAction = self.startActions[_actionId]
-        currentInfo: AddressInfo = self._observeCurrentReserveEngine()
+        currentInfo: AddressInfo = self._recordCurrentReserveEngine()
         stale: bool = not self._isCurrentTarget(currentInfo, action.targetEngine, action.targetRegistryVersion)
         if not stale and staticcall ire(action.targetEngine).currentConfigVersion() != action.expectedCurrentConfigVersion:
             stale = True
@@ -1176,7 +1191,7 @@ def executePendingAction(_actionId: uint256) -> bool:
 
     elif actionType == ACTION_UNPAUSE:
         action: UnpauseAction = self.unpauseActions[_actionId]
-        currentInfo: AddressInfo = self._observeCurrentReserveEngine()
+        currentInfo: AddressInfo = self._recordCurrentReserveEngine()
         stale: bool = not self._isCurrentTarget(currentInfo, action.targetEngine, action.targetRegistryVersion)
         if not stale and staticcall ire(action.targetEngine).closureNonce() != action.expectedClosureNonce:
             stale = True
@@ -1196,7 +1211,7 @@ def executePendingAction(_actionId: uint256) -> bool:
 
     elif actionType == ACTION_LIMIT_RAISE:
         action: LimitRaiseAction = self.limitRaiseActions[_actionId]
-        currentInfo: AddressInfo = self._observeCurrentReserveEngine()
+        currentInfo: AddressInfo = self._recordCurrentReserveEngine()
         stale: bool = not self._isCurrentTarget(currentInfo, action.targetEngine, action.targetRegistryVersion)
         if not stale and staticcall ire(action.targetEngine).activeLineageAllocationLimit() != action.expectedCurrentLineageLimit:
             stale = True
@@ -1238,7 +1253,7 @@ def executePendingAction(_actionId: uint256) -> bool:
 
     elif actionType == ACTION_RATE_OVERRIDE_INSTALL:
         action: RateOverrideInstallAction = self.rateOverrideInstallActions[_actionId]
-        currentInfo: AddressInfo = self._observeCurrentReserveEngine()
+        currentInfo: AddressInfo = self._recordCurrentReserveEngine()
         stale: bool = self.pendingRateOverrideActionId != _actionId
         if not stale and not self._isCurrentTarget(currentInfo, action.targetEngine, action.targetRegistryVersion):
             stale = True
