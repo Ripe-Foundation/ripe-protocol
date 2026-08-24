@@ -13,6 +13,7 @@ def migrate(migration: Migration):
         migration.blueprint().PARAMS["PRICE_DESK_MAX_STALE_TIME"],
         migration.blueprint().PARAMS["MIN_SWITCHBOARD_CHANGE_TIMELOCK"],
         migration.blueprint().PARAMS["MAX_SWITCHBOARD_CHANGE_TIMELOCK"],
+        migration.blueprint().PARAMS["PYTH_PRICES_ID"],
     )
 
     switchboard_charlie = migration.deploy(
@@ -45,6 +46,7 @@ def migrate(migration: Migration):
     credit_engine = migration.deploy(
         "CreditEngine",
         hq,
+        migration.blueprint().PARAMS["CURVE_PRICES_ID"],
     )
 
     deleverage = migration.deploy(
@@ -57,6 +59,7 @@ def migrate(migration: Migration):
         hq,
         migration.blueprint().ADDYS["WETH"],
         migration.blueprint().ADDYS["ETH"],
+        migration.blueprint().PARAMS["CURVE_PRICES_ID"],
     )
 
     endaoment_funds = migration.deploy(

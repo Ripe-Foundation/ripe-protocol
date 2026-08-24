@@ -1,4 +1,5 @@
 import boa
+import pytest
 
 from config.BluePrint import PARAMS
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
@@ -30,6 +31,7 @@ coins: public(address[8])
 lp: public(address)
 factory: public(address)
 n: public(uint256)
+registered: public(bool)
 
 @external
 def setup(_coins: address[8], _lp: address, _factory: address, _n: uint256):
@@ -37,6 +39,7 @@ def setup(_coins: address[8], _lp: address, _factory: address, _n: uint256):
     self.lp = _lp
     self.factory = _factory
     self.n = _n
+    self.registered = True
 
 @external
 def setN(_n: uint256):
@@ -46,10 +49,22 @@ def setN(_n: uint256):
 def setCoins(_coins: address[8]):
     self.coins = _coins
 
+@external
+def setLp(_lp: address):
+    self.lp = _lp
+
+@external
+def setFactory(_factory: address):
+    self.factory = _factory
+
+@external
+def setRegistered(_registered: bool):
+    self.registered = _registered
+
 @view
 @external
 def is_registered(_pool: address) -> bool:
-    return True
+    return self.registered
 
 @view
 @external
@@ -405,7 +420,29 @@ def test_empty_ecosystem_lp_update_confirmation_is_atomic_and_retryable(
     assert curve.curveConfig(lp).pool == new_pool.address
 
 
-def test_new_and_update_confirm_store_pending_four_coin_config_after_registry_drift(
+def _drift_curve_metadata(mr, drift, lp, coins, extra):
+    if drift == "unregistered":
+        mr.setRegistered(False)
+    elif drift == "lp":
+        mr.setLp(extra[0])
+    elif drift == "count":
+        mr.setN(3)
+    elif drift == "order":
+        mr.setCoins([coins[1], coins[0], coins[2], coins[3], *extra])
+    elif drift == "underlying":
+        mr.setCoins([coins[0], coins[1], coins[2], extra[0], *extra])
+    elif drift == "handler":
+        mr.setFactory(extra[0])
+    else:
+        raise AssertionError(f"unsupported drift: {drift}")
+
+
+@pytest.mark.parametrize("lifecycle", ("new", "update"))
+@pytest.mark.parametrize(
+    "drift",
+    ("unregistered", "lp", "count", "order", "underlying", "handler"),
+)
+def test_new_and_update_confirmation_cancel_on_registry_snapshot_drift(
     ripe_hq,
     governance,
     green_token,
@@ -416,8 +453,72 @@ def test_new_and_update_confirm_store_pending_four_coin_config_after_registry_dr
     charlie_token,
     delta_token,
     fork,
+    lifecycle,
+    drift,
 ):
     mr, ap, pool, lp, extra = _setup_system(
+        alpha_token, bravo_token, charlie_token, delta_token, 4
+    )
+    curve = _load_curve(ripe_hq, green_token, savings_green, fork, ap)
+    coins = (alpha_token, bravo_token, charlie_token, delta_token)
+    for token in coins:
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+    previous = curve.curveConfig(lp)
+    if lifecycle == "new":
+        assert curve.addNewPriceFeed(lp, pool, sender=governance.address)
+    else:
+        assert curve.addNewPriceFeed(lp, pool, sender=governance.address)
+        boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+        assert curve.confirmNewPriceFeed(lp, sender=governance.address)
+        previous = curve.curveConfig(lp)
+        candidate = boa.loads(CURVE_POOL)
+        assert candidate.address != pool.address
+        assert curve.updatePriceFeed(lp, candidate, sender=governance.address)
+
+    action_id = curve.pendingUpdates(lp).actionId
+    pending = curve.pendingUpdates(lp).config
+    assert pending.lpToken == lp.address
+    assert pending.numUnderlying == 4
+
+    _drift_curve_metadata(
+        mr,
+        drift,
+        lp,
+        [token.address for token in coins],
+        extra,
+    )
+    boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+    for token in coins:
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+    if lifecycle == "new":
+        assert not curve.confirmNewPriceFeed(lp, sender=governance.address)
+        assert curve.curveConfig(lp).pool == ZERO_ADDRESS
+        assert curve.indexOfAsset(lp) == 0
+    else:
+        assert not curve.confirmPriceFeedUpdate(lp, sender=governance.address)
+        assert curve.curveConfig(lp) == previous
+
+    assert not curve.hasPendingAction(action_id)
+    assert curve.pendingUpdates(lp).actionId == 0
+
+
+@pytest.mark.parametrize("lifecycle", ("new", "update"))
+def test_matching_registry_snapshot_activates_exact_pending_config(
+    ripe_hq,
+    governance,
+    green_token,
+    savings_green,
+    mock_price_source,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
+    fork,
+    lifecycle,
+):
+    mr, ap, pool, lp, _ = _setup_system(
         alpha_token, bravo_token, charlie_token, delta_token, 4
     )
     curve = _load_curve(ripe_hq, green_token, savings_green, fork, ap)
@@ -425,71 +526,20 @@ def test_new_and_update_confirm_store_pending_four_coin_config_after_registry_dr
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
 
     assert curve.addNewPriceFeed(lp, pool, sender=governance.address)
-    pending = curve.pendingUpdates(lp).config
-    assert pending.numUnderlying == 4
-    drifted_coins = [
-        extra[0],
-        extra[1],
-        extra[2],
-        extra[3],
-        alpha_token.address,
-        bravo_token.address,
-        charlie_token.address,
-        delta_token.address,
-    ]
-    boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
-    mr.setN(8)
-    mr.setCoins(drifted_coins)
-    for token in (alpha_token, bravo_token, charlie_token, delta_token):
-        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-    assert curve.confirmNewPriceFeed(lp, sender=governance.address)
-    stored = curve.curveConfig(lp)
-    assert stored.pool == pool.address
-    assert stored.lpToken == lp.address
-    assert stored.numUnderlying == 4
-    assert [str(a).lower() for a in stored.underlying] == [
-        str(alpha_token.address).lower(),
-        str(bravo_token.address).lower(),
-        str(charlie_token.address).lower(),
-        str(delta_token.address).lower(),
-    ]
-    assert curve.hasPriceFeed(lp)
-    assert curve.getPrice(lp) != 0
+    if lifecycle == "update":
+        boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
+        assert curve.confirmNewPriceFeed(lp, sender=governance.address)
+        pool = boa.loads(CURVE_POOL)
+        assert curve.updatePriceFeed(lp, pool, sender=governance.address)
 
-    other_pool = boa.loads(CURVE_POOL)
-    assert other_pool.address != pool.address
-    mr.setN(4)
-    mr.setCoins(
-        [
-            alpha_token.address,
-            bravo_token.address,
-            charlie_token.address,
-            delta_token.address,
-            extra[0],
-            extra[1],
-            extra[2],
-            extra[3],
-        ]
-    )
-    for token in (alpha_token, bravo_token, charlie_token, delta_token):
-        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-    assert curve.updatePriceFeed(lp, other_pool, sender=governance.address)
+    pending = curve.pendingUpdates(lp).config
+    assert pending == curve.getCurvePoolConfig(pool)
     boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
-    mr.setN(5)
-    mr.setCoins(drifted_coins)
-    for token in (alpha_token, bravo_token, charlie_token, delta_token):
-        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-    assert curve.confirmPriceFeedUpdate(lp, sender=governance.address)
-    updated = curve.curveConfig(lp)
-    assert updated.pool == other_pool.address
-    assert updated.numUnderlying == 4
-    assert [str(a).lower() for a in updated.underlying] == [
-        str(alpha_token.address).lower(),
-        str(bravo_token.address).lower(),
-        str(charlie_token.address).lower(),
-        str(delta_token.address).lower(),
-    ]
-    assert curve.getPrice(lp) != 0
+    if lifecycle == "new":
+        assert curve.confirmNewPriceFeed(lp, sender=governance.address)
+    else:
+        assert curve.confirmPriceFeedUpdate(lp, sender=governance.address)
+    assert curve.curveConfig(lp) == pending
 
 
 def test_stored_num_underlying_over_four_prices_zero(
@@ -597,15 +647,26 @@ def test_update_same_pool_nested_alt_rejected(
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
     assert curve.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
+    # Admit BRAVO through an acyclic route first. The strict dependency-graph
+    # check now rejects the former test setup (BRAVO -> ALPHA while the active
+    # ALPHA route already depends on BRAVO) at proposal time.
     pool_b = boa.loads(CURVE_POOL)
-    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mr.setCoins(
+        [bravo_token.address, charlie_token.address] + [ZERO_ADDRESS] * 6
+    )
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
     assert curve.addNewPriceFeed(bravo_token, pool_b, sender=governance.address)
     boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
-    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
     assert curve.confirmNewPriceFeed(bravo_token, sender=governance.address)
 
+    # Reconstruct pool A as ALPHA/BRAVO. Updating BRAVO to it would make the
+    # active ALPHA -> BRAVO edge recursive and must be rejected.
+    mr.setCoins(
+        [alpha_token.address, bravo_token.address] + [ZERO_ADDRESS] * 6
+    )
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
     assert not curve.isValidUpdateFeed(bravo_token, pool_a)

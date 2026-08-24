@@ -1,5 +1,15 @@
 # Robinhood reassessment and qualification synthesis
 
+> **24 August 2026 PriceDesk supersession:** the BlueChip-at-ID-3 and
+> Uniswap-absent passages below are dated planning history. Current owner
+> disposition assigns BlueChip ID `0` (deferred) and keeps launch priorities at
+> `[1, 2]`. Before PR #206, live ID 3 is the legacy functional UniswapV2Prices
+> fallback; the required PR #206 `2026082100/01` history promotes the
+> authenticated inert monitoring replacement at the same ID before PR #207's
+> forward stages can complete. Future source IDs are chain-local. See
+> [`current-owner-priorities.md`](current-owner-priorities.md) and
+> [`decision-register.md`](decision-register.md).
+
 **Synthesis date:** 1 August 2026
 
 **Repository baseline:** `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`

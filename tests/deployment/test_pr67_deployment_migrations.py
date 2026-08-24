@@ -31,6 +31,10 @@ UNISWAP = _load(
     "migrations/robinhood-mainnet/0008_UniswapV2Prices.py",
     "pr67_uniswap_deployment",
 )
+SWITCHBOARDS = _load(
+    "migrations/robinhood-mainnet/0002_Switchboards.py",
+    "pr67_switchboard_deployment",
+)
 REDEPLOY = _load(
     "migrations/robinhood-mainnet/0009_RedeployStaleContracts.py",
     "pr67_redeploy_candidates",
@@ -39,20 +43,20 @@ LEDGER = _load(
     "migrations/robinhood-mainnet/0010_RedeployLedger.py",
     "pr67_ledger_candidates",
 )
+CCIP_WIRE = _load(
+    "migrations/robinhood-mainnet/2026082400_CcipWirePlan.py",
+    "pr67_ccip_wire_plan",
+)
 BLUECHIP = _load(
-    "migrations/robinhood-mainnet/0011_BlueChipYieldPricesCandidate.py",
+    "migrations/robinhood-mainnet/2026082404_BlueChipTopologyDecision.py",
     "pr67_bluechip_candidate",
 )
-PROMOTE_BLUECHIP = _load(
-    "migrations/robinhood-mainnet/0012_PromoteBlueChipYieldPrices.py",
-    "pr67_bluechip_promotion",
-)
 VAULT_MIGRATOR = _load(
-    "migrations/robinhood-mainnet/0013_VaultMigratorCandidate.py",
+    "migrations/robinhood-mainnet/2026082402_VaultMigratorCandidate.py",
     "pr67_vault_migrator_candidate",
 )
 PROMOTE_VAULT_MIGRATOR = _load(
-    "migrations/robinhood-mainnet/0014_PromoteVaultMigrator.py",
+    "migrations/robinhood-mainnet/2026082403_PromoteVaultMigrator.py",
     "pr67_vault_migrator_promotion",
 )
 
@@ -72,6 +76,28 @@ class _Registry(_Contract):
         return self.slots.get(reg_id, ZERO_ADDRESS)
 
     def numAddrs(self):
+        return self.count
+
+    def getRegId(self, address):
+        expected = str(getattr(address, "address", address)).lower()
+        return next(
+            (
+                reg_id
+                for reg_id, registered in self.slots.items()
+                if str(registered).lower() == expected
+            ),
+            0,
+        )
+
+    def startAddNewAddressToRegistry(self, address, _description):
+        self._pending = address
+        return True
+
+    def confirmNewAddressToRegistry(self, address):
+        assert self._pending.address == address.address
+        self.count += 1
+        self.slots[self.count] = address.address
+        self._pending = None
         return self.count
 
 
@@ -156,12 +182,14 @@ class _FakeMigration:
         account=None,
         manifest_contracts=None,
         rpc="boa",
+        local_preview=True,
     ):
         self.contracts = dict(contracts or {})
         self.addresses = dict(addresses or {})
         self._previous_manifest = {"contracts": dict(manifest_contracts or {})}
         self._account = account or _addr(900)
         self._rpc = rpc
+        self._local_preview = local_preview
         self.deployments = []
         self.executions = []
         self.promotions = []
@@ -183,16 +211,20 @@ class _FakeMigration:
     def rpc(self):
         return self._rpc
 
+    def is_local_preview(self):
+        return self._local_preview
+
     def deploy(self, name, *args, **kwargs):
         label = kwargs.get("label", name)
         address = _addr(self._next_address)
         self._next_address += 1
-        if name == "VaultMigrator":
+        if name == "Switchboard":
+            contract = _Registry(address)
+        elif name == "VaultMigrator":
             contract = _VaultMigratorCandidate(address, args[1])
         elif name == "UniswapV2Prices":
             contract = _UniswapMonitorCandidate(address, *args)
         elif name in {
-            "BlueChipYieldPrices",
             "HumanResources",
             "SwitchboardAlpha",
             "SwitchboardBravo",
@@ -202,7 +234,7 @@ class _FakeMigration:
             minimum = (
                 REDEPLOY.HR_MIN_TIMELOCK
                 if name == "HumanResources"
-                else BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
+                else REDEPLOY.SWITCHBOARD_MIN_TIMELOCK
             )
             contract = _GovernedCandidate(
                 address,
@@ -307,6 +339,32 @@ def test_base_bluechip_replay_calls_match_final_constructor_shape():
     assert old_call.args[2].id == "ZERO_ADDRESS"
 
 
+def test_0002_passes_chain_local_pyth_id_to_switchboard_alpha():
+    hq = _Registry(_addr(1), count=5)
+    migration = _FakeMigration(contracts={"RipeHq": hq})
+
+    SWITCHBOARDS.migrate(migration)
+
+    alpha = next(
+        row for row in migration.deployments if row[0] == "SwitchboardAlpha"
+    )
+    assert alpha[2] == (
+        hq,
+        ZERO_ADDRESS,
+        SWITCHBOARDS.STALE_WINDOW_MIN,
+        SWITCHBOARDS.STALE_WINDOW_MAX,
+        SWITCHBOARDS.SWITCHBOARD_MIN_TIMELOCK,
+        SWITCHBOARDS.SWITCHBOARD_MAX_TIMELOCK,
+        SWITCHBOARDS.PYTH_PRICES_ID,
+    )
+    assert SWITCHBOARDS.PYTH_PRICES_ID == 0
+    assert all(
+        len(args) == 4
+        for name, _label, args, _contract in migration.deployments
+        if name.startswith("Switchboard") and name != "SwitchboardAlpha"
+    )
+
+
 def test_safe_calldata_helpers_bind_the_expected_registry_calls():
     from eth_abi.abi import decode
     from web3 import Web3
@@ -336,7 +394,7 @@ def test_safe_calldata_helpers_bind_the_expected_registry_calls():
     assert setup[:4] == Web3.keccak(text="setActionTimeLockAfterSetup(uint256)")[:4]
     assert decode(["uint256"], setup[4:]) == (REDEPLOY.HR_MIN_TIMELOCK,)
 
-    for module in (BLUECHIP, VAULT_MIGRATOR):
+    for module in (VAULT_MIGRATOR,):
         start, confirm = module._add_calldata(candidate, "candidate")
         start_bytes = bytes.fromhex(start)
         confirm_bytes = bytes.fromhex(confirm)
@@ -464,7 +522,7 @@ def test_0009_uses_candidate_labels_excludes_uniswap_and_emits_safe_calldata(
     )
 
 
-def _make_0010_migration(*, rpc="boa"):
+def _make_0010_migration(*, rpc="boa", local_preview=True):
     from eth_abi.abi import encode
 
     registries = {
@@ -511,6 +569,7 @@ def _make_0010_migration(*, rpc="boa"):
             },
         },
         rpc=rpc,
+        local_preview=local_preview,
     )
     return migration
 
@@ -621,6 +680,35 @@ def test_0010_validation_failure_stops_before_update_instructions(monkeypatch):
     assert not any("[2] 0x" in message for message in messages)
 
 
+def test_0010_live_execution_never_authorizes_preview_validation_skip(
+    monkeypatch,
+):
+    migration = _make_0010_migration(
+        rpc="https://rpc.example",
+        local_preview=False,
+    )
+    observed = []
+
+    def reject_missing_live_code(*_args, **kwargs):
+        observed.append(kwargs)
+        raise AssertionError("Ledger is not deployed on the configured RPC")
+
+    monkeypatch.setattr(
+        LEDGER,
+        "validate_ledger_action_block_source",
+        reject_missing_live_code,
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="Ledger is not deployed on the configured RPC",
+    ):
+        LEDGER.migrate(migration)
+
+    assert observed == [{"allow_local_preview": False}]
+    assert [row[0] for row in migration.deployments] == ["Ledger"]
+
+
 @pytest.mark.parametrize(
     "source_read,action_block_read,message",
     [
@@ -652,7 +740,10 @@ def test_0010_real_rpc_ledger_candidate_enforces_complete_node_validation(
     action_block_read,
     message,
 ):
-    migration = _make_0010_migration(rpc="https://rpc.example")
+    migration = _make_0010_migration(
+        rpc="https://rpc.example",
+        local_preview=False,
+    )
 
     class FakeEth:
         @staticmethod
@@ -690,7 +781,10 @@ def test_0010_real_rpc_ledger_candidate_enforces_complete_node_validation(
 
     monkeypatch.setattr(ledger_deployment, "_load_web3", lambda: FakeWeb3)
 
-    with pytest.raises(AssertionError, match=message):
+    with pytest.raises(
+        ledger_deployment.LedgerDeploymentValidationError,
+        match=message,
+    ):
         LEDGER.migrate(migration)
 
     assert [row[0] for row in migration.deployments] == ["Ledger"]
@@ -739,54 +833,133 @@ def test_0010_defaults_dependency_mismatch_fails_before_any_write():
     assert migration.deployments == []
 
 
-def test_0011_promotes_0010_and_prepares_slot_three_without_registering(
-    monkeypatch,
-):
-    selected_morpho_v2_factory = _addr(33)
-    monkeypatch.setattr(
-        BLUECHIP,
-        "address",
-        lambda key: selected_morpho_v2_factory if key == "MORPHO_V2_FACTORY" else None,
+def test_2026082400_requires_pr206_authoritative_history_before_any_other_read():
+    class _HistoryOnlyMigration:
+        def __init__(self, previous):
+            self.previous = previous
+
+        def previous_timestamp(self):
+            return self.previous
+
+    CCIP_WIRE._require_authoritative_history(
+        _HistoryOnlyMigration(CCIP_WIRE.REQUIRED_PREVIOUS_MIGRATION)
     )
-    price_desk = _Registry(_addr(30), count=3)
+
+    with pytest.raises(
+        RuntimeError,
+        match=CCIP_WIRE.AUTHORITATIVE_HISTORY_REQUIRED,
+    ):
+        CCIP_WIRE.migrate(_HistoryOnlyMigration("2026080700"))
+
+
+def test_2026082404_records_exact_live_topology_and_bluechip_deferral_without_writes():
+    uniswap = _addr(3)
+    ripe = _addr(5)
+    price_desk = _Registry(
+        _addr(4),
+        {1: _addr(1), 2: _addr(2), 3: uniswap},
+        count=4,
+    )
     migration = _FakeMigration(
         contracts={
-            "RipeHq": _Registry(_addr(31)),
-            "VaultBook": _Registry(_addr(32)),
             "PriceDesk": price_desk,
+            "UniswapV2Prices": _UniswapMonitorCandidate(
+                uniswap,
+                _Contract(_addr(6)),
+                _addr(7),
+                _Contract(ripe),
+                _addr(8),
+            ),
         },
-        addresses={"DefaultsRobinhoodLive": _addr(34)},
+        addresses={"UniswapV2Prices": uniswap, "RipeToken": ripe},
     )
-    messages = []
-    monkeypatch.setattr(BLUECHIP.log, "info", messages.append)
 
-    BLUECHIP.migrate(migration)
+    assert BLUECHIP.BLUECHIP_PRICES_ID == 0
+    assert BLUECHIP.migrate(migration) is None
 
-    assert len(migration.promotions) == 4
-    assert migration.promotion_batch_sizes == [4]
-    intents = {spec.canonical_name: spec for spec in migration.promotion_specs}
-    assert set(intents) == {"Ledger", "Lootbox", "Teller", "RipeGov"}
-    assert {
-        name: spec.expected_source_path for name, spec in intents.items()
-    } == BLUECHIP.CANONICAL_SOURCE_PATHS
-    assert all(
-        spec.registry_name in {"RipeHq", "VaultBook"} for spec in intents.values()
+    assert migration.promotions == []
+    assert migration.deployments == []
+    assert migration.executions == []
+
+
+@pytest.mark.parametrize(
+    ("slots", "count", "message"),
+    (
+        ({1: _addr(1), 2: _addr(2), 3: _addr(3)}, 5, "next registry id"),
+        ({1: _addr(1), 2: _addr(2)}, 4, "slot 3"),
+        ({1: _addr(1), 2: _addr(2), 3: _addr(30)}, 4, "slot 3"),
+    ),
+)
+def test_2026082404_rejects_bluechip_deferral_under_unexpected_live_topology(
+    slots,
+    count,
+    message,
+):
+    migration = _FakeMigration(
+        contracts={"PriceDesk": _Registry(_addr(4), slots, count)},
+        addresses={"UniswapV2Prices": _addr(3)},
     )
-    assert intents["Ledger"].expected_constructor_args == (
-        migration.contracts["RipeHq"],
-        migration.addresses["DefaultsRobinhoodLive"],
-        BLUECHIP.LEDGER_ACTION_BLOCK_SOURCE,
+
+    with pytest.raises(RuntimeError, match=message):
+        BLUECHIP.migrate(migration)
+
+    assert migration.promotions == []
+    assert migration.deployments == []
+    assert migration.executions == []
+
+
+def test_2026082404_rejects_mismatched_reverse_registration():
+    class _BrokenReverseRegistry(_Registry):
+        def getRegId(self, _address):
+            return 2
+
+    uniswap = _addr(3)
+    migration = _FakeMigration(
+        contracts={
+            "PriceDesk": _BrokenReverseRegistry(
+                _addr(4),
+                {1: _addr(1), 2: _addr(2), 3: uniswap},
+                count=4,
+            )
+        },
+        addresses={"UniswapV2Prices": uniswap},
     )
-    assert [row[0] for row in migration.deployments] == ["BlueChipYieldPrices"]
-    name, label, args, candidate = migration.deployments[0]
-    assert name == "BlueChipYieldPrices"
-    assert label == BLUECHIP.BLUECHIP_CANDIDATE
-    assert args[-1] == selected_morpho_v2_factory
-    assert candidate.actionTimeLock() == BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
-    assert candidate.governance() == ZERO_ADDRESS
-    assert price_desk.slots == {}
-    assert sum("[1] 0x" in message for message in messages) == 1
-    assert sum("[2] 0x" in message for message in messages) == 1
+
+    with pytest.raises(RuntimeError, match="reverse registration"):
+        BLUECHIP.migrate(migration)
+
+    assert migration.promotions == []
+    assert migration.deployments == []
+    assert migration.executions == []
+
+
+def test_2026082404_rejects_non_inert_uniswap_generation():
+    class _LegacyUniswap(_Contract):
+        def isMonitoringOnly(self):
+            return False
+
+        def getPriceAndHasFeed(self, _asset):
+            return 10**18, True
+
+    uniswap = _addr(3)
+    migration = _FakeMigration(
+        contracts={
+            "PriceDesk": _Registry(
+                _addr(4),
+                {1: _addr(1), 2: _addr(2), 3: uniswap},
+                count=4,
+            ),
+            "UniswapV2Prices": _LegacyUniswap(uniswap),
+        },
+        addresses={"UniswapV2Prices": uniswap, "RipeToken": _addr(5)},
+    )
+
+    with pytest.raises(RuntimeError, match="monitoring marker"):
+        BLUECHIP.migrate(migration)
+
+    assert migration.promotions == []
+    assert migration.deployments == []
+    assert migration.executions == []
 
 
 def test_mock_governance_fixture_is_bound_to_the_session_environment():
@@ -802,47 +975,7 @@ def test_mock_governance_fixture_is_bound_to_the_session_environment():
     assert [argument.arg for argument in governance.args.args] == ["env"]
 
 
-def test_0012_only_promotes_after_price_desk_readback(monkeypatch):
-    selected_morpho_v2_factory = _addr(43)
-    monkeypatch.setattr(
-        PROMOTE_BLUECHIP,
-        "address",
-        lambda key: selected_morpho_v2_factory if key == "MORPHO_V2_FACTORY" else None,
-    )
-    price_desk = _Registry(_addr(40), {3: _addr(41)}, count=3)
-    migration = _FakeMigration(
-        contracts={"PriceDesk": price_desk, "RipeHq": _Contract(_addr(42))}
-    )
-
-    PROMOTE_BLUECHIP.migrate(migration)
-
-    assert migration.deployments == []
-    assert migration.promotions == [
-        (
-            "BlueChipYieldPrices",
-            "BlueChipYieldPricesCandidate0011",
-            price_desk.address,
-            3,
-            None,
-            None,
-        )
-    ]
-    assert migration.promotion_specs[0].registry_name == "PriceDesk"
-    assert (
-        migration.promotion_specs[0].expected_source_path
-        == "contracts/priceSources/BlueChipYieldPrices.vy"
-    )
-    assert (
-        migration.promotion_specs[0].expected_constructor_args[0]
-        is (migration.contracts["RipeHq"])
-    )
-    assert (
-        migration.promotion_specs[0].expected_constructor_args[-1]
-        == selected_morpho_v2_factory
-    )
-
-
-def test_0013_prepares_unpaused_vault_migrator_for_exact_hq_id_25(
+def test_2026082402_prepares_unpaused_vault_migrator_for_exact_hq_id_25(
     monkeypatch,
 ):
     from eth_abi.abi import decode
@@ -863,7 +996,7 @@ def test_0013_prepares_unpaused_vault_migrator_for_exact_hq_id_25(
     assert len(migration.deployments) == 1
     name, label, args, candidate = migration.deployments[0]
     assert name == "VaultMigrator"
-    assert label == "VaultMigratorCandidate0013"
+    assert label == "VaultMigratorCandidate2026082402"
     assert args == (
         hq,
         VAULT_MIGRATOR.VAULT_MIGRATOR_SHOULD_PAUSE,
@@ -895,7 +1028,7 @@ def test_0013_prepares_unpaused_vault_migrator_for_exact_hq_id_25(
     assert decode(["address"], confirm_bytes[4:]) == (candidate.address,)
 
 
-def test_0013_fails_closed_until_ccip_slots_23_and_24_are_occupied():
+def test_2026082402_fails_closed_until_ccip_slots_23_and_24_are_occupied():
     hq = _Registry(_addr(60), count=23)
     migration = _FakeMigration(contracts={"RipeHq": hq})
 
@@ -908,7 +1041,7 @@ def test_0013_fails_closed_until_ccip_slots_23_and_24_are_occupied():
     assert migration.deployments == []
 
 
-def test_0013_fails_closed_if_a_prior_ccip_slot_is_disabled():
+def test_2026082402_fails_closed_if_a_prior_ccip_slot_is_disabled():
     hq = _Registry(_addr(65), {23: _addr(66)}, count=25)
     migration = _FakeMigration(contracts={"RipeHq": hq})
 
@@ -921,7 +1054,7 @@ def test_0013_fails_closed_if_a_prior_ccip_slot_is_disabled():
     assert migration.deployments == []
 
 
-def test_0014_only_promotes_vault_migrator_after_hq_readback():
+def test_2026082403_only_promotes_vault_migrator_after_hq_readback():
     candidate_address = _addr(71)
     hq = _Registry(_addr(70), {25: candidate_address}, count=26)
     migration = _FakeMigration(contracts={"RipeHq": hq})
@@ -932,7 +1065,7 @@ def test_0014_only_promotes_vault_migrator_after_hq_readback():
     assert migration.promotions == [
         (
             "VaultMigrator",
-            "VaultMigratorCandidate0013",
+            "VaultMigratorCandidate2026082402",
             hq.address,
             25,
             None,

@@ -68,14 +68,17 @@ is not a current Defaults constructor binding or selected asset.
 | --- | --- |
 | 1 | Chainlink selected |
 | 2 | Unchanged CurvePrices selected for GREEN only |
-| 3 | BlueChipYield structurally selected in the blueprint, but not deployed or finalized by the current migration candidate |
-| 4 | Empty Pyth |
-| 5 | Empty Stork |
+| 3 | Pre-PR #206 legacy UniswapV2Prices fallback; PR #206 must promote the authenticated inert monitor replacement |
+| 4+ | Unassigned; future sources require chain-local IDs |
 
 Priority price-source IDs are `[1, 2]`. The configured GREEN route is GREEN ->
-Curve GREEN/USDG -> PriceDesk -> Chainlink USDG. USDG has no Curve feed. No
-Uniswap price source is admitted or deployed, and neither GREEN/USDG nor
-RIPE/WETH LP is admitted as a Ripe asset.
+Curve GREEN/USDG -> PriceDesk -> Chainlink USDG. USDG has no Curve feed.
+Priority ordering does not disable other registered sources: the pre-PR #206
+legacy slot-3 contract remains a functional fallback. Do not proceed to the
+forward stages until PR #206's `2026082100/01` replacement is integrated and
+the live inert surface is revalidated. BlueChipYield, Pyth, and Stork remain
+omitted or deferred with no Robinhood ID, and neither GREEN/USDG nor RIPE/WETH
+LP is admitted as a Ripe asset.
 
 Current source assigns `1,000,000e18` RIPE to rewards, zero to HR, and
 `1,000,000e18` RIPE to bonds. `rewardsConfig()` enables points at
@@ -389,11 +392,13 @@ the 86-key plan census, the shared 1,000-RIPE analysis, and priority IDs
 `[1, 3]` remain historical inputs. Do not rebase, merge, execute, or use them as
 current configuration or migration authority.
 
-The current candidate intentionally omits BlueChipYield deployment even though
-the structural blueprint retains ID 3. Do not infer deployed topology from the
-blueprint and do not invent an alternate registration merely to reconcile the
-two. Resolve that boundary through a separately reviewed production change if
-the owner later wants BlueChipYield deployed.
+The current candidate intentionally defers BlueChipYield and assigns it ID `0`.
+That does not make live slot 3 empty: before PR #206 it contains the legacy
+functional UniswapV2Prices generation, and the required PR #206 replacement
+promotes the inert monitor at the same ID. If the owner later wants
+BlueChipYield deployed, select its ID from the then-live chain-local topology in
+a separately reviewed production change; do not assume that any ID matches
+another chain.
 
 ## Stop conditions and prohibited substitutions
 

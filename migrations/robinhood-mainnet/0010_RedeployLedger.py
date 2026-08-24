@@ -56,6 +56,7 @@ from scripts.utils.ledger_deployment import validate_ledger_action_block_source
 from scripts.utils.migration import Migration, PromotionSpec
 
 from config.robinhood_launch import (
+    CURVE_PRICES_ID,
     HR_MAX_TIMELOCK,
     HR_MIN_TIMELOCK,
     LEDGER_ACTION_BLOCK_SOURCE,
@@ -63,6 +64,7 @@ from config.robinhood_launch import (
     LOOTBOX_MIN_SEND_INTERVAL,
     LOOTBOX_SEND_INTERVAL,
     LOOTBOX_YIELD_BONUS,
+    PYTH_PRICES_ID,
     STALE_WINDOW_MAX,
     STALE_WINDOW_MIN,
     SWITCHBOARD_MAX_TIMELOCK,
@@ -232,7 +234,7 @@ def migrate(migration: Migration):
         "MissionControl": (hq, defaults_candidate),
         "AuctionHouse": (hq,),
         "BondRoom": (hq, migration.get_contract("BondBooster")),
-        "CreditEngine": (hq,),
+        "CreditEngine": (hq, CURVE_PRICES_ID),
         "HumanResources": (hq, HR_MIN_TIMELOCK, HR_MAX_TIMELOCK),
         "Lootbox": (
             hq,
@@ -241,7 +243,7 @@ def migrate(migration: Migration):
             LOOTBOX_DEPOSIT_REWARD,
             LOOTBOX_YIELD_BONUS,
         ),
-        "Teller": (hq, TELLER_SHOULD_PAUSE),
+        "Teller": (hq, TELLER_SHOULD_PAUSE, CURVE_PRICES_ID),
         "CreditRedeem": (hq,),
         "TellerUtils": (hq,),
         "StabilityPool": (hq,),
@@ -254,6 +256,7 @@ def migrate(migration: Migration):
             STALE_WINDOW_MAX,
             SWITCHBOARD_MIN_TIMELOCK,
             SWITCHBOARD_MAX_TIMELOCK,
+            PYTH_PRICES_ID,
         ),
         "SwitchboardBravo": (
             hq,
@@ -337,7 +340,7 @@ def migrate(migration: Migration):
         migration,
         ledger.address,
         LEDGER_ACTION_BLOCK_SOURCE,
-        allow_local_preview=True,
+        allow_local_preview=migration.is_local_preview(),
     )
     if validation is None:
         log.h2("Ledger node-backed validation skipped for local/fork preview")
@@ -357,7 +360,14 @@ def migrate(migration: Migration):
         LOOTBOX_DEPOSIT_REWARD,
         LOOTBOX_YIELD_BONUS,
     )
-    redeploy("Teller", RIPE_HQ, 17, hq, TELLER_SHOULD_PAUSE)
+    redeploy(
+        "Teller",
+        RIPE_HQ,
+        17,
+        hq,
+        TELLER_SHOULD_PAUSE,
+        CURVE_PRICES_ID,
+    )
     redeploy("RipeGov", VAULT_BOOK, 2, hq)
 
     log.h1("Registry updates for the Safe")

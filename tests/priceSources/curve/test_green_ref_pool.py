@@ -1979,6 +1979,10 @@ def __init__():
 def setLive(_live: bool):
     self.live = _live
 
+@external
+def setDecimals(_decimals: uint8):
+    self._decimals = _decimals
+
 @view
 @external
 def decimals() -> uint8:
@@ -1988,7 +1992,7 @@ def decimals() -> uint8:
 
 
 @pytest.mark.fork("local", "base")
-def test_confirmation_succeeds_after_registry_unregistration(local_curve_ref_system):
+def test_confirmation_cancels_after_registry_unregistration(local_curve_ref_system):
     curve, pool, registry, governance, _ = local_curve_ref_system
     with boa.env.anchor():
         registry.setPoolRegistered(pool, True)
@@ -2005,18 +2009,17 @@ def test_confirmation_succeeds_after_registry_unregistration(local_curve_ref_sys
         )
         pending = curve.pendingGreenRefPoolConfig(aid)
         assert pending.altAssetDecimals == 18
+        before = curve.greenRefPoolConfig()
         registry.setPoolRegistered(pool, False)
         boa.env.time_travel(blocks=curve.actionTimeLock())
-        assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
-        config = curve.greenRefPoolConfig()
-        assert config.pool == pool.address
-        assert config.maxNumSnapshots == 4
-        assert config.altAssetDecimals == 18
+        assert not curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        assert curve.greenRefPoolConfig() == before
         assert curve.pendingGreenRefPoolConfig(aid).pool == ZERO_ADDRESS
+        assert not curve.hasPendingAction(aid)
 
 
 @pytest.mark.fork("local", "base")
-def test_confirmation_succeeds_after_alt_decimals_unavailable(local_curve_ref_system):
+def test_confirmation_failure_on_unavailable_alt_decimals_is_atomic(local_curve_ref_system):
     curve, pool, registry, governance, _ = local_curve_ref_system
     with boa.env.anchor():
         alt = boa.loads(TOGGLE_DECIMALS)
@@ -2039,11 +2042,70 @@ def test_confirmation_succeeds_after_alt_decimals_unavailable(local_curve_ref_sy
         with boa.reverts():
             alt.decimals()
         boa.env.time_travel(blocks=curve.actionTimeLock())
-        assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
-        config = curve.greenRefPoolConfig()
-        assert config.pool == pool.address
-        assert config.altAsset == alt.address
-        assert config.altAssetDecimals == 18
+        with boa.reverts():
+            curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        assert curve.greenRefPoolConfig().pool == ZERO_ADDRESS
+        assert curve.pendingGreenRefPoolConfig(aid) == pending
+        assert curve.hasPendingAction(aid)
+
+
+@pytest.mark.fork("local", "base")
+def test_confirmation_cancels_after_alt_decimals_drift(local_curve_ref_system):
+    curve, pool, registry, governance, _ = local_curve_ref_system
+    with boa.env.anchor():
+        alt = boa.loads(TOGGLE_DECIMALS)
+        registry.setPool(pool, alt, registry.green())
+        pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 10_000 * EIGHTEEN_DECIMALS)
+        aid = curve.setGreenRefPoolConfig(
+            pool,
+            10,
+            60_00,
+            100,
+            10_00,
+            100_000 * EIGHTEEN_DECIMALS,
+            sender=governance,
+        )
+        pending = curve.pendingGreenRefPoolConfig(aid)
+        assert pending.altAssetDecimals == 18
+        alt.setDecimals(6)
+        boa.env.time_travel(blocks=curve.actionTimeLock())
+
+        assert not curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        assert curve.greenRefPoolConfig().pool == ZERO_ADDRESS
+        assert curve.pendingGreenRefPoolConfig(aid).pool == ZERO_ADDRESS
+        assert not curve.hasPendingAction(aid)
+
+
+@pytest.mark.fork("local", "base")
+@pytest.mark.parametrize("drift", ("alt_identity", "green_index"))
+def test_confirmation_cancels_after_green_ref_identity_drift(
+    local_curve_ref_system,
+    drift,
+):
+    curve, pool, registry, governance, _ = local_curve_ref_system
+    with boa.env.anchor():
+        registry.setPoolRegistered(pool, True)
+        pool.setBalances(10_000 * EIGHTEEN_DECIMALS, 10_000 * EIGHTEEN_DECIMALS)
+        aid = curve.setGreenRefPoolConfig(
+            pool,
+            10,
+            60_00,
+            100,
+            10_00,
+            100_000 * EIGHTEEN_DECIMALS,
+            sender=governance,
+        )
+        pending = curve.pendingGreenRefPoolConfig(aid)
+        if drift == "alt_identity":
+            registry.setPool(pool, registry.savingsGreen(), registry.green())
+        else:
+            registry.setPool(pool, registry.green(), pending.altAsset)
+        boa.env.time_travel(blocks=curve.actionTimeLock())
+
+        assert not curve.confirmGreenRefPoolConfig(aid, sender=governance)
+        assert curve.greenRefPoolConfig().pool == ZERO_ADDRESS
+        assert curve.pendingGreenRefPoolConfig(aid).pool == ZERO_ADDRESS
+        assert not curve.hasPendingAction(aid)
 
 
 @pytest.mark.fork("local", "base")

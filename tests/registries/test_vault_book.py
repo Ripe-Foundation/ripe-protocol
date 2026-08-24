@@ -8,6 +8,114 @@ SIMPLE_VAULT_ID = 3
 REBASE_VAULT_ID = 4
 
 
+STABILITY_REPLACEMENT_PROBES = {
+    "doesVaultHaveAnyFunds": (
+        """
+@external
+@view
+def doesVaultHaveAnyFunds() -> bool:
+    return False
+""",
+        """
+@external
+@view
+def doesVaultHaveAnyFunds():
+    pass
+""",
+    ),
+    "vaultAssets": (
+        """
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return empty(address)
+""",
+        """
+@external
+@view
+def vaultAssets(_index: uint256):
+    pass
+""",
+    ),
+    "claimableBalances": (
+        """
+@external
+@view
+def claimableBalances(_stab_asset: address, _claim_asset: address) -> uint256:
+    return 0
+""",
+        """
+@external
+@view
+def claimableBalances(_stab_asset: address, _claim_asset: address):
+    pass
+""",
+    ),
+    "canAcceptLiquidationAsset": (
+        """
+@external
+@view
+def canAcceptLiquidationAsset(_stab_asset: address, _claim_asset: address) -> bool:
+    return False
+""",
+        """
+@external
+@view
+def canAcceptLiquidationAsset(_stab_asset: address, _claim_asset: address):
+    pass
+""",
+    ),
+    "totalClaimableBalances": (
+        """
+@external
+@view
+def totalClaimableBalances(_claim_asset: address) -> uint256:
+    return 0
+""",
+        """
+@external
+@view
+def totalClaimableBalances(_claim_asset: address):
+    pass
+""",
+    ),
+    "isPaused": (
+        """
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        """
+@external
+@view
+def isPaused():
+    pass
+""",
+    ),
+}
+
+
+def _deploy_stability_probe_candidate(
+    name,
+    defective_probe=None,
+    defect_kind=None,
+):
+    definitions = []
+    for probe_name, (
+        valid_source,
+        malformed_source,
+    ) in STABILITY_REPLACEMENT_PROBES.items():
+        if probe_name == defective_probe and defect_kind == "missing":
+            continue
+        definitions.append(
+            malformed_source
+            if probe_name == defective_probe and defect_kind == "malformed"
+            else valid_source
+        )
+    return boa.loads("\n".join(definitions), name=name)
+
+
 def _deploy_replacement(ripe_hq, name):
     return boa.load(
         "contracts/vaults/SimpleErc20.vy",
@@ -1111,25 +1219,163 @@ def test_stab_claim_zero_amount_succeeds_without_state_change(
     assert _reward_state(ripe_token, ledger, stability_pool) == state_before
 
 
-def test_historically_classified_stability_id_reuse_characterization(
+@pytest.mark.parametrize("validation_phase", ("start", "confirmation"))
+@pytest.mark.parametrize("defect_kind", ("missing", "malformed"))
+@pytest.mark.parametrize(
+    "defective_probe",
+    tuple(STABILITY_REPLACEMENT_PROBES),
+)
+def test_historical_stability_id_requires_every_replacement_probe(
+    validation_phase,
+    defect_kind,
+    defective_probe,
+    governance,
+    vault_book,
+    stability_pool,
+    mission_control,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert vault_id == 1
+    assert mission_control.isStabVaultId(vault_id)
+    assert not stability_pool.doesVaultHaveAnyFunds()
+
+    defective = _deploy_stability_probe_candidate(
+        f"{validation_phase}_{defect_kind}_{defective_probe}",
+        defective_probe,
+        defect_kind,
+    )
+    expected_revert = "external call failed"
+    if defect_kind == "malformed":
+        expected_revert = (
+            "uint1 bounds check"
+            if defective_probe in ("doesVaultHaveAnyFunds", "vaultAssets")
+            else "returndatasize too small"
+        )
+
+    if validation_phase == "start":
+        with boa.reverts(expected_revert):
+            vault_book.startAddressUpdateToRegistry(
+                vault_id,
+                defective,
+                sender=governance.address,
+            )
+
+        assert vault_book.pendingAddrUpdate(vault_id).confirmBlock == 0
+        assert vault_book.getAddr(vault_id) == stability_pool.address
+        assert vault_book.getRegId(stability_pool) == vault_id
+        assert vault_book.getRegId(defective) == 0
+        return
+
+    candidate = _deploy_stability_probe_candidate(
+        f"confirmation_candidate_for_{defect_kind}_{defective_probe}",
+    )
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        candidate,
+        sender=governance.address,
+    )
+    pending_before = vault_book.pendingAddrUpdate(vault_id)
+    boa.env.set_code(
+        candidate.address,
+        bytes(boa.env.get_code(defective.address)),
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+
+    with boa.reverts(expected_revert):
+        vault_book.confirmAddressUpdateToRegistry(
+            vault_id,
+            sender=governance.address,
+        )
+
+    # The post-swap validation revert rolls the registry update back atomically.
+    assert vault_book.pendingAddrUpdate(vault_id) == pending_before
+    assert vault_book.getAddr(vault_id) == stability_pool.address
+    assert vault_book.getRegId(stability_pool) == vault_id
+    assert vault_book.getRegId(candidate) == 0
+    assert mission_control.isStabVaultId(vault_id)
+
+
+def test_historical_stability_id_rejects_incompatible_replacement_at_start(
     ripe_hq,
     governance,
     vault_book,
     stability_pool,
     mission_control,
-    ripe_token,
-    ledger,
 ):
-    """Document the accepted boundary: classified Stability Pool IDs are permanent."""
     vault_id = vault_book.getRegId(stability_pool)
-    assert vault_id != 0
+    assert vault_id == 1
     assert mission_control.isStabVaultId(vault_id)
     assert not stability_pool.doesVaultHaveAnyFunds()
 
-    replacement = _deploy_replacement(ripe_hq, "historically_classified_replacement")
+    replacement = _deploy_replacement(ripe_hq, "incompatible_stability_replacement")
+    with boa.reverts("external call failed"):
+        vault_book.startAddressUpdateToRegistry(
+            vault_id,
+            replacement,
+            sender=governance.address,
+        )
+
+    assert vault_book.pendingAddrUpdate(vault_id).confirmBlock == 0
+    assert vault_book.getAddr(vault_id) == stability_pool.address
+    assert vault_book.getRegId(stability_pool) == vault_id
+    assert vault_book.getRegId(replacement) == 0
+
+
+def test_historical_stability_id_revalidates_replacement_at_confirmation(
+    ripe_hq,
+    governance,
+    vault_book,
+    stability_pool,
+    alternate_stability_pool,
+    mission_control,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert vault_id == 1
+    assert mission_control.isStabVaultId(vault_id)
     assert vault_book.startAddressUpdateToRegistry(
         vault_id,
-        replacement,
+        alternate_stability_pool,
+        sender=governance.address,
+    )
+    pending_before = vault_book.pendingAddrUpdate(vault_id)
+
+    incompatible = _deploy_replacement(ripe_hq, "confirm_time_incompatible_stability")
+    boa.env.set_code(
+        alternate_stability_pool.address,
+        bytes(boa.env.get_code(incompatible.address)),
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    with boa.reverts("external call failed"):
+        vault_book.confirmAddressUpdateToRegistry(
+            vault_id,
+            sender=governance.address,
+        )
+
+    assert vault_book.pendingAddrUpdate(vault_id) == pending_before
+    assert vault_book.getAddr(vault_id) == stability_pool.address
+    assert vault_book.getRegId(stability_pool) == vault_id
+    assert vault_book.getRegId(alternate_stability_pool) == 0
+    assert mission_control.isStabVaultId(vault_id)
+
+
+def test_historical_stability_id_accepts_full_stability_surface(
+    governance,
+    vault_book,
+    stability_pool,
+    alternate_stability_pool,
+    mission_control,
+    ripe_token,
+    ledger,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert vault_id == 1
+    assert mission_control.isStabVaultId(vault_id)
+    assert not stability_pool.doesVaultHaveAnyFunds()
+    assert not alternate_stability_pool.doesVaultHaveAnyFunds()
+
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        alternate_stability_pool,
         sender=governance.address,
     )
     boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
@@ -1137,18 +1383,79 @@ def test_historically_classified_stability_id_reuse_characterization(
         vault_id,
         sender=governance.address,
     )
+
+    assert vault_book.getAddr(vault_id) == alternate_stability_pool.address
     assert vault_book.getRegId(stability_pool) == 0
-    assert vault_book.getRegId(replacement) == vault_id
+    assert vault_book.getRegId(alternate_stability_pool) == vault_id
     assert mission_control.isStabVaultId(vault_id)
 
-    state_before = _reward_state(ripe_token, ledger, replacement)
+    state_before = _reward_state(ripe_token, ledger, alternate_stability_pool)
     assert vault_book.mintRipeForStabPoolClaims(
         0,
         ripe_token.address,
         ledger.address,
-        sender=replacement.address,
+        sender=alternate_stability_pool.address,
+    )
+    assert _reward_state(ripe_token, ledger, alternate_stability_pool) == state_before
+
+
+def test_stability_replacement_validation_is_explicitly_shape_only(
+    governance,
+    vault_book,
+    stability_pool,
+    mission_control,
+):
+    shaped_candidate = boa.loads(
+        """
+@external
+@view
+def doesVaultHaveAnyFunds() -> bool:
+    return False
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return empty(address)
+
+@external
+@view
+def claimableBalances(_stab_asset: address, _claim_asset: address) -> uint256:
+    return max_value(uint256)
+
+@external
+@view
+def canAcceptLiquidationAsset(_stab_asset: address, _claim_asset: address) -> bool:
+    return False
+
+@external
+@view
+def totalClaimableBalances(_claim_asset: address) -> uint256:
+    return max_value(uint256)
+
+@external
+@view
+def isPaused() -> bool:
+    return True
+""",
+        name="shape_only_stability_replacement",
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+    assert vault_id == 1
+    assert mission_control.isStabVaultId(vault_id)
+
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        shaped_candidate,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        vault_id,
+        sender=governance.address,
     )
 
-    # This is an accepted operational boundary, not desirable vault-ID reuse behavior.
-    # The zero-value Transfer event is expected; reward state remains unchanged.
-    assert _reward_state(ripe_token, ledger, replacement) == state_before
+    # F13 deliberately validates the callable StabilityPool surface, not the
+    # values returned by those probes or the replacement's governance intent.
+    assert vault_book.getAddr(vault_id) == shaped_candidate.address
+    assert vault_book.getRegId(shaped_candidate) == vault_id
+    assert mission_control.isStabVaultId(vault_id)

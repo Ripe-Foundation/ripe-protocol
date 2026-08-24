@@ -26,7 +26,7 @@ activation remain prohibited
 **Recreation branch:** `rh-track-6-s5-ledger-guard-recreation`
 
 **Recreation worktree:**
-`/Users/wigglez/dev/ripe-protocol-track-6-s5-ledger-guard-recreation`
+`${HOME}/dev/ripe-protocol-track-6-s5-ledger-guard-recreation`
 
 **Exact recreation baseline:**
 `02787d351a3064e35d627e8fbc44150770e61c73`
@@ -404,7 +404,7 @@ The following table is retained as historical evidence of the original
 
 | Gate | Frozen result |
 | --- | --- |
-| Integration repository | `/Users/wigglez/dev/ripe-protocol` |
+| Integration repository | `${HOME}/dev/ripe-protocol` |
 | Integration worktree | Clean; `## rh...origin/rh` |
 | Local `rh` | `4966969265c6056bc7f3f139dc1a2437ef553c9f` |
 | Local `origin/rh` | `4966969265c6056bc7f3f139dc1a2437ef553c9f` |

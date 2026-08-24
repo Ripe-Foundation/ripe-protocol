@@ -157,8 +157,14 @@ def _getStabAddys() -> (address, address, address):
 
 @view
 @internal
+def _balanceOf(_asset: address, _owner: address) -> uint256:
+    return staticcall IERC20(_asset).balanceOf(_owner)
+
+
+@view
+@internal
 def _getUnreservedBalance(_asset: address) -> uint256:
-    custody: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    custody: uint256 = self._balanceOf(_asset, self)
     reserved: uint256 = self.totalClaimableBalances[_asset]
     assert custody >= reserved # dev: claim custody deficit
     return custody - reserved
@@ -182,7 +188,7 @@ def _depositTokensInVault(
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
     assert _asset != _a.greenToken # dev: green cannot be stab asset
     assert self.totalClaimableBalances[_asset] == 0 # dev: asset reserved for claims
-    totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    totalAssetBalance: uint256 = self._balanceOf(_asset, self)
     depositAmount: uint256 = min(_amount, totalAssetBalance)
     assert depositAmount != 0 # dev: invalid deposit amount
 
@@ -292,7 +298,7 @@ def _getCohortLiquidationAmount(_stabAsset: address) -> uint256:
     # its mandatory ordinary-auction fallback. Keep this mirror aligned with
     # both _getTotalAmountForVault and
     # _getValueOfClaimableAssets when their custody or valuation inputs change.
-    custody: uint256 = staticcall IERC20(_stabAsset).balanceOf(self)
+    custody: uint256 = self._balanceOf(_stabAsset, self)
     reserved: uint256 = self.totalClaimableBalances[_stabAsset]
     if custody <= reserved:
         return 0
@@ -315,7 +321,7 @@ def _getCohortLiquidationAmount(_stabAsset: address) -> uint256:
             # A claim is usable only when aggregate custody covers every cohort's
             # liability and PriceDesk can establish a non-zero value without
             # raising. Any zero result makes this cohort unavailable for now.
-            if staticcall IERC20(claimAsset).balanceOf(self) < self.totalClaimableBalances[claimAsset]:
+            if self._balanceOf(claimAsset, self) < self.totalClaimableBalances[claimAsset]:
                 return 0
 
             claimValue: uint256 = self._getUsdValue(claimAsset, claimBalance, GREEN_TOKEN, SAVINGS_GREEN, priceDesk, False)
@@ -600,7 +606,7 @@ def swapWithClaimableGreen(
 
     # finalize amount
     maxClaimableGreen: uint256 = self.claimableBalances[_stabAsset][_greenToken]
-    greenAvailable: uint256 = min(maxClaimableGreen, staticcall IERC20(_greenToken).balanceOf(self))
+    greenAvailable: uint256 = min(maxClaimableGreen, self._balanceOf(_greenToken, self))
     amount: uint256 = min(_greenAmount, greenAvailable)
     assert amount != 0 # dev: no green
 
@@ -700,7 +706,7 @@ def _getValueOfClaimableAssets(
         # stability-asset cohort, not only the pair currently being valued.
         # PriceDesk floors a nonzero amount at a nonzero price to one USD-value
         # unit; an unavailable price still fails closed.
-        assert staticcall IERC20(asset).balanceOf(self) >= self.totalClaimableBalances[asset] # dev: claim custody deficit
+        self._getUnreservedBalance(asset)
         claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, True)
         assert claimValue != 0 # dev: no price for claim asset
         totalValue += claimValue
@@ -844,7 +850,7 @@ def _calcClaimSharesAndAmount(
     # NOTE: failing gracefully here, in case of many claims at same time
 
     # total claimable asset
-    totalClaimAsset: uint256 = min(_maxClaimableAsset, staticcall IERC20(_claimAsset).balanceOf(self))
+    totalClaimAsset: uint256 = min(_maxClaimableAsset, self._balanceOf(_claimAsset, self))
     if totalClaimAsset == 0:
         return 0, 0, 0 # no claimable asset
 
@@ -927,7 +933,7 @@ def redeemFromStabilityPool(
 
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
 
-    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    greenAmount: uint256 = min(_greenAmount, self._balanceOf(a.greenToken, self))
     assert greenAmount != 0 # dev: no green to redeem
     greenSpent: uint256 = self._redeemFromStabilityPool(_recipient, _caller, _asset, max_value(uint256), greenAmount, _shouldAutoDeposit, a)
     assert greenSpent != 0 # dev: no redemptions occurred
@@ -956,7 +962,7 @@ def redeemManyFromStabilityPool(
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
 
     totalGreenSpent: uint256 = 0
-    totalGreenRemaining: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    totalGreenRemaining: uint256 = min(_greenAmount, self._balanceOf(a.greenToken, self))
     assert totalGreenRemaining != 0 # dev: no green to redeem
 
     for r: StabPoolRedemption in _redemptions:
@@ -1015,7 +1021,7 @@ def _redeemFromStabilityPool(
         assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_recipient, _caller, _a.missionControl) # dev: not allowed to deposit for user
 
     # treating green as $1
-    maxGreenAvailable: uint256 = min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))
+    maxGreenAvailable: uint256 = min(_totalGreenRemaining, self._balanceOf(_a.greenToken, self))
     maxRedeemValue: uint256 = min(_maxGreenForAsset, maxGreenAvailable)
     if maxRedeemValue == 0:
         return 0
@@ -1026,7 +1032,7 @@ def _redeemFromStabilityPool(
         return 0
 
     # total claimable asset
-    actualClaimableAmount: uint256 = min(self.totalClaimableBalances[_asset], staticcall IERC20(_asset).balanceOf(self))
+    actualClaimableAmount: uint256 = min(self.totalClaimableBalances[_asset], self._balanceOf(_asset, self))
     if actualClaimableAmount == 0:
         return 0
 
@@ -1034,7 +1040,8 @@ def _redeemFromStabilityPool(
     remainingRedeemValue: uint256 = maxRedeemValue
     remainingClaimAmount: uint256 = maxClaimableAmount
     if maxClaimableAmount > actualClaimableAmount:
-        remainingRedeemValue = min(actualClaimableAmount * maxRedeemValue // maxClaimableAmount, maxRedeemValue)
+        # This branch guarantees the prorated value is below maxRedeemValue.
+        remainingRedeemValue = actualClaimableAmount * maxRedeemValue // maxClaimableAmount
         remainingClaimAmount = actualClaimableAmount
 
     greenSpent: uint256 = 0
@@ -1111,7 +1118,7 @@ def _handleGreenForUser(
     _greenToken: address,
     _savingsGreen: address,
 ):
-    amount: uint256 = min(_greenAmount, staticcall IERC20(_greenToken).balanceOf(self))
+    amount: uint256 = min(_greenAmount, self._balanceOf(_greenToken, self))
     if amount == 0:
         return
 
@@ -1141,18 +1148,22 @@ def _handleAssetForUser(
 
     # auto-deposit
     if _shouldAutoDeposit and self._canPerformAutoDeposit(vaultId, _asset, _recipient, _a.missionControl, _a.vaultBook):
+        vaultBefore: uint256 = self._balanceOf(_asset, self)
         assert extcall IERC20(_asset).approve(_a.teller, _amount, default_return_value=True) # dev: token approval failed
         extcall Teller(_a.teller).depositFromTrusted(_recipient, vaultId, _asset, _amount, 0, _a)
         assert extcall IERC20(_asset).approve(_a.teller, 0, default_return_value=True) # dev: token approval failed
+        assert self._balanceOf(_asset, self) == vaultBefore - _amount # dev: invalid vault outflow
     else:
         self._transferAssetExact(_asset, _amount, _recipient)
 
 
 @internal
 def _transferAssetExact(_asset: address, _amount: uint256, _recipient: address):
-    recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+    vaultBefore: uint256 = self._balanceOf(_asset, self)
+    recipientBefore: uint256 = self._balanceOf(_asset, _recipient)
     assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: transfer failed
-    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == _amount # dev: invalid recipient delivery
+    assert self._balanceOf(_asset, self) == vaultBefore - _amount # dev: invalid vault outflow
+    assert self._balanceOf(_asset, _recipient) - recipientBefore == _amount # dev: invalid recipient delivery
 
 
 @view
@@ -1209,6 +1220,14 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
     if vaultData.indexOfAsset[_stabAsset] == 0 or vaultData.indexOfAsset[_claimAsset] != 0:
         return False
 
+    # AuctionHouse sizes a Stability Pool swap from raw custody, while the
+    # settlement path can spend only unreserved custody. Any reservation in
+    # the stabilization asset can therefore make its requested payment exceed
+    # the amount this cohort may transfer. Reject it before collateral moves
+    # so AuctionHouse can use its ordinary-auction fallback.
+    if self.totalClaimableBalances[_stabAsset] != 0:
+        return False
+
     activeCount: uint256 = self._getNumActiveClaimAssets(_stabAsset)
     if self.indexOfClaimableAsset[_stabAsset][_claimAsset] == 0 and activeCount >= MAX_ACTIVE_CLAIM_ASSETS:
         return False
@@ -1216,10 +1235,10 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
         return False
 
     if vaultData.totalBalances[_stabAsset] == 0 and activeCount == 0:
-        # A configured empty cohort may receive its first liquidation, but any
-        # legacy cross-cohort reservation makes AuctionHouse's raw-custody
-        # sizing unsafe because it cannot distinguish the reserved amount.
-        return self.totalClaimableBalances[_stabAsset] == 0
+        # The reservation guard above already established that raw custody is
+        # fully spendable, so a configured empty cohort may receive its first
+        # liquidation.
+        return True
 
     return self._getCohortLiquidationAmount(_stabAsset) != 0
 
@@ -1261,9 +1280,7 @@ def _getClaimAssetActivationData(
     if pairBalance == 0 or self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0:
         return 0, capacityRemaining
 
-    custody: uint256 = staticcall IERC20(_claimAsset).balanceOf(self)
-    priorLiability: uint256 = self.totalClaimableBalances[_claimAsset]
-    assert custody >= priorLiability # dev: claim custody deficit
+    self._getUnreservedBalance(_claimAsset)
     return self._getUsdValue(_claimAsset, pairBalance, _greenToken, _savingsGreen, _priceDesk, False), capacityRemaining
 
 
@@ -1287,9 +1304,7 @@ def _maintainClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address
             if pairBalance == 0 or self.indexOfClaimableAsset[_stabAsset][claimAsset] != 0:
                 continue
 
-            custody: uint256 = staticcall IERC20(claimAsset).balanceOf(self)
-            priorLiability: uint256 = self.totalClaimableBalances[claimAsset]
-            assert custody >= priorLiability # dev: claim custody deficit
+            self._getUnreservedBalance(claimAsset)
 
             usdValue: uint256 = self._getUsdValue(claimAsset, pairBalance, greenToken, savingsGreen, priceDesk, False)
             if usdValue < ACTIVATION_USD_THRESHOLD:
@@ -1313,7 +1328,7 @@ def _maintainClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address
         if vaultData.totalBalances[_stabAsset] != 0:
             continue
 
-        custody: uint256 = staticcall IERC20(claimAsset).balanceOf(self)
+        custody: uint256 = self._balanceOf(claimAsset, self)
         if custody < self.totalClaimableBalances[claimAsset]:
             continue
 
@@ -1374,7 +1389,7 @@ def _addClaimableBalance(
     assert vaultData.indexOfAsset[_claimAsset] == 0 # dev: claim asset is stability asset
 
     # validate custody
-    custody: uint256 = staticcall IERC20(_claimAsset).balanceOf(self)
+    custody: uint256 = self._balanceOf(_claimAsset, self)
     priorLiability: uint256 = self.totalClaimableBalances[_claimAsset]
     assert custody >= priorLiability # dev: claim custody deficit
     assert _reportedAmount <= custody - priorLiability # dev: short claim receipt
@@ -1436,6 +1451,8 @@ def _reduceClaimableBalances(
     _prevClaimableBalance: uint256,
     _remainingUsdValue: uint256,
 ):
+    # Never reduce a claim liability while aggregate custody is deficient.
+    self._getUnreservedBalance(_claimAsset)
     newClaimableBalance: uint256 = _prevClaimableBalance - _claimAmount
     self.claimableBalances[_stabAsset][_claimAsset] = newClaimableBalance
     self.totalClaimableBalances[_claimAsset] -= _claimAmount

@@ -276,6 +276,40 @@ def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (ui
     return staleTime, True
 
 
+@view
+@internal
+def _readFeedDecimals(_feed: address) -> (bool, uint256):
+    if _feed == empty(address):
+        return False, 0
+
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _feed,
+        method_id("decimals()", output_type=Bytes[4]),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, 0
+
+    decimals: uint256 = abi_decode(response, uint256)
+    if decimals > 255:
+        return False, 0
+    return True, decimals
+
+
+@view
+@internal
+def _hasExpectedFeedDecimals(_feed: address, _expectedDecimals: uint256) -> bool:
+    # Bind pending configs at confirmation; active reads trust the snapshot.
+    hasDecimals: bool = False
+    liveDecimals: uint256 = 0
+    hasDecimals, liveDecimals = self._readFeedDecimals(_feed)
+    return hasDecimals and liveDecimals == _expectedDecimals
+
+
 #################
 # RedStone Data #
 #################
@@ -290,16 +324,13 @@ def getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0)
 @view
 @internal
 def _getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
-    if _feed == empty(address):
+    if _feed == empty(address) or _decimals > NORMALIZED_DECIMALS:
         return 0
+
     oracle: ChainlinkRound = staticcall ChainlinkInterface(_feed).latestRoundData()
 
     # oracle has no price
     if oracle.answer <= 0:
-        return 0
-
-    # bad decimals
-    if _decimals > NORMALIZED_DECIMALS:
         return 0
 
     # cannot have future timestamp
@@ -346,10 +377,10 @@ def addNewPriceFeed(
     assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
+    hasDecimals: bool = False
     decimals: uint256 = 0
-    if _newFeed != empty(address):
-        decimals = convert(staticcall ChainlinkInterface(_newFeed).decimals(), uint256)
-    assert self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _staleTime) # dev: invalid feed
+    hasDecimals, decimals = self._readFeedDecimals(_newFeed)
+    assert hasDecimals and self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -379,7 +410,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     d: PendingRedStoneConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending new feed
     assert self.feedConfig[_asset].feed == empty(address) # dev: no pending new feed
-    if not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
+    if not self._hasExpectedFeedDecimals(d.config.feed, d.config.decimals) or not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -459,9 +490,10 @@ def updatePriceFeed(
     staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
 
     # validation
+    hasDecimals: bool = False
     decimals: uint256 = 0
-    if _newFeed != empty(address):
-        decimals = convert(staticcall ChainlinkInterface(_newFeed).decimals(), uint256)
+    hasDecimals, decimals = self._readFeedDecimals(_newFeed)
+    assert hasDecimals # dev: invalid feed
     return self._initiatePriceFeedUpdate(_asset, _newFeed, decimals, _needsEthToUsd, staleTime)
 
 
@@ -522,6 +554,9 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert d.config.feed != empty(address) # dev: no pending update feed
     oldFeed: address = self.feedConfig[_asset].feed
     assert oldFeed != empty(address) # dev: no pending update feed
+    if not self._hasExpectedFeedDecimals(d.config.feed, d.config.decimals):
+        self._cancelPriceFeedUpdate(_asset, d.actionId)
+        return False
     if not self._isValidUpdateFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
         # a stale-only update can fail transiently when its unchanged oracle is
         # unavailable. Preserve the timelocked action so governance can retry.

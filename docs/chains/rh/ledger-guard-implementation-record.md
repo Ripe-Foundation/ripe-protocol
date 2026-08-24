@@ -29,7 +29,7 @@ action remains unauthorized
 **Branch:** `rh-track-6-s5-ledger-guard-recreation`
 
 **Worktree:**
-`/Users/wigglez/dev/ripe-protocol-track-6-s5-ledger-guard-recreation`
+`${HOME}/dev/ripe-protocol-track-6-s5-ledger-guard-recreation`
 
 This record covers only the bounded Stage B implementation authorized from the
 exact starting commit above. It is not Gate 1 approval. It is not authority to

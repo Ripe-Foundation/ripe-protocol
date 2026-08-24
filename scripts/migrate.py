@@ -439,6 +439,7 @@ def cli(
         ignore_logs=is_retry,
         blueprint=selected_blueprint,
         rpc=final_rpc,
+        local_preview=fork,
     )
 
     log.h1("Contract Migration")

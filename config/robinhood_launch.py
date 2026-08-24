@@ -69,6 +69,13 @@ REGISTRY_MIN_DELAY = HOUR_IN_BLOCKS * 12
 REGISTRY_MAX_DELAY = WEEK_IN_BLOCKS
 PRICE_MIN_TIMELOCK = HOUR_IN_BLOCKS * 2
 PRICE_MAX_TIMELOCK = WEEK_IN_BLOCKS
+
+# PriceDesk source IDs are chain-local. Curve is active at Robinhood ID 2;
+# BlueChipYield and Pyth are not deployed or assigned IDs for this launch.
+CURVE_PRICES_ID = 2
+BLUECHIP_PRICES_ID = 0
+PYTH_PRICES_ID = 0
+
 # All five switchboards share one band.
 SWITCHBOARD_MIN_TIMELOCK = HOUR_IN_BLOCKS * 2
 SWITCHBOARD_MAX_TIMELOCK = WEEK_IN_BLOCKS

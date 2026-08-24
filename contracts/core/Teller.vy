@@ -222,13 +222,14 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
-CURVE_PRICES_ID: constant(uint256) = 2
+CURVE_PRICES_ID: immutable(uint256)
 
 
 @deploy
-def __init__(_ripeHq: address, _shouldPause: bool):
+def __init__(_ripeHq: address, _shouldPause: bool, _curvePricesId: uint256):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
+    CURVE_PRICES_ID = _curvePricesId
 
 
 ############

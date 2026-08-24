@@ -555,8 +555,24 @@ def _isValidNewRipeHq(_newHq: address, _prevHq: address) -> bool:
         return False
 
     # tokens must be set
-    if staticcall RipeHq(_newHq).greenToken() == empty(address) or staticcall RipeHq(_newHq).ripeToken() == empty(address) or staticcall RipeHq(_newHq).savingsGreen() == empty(address):
+    newGreenToken: address = staticcall RipeHq(_newHq).greenToken()
+    newSavingsGreen: address = staticcall RipeHq(_newHq).savingsGreen()
+    newRipeToken: address = staticcall RipeHq(_newHq).ripeToken()
+    if empty(address) in [newGreenToken, newSavingsGreen, newRipeToken]:
         return False
+    if self not in [newGreenToken, newSavingsGreen, newRipeToken]:
+        return False
+
+    # an hq migration must retain the complete token suite. In particular,
+    # GREEN's backing guard must keep protecting the same SavingsGreen token.
+    if _prevHq != empty(address):
+        prevGreenToken: address = staticcall RipeHq(_prevHq).greenToken()
+        prevSavingsGreen: address = staticcall RipeHq(_prevHq).savingsGreen()
+        prevRipeToken: address = staticcall RipeHq(_prevHq).ripeToken()
+        if self not in [prevGreenToken, prevSavingsGreen, prevRipeToken]:
+            return False
+        if newGreenToken != prevGreenToken or newSavingsGreen != prevSavingsGreen or newRipeToken != prevRipeToken:
+            return False
 
     # make sure it has the necessary interfaces
     assert not staticcall RipeHq(_newHq).canSetTokenBlacklist(empty(address)) # dev: invalid interface

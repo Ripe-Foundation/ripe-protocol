@@ -190,12 +190,12 @@ post_freeze_reconciliation:
     price_desk_registry:
       1: { semantic: Chainlink, state: selected }
       2: { semantic: Curve, state: selected_green_only }
-      3: { semantic: BlueChipYield, state: blueprint_selected_but_not_deployed_by_candidate }
-      4: { semantic: Pyth, state: empty }
-      5: { semantic: Stork, state: empty }
+      3: { semantic: UniswapV2Prices, state: live_legacy_fallback_pr206_inert_replacement_required }
+      4: { semantic: unassigned, state: empty_chain_local_future_assignment }
+      5: { semantic: unassigned, state: empty_chain_local_future_assignment }
     external_address_state: external_facts_pending_independent_verification
     deployment_identity_state: unresolved_until_derived
-    bluechip_compatibility_state: source_compatible_but_omitted_from_current_migration_candidate
+    bluechip_compatibility_state: source_compatible_deferred_and_unassigned
     bluechip_runtime_bytes: 22054
     bluechip_eip170_headroom_bytes: 2522
     defaults_state: present_compiling_source_authoritative_derived_ledger_synchronized
@@ -387,8 +387,8 @@ reassessment_and_qualification:
     teller: preserve_current_strict_balance_measurement
     basic_vault: shared_fail_closed_nominal_protection_candidate
     launch_profile: bounded_curve_pricing
-    launch_oracle_authority: Chainlink_slot_1_Curve_slot_2_GREEN_only_BlueChipYield_slot_3_blueprint_selected_but_not_deployed_by_candidate
-    uniswap_launch_price_source: none
+    launch_oracle_authority: Chainlink_slot_1_Curve_slot_2_GREEN_only_priority_Uniswap_slot_3_legacy_fallback_until_pr206_inert_replacement_BlueChipYield_deferred_unassigned
+    uniswap_launch_price_source: blocked_until_pr206_inert_replacement
     ripe_weth_v2: optional_externally_held_liquidity_canary_only
     green_usdg: launch_pricing_pool_candidate_deployment_and_operations_blocked
     launch_lp_admissions: none
@@ -584,10 +584,11 @@ overall:
   bottom_line: >
     Ready to continue bounded launch preparation under the current
     production-remediation disposition. The candidate selects Chainlink slot 1
-    and GREEN-only Curve slot 2 with priority IDs [1, 2]. BlueChipYield remains
-    structurally selected at slot 3 in the blueprint but is deliberately not
-    deployed or finalized by this migration candidate. Both LP admissions and
-    every Curve higher power remain separate. Every Deleverage task is
+    and GREEN-only Curve slot 2 with priority IDs [1, 2]. BlueChipYield is
+    deferred and unassigned. Before PR #206, PriceDesk slot 3 remains the legacy
+    functional UniswapV2Prices fallback; the required PR #206 history must
+    replace it with the authenticated inert monitor. Both LP
+    admissions and every Curve higher power remain separate. Every Deleverage task is
     deferred. Repository configuration is consistent but 64 unresolved or
     unverified bindings keep deployment readiness false;
     production/onchain configuration for the launch-remediation candidate has
@@ -621,7 +622,7 @@ authorization_boundaries:
   - H-06 qualifies a candidate operator/storage class only; final operator, machine, volume, deployment, and release authorization remain open.
   - M4 composed-route evidence is integrated; M5 configuration, freeze, and activation remain outstanding.
   - fullPayoffBuffer, overageBps, dustThreshold, and dustBps remain zero and lack Robinhood machine-facing parameter/planning representation; every Deleverage task is parked and nonblocking.
-  - Launch selects PriceDesk 1 Chainlink and PriceDesk 2 unchanged CurvePrices for GREEN only; PriceDesk 3 BlueChipYield remains blueprint-selected but is not deployed or finalized by the current candidate. IDs 4/5 remain empty, priorities are [1, 2], USDG has no Curve feed, no Uniswap source is admitted or deployed, and neither LP token is admitted. All selected external identities remain verification-gated.
+  - Launch priority selects PriceDesk 1 Chainlink and PriceDesk 2 unchanged CurvePrices for GREEN only. Before PR #206, PriceDesk 3 remains the legacy functional UniswapV2Prices fallback because priority ordering does not disable registered sources. The required PR #206 history must promote the authenticated inert replacement before forward execution. BlueChipYield, Pyth, and Stork are unassigned on Robinhood, future IDs are chain-local, priorities are [1, 2], USDG has no Curve feed, and neither LP token is admitted. All selected external identities remain verification-gated.
   - The GREEN/USDG pool is a launch-pricing venue candidate only. Its deployment and operating inputs, both LP admissions, every additional Curve feed or consumer, dynamic rates, Teller snapshots, and Endaoment stabilization remain independently gated.
   - Current source sets RIPE availability to 1,000,000e18 for rewards, 0 for HR, and 1,000,000e18 for bonds; B-REWARD-PROMOTION remains open for checkpoints, identities, runbook acceptance, monitoring, operator binding, rehearsal, and release prerequisites. Stock rewards remain disabled.
   - The fresh LP qualification preserves the selected GREEN/USDG launch-pricing pool while rejecting its LP token as a Ripe asset; RIPE/WETH remains external-canary-only, Uniswap remains PriceDesk-inert, and PSM reserves cannot fund LP liquidity.
@@ -1195,7 +1196,7 @@ decisions:
   - { id: RH-D019, title: "Private dashboard is a temporary presentation mirror", status: "approved_temporary", summary: "The private mirror is optional; repository documents remain complete authority and fallback.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
   - { id: RH-D024, title: "The dashboard is extracted from the active tree", status: "approved_extraction", summary: "The dashboard application and its workflow are removed from the active tree and recoverable from 610b43f4508e85628a1362532a79d68d71ea902c; this supersedes the RH-D018 placement clause and leaves the RH-D019 publication posture parked.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D020, title: "Consolidated Profile 1 launch and Profile 2 follow-on", status: "approved_superseded_for_curve_topology", summary: "Preserve Ledger, Teller, and separate Stock-specific Guarded architecture. RH-D021 supersedes only the earlier empty-ID-2 and all-Curve-in-Profile-2 boundary; the remaining H-09/H-10 lifecycle separation continues.", source: "docs/chains/rh/reassessment-and-qualification-synthesis.md"}
-  - { id: RH-D021, title: "Bounded Curve launch pricing", status: "approved_candidate_implementation_blocked_for_deployment", summary: "Select unchanged CurvePrices at PriceDesk ID 2 for GREEN only, configure priorities [1,2], keep USDG Chainlink-only and IDs 4/5 empty, and keep blueprint-selected ID 3 undeployed by the current candidate. Exclude LP admission, additional feeds or consumers, dynamic rates, Teller snapshots, Endaoment stabilization, PSM Curve use, and Uniswap. Sixty-four unresolved or unverified bindings keep deployment readiness false.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
+  - { id: RH-D021, title: "Bounded Curve launch pricing", status: "approved_candidate_implementation_blocked_for_deployment", summary: "Select unchanged CurvePrices at PriceDesk ID 2 for GREEN only, configure priorities [1,2], keep USDG Chainlink-only, and defer BlueChipYield without assigning a PriceDesk ID. Before PR #206, live ID 3 remains the legacy functional UniswapV2Prices fallback; PR #206 must promote the authenticated inert replacement before forward execution. Future price-source IDs are chain-local. Exclude LP admission, additional feeds or consumers, dynamic rates, Teller snapshots, Endaoment stabilization, PSM Curve use, and any Uniswap pricing. Sixty-four unresolved or unverified bindings keep deployment readiness false.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
   - { id: RH-D022, title: "RIPE reward launch product decision approved; operations open", status: "approved_product_decision_operationally_blocked", summary: "Current source assigns 1,000,000e18 RIPE to rewards, 0 to HR, and 1,000,000e18 to bonds while retaining the approved rewards configuration. Operational prerequisites remain open, Stock rewards remain disabled, and no lifecycle authority is granted.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
   - { id: RH-D023, title: "LP launch admission reconsidered independently", status: "qualified_no_protocol_admission", summary: "Fresh per-LP source-path qualification preserves the selected GREEN/USDG launch-pricing pool but excludes its LP token; RIPE/WETH remains external-canary-only, both protocol admissions and all DP-14 leaves remain blocked, and no lifecycle authority is granted.", source: "docs/chains/rh/qualification/lp-launch-admission.md"}
   - { id: RH-D025, title: "Production clock usage is no longer scanned", status: "owner_accepted_coverage_loss", summary: "The block-clock inventory, its checker, and its tests are removed and nothing replaces them. Production block.number and block.timestamp usage, mixed-clock arithmetic, and unclassified Vyper paths are no longer scanned; clock-affecting changes are reviewed on their own merits. Reopen if a clock-related defect reaches a deployment candidate or a second chain with a divergent block clock is added.", source: "docs/chains/rh/decision-register.md"}

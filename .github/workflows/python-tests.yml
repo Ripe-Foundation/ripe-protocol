@@ -3,26 +3,27 @@ name: Python tests
 on:
   pull_request:
     branches:
+      - master
       - rh
       - rh-audit-remediation
   merge_group:
     branches:
+      - master
       - rh
       - rh-audit-remediation
   push:
     # Push runs the full job set -- the same jobs as pull_request and
     # merge_group, not a reduced one.
     #
-    # master, rh, and rh-audit-remediation are not push-protected today, and
-    # master is not listed on pull_request or merge_group. Push is therefore
-    # the only automatic Python validation covering direct integration-branch
-    # updates and anything reaching master; PRs targeting master still get no
-    # pre-merge merge-ref run.
+    # master, rh, and rh-audit-remediation are not push-protected today. Push
+    # therefore remains the automatic validation covering direct
+    # integration-branch updates in addition to pull_request and merge_group
+    # validation of each prospective merge.
     #
     # Do not gate the validation jobs off of push again unless both are true:
-    # (1) all three branches reject direct pushes, and (2) master is listed on
-    # pull_request and merge_group. A unit test cannot see live branch
-    # protection -- the YAML routing here is the source of truth.
+    # all three branches reject direct pushes. A unit test cannot see live
+    # branch protection, so repository routing and the GitHub setting are
+    # separate release controls.
     #
     # A run on one of these branches is also what makes the Titanoboa cache
     # usable at all: a cache written during a pull_request run is scoped to
@@ -405,12 +406,22 @@ jobs:
     name: rh-pr-gate
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     needs:
+      - solidity
       - test
       - deployment-controls
       - snapshot-gas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Require successful Solidity lane
+        env:
+          SOLIDITY_RESULT: ${{ needs.solidity.result }}
+        run: |
+          if [ "$SOLIDITY_RESULT" != "success" ]; then
+            echo "Solidity build and focused tests did not succeed: $SOLIDITY_RESULT"
+            exit 1
+          fi
+
       - name: Require successful lean lane
         env:
           TEST_RESULT: ${{ needs.test.result }}

@@ -56,7 +56,7 @@ owner can choose a later delta integration separately.
 
 The prepared handoff location is:
 
-- Worktree: `/Users/wigglez/dev/ripe-protocol-rh-production-vyper-remediation`
+- Worktree: `${HOME}/dev/ripe-protocol-rh-production-vyper-remediation`
 - Branch: `codex/rh-production-vyper-remediation`
 
 Its clean starting `HEAD` is a documentation-only seed commit. The seed's

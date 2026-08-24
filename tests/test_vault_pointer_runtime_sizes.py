@@ -7,48 +7,57 @@ EIP170_LIMIT = 24_576
 # are load-bearing for these numbers — bumping either is a deploy event.
 # RipeGov headroom is 460 bytes after the migration, SharesVault, and
 # governance-remediation changes. Any RipeGov edit must remeasure this pin.
-# Composed SwitchboardAlpha headroom is 19 bytes after RipeGov duration
-# validation and the existing execution sanitization.
-# Teller headroom is 68 bytes after the SharesVault and historical RipeGov
-# routing changes.
+# Composed SwitchboardAlpha headroom is 14 bytes after binding its chain-local
+# Pyth source ID. Teller and CreditEngine retain 33 and 39 bytes respectively
+# after binding their chain-local Curve source IDs. Endaoment retains 1,190
+# bytes after the same change. These pins include the deployed immutable data.
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
-# StabilityPool headroom is 12 bytes after the deferred claim checkpoint,
-# exact-payment, and Stability-local claimable-aware retirement remediations.
+# StabilityPool headroom is 279 bytes after the deferred claim checkpoint,
+# exact-payment, claimable-aware retirement, and partial-reservation admission
+# remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
+# SwitchboardBravo retains only 26 bytes of headroom. CurvePrices retains 1,170
+# bytes after switching to codesize optimization for confirmation-time registry
+# snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
+# metadata binding and checked runtime arithmetic. Any edit to these contracts
+# must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
-    "SwitchboardAlpha": 24557,
-    "SwitchboardBravo": 24541,
+    "SwitchboardAlpha": 24562,
+    "SwitchboardBravo": 24550,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
-    "VaultBook": 13833,
-    "Teller": 24508,
+    "VaultBook": 14410,
+    "Teller": 24543,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
     "Lootbox": 24456,
+    "GreenToken": 8760,
+    "SavingsGreen": 13166,
+    "RipeToken": 8760,
     "RebaseErc20": 11602,
     "RipeGov": 24116,
     "HumanResources": 14777,
     "AuctionHouse": 24566,
-    "CreditEngine": 24502,
+    "CreditEngine": 24537,
     "CreditRedeem": 8415,
-    "Endaoment": 23351,
+    "Endaoment": 23386,
     "PriceDesk": 17742,
     "Deleverage": 24459,
-    "StabilityPool": 24564,
+    "StabilityPool": 24297,
     "BlueChipYieldPrices": 20857,
-    "ChainlinkPrices": 16091,
-    "CurvePrices": 23966,
+    "ChainlinkPrices": 16436,
+    "CurvePrices": 23406,
     "PythPrices": 16055,
-    "RedStone": 14985,
+    "RedStone": 15325,
     "StorkPrices": 15067,
-    "UndyVaultPrices": 17689,
+    "UndyVaultPrices": 18306,
     "wsuperOETHbPrices": 8336,
 }
 
@@ -66,6 +75,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     bond_room,
     ledger,
     lootbox,
+    green_token,
+    savings_green,
+    ripe_token,
     rebase_erc20_vault,
     ripe_gov_vault,
     human_resources,
@@ -106,6 +118,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "BondRoom": len(bond_room.env.get_code(bond_room.address)),
         "Ledger": len(ledger.env.get_code(ledger.address)),
         "Lootbox": len(lootbox.env.get_code(lootbox.address)),
+        "GreenToken": len(green_token.env.get_code(green_token.address)),
+        "SavingsGreen": len(savings_green.env.get_code(savings_green.address)),
+        "RipeToken": len(ripe_token.env.get_code(ripe_token.address)),
         "RebaseErc20": len(
             rebase_erc20_vault.env.get_code(rebase_erc20_vault.address)
         ),
@@ -139,10 +154,18 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     oversized = {
         name: size
         for name, size in deployed_runtime_bytes.items()
-        if size >= EIP170_LIMIT
+        if size > EIP170_LIMIT
     }
-    assert not oversized, f"EIP-170 runtime limit reached or exceeded: {oversized}"
-    assert deployed_runtime_bytes == EXPECTED_RUNTIME_BYTES, (
+    assert not oversized, f"EIP-170 runtime limit exceeded: {oversized}"
+    runtime_diff = {
+        name: (
+            EXPECTED_RUNTIME_BYTES.get(name),
+            deployed_runtime_bytes.get(name),
+        )
+        for name in sorted(EXPECTED_RUNTIME_BYTES.keys() | deployed_runtime_bytes.keys())
+        if EXPECTED_RUNTIME_BYTES.get(name) != deployed_runtime_bytes.get(name)
+    }
+    assert not runtime_diff, (
         "Deployed runtime changed; update EXPECTED_RUNTIME_BYTES if intentional: "
-        f"{ {k: (EXPECTED_RUNTIME_BYTES[k], deployed_runtime_bytes[k]) for k in deployed_runtime_bytes if EXPECTED_RUNTIME_BYTES.get(k) != deployed_runtime_bytes[k]} }"
+        f"{runtime_diff}"
     )

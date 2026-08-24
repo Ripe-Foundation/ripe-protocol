@@ -258,6 +258,9 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingPriceConfig = self.pendingPriceConfigs[_asset]
     assert d.config.underlyingAsset != empty(address) # dev: no pending config
+    if not self._hasExpectedMetadata(_asset, d.config):
+        self._cancelNewPendingPriceFeed(_asset, d.actionId)
+        return False
     if not self._isValidNewPriceConfig(_asset, d.config, False):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
@@ -403,6 +406,17 @@ def _getPriceConfig(
     )
 
 
+@view
+@internal
+def _hasExpectedMetadata(_asset: address, _config: PriceConfig) -> bool:
+    underlyingAsset: address = staticcall IERC4626(_asset).asset()
+    if underlyingAsset != _config.underlyingAsset:
+        return False
+    if convert(staticcall IERC20Detailed(underlyingAsset).decimals(), uint256) != _config.underlyingDecimals:
+        return False
+    return convert(staticcall IERC20Detailed(_asset).decimals(), uint256) == _config.vaultTokenDecimals
+
+
 #################
 # Update Config #
 #################
@@ -454,6 +468,9 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingPriceConfig = self.pendingPriceConfigs[_asset]
     assert d.config.underlyingAsset != empty(address) # dev: no pending config
     currentConfig: PriceConfig = self.priceConfigs[_asset]
+    if not self._hasExpectedMetadata(_asset, d.config):
+        self._cancelPriceFeedUpdate(_asset, d.actionId)
+        return False
     requireValidSnapshot: bool = d.config.maxNumSnapshots == currentConfig.maxNumSnapshots
     if not self._isValidUpdateConfig(_asset, d.config, requireValidSnapshot):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
@@ -781,8 +798,12 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
         return False
 
     # check if snapshot is too recent
-    if config.lastSnapshot.lastUpdate + config.minSnapshotDelay > block.timestamp:
-        return False
+    if config.minSnapshotDelay != 0:
+        didAdd: bool = False
+        nextSnapshotAt: uint256 = 0
+        didAdd, nextSnapshotAt = self._tryAdd(config.lastSnapshot.lastUpdate, config.minSnapshotDelay)
+        if not didAdd or nextSnapshotAt > block.timestamp:
+            return False
 
     # create and store new snapshot
     newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
@@ -838,7 +859,15 @@ def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
 def _throttleUpside(_newValue: uint256, _prevValue: uint256, _maxUpside: uint256) -> uint256:
     if _maxUpside == 0 or _prevValue == 0 or _newValue == 0:
         return _newValue
-    maxPricePerShare: uint256 = _prevValue + (_prevValue * _maxUpside // HUNDRED_PERCENT)
+    didCalculate: bool = False
+    weightedUpside: uint256 = 0
+    didCalculate, weightedUpside = self._tryMul(_prevValue, _maxUpside)
+    if not didCalculate:
+        return 0
+    maxPricePerShare: uint256 = 0
+    didCalculate, maxPricePerShare = self._tryAdd(_prevValue, weightedUpside // HUNDRED_PERCENT)
+    if not didCalculate:
+        return 0
     return min(_newValue, maxPricePerShare)
 
 
@@ -865,7 +894,12 @@ def _getUnderscoreVaultPrice(
         return 0
     pricePerShare = min(pricePerShare, currentPricePerShare)
 
-    return _underlyingPrice * pricePerShare // (10 ** _config.underlyingDecimals)
+    didCalculate: bool = False
+    product: uint256 = 0
+    didCalculate, product = self._tryMul(_underlyingPrice, pricePerShare)
+    if not didCalculate:
+        return 0
+    return product // (10 ** _config.underlyingDecimals)
 
 
 @view

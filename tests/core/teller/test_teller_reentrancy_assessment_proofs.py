@@ -118,6 +118,7 @@ def _load_teller_variant(variant, ripe_hq_deploy):
         source,
         ripe_hq_deploy,
         False,
+        2,  # local test PriceDesk Curve ID
         name=f"teller_{variant}",
         override_address=boa.env.generate_address(),
     )

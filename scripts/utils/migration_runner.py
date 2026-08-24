@@ -63,11 +63,11 @@ class MigrationRunner:
         # migrations on robinhood-mainnet, the exact redeployment this guard
         # exists to prevent.
         #
-        # Three things are required, and none of them can be derived for the
-        # caller: the value names a migration that exists, and it is strictly
-        # after the latest migration this history has a completion marker for.
-        # There is deliberately no override; --force-replay is the more
-        # dangerous mode, not a bypass.
+        # The value must name the earliest known migration after the latest
+        # completion marker. Merely requiring a later timestamp would let an
+        # operator skip unfinished stages whose postconditions later stages
+        # depend on. There is deliberately no override; --force-replay is the
+        # more dangerous mode, not a bypass.
         if not history_has_deployment(self.history_dir):
             return
 
@@ -77,9 +77,9 @@ class MigrationRunner:
             raise MigrationHistoryError(
                 "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
                 f"{self.history_dir} already holds a deployed "
-                "current-manifest.json, and the auto-resume checkpoint does not "
-                "record migrations that deploy nothing. Pass --start-timestamp "
-                "naming the first migration to run."
+                "current-manifest.json. Pass --start-timestamp naming the first "
+                "migration to run; the default would select deployed history "
+                "from the beginning."
             )
 
         known = self._known_migration_timestamps()
@@ -103,6 +103,22 @@ class MigrationRunner:
                 "as complete. Re-running it would repeat work already done."
             )
 
+        unfinished = sorted(
+            (timestamp for timestamp in known if int(timestamp) > int(frontier)),
+            key=int,
+        )
+        if not unfinished:
+            raise MigrationHistoryError(
+                "H06_NO_UNFINISHED_MIGRATION: no known migration follows "
+                f"the recorded frontier {frontier}."
+            )
+        expected = unfinished[0]
+        if text != expected:
+            raise MigrationHistoryError(
+                f"H06_START_TIMESTAMP_NOT_NEXT: {text} would skip {expected}, "
+                "the earliest migration not recorded complete."
+            )
+
     def run(self, deploy_args: DeployArgs, start_timestamp=None, end_timestamp=None, continue_running=True):
         """
         Run migrations starting at `start_timestamp`. If no start timestamp is provided,
@@ -118,15 +134,23 @@ class MigrationRunner:
         named `current-manifest.json` will be also be saved in the history directory,
         duplicating the manifest of the latest migration.
         """
+        if not __debug__:
+            raise MigrationHistoryError(
+                "MIGRATION_OPTIMIZED_MODE_FORBIDDEN: migrations require Python "
+                "assertions because deployment validation must not be stripped"
+            )
+
         self._require_start_point(deploy_args, start_timestamp)
 
         for migrate, timestamp, prev_timestamp in self._migrations(start_timestamp, end_timestamp):
             log.h1(f"Running migration with timestamp {timestamp}...")
             try:
                 migration = Migration(
-                    deploy_args, self.files, timestamp, prev_timestamp, self.history_dir,
-                    # _require_start_point has established a deliberate start.
-                    allow_deployed_history=True,
+                    deploy_args,
+                    self.files,
+                    timestamp,
+                    prev_timestamp,
+                    self.history_dir,
                 )
                 migrate(migration)
                 self.gas += migration.end()

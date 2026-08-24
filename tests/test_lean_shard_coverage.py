@@ -192,10 +192,12 @@ def test_python_workflow_routes_validation_jobs_on_automatic_events():
         "workflow_dispatch",
     }
     assert workflow["on"]["pull_request"]["branches"] == [
+        "master",
         "rh",
         "rh-audit-remediation",
     ]
     assert workflow["on"]["merge_group"]["branches"] == [
+        "master",
         "rh",
         "rh-audit-remediation",
     ]
@@ -440,9 +442,18 @@ def test_python_workflow_cancels_superseded_branch_or_pr_runs():
 def test_python_workflow_exposes_stable_rh_pr_gate():
     job = _workflow()["jobs"]["rh-pr-gate"]
     assert job["name"] == "rh-pr-gate"
-    assert job["needs"] == ["test", "deployment-controls", "snapshot-gas"]
+    assert job["needs"] == [
+        "solidity",
+        "test",
+        "deployment-controls",
+        "snapshot-gas",
+    ]
 
     expected_results = {
+        "Require successful Solidity lane": (
+            "SOLIDITY_RESULT",
+            "${{ needs.solidity.result }}",
+        ),
         "Require successful lean lane": (
             "TEST_RESULT",
             "${{ needs.test.result }}",

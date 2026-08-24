@@ -23,7 +23,7 @@
 > evidence. No production contract was modified in either pass.
 
 - **Branch:** `codex/rh-codebase-simplification`
-- **Worktree:** `/Users/wigglez/dev/ripe-protocol-rh-simplification`
+- **Worktree:** `${HOME}/dev/ripe-protocol-rh-simplification`
 - **Baseline:** `610b43f4508e85628a1362532a79d68d71ea902c` (`rh` / `origin/rh` at plan time)
 - **Authorizing plan:** [`implementation-plan.md`](implementation-plan.md) — the exact
   bytes of `RH-CODEBASE-SIMPLIFICATION-PLAN.md` used to authorize this run
@@ -371,9 +371,9 @@ root-level lean/comprehensive test.
 
 ## Validation
 
-Interpreter `/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python`
+Interpreter `${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python`
 (Python 3.12.0, IPython 9.8.0, pytest 8.4.2, vyper 0.4.3) on
-Wigglez-MacStudio-2025, same private-cache methodology for every measurement.
+`<validation-host>`, same private-cache methodology for every measurement.
 Exact paths, SHA-256 values, timing metadata, and the complete failure
 inventories are in [`validation-evidence.md`](validation-evidence.md).
 

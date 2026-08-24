@@ -27,11 +27,11 @@ read from there, so a replacement Ledger inherits what has already been
 emitted instead of resetting to the launch allocation.
 
 Not everything MissionControl holds can travel through Defaults. The
-interface has no slot for userConfig or userDelegation, and the vault-id
-fields added since the live deployments (coreRipeGovVaultId,
-preferredStabVaultId) are set by the constructor rather than read from
-defaults. The run prints an explicit accounting of what it carried and what
-it could not, so the gap is a decision rather than a surprise.
+interface has no slot for userConfig, userDelegation, the current vault-ID
+pointers, or historical vault classifications. The run prints an explicit
+accounting of what it carried and what it could not, so the gap is a decision
+rather than a surprise. verify_defaults.py rejects observable pointer or
+classification drift before a replacement is deployed.
 """
 
 from __future__ import annotations
@@ -274,8 +274,11 @@ HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-pro
 # construction, which is the only reason a replacement for either can come up
 # matching what is already running.
 #
-# MissionControl state that Defaults has no slot for -- userConfig and
+# MissionControl per-user state that Defaults has no slot for -- userConfig and
 # userDelegation -- does NOT survive the redeploy and is not represented here.
+# Vault pointers and historical vault classifications are also not carried;
+# verify_defaults.py must exact-match their observable live state before this
+# contract is used for a replacement.
 #
 {cadence_note}
 
@@ -797,11 +800,12 @@ class BuildResult:
             "MissionControl starts empty and they need their own migration step:\n"
             "  userConfig (per-user deposit/repay/bond permissions)\n"
             "  userDelegation (per-user, per-delegate action grants)\n"
-            "set by the replacement MissionControl constructor rather than read\n"
-            f"from live {network.display_name} (the deployed contract has no such getter):\n"
-            "  preferredStabVaultId = 1, coreRipeGovVaultId = 2\n"
-            "rebuilt from the asset configs above, so no action needed:\n"
-            "  totalPointsAllocs, indexOfAsset, numAssets, isStabVaultId"
+            "  coreRipeGovVaultId and preferredStabVaultId (constructor defaults only)\n"
+            "  historical isStabVaultId and isRipeGovVaultId entries\n"
+            "verify_defaults.py must exact-match every one of those vault-topology\n"
+            f"values exposed by live {network.display_name}; otherwise replacement is blocked.\n"
+            "rebuilt completely from the asset configs above:\n"
+            "  totalPointsAllocs, indexOfAsset, numAssets"
         )
 
 

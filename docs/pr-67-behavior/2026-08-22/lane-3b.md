@@ -375,12 +375,3 @@ These were observed while opening cited source but were not promoted into Brief/
 - No unreported added API name was found in the twelve FOCUS files.
 
 LANE SYNTHESIS COMPLETE — Lane 3B — 91eda49c vs 251ac9e2
-
-<oai-mem-citation>
-<citation_entries>
-MEMORY.md:1609-1617|note=[prior PR67 contracts scope context]
-</citation_entries>
-<rollout_ids>
-019fde5a-1ff3-7760-885a-d74acd76e57a
-</rollout_ids>
-</oai-mem-citation>

@@ -68,6 +68,9 @@ PARAMS = {
         # price desk (timestamps, not blocks!)
         "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins
         "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 7,  # 7 days
+        # chain-local PriceDesk source identities
+        "CURVE_PRICES_ID": 2,
+        "PYTH_PRICES_ID": 4,
         # price desk (blocks)
         "PRICE_DESK_MIN_REG_TIMELOCK": 3_600,  # 2 hours on Base
         "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
@@ -88,6 +91,9 @@ PARAMS = {
         # price desk (timestamps, not blocks!)
         "PRICE_DESK_MIN_STALE_TIME": 60 * 5,
         "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 3,
+        # chain-local PriceDesk source identities
+        "CURVE_PRICES_ID": 2,
+        "PYTH_PRICES_ID": 4,
         # price desk (blocks)
         "PRICE_DESK_MIN_REG_TIMELOCK": 21_600,
         "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,
@@ -404,7 +410,7 @@ ROBINHOOD_COMPONENT_SELECTIONS = (
     RobinhoodComponentSelection("CM-015", "PriceDesk", "required", "selected"),
     RobinhoodComponentSelection("CM-016", "ChainlinkPrices", "required", "selected"),
     RobinhoodComponentSelection("CM-017", "CurvePrices", "required", "selected"),
-    RobinhoodComponentSelection("CM-018", "BlueChipYieldPrices", "required", "selected"),
+    RobinhoodComponentSelection("CM-018", "BlueChipYieldPrices", "deferred", "deferred"),
     RobinhoodComponentSelection("CM-019", "PythPrices", "omitted", "omitted"),
     RobinhoodComponentSelection("CM-020", "StorkPrices", "omitted", "omitted"),
     RobinhoodComponentSelection("CM-021", "VaultBook", "required", "selected"),
@@ -479,7 +485,7 @@ ROBINHOOD_REGISTRY_ID_AUTHORITIES = (
     "provisional_reservation",
 )
 
-# Complete 38-row registry authority. A reserved row is deliberately unselected;
+# Complete assigned registry authority. A reserved row is deliberately unselected;
 # its deployment disposition still records whether it is omitted or deferred.
 ROBINHOOD_REGISTRY_TOPOLOGY = (
     RobinhoodRegistrySelection("ripe_hq", 1, "Green Token", "source_hard_coded", "CM-001", "required", "selected"),
@@ -524,10 +530,6 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
                                "registration_order", "CM-025", "omitted", "omitted"),
     RobinhoodRegistrySelection("price_desk", 1, "Chainlink", "registration_order", "CM-016", "required", "selected"),
     RobinhoodRegistrySelection("price_desk", 2, "Curve", "source_hard_coded", "CM-017", "required", "selected"),
-    RobinhoodRegistrySelection("price_desk", 3, "BlueChipYield", "registration_order",
-                               "CM-018", "required", "selected"),
-    RobinhoodRegistrySelection("price_desk", 4, "Pyth", "source_hard_coded", "CM-019", "omitted", "omitted"),
-    RobinhoodRegistrySelection("price_desk", 5, "Stork", "registration_order", "CM-020", "omitted", "omitted"),
     RobinhoodRegistrySelection("switchboard", 1, "Switchboard Alpha",
                                "source_hard_coded", "CM-011", "required", "selected"),
     RobinhoodRegistrySelection("switchboard", 2, "Switchboard Bravo",
@@ -771,6 +773,8 @@ ROBINHOOD_COMPONENTS = {
     "blue_chip_yield": {
         "protocol": "MorphoV2",
         "compatibility": "resolved_by_33ad0f3c08bf6dc88f6569c622886d264d6e2868",
+        "deployment_disposition": "deferred",
+        "price_source_id": 0,
     },
     "profile_1_omissions": ("GREEN_USDG_LP", "RIPE_WETH_LP"),
 }
@@ -1022,7 +1026,7 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
     ),
     RobinhoodCurveLaunchInput(
         "launch.price_desk_registration_order",
-        ((1, "ChainlinkPrices"), (2, "CurvePrices"), (3, "BlueChipYieldPrices")),
+        ((1, "ChainlinkPrices"), (2, "CurvePrices")),
         "repository_approved", "migration_owner", "ROBINHOOD_REGISTRY_TOPOLOGY",
         "selected_launch",
     ),

@@ -1,5 +1,12 @@
 # Robinhood deployment validation plan
 
+> **24 August 2026 PriceDesk supersession:** the BlueChip-at-ID-3 and
+> Uniswap-absent planning statements below are historical. BlueChip is deferred
+> at chain-local ID `0`; before PR #206, live ID 3 is the legacy functional
+> UniswapV2Prices fallback, and the required PR #206 `2026082100/01` history
+> promotes the authenticated inert monitoring replacement there. Launch
+> priorities remain `[1, 2]`. See [`current-owner-priorities.md`](current-owner-priorities.md).
+
 > **11 August 2026 CCIP supersession:** this plan's `1000`-deferred and
 > disabled/not-deployed CCIP statements are preserved historical validation
 > design. GREEN and RIPE CCIP topology is already live and is now an observed

@@ -131,17 +131,23 @@ The corrected Robinhood forward sequence is deliberately multi-stage:
    complete 0009 records, deploys four interlocked replacements under
    `*Candidate0010`, and emits their Safe calldata. Those four confirmations
    must execute atomically.
-4. After that atomic activation, `0011_BlueChipYieldPricesCandidate.py` verifies
-   and promotes 0010, deploys/finalizes a Morpho V2-capable BlueChip candidate,
-   and emits the Safe calls that add PriceDesk slot 3.
-5. `0012_PromoteBlueChipYieldPrices.py` advances the canonical BlueChip
-   manifest record only after slot-3 readback equals the candidate.
-6. `0013_VaultMigratorCandidate.py` requires RipeHq's next id to be exactly
+4. `2026082400_CcipWirePlan.py` performs the gated deployer-owned lane work and
+   emits the remaining Safe packet. Its marker means only that preparation ran.
+5. `2026082401_CcipActivationFinalized.py` is read-only and can complete only
+   after exact admin, ownership, routing, lane-policy, RipeHq, and pending-state
+   readback proves both token packages fully activated.
+6. `2026082402_VaultMigratorCandidate.py` requires RipeHq's next id to be exactly
    25, deploys an unpaused Robinhood candidate with a zero Base-legacy-vault
    binding, and emits the Safe calls that append it. It neither reserves nor
    changes the CCIP rows at ids 23 and 24.
-7. `0014_PromoteVaultMigrator.py` creates the first canonical VaultMigrator
+7. `2026082403_PromoteVaultMigrator.py` creates the first canonical VaultMigrator
    manifest record only after RipeHq id 25 equals the candidate.
+8. `2026082404_BlueChipTopologyDecision.py` is a read-only live-history
+   checkpoint. It requires BlueChip's chain-local ID to remain disabled at `0`,
+   PriceDesk's next id to be `4`, and both forward and reverse registry reads to
+   bind slot `3` to the canonical `UniswapV2Prices` record promoted by
+   `2026082101`. It also reads the live monitoring marker and inert RIPE pricing
+   surface. It emits no deployment, registry write, or activation calldata.
 
 The promotion helper copies the candidate's complete record, including file,
 ABI, compiler JSON, and canonical ABI-encoded constructor arguments. Every
@@ -173,8 +179,8 @@ execution. Copying only an address would silently pair new code with the prior
 generation's metadata and is forbidden. Candidate labels and prior timestamp
 manifests remain preserved as evidence.
 
-The 17 promotions in `0010` and the four promotions in `0011` each use one
-batch helper call. Every candidate, source/compiler/runtime identity,
+The 17 promotions in `0010` use one batch helper call. Every candidate,
+source/compiler/runtime identity,
 constructor, dependency, registry identity, and registry readback is
 preflighted before any checkpoint write. The transaction log is then persisted
 before the pending manifest, making a pure-promotion checkpoint immediately
@@ -219,13 +225,16 @@ a separately authorized deployment, exact constructor/runtime binding,
 consumer update, and manifest transition; the old instance cannot be converted
 in place by governance or a timelock action.
 
-PriceDesk's `numAddrs()` is the next registry id. With Chainlink and Curve in
-slots 1 and 2, the BlueChip precondition is `numAddrs() == 3` and
-`getAddr(3) == 0`. Keep an exclusive PriceDesk-add window through the
-timelock, require the confirmation to return id 3, and read slot 3 back before
-the first canonical `BlueChipYieldPrices` record is created. First promotion
-must support an absent canonical label while retaining every candidate,
-witness, nonzero-address, and registry-readback check.
+PriceDesk's `numAddrs()` is the next registry id. Before PR #206, live slot 3 is
+the legacy functional UniswapV2Prices generation; priority IDs `[1, 2]` do not
+exclude it from PriceDesk's fallback scan. PR #206's required `2026082100/01`
+history replaces the complete PriceDesk tree and promotes the authenticated
+inert monitoring-only UniswapV2Prices generation in slot 3, with cursor `4`.
+BlueChip remains unassigned at chain-local ID `0`; this does not make slot 3
+empty. Any future BlueChip proposal must bind the then-live cursor and choose a
+chain-local ID in a separately reviewed migration rather than assuming `3` or
+`4`. First promotion must support an absent canonical label while retaining
+every candidate, witness, nonzero-address, and registry-readback check.
 
 The Morpho V2 address remains a selected external fact until the execution
 envelope binds the target chain, code-bearing address, runtime identity, and
@@ -244,20 +253,19 @@ zero-address)` on Robinhood before activation.
 
 ### Static-plan boundary
 
-`migrations/robinhood-mainnet/0008_*.py` through `0014_*.py` use the legacy
-`migration.deploy`/`migration.execute` API. The H-06 Robinhood runner
-intentionally marks this history profile as manifest v2 and rejects those
-methods. The files and fake-migration tests therefore establish the intended
-constructor arguments, candidate labels, calldata, ordering, and readback
-postconditions, but they are not executable through the canonical production
-CLI.
-
-Before any Robinhood action, the sequence must be converted into reserved,
-typed `MIGRATION_STAGE` actions, bound to the accepted execution envelope and
-source identities, and handed to the separately authorized H-06 executor.
-That conversion must preserve the candidate-before-activation and
-readback-before-promotion semantics above. Do not weaken `_manifest_v2`, route
-around the executor, or describe these static modules as deployment-ready.
+The forward stages are numbered after the independently recorded `2026082101`
+Robinhood frontier. The first stage machine-checks that `2026082101` is its
+immediate predecessor, so this branch cannot execute it while PR #206's history
+is absent. They depend on integrating PR #206's executed-history and
+current-manifest update at commit `452053044de5fafa09e2c8acb9638cb61bdbce28`
+before execution; PR 67's older manifest is not live authority.
+They use the canonical `migration.deploy`/`migration.execute` API and are
+reachable only through an explicit `--start-timestamp` after the integrated
+frontier. The
+transaction journal binds calls to chain, sender, target, value, and calldata;
+Solidity deployment resume additionally binds Foundry artifact, creation input,
+address, and live runtime. Preserve the candidate-before-activation and
+readback-before-promotion order above.
 
 The historical Base PriceDesk callers now supply both constructor additions:
 the temporary-governance position and an explicit zero Morpho V2 address.

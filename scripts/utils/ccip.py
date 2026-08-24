@@ -19,6 +19,7 @@ from config.Ccip import (
 from scripts.utils import log
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+MAINNET_TOKEN_DECIMALS = 18
 
 TOKEN_ADMIN_REGISTRY_ABI = [
     {
@@ -450,6 +451,13 @@ def complete_mainnet_activation_preflight(
         assert _is(pool.getRmnProxy(), config["RMN_PROXY"]), (
             f"{label} pool has wrong RMN proxy"
         )
+        assert int(pool.getTokenDecimals()) == MAINNET_TOKEN_DECIMALS, (
+            f"{label} pool has wrong token decimals"
+        )
+        assert (
+            not bool(pool.getAllowListEnabled())
+            and tuple(pool.getAllowList()) == ()
+        ), f"{label} pool has an unexpected allowlist"
         assert pool.typeAndVersion() == "BurnMintTokenPool 1.5.1", (
             f"{label} pool has wrong source version"
         )
@@ -549,6 +557,164 @@ def complete_mainnet_activation_preflight(
             or routing_mutation_needed
         ):
             require_activation_policy(migration, label)
+
+
+def require_mainnet_activation_finalized(migration, pools, source_file):
+    """Read back the complete mainnet activation before recording completion.
+
+    The wiring stage may legitimately stop with governance/Safe work pending.
+    This function is deliberately read-only and uses explicit exceptions so a
+    completion marker cannot be produced under ``python -O`` from partial state.
+    """
+
+    chain = migration.chain()
+    config = CCIP[chain]
+    hq = migration.get_contract("RipeHq")
+    governance = str(hq.governance())
+    registry = token_admin_registry(chain)
+
+    expected_cursor = max(CCIP_POOL_HQ_IDS.values()) + 1
+    if int(hq.numAddrs()) != expected_cursor:
+        raise RuntimeError(
+            "CCIP_FINALIZATION_HQ_CURSOR_MISMATCH: expected next RipeHq id "
+            f"{expected_cursor}, got {int(hq.numAddrs())}"
+        )
+
+    for label, contract_name, token_name, can_green, can_ripe in pools:
+        token = migration.get_address(token_name)
+        pool = migration.get_solidity_contract(
+            contract_name, source_file=source_file
+        )
+        administrator, pending_administrator, configured_pool = tuple(
+            registry.getTokenConfig(token)
+        )
+        if not _is(administrator, governance) or not _is(
+            pending_administrator, ZERO_ADDRESS
+        ):
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_ADMIN_PENDING: {label} administrator state "
+                f"is ({administrator}, {pending_administrator})"
+            )
+        if not _is(configured_pool, pool.address) or not _is(
+            registry.getPool(token), pool.address
+        ):
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_POOL_ROUTE_MISMATCH: {label} is not routed "
+                f"through {pool.address}"
+            )
+        expected_static = (
+            (pool.getToken(), token, "token"),
+            (pool.getRouter(), config["ROUTER"], "router"),
+            (pool.getRmnProxy(), config["RMN_PROXY"], "RMN proxy"),
+            (pool.owner(), governance, "owner"),
+        )
+        for actual, expected, field in expected_static:
+            if not _is(actual, expected):
+                raise RuntimeError(
+                    f"CCIP_FINALIZATION_POOL_{field.upper().replace(' ', '_')}_MISMATCH: "
+                    f"{label} has {actual}, expected {expected}"
+                )
+        if int(pool.getTokenDecimals()) != MAINNET_TOKEN_DECIMALS:
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_POOL_TOKEN_DECIMALS_MISMATCH: {label}"
+            )
+        if bool(pool.getAllowListEnabled()) or tuple(pool.getAllowList()) != ():
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_POOL_ALLOWLIST_MISMATCH: {label}"
+            )
+        if pool.typeAndVersion() != "BurnMintTokenPool 1.5.1":
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_POOL_VERSION_MISMATCH: {label}"
+            )
+        if bool(pool.canMintGreen()) is not can_green or bool(
+            pool.canMintRipe()
+        ) is not can_ripe:
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_POOL_CAPABILITY_MISMATCH: {label}"
+            )
+
+        expected_selectors = tuple(
+            sorted(
+                int(CCIP[remote_chain]["CHAIN_SELECTOR"])
+                for remote_chain in config["REMOTE_CHAINS"]
+            )
+        )
+        actual_selectors = tuple(
+            sorted(int(selector) for selector in pool.getSupportedChains())
+        )
+        if actual_selectors != expected_selectors:
+            raise RuntimeError(
+                "CCIP_FINALIZATION_LANE_SET_MISMATCH: "
+                f"{label} has selectors {actual_selectors}, expected "
+                f"{expected_selectors}"
+            )
+
+        for remote_chain in config["REMOTE_CHAINS"]:
+            selector = CCIP[remote_chain]["CHAIN_SELECTOR"]
+            if not pool.isSupportedChain(selector):
+                raise RuntimeError(
+                    f"CCIP_FINALIZATION_LANE_MISSING: {label} to {remote_chain}"
+                )
+            remote_pool = migration.get_address_on_chain(
+                remote_chain, contract_name
+            )
+            remote_token = migration.get_address_on_chain(remote_chain, token_name)
+            actual_pools = tuple(pool.getRemotePools(selector))
+            expected_pool = encode_address(remote_pool)
+            if tuple(actual_pools) != (expected_pool,):
+                raise RuntimeError(
+                    f"CCIP_FINALIZATION_REMOTE_POOL_MISMATCH: {label} to {remote_chain}"
+                )
+            if bytes(pool.getRemoteToken(selector)) != encode_address(remote_token):
+                raise RuntimeError(
+                    f"CCIP_FINALIZATION_REMOTE_TOKEN_MISMATCH: {label} to {remote_chain}"
+                )
+            policy = lane_policy_for_revalidation(chain, remote_chain, label)
+            outbound, inbound, rate_limit_admin = current_lane_policy_fields(
+                pool, selector
+            )
+            expected_policy = (
+                policy.outbound.as_tuple(),
+                policy.inbound.as_tuple(),
+                policy.rate_limit_admin.lower(),
+            )
+            if (outbound, inbound, rate_limit_admin.lower()) != expected_policy:
+                raise RuntimeError(
+                    f"CCIP_FINALIZATION_RATE_POLICY_MISMATCH: {label} to {remote_chain}"
+                )
+
+        reg_id = CCIP_POOL_HQ_IDS[label]
+        if int(hq.getRegId(pool.address)) != reg_id or not _is(
+            hq.getAddr(reg_id), pool.address
+        ):
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_HQ_ID_MISMATCH: {label} must be id {reg_id}"
+            )
+        hq_config = tuple(hq.hqConfig(reg_id))
+        if tuple(bool(value) for value in hq_config[1:4]) != (
+            can_green,
+            can_ripe,
+            False,
+        ):
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_HQ_CAPABILITY_MISMATCH: {label}"
+            )
+        if bool(hq.hasPendingHqConfigChange(reg_id)):
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_HQ_CONFIG_PENDING: {label}"
+            )
+        if int(tuple(hq.pendingNewAddr(pool.address))[2]) != 0:
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_HQ_REGISTRATION_PENDING: {label}"
+            )
+        if int(tuple(hq.pendingAddrUpdate(reg_id))[2]) != 0 or int(
+            tuple(hq.pendingAddrDisable(reg_id))[1]
+        ) != 0:
+            raise RuntimeError(
+                f"CCIP_FINALIZATION_HQ_ADDRESS_CHANGE_PENDING: {label}"
+            )
+
+    log.h1("CCIP mainnet activation fully revalidated")
 
 
 def claim_admin_role(migration, token, token_label):

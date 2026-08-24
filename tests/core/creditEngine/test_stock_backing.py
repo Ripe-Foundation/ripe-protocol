@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import re
 import statistics
 import sys
@@ -12,9 +13,18 @@ import pytest
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
-C2_MEASUREMENT_INTERPRETER = Path(
-    "/Users/wigglez/dev/ripe-protocol-validation-envs/"
-    "rh-wave2-py312/bin/python"
+_C2_INTERPRETER_PATH = os.environ.get("RIPE_C2_MEASUREMENT_INTERPRETER")
+C2_MEASUREMENT_INTERPRETER = (
+    Path(_C2_INTERPRETER_PATH).resolve()
+    if _C2_INTERPRETER_PATH
+    else (
+        Path.home()
+        / "dev"
+        / "ripe-protocol-validation-envs"
+        / "rh-wave2-py312"
+        / "bin"
+        / "python"
+    ).resolve()
 )
 
 
@@ -880,7 +890,9 @@ def test_c1_max_withdrawable_numeric_null_and_terms_failure_surface(
 
 @pytest.mark.skipif(
     Path(sys.executable).resolve() != C2_MEASUREMENT_INTERPRETER,
-    reason="sealed C2 gas protocol requires the attested RH validation venv",
+    reason=(
+        "sealed C2 gas protocol requires the attested RH validation interpreter"
+    ),
 )
 @pytest.mark.gas
 def test_c2_marginal_gas_protocol(
@@ -905,7 +917,7 @@ def test_c2_marginal_gas_protocol(
         Path("contracts/core/CreditEngine.vy").read_bytes()
     ).hexdigest()
     assert source_sha256 == (
-        "96e7deef17d5fe094c964090850cae9eb9293350eff94567519444631701deb6"
+        "75b0e9397e8eb15dd8246c4816b96585a4c057e9dee19c2a824cf1db4b7069c0"
     )
     manifest_rows = sorted(
         (

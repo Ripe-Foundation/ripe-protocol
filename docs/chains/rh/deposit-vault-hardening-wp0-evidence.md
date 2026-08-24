@@ -48,8 +48,8 @@ edited by this branch.**
 
 | Field | Value |
 |---|---|
-| Repository anchor | `/Users/wigglez/dev/ripe-protocol` |
-| Worktree | `/Users/wigglez/dev/ripe-protocol-rh-deposit-vault-hardening-plan` |
+| Repository anchor | `${HOME}/dev/ripe-protocol` |
+| Worktree | `${HOME}/dev/ripe-protocol-rh-deposit-vault-hardening-plan` |
 | Branch | `codex/rh-deposit-vault-hardening-plan` |
 | **Original bound baseline** | `be6e4e9805e9b499b10f61cd219c555e62b43857` / tree `dba8a4e557e3a943e25bb84d9911842c74371415` |
 | **Rebound baseline** | `24de5e62e2158114e3694c9a356c0add94b6f329` / tree `863d68ef61cf194e58bae76fc27f7b703a63b2e4` (`origin/rh`, "Merge pull request #75 from Ripe-Foundation/codex/rh-vault-migration-phase1") |

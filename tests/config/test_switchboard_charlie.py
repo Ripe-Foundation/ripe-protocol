@@ -3534,6 +3534,144 @@ def isPaused() -> bool:
         )
 
 
+def test_preferred_stability_pool_requires_can_accept_capability_probe(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    savings_green,
+):
+    missing_can_accept = boa.loads(
+        """
+asset: immutable(address)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def claimableBalances(_stab_asset: address, _claim_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        savings_green,
+        name="preferred_pool_missing_can_accept",
+    )
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        missing_can_accept,
+        "Preferred Pool Missing canAccept",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1, vault_id],
+    )
+
+    with boa.reverts("external call failed"):
+        switchboard_charlie.setPreferredStabVaultId(
+            vault_id,
+            sender=governance.address,
+        )
+
+
+@pytest.mark.parametrize("reservation_phase", ("proposal", "execution"))
+def test_preferred_stability_pool_rejects_savings_green_reservations(
+    reservation_phase,
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_stability_pool,
+    savings_green,
+):
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        alternate_stability_pool,
+        f"Reserved Preferred Pool ({reservation_phase})",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1, vault_id],
+    )
+    assert alternate_stability_pool.totalClaimableBalances(savings_green) == 0
+    # This selector is a required capability probe, not a truthy admission
+    # predicate: a stability asset cannot simultaneously be its own claim asset.
+    assert not alternate_stability_pool.canAcceptLiquidationAsset(
+        savings_green,
+        savings_green,
+    )
+
+    action_id = None
+    if reservation_phase == "execution":
+        action_id = switchboard_charlie.setPreferredStabVaultId(
+            vault_id,
+            sender=governance.address,
+        )
+
+    alternate_stability_pool.eval(
+        "stabVault.totalClaimableBalances"
+        f"[{savings_green.address}] = 1"
+    )
+    assert alternate_stability_pool.totalClaimableBalances(savings_green) == 1
+
+    if reservation_phase == "proposal":
+        next_action_id = switchboard_charlie.actionId()
+        with boa.reverts("asset reserved for claims"):
+            switchboard_charlie.setPreferredStabVaultId(
+                vault_id,
+                sender=governance.address,
+            )
+        assert switchboard_charlie.actionId() == next_action_id
+        assert mission_control.preferredStabVaultId() == 1
+        return
+
+    pending_id = switchboard_charlie.pendingPreferredStabVaultId(action_id)
+    pending_target = switchboard_charlie.pendingMissionControl(action_id)
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    with boa.reverts("asset reserved for claims"):
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert mission_control.preferredStabVaultId() == 1
+    assert switchboard_charlie.hasPendingAction(action_id)
+    assert switchboard_charlie.pendingPreferredStabVaultId(action_id) == pending_id
+    assert switchboard_charlie.pendingMissionControl(action_id) == pending_target
+
+    alternate_stability_pool.eval(
+        "stabVault.totalClaimableBalances"
+        f"[{savings_green.address}] = 0"
+    )
+    assert switchboard_charlie.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    assert mission_control.preferredStabVaultId() == vault_id
+
+
 def test_vault_pointer_actions_reject_malformed_probe_return_data(
     switchboard_charlie,
     switchboard_bravo,

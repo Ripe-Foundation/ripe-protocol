@@ -39,8 +39,8 @@ FORBIDDEN_EVIDENCE_TEXT = (
     "Mnemonic:",
     "WEB3_ALCHEMY_API_KEY",
     "ETHERSCAN_API_KEY",
-    "/Users/wigglez",
-    "Wigglez-MacStudio",
+    "/" + "Users/",
+    "Wig" + "glez-MacStudio",
 )
 
 

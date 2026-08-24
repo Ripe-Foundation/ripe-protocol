@@ -7,6 +7,7 @@ resulting artifact, so they go through the exact same migration bookkeeping.
 """
 
 import json
+import hashlib
 import os
 import subprocess
 
@@ -80,8 +81,36 @@ def deploy(name, *args, sender=None, source_file=None):
     Returns the deployed contract.
     """
     contract_artifact = artifact(name, source_file)
-    bytecode = bytes.fromhex(_strip_hex(contract_artifact["bytecode"]["object"]))
+    bytecode = _creation_bytecode(contract_artifact, args)
 
+    address, computation = boa.env.deploy(sender=sender, bytecode=bytecode)
+    if computation.is_error:
+        raise computation.error
+
+    return at(name, address, source_file)
+
+
+def deployment_intent(name, *args, sender, chain, source_file=None):
+    """Canonical hashes that bind a resumable Foundry deployment."""
+    contract_artifact = artifact(name, source_file)
+    artifact_payload = json.dumps(
+        contract_artifact, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    creation_code = _creation_bytecode(contract_artifact, args)
+    return {
+        "version": 1,
+        "kind": "solidity_deploy",
+        "chain": str(chain),
+        "sender": str(sender).lower(),
+        "contract": name,
+        "source_file": source_file or f"{name}.sol",
+        "artifact_sha256": hashlib.sha256(artifact_payload).hexdigest(),
+        "creation_sha256": hashlib.sha256(creation_code).hexdigest(),
+    }
+
+
+def _creation_bytecode(contract_artifact, args):
+    bytecode = bytes.fromhex(_strip_hex(contract_artifact["bytecode"]["object"]))
     constructor = next(
         (item for item in contract_artifact["abi"] if item.get("type") == "constructor"),
         None,
@@ -89,12 +118,7 @@ def deploy(name, *args, sender=None, source_file=None):
     if constructor is not None and constructor["inputs"]:
         types = [_abi_type(item) for item in constructor["inputs"]]
         bytecode += encode(types, [_arg(arg) for arg in args])
-
-    address, computation = boa.env.deploy(sender=sender, bytecode=bytecode)
-    if computation.is_error:
-        raise computation.error
-
-    return at(name, address, source_file)
+    return bytecode
 
 
 def constructor_args(name, *args, source_file=None):
