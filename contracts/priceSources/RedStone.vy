@@ -29,6 +29,9 @@ interface ChainlinkInterface:
 interface PriceDesk:
     def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256: view
 
+interface MissionControl:
+    def getPriceStaleTime() -> uint256: view
+
 struct ChainlinkRound:
     roundId: uint80
     answer: int256
@@ -221,19 +224,7 @@ def _getGlobalStaleTime() -> (uint256, bool):
     if missionControl == empty(address):
         return 0, False
 
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        missionControl,
-        method_id("getPriceStaleTime()", output_type=Bytes[4]),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return 0, False
-
-    staleTime: uint256 = abi_decode(response, uint256)
+    staleTime: uint256 = staticcall MissionControl(missionControl).getPriceStaleTime()
     if staleTime == 0 or staleTime > MAX_FEED_STALE_TIME:
         return 0, False
     return staleTime, True
