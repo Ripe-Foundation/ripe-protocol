@@ -1,0 +1,48 @@
+{
+  "contracts": {
+    "SwitchboardAlpha": {
+      "address": "0x5e7dE30B8636f6227f4C1fCA2d03FEcC7C2F286d",
+      "file": "contracts/config/SwitchboardAlpha.vy"
+    },
+    "SwitchboardBravo": {
+      "address": "0x5281175B0f4a8ba4839d43d778434F7274Be52B8",
+      "file": "contracts/config/SwitchboardBravo.vy"
+    },
+    "SwitchboardCharlie": {
+      "address": "0x846176B2294a5168a04345087f0474738B569150",
+      "file": "contracts/config/SwitchboardCharlie.vy"
+    },
+    "PriceDesk": {
+      "address": "0x56Db9c2322e009189049bC57385751fc7922AAb0",
+      "file": "contracts/registries/PriceDesk.vy"
+    },
+    "ChainlinkPrices": {
+      "address": "0xf4AF744784fBdB5f251F95a789AC0f9aB702d310",
+      "file": "contracts/priceSources/ChainlinkPrices.vy"
+    },
+    "CurvePrices": {
+      "address": "0x8BF03188260BCa81619FE535be7E1B87322e9366",
+      "file": "contracts/priceSources/CurvePrices.vy"
+    },
+    "VaultBook": {
+      "address": "0x9B37ea4E5b250Fef242fFC88364A143Fa39DF090",
+      "file": "contracts/registries/VaultBook.vy"
+    },
+    "StabilityPool": {
+      "address": "0x03b9d0C5f628671FC877f267cC706BEd91Cc42fB",
+      "file": "contracts/vaults/StabilityPool.vy"
+    },
+    "CreditEngine": {
+      "address": "0x16371fAf6f603f8d8D6cef8C46253c80AdEe8b98",
+      "file": "contracts/core/CreditEngine.vy"
+    },
+    "Endaoment": {
+      "address": "0x9f20F25f037046721A292B19A486932ef390EAf9",
+      "file": "contracts/core/Endaoment.vy"
+    },
+    "Teller": {
+      "address": "0xceE8Ed804f72b6EcB6B2D679ca17B545bD654bF6",
+      "file": "contracts/core/Teller.vy"
+    }
+  }
+}

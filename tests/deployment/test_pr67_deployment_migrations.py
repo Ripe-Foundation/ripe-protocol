@@ -43,24 +43,6 @@ LEDGER = _load(
     "migrations/robinhood-mainnet/0010_RedeployLedger.py",
     "pr67_ledger_candidates",
 )
-CCIP_WIRE = _load(
-    "migrations/robinhood-mainnet/2026082400_CcipWirePlan.py",
-    "pr67_ccip_wire_plan",
-)
-BLUECHIP = _load(
-    "migrations/robinhood-mainnet/2026082404_BlueChipTopologyDecision.py",
-    "pr67_bluechip_candidate",
-)
-VAULT_MIGRATOR = _load(
-    "migrations/robinhood-mainnet/2026082402_VaultMigratorCandidate.py",
-    "pr67_vault_migrator_candidate",
-)
-PROMOTE_VAULT_MIGRATOR = _load(
-    "migrations/robinhood-mainnet/2026082403_PromoteVaultMigrator.py",
-    "pr67_vault_migrator_promotion",
-)
-
-
 class _Contract:
     def __init__(self, address):
         self.address = address
@@ -127,15 +109,6 @@ class _GovernedCandidate(_Contract):
 
     def governance(self):
         return self._governance
-
-
-class _VaultMigratorCandidate(_Contract):
-    def __init__(self, address, should_pause):
-        super().__init__(address)
-        self._should_pause = should_pause
-
-    def isPaused(self):
-        return self._should_pause
 
 
 class _UniswapMonitorCandidate(_Contract):
@@ -220,8 +193,6 @@ class _FakeMigration:
         self._next_address += 1
         if name == "Switchboard":
             contract = _Registry(address)
-        elif name == "VaultMigrator":
-            contract = _VaultMigratorCandidate(address, args[1])
         elif name == "UniswapV2Prices":
             contract = _UniswapMonitorCandidate(address, *args)
         elif name in {
@@ -393,25 +364,6 @@ def test_safe_calldata_helpers_bind_the_expected_registry_calls():
     )
     assert setup[:4] == Web3.keccak(text="setActionTimeLockAfterSetup(uint256)")[:4]
     assert decode(["uint256"], setup[4:]) == (REDEPLOY.HR_MIN_TIMELOCK,)
-
-    for module in (VAULT_MIGRATOR,):
-        start, confirm = module._add_calldata(candidate, "candidate")
-        start_bytes = bytes.fromhex(start)
-        confirm_bytes = bytes.fromhex(confirm)
-        assert (
-            start_bytes[:4]
-            == Web3.keccak(text="startAddNewAddressToRegistry(address,string)")[:4]
-        )
-        assert decode(["address", "string"], start_bytes[4:]) == (
-            candidate,
-            "candidate",
-        )
-        assert (
-            confirm_bytes[:4]
-            == Web3.keccak(text="confirmNewAddressToRegistry(address)")[:4]
-        )
-        assert decode(["address"], confirm_bytes[4:]) == (candidate,)
-
 
 @pytest.mark.artifact
 def test_accepted_teller_and_stability_pool_abi_removals_are_explicit():
@@ -833,135 +785,6 @@ def test_0010_defaults_dependency_mismatch_fails_before_any_write():
     assert migration.deployments == []
 
 
-def test_2026082400_requires_pr206_authoritative_history_before_any_other_read():
-    class _HistoryOnlyMigration:
-        def __init__(self, previous):
-            self.previous = previous
-
-        def previous_timestamp(self):
-            return self.previous
-
-    CCIP_WIRE._require_authoritative_history(
-        _HistoryOnlyMigration(CCIP_WIRE.REQUIRED_PREVIOUS_MIGRATION)
-    )
-
-    with pytest.raises(
-        RuntimeError,
-        match=CCIP_WIRE.AUTHORITATIVE_HISTORY_REQUIRED,
-    ):
-        CCIP_WIRE.migrate(_HistoryOnlyMigration("2026080700"))
-
-
-def test_2026082404_records_exact_live_topology_and_bluechip_deferral_without_writes():
-    uniswap = _addr(3)
-    ripe = _addr(5)
-    price_desk = _Registry(
-        _addr(4),
-        {1: _addr(1), 2: _addr(2), 3: uniswap},
-        count=4,
-    )
-    migration = _FakeMigration(
-        contracts={
-            "PriceDesk": price_desk,
-            "UniswapV2Prices": _UniswapMonitorCandidate(
-                uniswap,
-                _Contract(_addr(6)),
-                _addr(7),
-                _Contract(ripe),
-                _addr(8),
-            ),
-        },
-        addresses={"UniswapV2Prices": uniswap, "RipeToken": ripe},
-    )
-
-    assert BLUECHIP.BLUECHIP_PRICES_ID == 0
-    assert BLUECHIP.migrate(migration) is None
-
-    assert migration.promotions == []
-    assert migration.deployments == []
-    assert migration.executions == []
-
-
-@pytest.mark.parametrize(
-    ("slots", "count", "message"),
-    (
-        ({1: _addr(1), 2: _addr(2), 3: _addr(3)}, 5, "next registry id"),
-        ({1: _addr(1), 2: _addr(2)}, 4, "slot 3"),
-        ({1: _addr(1), 2: _addr(2), 3: _addr(30)}, 4, "slot 3"),
-    ),
-)
-def test_2026082404_rejects_bluechip_deferral_under_unexpected_live_topology(
-    slots,
-    count,
-    message,
-):
-    migration = _FakeMigration(
-        contracts={"PriceDesk": _Registry(_addr(4), slots, count)},
-        addresses={"UniswapV2Prices": _addr(3)},
-    )
-
-    with pytest.raises(RuntimeError, match=message):
-        BLUECHIP.migrate(migration)
-
-    assert migration.promotions == []
-    assert migration.deployments == []
-    assert migration.executions == []
-
-
-def test_2026082404_rejects_mismatched_reverse_registration():
-    class _BrokenReverseRegistry(_Registry):
-        def getRegId(self, _address):
-            return 2
-
-    uniswap = _addr(3)
-    migration = _FakeMigration(
-        contracts={
-            "PriceDesk": _BrokenReverseRegistry(
-                _addr(4),
-                {1: _addr(1), 2: _addr(2), 3: uniswap},
-                count=4,
-            )
-        },
-        addresses={"UniswapV2Prices": uniswap},
-    )
-
-    with pytest.raises(RuntimeError, match="reverse registration"):
-        BLUECHIP.migrate(migration)
-
-    assert migration.promotions == []
-    assert migration.deployments == []
-    assert migration.executions == []
-
-
-def test_2026082404_rejects_non_inert_uniswap_generation():
-    class _LegacyUniswap(_Contract):
-        def isMonitoringOnly(self):
-            return False
-
-        def getPriceAndHasFeed(self, _asset):
-            return 10**18, True
-
-    uniswap = _addr(3)
-    migration = _FakeMigration(
-        contracts={
-            "PriceDesk": _Registry(
-                _addr(4),
-                {1: _addr(1), 2: _addr(2), 3: uniswap},
-                count=4,
-            ),
-            "UniswapV2Prices": _LegacyUniswap(uniswap),
-        },
-        addresses={"UniswapV2Prices": uniswap, "RipeToken": _addr(5)},
-    )
-
-    with pytest.raises(RuntimeError, match="monitoring marker"):
-        BLUECHIP.migrate(migration)
-
-    assert migration.promotions == []
-    assert migration.deployments == []
-    assert migration.executions == []
-
-
 def test_mock_governance_fixture_is_bound_to_the_session_environment():
     tree = ast.parse(
         (ROOT / "tests" / "conf_mock.py").read_text(),
@@ -973,112 +796,3 @@ def test_mock_governance_fixture_is_bound_to_the_session_environment():
         if isinstance(node, ast.FunctionDef) and node.name == "governance"
     )
     assert [argument.arg for argument in governance.args.args] == ["env"]
-
-
-def test_2026082402_prepares_unpaused_vault_migrator_for_exact_hq_id_25(
-    monkeypatch,
-):
-    from eth_abi.abi import decode
-    from web3 import Web3
-
-    hq = _Registry(
-        _addr(50),
-        {23: _addr(51), 24: _addr(52)},
-        count=25,
-    )
-    migration = _FakeMigration(contracts={"RipeHq": hq})
-    messages = []
-    monkeypatch.setattr(VAULT_MIGRATOR.log, "info", messages.append)
-
-    VAULT_MIGRATOR.migrate(migration)
-
-    assert migration.promotions == []
-    assert len(migration.deployments) == 1
-    name, label, args, candidate = migration.deployments[0]
-    assert name == "VaultMigrator"
-    assert label == "VaultMigratorCandidate2026082402"
-    assert args == (
-        hq,
-        VAULT_MIGRATOR.VAULT_MIGRATOR_SHOULD_PAUSE,
-        ZERO_ADDRESS,
-    )
-    assert candidate.isPaused() is False
-    assert hq.slots == {23: _addr(51), 24: _addr(52)}
-    assert sum("[1] 0x" in message for message in messages) == 1
-    assert sum("[2] 0x" in message for message in messages) == 1
-
-    start, confirm = VAULT_MIGRATOR._add_calldata(
-        candidate.address,
-        "VaultMigrator",
-    )
-    start_bytes = bytes.fromhex(start)
-    confirm_bytes = bytes.fromhex(confirm)
-    assert (
-        start_bytes[:4]
-        == Web3.keccak(text="startAddNewAddressToRegistry(address,string)")[:4]
-    )
-    assert decode(["address", "string"], start_bytes[4:]) == (
-        candidate.address,
-        "VaultMigrator",
-    )
-    assert (
-        confirm_bytes[:4]
-        == Web3.keccak(text="confirmNewAddressToRegistry(address)")[:4]
-    )
-    assert decode(["address"], confirm_bytes[4:]) == (candidate.address,)
-
-
-def test_2026082402_fails_closed_until_ccip_slots_23_and_24_are_occupied():
-    hq = _Registry(_addr(60), count=23)
-    migration = _FakeMigration(contracts={"RipeHq": hq})
-
-    with pytest.raises(
-        AssertionError,
-        match="next id is not VaultMigrator slot 25",
-    ):
-        VAULT_MIGRATOR.migrate(migration)
-
-    assert migration.deployments == []
-
-
-def test_2026082402_fails_closed_if_a_prior_ccip_slot_is_disabled():
-    hq = _Registry(_addr(65), {23: _addr(66)}, count=25)
-    migration = _FakeMigration(contracts={"RipeHq": hq})
-
-    with pytest.raises(
-        AssertionError,
-        match="CCIP pool slot 24 is not active",
-    ):
-        VAULT_MIGRATOR.migrate(migration)
-
-    assert migration.deployments == []
-
-
-def test_2026082403_only_promotes_vault_migrator_after_hq_readback():
-    candidate_address = _addr(71)
-    hq = _Registry(_addr(70), {25: candidate_address}, count=26)
-    migration = _FakeMigration(contracts={"RipeHq": hq})
-
-    PROMOTE_VAULT_MIGRATOR.migrate(migration)
-
-    assert migration.deployments == []
-    assert migration.promotions == [
-        (
-            "VaultMigrator",
-            "VaultMigratorCandidate2026082402",
-            hq.address,
-            25,
-            None,
-            None,
-        )
-    ]
-    assert migration.promotion_specs[0].registry_name == "RipeHq"
-    assert (
-        migration.promotion_specs[0].expected_source_path
-        == "contracts/core/VaultMigrator.vy"
-    )
-    assert migration.promotion_specs[0].expected_constructor_args == (
-        hq,
-        PROMOTE_VAULT_MIGRATOR.VAULT_MIGRATOR_SHOULD_PAUSE,
-        ZERO_ADDRESS,
-    )

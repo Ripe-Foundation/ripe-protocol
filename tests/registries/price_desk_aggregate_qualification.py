@@ -58,10 +58,10 @@ QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE = 3
 
 # Snapshot of a read-only live registry check at the gas-limit observation
 # block, before PR #206's fresh-generation replacement. The legacy live
-# UniswapV2Prices instance occupied ID 3. The forward 2026082404 checkpoint can
-# complete only after PR #206 promotes the authenticated inert replacement at
-# the same ID; it reads the canonical address and live marker rather than
-# treating this historical address as current authority.
+# UniswapV2Prices instance occupied ID 3. The 2026082405 preflight requires the
+# authenticated inert replacement to remain registered at the same ID; it reads
+# the canonical address and live marker rather than treating this historical
+# address as current authority.
 ROBINHOOD_LIVE_PRICE_DESK_SLOT_3 = "Uniswap V2 Prices"
 ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS = (
     "0xfB2d96242769fCE0a3Cf75204B0553cE0E516545"
