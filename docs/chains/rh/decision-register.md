@@ -472,11 +472,14 @@ work.
 every external-state phase remain blocked.
 
 Select unchanged `CurvePrices` at PriceDesk ID 2 for GREEN only, while keeping
-Chainlink at ID 1, IDs 3 through 5 empty, and priority IDs `[1, 2]`.
-BlueChipYield is deferred and unassigned; any future activation must select a
-chain-local PriceDesk ID in a separately reviewed change. The exact configured
-route is GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG. USDG has no
-Curve feed, so the route cannot recurse.
+Chainlink at ID 1 and priority IDs `[1, 2]`. Before PR #206, live ID 3 remains
+the legacy functional UniswapV2Prices fallback; priority ordering does not
+disable it. The required PR #206 fresh-generation history must replace it with
+the authenticated inert monitor before this launch disposition can be
+realized. BlueChipYield, Pyth, and Stork remain unassigned on Robinhood. Any
+future activation must select a chain-local PriceDesk ID in a separately
+reviewed change. The exact configured route is GREEN -> Curve GREEN/USDG ->
+PriceDesk -> Chainlink USDG. USDG has no Curve feed, so the route cannot recurse.
 
 This decision does not admit either LP token, add another Curve feed or
 consumer, enable dynamic rates, create Teller reference snapshots, enable
@@ -1443,16 +1446,18 @@ MissionControl address when proposed. A later RipeHq MissionControl rotation
 therefore does not retarget either pending action. The following are separate
 proposal-to-confirmation policies, not MissionControl-retargeting defects:
 
-- **Alpha `RIPE_VAULT_CONFIG`: pending owner disposition.** Proposal validates
+- **Alpha `RIPE_VAULT_CONFIG`: proposal-time validation ratified.** Proposal validates
   the asset against the target MissionControl's
   then-current core RipeGov vault id and supported-asset topology, as well as
   the bounded weight and lock terms. Confirmation writes the reviewed values to
   that same pinned MissionControl without re-reading its live core-vault id or
   asset classification. The governance risk is that another action can change
   that target topology during the timelock and leave the queued config stale but
-  executable. Before approval, the owner must either ratify proposal-time
-  validation with serialized topology changes and stale-action cancellation as
-  operating controls, or authorize confirmation-time revalidation.
+  executable. The owner accepted proposal-time validation: governance must
+  serialize core RipeGov vault/asset topology changes against pending
+  `RIPE_VAULT_CONFIG` actions, cancel any stale proposal before changing that
+  topology, and repropose against the new state. This ratification does not
+  authorize deployment or execution.
 - **Delta Underscore registry: deferred and not ratified for nonzero
   activation.** Proposal checks the candidate root, Ledger, optional vault
   registry, and optional LegoBook interfaces; confirmation writes the candidate

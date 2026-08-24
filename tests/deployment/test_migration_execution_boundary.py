@@ -84,6 +84,14 @@ def test_current_manifest_is_what_marks_a_history_deployed(tmp_path):
     assert history_has_deployment(deployed) is True
 
 
+def test_migration_exposes_the_immediate_source_predecessor(tmp_path):
+    history = _history(tmp_path, deployed=False)
+    migration = Migration(_args(), {}, "2026082400", "2026082101", str(history))
+
+    assert migration.timestamp() == "2026082400"
+    assert migration.previous_timestamp() == "2026082101"
+
+
 def test_every_committed_history_is_recognised_as_deployed():
     root = Path(__file__).resolve().parents[2] / "migration_history"
     histories = [p for p in root.glob("*/*") if p.is_dir()]

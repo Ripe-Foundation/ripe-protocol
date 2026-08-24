@@ -1,5 +1,12 @@
 # Robinhood deployment-support specification
 
+> **PriceDesk supersession note (2026-08-24):** the BlueChip-at-ID-3 and
+> Uniswap-absent planning statements below are historical. BlueChip is deferred
+> at chain-local ID `0`; before PR #206, live ID 3 is the legacy functional
+> UniswapV2Prices fallback, and the required PR #206 `2026082100/01` history
+> promotes the authenticated inert monitoring replacement there. Launch
+> priorities remain `[1, 2]`. See [`current-owner-priorities.md`](current-owner-priorities.md).
+
 > **CCIP supersession note (2026-08-11):** this specification's CCIP rows are
 > predeployment planning history. GREEN/RIPE CCIP is now live; current topology,
 > unresolved exact live-creation source identity, and remaining operational gates are in

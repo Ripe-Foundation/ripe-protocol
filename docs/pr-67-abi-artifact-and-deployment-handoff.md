@@ -142,10 +142,12 @@ The corrected Robinhood forward sequence is deliberately multi-stage:
    changes the CCIP rows at ids 23 and 24.
 7. `2026082403_PromoteVaultMigrator.py` creates the first canonical VaultMigrator
    manifest record only after RipeHq id 25 equals the candidate.
-8. `2026082404_BlueChipTopologyDecision.py` intentionally blocks before any
-   deployment or calldata emission. Live slot 3 is occupied by UniswapV2Prices,
-   while SwitchboardAlpha hard-codes slot 4 as Pyth; governance must first choose
-   and implement one coherent registry/consumer topology.
+8. `2026082404_BlueChipTopologyDecision.py` is a read-only live-history
+   checkpoint. It requires BlueChip's chain-local ID to remain disabled at `0`,
+   PriceDesk's next id to be `4`, and both forward and reverse registry reads to
+   bind slot `3` to the canonical `UniswapV2Prices` record promoted by
+   `2026082101`. It also reads the live monitoring marker and inert RIPE pricing
+   surface. It emits no deployment, registry write, or activation calldata.
 
 The promotion helper copies the candidate's complete record, including file,
 ABI, compiler JSON, and canonical ABI-encoded constructor arguments. Every
@@ -223,13 +225,16 @@ a separately authorized deployment, exact constructor/runtime binding,
 consumer update, and manifest transition; the old instance cannot be converted
 in place by governance or a timelock action.
 
-PriceDesk's `numAddrs()` is the next registry id. With Chainlink and Curve in
-slots 1 and 2, the BlueChip precondition is `numAddrs() == 3` and
-`getAddr(3) == 0`. Keep an exclusive PriceDesk-add window through the
-timelock, require the confirmation to return id 3, and read slot 3 back before
-the first canonical `BlueChipYieldPrices` record is created. First promotion
-must support an absent canonical label while retaining every candidate,
-witness, nonzero-address, and registry-readback check.
+PriceDesk's `numAddrs()` is the next registry id. Before PR #206, live slot 3 is
+the legacy functional UniswapV2Prices generation; priority IDs `[1, 2]` do not
+exclude it from PriceDesk's fallback scan. PR #206's required `2026082100/01`
+history replaces the complete PriceDesk tree and promotes the authenticated
+inert monitoring-only UniswapV2Prices generation in slot 3, with cursor `4`.
+BlueChip remains unassigned at chain-local ID `0`; this does not make slot 3
+empty. Any future BlueChip proposal must bind the then-live cursor and choose a
+chain-local ID in a separately reviewed migration rather than assuming `3` or
+`4`. First promotion must support an absent canonical label while retaining
+every candidate, witness, nonzero-address, and registry-readback check.
 
 The Morpho V2 address remains a selected external fact until the execution
 envelope binds the target chain, code-bearing address, runtime identity, and
@@ -249,7 +254,9 @@ zero-address)` on Robinhood before activation.
 ### Static-plan boundary
 
 The forward stages are numbered after the independently recorded `2026082101`
-Robinhood frontier. They depend on integrating PR #206's executed-history and
+Robinhood frontier. The first stage machine-checks that `2026082101` is its
+immediate predecessor, so this branch cannot execute it while PR #206's history
+is absent. They depend on integrating PR #206's executed-history and
 current-manifest update at commit `452053044de5fafa09e2c8acb9638cb61bdbce28`
 before execution; PR 67's older manifest is not live authority.
 They use the canonical `migration.deploy`/`migration.execute` API and are

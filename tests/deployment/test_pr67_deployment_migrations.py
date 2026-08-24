@@ -43,6 +43,10 @@ LEDGER = _load(
     "migrations/robinhood-mainnet/0010_RedeployLedger.py",
     "pr67_ledger_candidates",
 )
+CCIP_WIRE = _load(
+    "migrations/robinhood-mainnet/2026082400_CcipWirePlan.py",
+    "pr67_ccip_wire_plan",
+)
 BLUECHIP = _load(
     "migrations/robinhood-mainnet/2026082404_BlueChipTopologyDecision.py",
     "pr67_bluechip_candidate",
@@ -73,6 +77,17 @@ class _Registry(_Contract):
 
     def numAddrs(self):
         return self.count
+
+    def getRegId(self, address):
+        expected = str(getattr(address, "address", address)).lower()
+        return next(
+            (
+                reg_id
+                for reg_id, registered in self.slots.items()
+                if str(registered).lower() == expected
+            ),
+            0,
+        )
 
     def startAddNewAddressToRegistry(self, address, _description):
         self._pending = address
@@ -818,11 +833,129 @@ def test_0010_defaults_dependency_mismatch_fails_before_any_write():
     assert migration.deployments == []
 
 
-def test_2026082404_records_bluechip_deferral_without_writes():
-    migration = _FakeMigration()
+def test_2026082400_requires_pr206_authoritative_history_before_any_other_read():
+    class _HistoryOnlyMigration:
+        def __init__(self, previous):
+            self.previous = previous
+
+        def previous_timestamp(self):
+            return self.previous
+
+    CCIP_WIRE._require_authoritative_history(
+        _HistoryOnlyMigration(CCIP_WIRE.REQUIRED_PREVIOUS_MIGRATION)
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=CCIP_WIRE.AUTHORITATIVE_HISTORY_REQUIRED,
+    ):
+        CCIP_WIRE.migrate(_HistoryOnlyMigration("2026080700"))
+
+
+def test_2026082404_records_exact_live_topology_and_bluechip_deferral_without_writes():
+    uniswap = _addr(3)
+    ripe = _addr(5)
+    price_desk = _Registry(
+        _addr(4),
+        {1: _addr(1), 2: _addr(2), 3: uniswap},
+        count=4,
+    )
+    migration = _FakeMigration(
+        contracts={
+            "PriceDesk": price_desk,
+            "UniswapV2Prices": _UniswapMonitorCandidate(
+                uniswap,
+                _Contract(_addr(6)),
+                _addr(7),
+                _Contract(ripe),
+                _addr(8),
+            ),
+        },
+        addresses={"UniswapV2Prices": uniswap, "RipeToken": ripe},
+    )
 
     assert BLUECHIP.BLUECHIP_PRICES_ID == 0
     assert BLUECHIP.migrate(migration) is None
+
+    assert migration.promotions == []
+    assert migration.deployments == []
+    assert migration.executions == []
+
+
+@pytest.mark.parametrize(
+    ("slots", "count", "message"),
+    (
+        ({1: _addr(1), 2: _addr(2), 3: _addr(3)}, 5, "next registry id"),
+        ({1: _addr(1), 2: _addr(2)}, 4, "slot 3"),
+        ({1: _addr(1), 2: _addr(2), 3: _addr(30)}, 4, "slot 3"),
+    ),
+)
+def test_2026082404_rejects_bluechip_deferral_under_unexpected_live_topology(
+    slots,
+    count,
+    message,
+):
+    migration = _FakeMigration(
+        contracts={"PriceDesk": _Registry(_addr(4), slots, count)},
+        addresses={"UniswapV2Prices": _addr(3)},
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        BLUECHIP.migrate(migration)
+
+    assert migration.promotions == []
+    assert migration.deployments == []
+    assert migration.executions == []
+
+
+def test_2026082404_rejects_mismatched_reverse_registration():
+    class _BrokenReverseRegistry(_Registry):
+        def getRegId(self, _address):
+            return 2
+
+    uniswap = _addr(3)
+    migration = _FakeMigration(
+        contracts={
+            "PriceDesk": _BrokenReverseRegistry(
+                _addr(4),
+                {1: _addr(1), 2: _addr(2), 3: uniswap},
+                count=4,
+            )
+        },
+        addresses={"UniswapV2Prices": uniswap},
+    )
+
+    with pytest.raises(RuntimeError, match="reverse registration"):
+        BLUECHIP.migrate(migration)
+
+    assert migration.promotions == []
+    assert migration.deployments == []
+    assert migration.executions == []
+
+
+def test_2026082404_rejects_non_inert_uniswap_generation():
+    class _LegacyUniswap(_Contract):
+        def isMonitoringOnly(self):
+            return False
+
+        def getPriceAndHasFeed(self, _asset):
+            return 10**18, True
+
+    uniswap = _addr(3)
+    migration = _FakeMigration(
+        contracts={
+            "PriceDesk": _Registry(
+                _addr(4),
+                {1: _addr(1), 2: _addr(2), 3: uniswap},
+                count=4,
+            ),
+            "UniswapV2Prices": _LegacyUniswap(uniswap),
+        },
+        addresses={"UniswapV2Prices": uniswap, "RipeToken": _addr(5)},
+    )
+
+    with pytest.raises(RuntimeError, match="monitoring marker"):
+        BLUECHIP.migrate(migration)
 
     assert migration.promotions == []
     assert migration.deployments == []

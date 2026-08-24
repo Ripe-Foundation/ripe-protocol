@@ -877,6 +877,9 @@ class Migration:
     def timestamp(self):
         return self._timestamp
 
+    def previous_timestamp(self):
+        return self._previous_timestamp
+
     def blueprint(self):
         return self._deploy_args.blueprint
 

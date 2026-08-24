@@ -26,6 +26,8 @@ from scripts.utils import ccip, log
 from scripts.utils.migration import Migration
 
 SOURCE_FILE = "RipeCcipBurnMintTokenPools.sol"
+REQUIRED_PREVIOUS_MIGRATION = "2026082101"
+AUTHORITATIVE_HISTORY_REQUIRED = "PR206_AUTHORITATIVE_HISTORY_REQUIRED"
 
 # (label, contract, token, canMintGreen, canMintRipe). The contract name is
 # also the manifest key -- one contract per token, so no aliasing needed.
@@ -33,6 +35,15 @@ POOLS = (
     ("RIPE", "RipeCcipBurnMintTokenPool", "RipeToken", False, True),
     ("GREEN", "GreenCcipBurnMintTokenPool", "GreenToken", True, False),
 )
+
+
+def _require_authoritative_history(migration):
+    previous = migration.previous_timestamp()
+    if previous != REQUIRED_PREVIOUS_MIGRATION:
+        raise RuntimeError(
+            f"{AUTHORITATIVE_HISTORY_REQUIRED}: expected "
+            f"{REQUIRED_PREVIOUS_MIGRATION}, got {previous}"
+        )
 
 
 def _calldata(signature, types, values):
@@ -101,6 +112,11 @@ def _hq_append_plan(migration, hq, missing_labels):
 
 
 def migrate(migration: Migration):
+    # These stages consume the fresh-generation registry and manifest state
+    # finalized by PR #206. Timestamp spacing alone cannot prove that history
+    # is present when the two branches have not yet been composed.
+    _require_authoritative_history(migration)
+
     chain = migration.chain()
     config = CCIP[chain]
     hq = migration.get_contract("RipeHq")
