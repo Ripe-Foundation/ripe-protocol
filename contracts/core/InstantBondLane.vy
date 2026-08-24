@@ -53,6 +53,7 @@ interface RipeToken:
     def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
     def ripeHq() -> address: view
     def isPaused() -> bool: view
+    def blacklisted(_addr: address) -> bool: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -342,6 +343,7 @@ def buyNow(
         snap.maxVestingLength,
     )
     assert payout.vestingLength == _expectedVestingLength # dev: vesting length moved
+    assert self._isWithinMaxEffectiveRate(_paymentAmount, payout.totalRipe, config.maxEffectiveRate) # dev: effective rate ceiling
 
     assert payout.totalRipe >= _minRipeOut # dev: slippage
     claims: address = self._getClaimsAddr()
@@ -414,6 +416,12 @@ def _calculatePayout(
     )
 
 
+@view
+@internal
+def _isWithinMaxEffectiveRate(_paymentAmount: uint256, _totalRipe: uint256, _maxEffectiveRate: uint256) -> bool:
+    return _totalRipe <= _paymentAmount * _maxEffectiveRate // self.paymentScale
+
+
 ####################
 # Claim Settlement #
 ####################
@@ -442,6 +450,7 @@ def settleVestedRipe(
     assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
     assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
     assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe token paused
+    assert not staticcall RipeToken(ripeToken).blacklisted(_beneficiary) # dev: blacklisted
 
     if not _autoDeposit:
         balanceBefore: uint256 = staticcall IERC20(ripeToken).balanceOf(_beneficiary)
@@ -480,6 +489,10 @@ def settleVestedRipe(
 @internal
 def _isPurchaseReady() -> bool:
     if addys._getInstantBondLaneAddr() != self:
+        return False
+
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    if endaoFunds == empty(address) or not endaoFunds.is_contract:
         return False
 
     claims: address = self._getClaimsAddr()
@@ -576,6 +589,8 @@ def _nextRate(
 @view
 @external
 def getEpochSnapshot() -> EpochSnapshot:
+    if not self.isRunning:
+        return empty(EpochSnapshot)
     snap: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
     snap, transition = self._getEpochSnapshot(self.epochState, self.bondConfig)
@@ -1049,8 +1064,9 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
     if _config.minPaymentAmount < paymentScale or _config.minPaymentAmount > _config.paymentCapPerEpoch:
         return False
 
-    # payment × rate at the cap cannot overflow
-    if _config.maxEffectiveRate > max_value(uint256) // _config.paymentCapPerEpoch:
+    # live ceiling must be safe against both the new cap and a committed epoch's cap
+    effectivePaymentCap: uint256 = max(_config.paymentCapPerEpoch, self.epochState.paymentCap)
+    if _config.maxEffectiveRate > max_value(uint256) // effectivePaymentCap:
         return False
 
     # vesting bonus stays inside the hard cap
@@ -1107,7 +1123,7 @@ def _baseRateCeiling(_maxEffectiveRate: uint256, _maxVestingBonus: uint256) -> u
 @external
 def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> InstantBondQuote:
     quote: InstantBondQuote = empty(InstantBondQuote)
-    if block.number < self.genesisBlock:
+    if not self.isRunning or block.number < self.genesisBlock:
         return quote
 
     config: InstantBondConfig = self.bondConfig
@@ -1152,7 +1168,9 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
     quote.totalRipe = payout.totalRipe
 
     # same gates as buyNow, minus deadline / expectedEpoch / slippage
-    if deptBasics.isPaused or not self.isRunning or not config.canBuyNow:
+    if deptBasics.isPaused or not config.canBuyNow:
+        return quote
+    if not self._isWithinMaxEffectiveRate(_paymentAmount, payout.totalRipe, config.maxEffectiveRate):
         return quote
     if payout.totalRipe > budgetRemaining:
         return quote

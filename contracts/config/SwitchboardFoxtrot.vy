@@ -23,6 +23,7 @@ import contracts.modules.TimeLock as timeLock
 
 interface InstantBondLane:
     def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
+    def genesisBlock() -> uint256: view
     def isValidRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> bool: view
     def isValidConfig(_config: InstantBondConfig) -> bool: view
     def isValidEpochLength(_epochLength: uint256) -> bool: view
@@ -256,7 +257,8 @@ def startInstantBond(_genesisBlock: uint256, _epochLength: uint256):
     assert staticcall InstantBondLane(lane).isValidEpochLength(_epochLength) # dev: invalid epoch length
     assert staticcall InstantBondLane(lane).isValidConfig(staticcall InstantBondLane(lane).bondConfig()) # dev: not configured
     extcall InstantBondLane(lane).start(_genesisBlock, _epochLength)
-    log InstantBondStarted(genesisBlock=_genesisBlock, epochLength=_epochLength)
+    resolvedGenesisBlock: uint256 = staticcall InstantBondLane(lane).genesisBlock()
+    log InstantBondStarted(genesisBlock=resolvedGenesisBlock, epochLength=_epochLength)
 
 
 @external
@@ -324,16 +326,24 @@ def executePendingAction(_aid: uint256) -> bool:
 
     actionType: ActionType = self.actionType[_aid]
     assert actionType != empty(ActionType) # dev: invalid action
-    lane: address = self._getInstantBondLaneAddr()
 
     if actionType == ActionType.INSTANT_BOND_CONFIG:
-        assert staticcall InstantBondLane(lane).isValidConfig(self.pendingConfig[_aid]) # dev: invalid config
-        extcall InstantBondLane(lane).setConfig(self.pendingConfig[_aid])
+        lane: address = self._getInstantBondLaneAddr()
+        config: InstantBondConfig = self.pendingConfig[_aid]
+        assert staticcall InstantBondLane(lane).isValidConfig(config) # dev: invalid config
+        extcall InstantBondLane(lane).setConfig(config)
+        self.pendingConfig[_aid] = empty(InstantBondConfig)
         log InstantBondConfigExecuted(actionId=_aid)
-    else:
+
+    elif actionType == ActionType.REMAINING_ALLOCATION_BUDGET_SET:
         claims: address = self._getInstantBondClaimsAddr()
-        extcall InstantBondClaims(claims).setRemainingAllocationBudget(self.pendingRemainingAllocationBudget[_aid])
+        amount: uint256 = self.pendingRemainingAllocationBudget[_aid]
+        extcall InstantBondClaims(claims).setRemainingAllocationBudget(amount)
+        self.pendingRemainingAllocationBudget[_aid] = 0
         log InstantBondRemainingAllocationBudgetExecuted(actionId=_aid)
+
+    else:
+        raise "invalid action"
 
     self.actionType[_aid] = empty(ActionType)
     return True
@@ -353,5 +363,15 @@ def cancelPendingAction(_aid: uint256) -> bool:
 
 @internal
 def _cancelPendingAction(_aid: uint256):
+    actionType: ActionType = self.actionType[_aid]
+    assert actionType != empty(ActionType) # dev: invalid action
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+
+    if actionType == ActionType.INSTANT_BOND_CONFIG:
+        self.pendingConfig[_aid] = empty(InstantBondConfig)
+    elif actionType == ActionType.REMAINING_ALLOCATION_BUDGET_SET:
+        self.pendingRemainingAllocationBudget[_aid] = 0
+    else:
+        raise "invalid action"
+
     self.actionType[_aid] = empty(ActionType)
