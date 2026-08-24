@@ -283,6 +283,16 @@ def _readFeedDecimals(_feed: address) -> (bool, uint256):
     return True, decimals
 
 
+@view
+@internal
+def _hasExpectedFeedDecimals(_feed: address, _expectedDecimals: uint256) -> bool:
+    # Bind pending configs at confirmation; active reads trust the snapshot.
+    hasDecimals: bool = False
+    liveDecimals: uint256 = 0
+    hasDecimals, liveDecimals = self._readFeedDecimals(_feed)
+    return hasDecimals and liveDecimals == _expectedDecimals
+
+
 ##################
 # Chainlink Data #
 ##################
@@ -298,12 +308,6 @@ def getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0
 @internal
 def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
     if _feed == empty(address) or _decimals > NORMALIZED_DECIMALS:
-        return 0
-
-    hasDecimals: bool = False
-    liveDecimals: uint256 = 0
-    hasDecimals, liveDecimals = self._readFeedDecimals(_feed)
-    if not hasDecimals or liveDecimals != _decimals:
         return 0
 
     oracle: ChainlinkRound = staticcall ChainlinkFeed(_feed).latestRoundData()
@@ -389,7 +393,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending new feed
-    if not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
+    if not self._hasExpectedFeedDecimals(d.config.feed, d.config.decimals) or not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -496,7 +500,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending update feed
     oldFeed: address = self.feedConfig[_asset].feed
-    if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
+    if not self._hasExpectedFeedDecimals(d.config.feed, d.config.decimals) or not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
