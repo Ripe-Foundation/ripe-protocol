@@ -42,7 +42,6 @@ interface Teller:
 
 interface InstantBondClaims:
     def getRipeHq() -> address: view
-    def RIPE_TOKEN() -> address: view
     def isPaused() -> bool: view
     def remainingAllocationBudget() -> uint256: view
     def createVestingPosition(_beneficiary: address, _ripePayout: uint256, _vestingLength: uint256) -> uint256: nonpayable
@@ -53,7 +52,7 @@ interface RipeToken:
     def isPaused() -> bool: view
 
 interface RipeHq:
-    def ripeToken() -> address: view
+    def getAddr(_regId: uint256) -> address: view
     def canMintRipe(_addr: address) -> bool: view
 
 struct InstantBondConfig:
@@ -227,26 +226,18 @@ MAX_PRICE_STEP_BPS: constant(uint256) = 100_00 # 100.00%
 MAX_DECAY_EPOCHS: constant(uint256) = 32
 MAX_PAYMENT_DECIMALS: constant(uint8) = 73
 MIN_BASE_RATE: constant(uint256) = 10_000
-
-CLAIMS: public(immutable(address))
+RIPE_TOKEN_ID: constant(uint256) = 3
+INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
 
 
 @deploy
 def __init__(
     _ripeHq: address,
     _paymentToken: address,
-    _claims: address,
     _config: InstantBondConfig,
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(True, False, True) # starts paused, can mint ripe only
-
-    assert _claims.is_contract # dev: invalid claims
-    assert staticcall InstantBondClaims(_claims).getRipeHq() == _ripeHq # dev: invalid claims hq
-    ripeToken: address = staticcall InstantBondClaims(_claims).RIPE_TOKEN()
-    assert ripeToken == staticcall RipeHq(_ripeHq).ripeToken() # dev: invalid ripe token
-    assert staticcall RipeToken(ripeToken).ripeHq() == _ripeHq # dev: invalid token hq
-    CLAIMS = _claims
 
     self._storePaymentToken(_paymentToken)
     assert self._isValidConfig(_config) # dev: invalid config
@@ -303,7 +294,8 @@ def buyNow(
     assert payout.vestingLength == _expectedVestingLength # dev: vesting length moved
 
     assert payout.totalRipe >= _minRipeOut # dev: slippage
-    budgetRemaining: uint256 = staticcall InstantBondClaims(CLAIMS).remainingAllocationBudget()
+    claims: address = self._getClaimsAddr()
+    budgetRemaining: uint256 = staticcall InstantBondClaims(claims).remainingAllocationBudget()
     assert payout.totalRipe <= budgetRemaining # dev: allocation budget
 
     # consume against this epoch before the state-changing external calls below
@@ -320,7 +312,7 @@ def buyNow(
     assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount # dev: payment receipt mismatch
 
     # record one persistent vesting position; no ripe is minted at purchase
-    positionIndex: uint256 = extcall InstantBondClaims(CLAIMS).createVestingPosition(msg.sender, payout.totalRipe, payout.vestingLength)
+    positionIndex: uint256 = extcall InstantBondClaims(claims).createVestingPosition(msg.sender, payout.totalRipe, payout.vestingLength)
     assert positionIndex != 0 # dev: invalid position
 
     log InstantBondPurchased(
@@ -385,7 +377,7 @@ def settleVestedRipe(
     _autoDeposit: bool,
     _lockDuration: uint256,
 ) -> bool:
-    assert msg.sender == CLAIMS # dev: invalid claims
+    assert msg.sender == self._getClaimsAddr() # dev: invalid claims
     assert addys._getInstantBondLaneAddr() == self # dev: retired lane
     assert _beneficiary != empty(address) and _amount != 0 # dev: invalid settlement
 
@@ -396,8 +388,8 @@ def settleVestedRipe(
 
     ripeHq: address = addys._getRipeHq()
     assert staticcall RipeHq(ripeHq).canMintRipe(self) # dev: cannot mint ripe
-    ripeToken: address = staticcall InstantBondClaims(CLAIMS).RIPE_TOKEN()
-    assert staticcall RipeHq(ripeHq).ripeToken() == ripeToken # dev: invalid ripe token
+    ripeToken: address = self._getRipeTokenAddr()
+    assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
     assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
     assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe token paused
 
@@ -440,7 +432,9 @@ def _isPurchaseReady() -> bool:
     if addys._getInstantBondLaneAddr() != self:
         return False
 
-    claims: address = CLAIMS
+    claims: address = self._getClaimsAddr()
+    if claims == empty(address) or not claims.is_contract:
+        return False
     if staticcall InstantBondClaims(claims).isPaused():
         return False
 
@@ -448,14 +442,26 @@ def _isPurchaseReady() -> bool:
     if staticcall InstantBondClaims(claims).getRipeHq() != ripeHq:
         return False
 
-    ripeToken: address = staticcall InstantBondClaims(claims).RIPE_TOKEN()
-    if staticcall RipeHq(ripeHq).ripeToken() != ripeToken:
+    ripeToken: address = self._getRipeTokenAddr()
+    if ripeToken == empty(address) or not ripeToken.is_contract:
         return False
     if staticcall RipeToken(ripeToken).ripeHq() != ripeHq:
         return False
     if staticcall RipeToken(ripeToken).isPaused():
         return False
     return staticcall RipeHq(ripeHq).canMintRipe(self)
+
+
+@view
+@internal
+def _getClaimsAddr() -> address:
+    return staticcall RipeHq(addys._getRipeHq()).getAddr(INSTANT_BOND_CLAIMS_ID)
+
+
+@view
+@internal
+def _getRipeTokenAddr() -> address:
+    return staticcall RipeHq(addys._getRipeHq()).getAddr(RIPE_TOKEN_ID)
 
 
 # next rate
@@ -1003,7 +1009,10 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
     transition: RateTransition = empty(RateTransition)
     snap, transition = self._getEpochSnapshot(self.epochState, config)
     remainingPayment: uint256 = snap.paymentCap - snap.acceptedPayment
-    budgetRemaining: uint256 = staticcall InstantBondClaims(CLAIMS).remainingAllocationBudget()
+    claims: address = self._getClaimsAddr()
+    budgetRemaining: uint256 = 0
+    if claims != empty(address) and claims.is_contract:
+        budgetRemaining = staticcall InstantBondClaims(claims).remainingAllocationBudget()
 
     quote.epoch = snap.epoch
     quote.rate = snap.rate

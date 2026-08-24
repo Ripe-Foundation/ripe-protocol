@@ -35,7 +35,6 @@ interface InstantBondLane:
     def canCancelRateOverride() -> bool: view
     def cancelRateOverride(): nonpayable
     def isRunning() -> bool: view
-    def CLAIMS() -> address: view
     def stop(): nonpayable
 
 interface InstantBondClaims:
@@ -133,6 +132,7 @@ pendingRemainingAllocationBudget: public(HashMap[uint256, uint256]) # aid -> amo
 pendingRateOverride: public(HashMap[uint256, uint256]) # aid -> target rate
 
 INSTANT_BOND_LANE_ID: constant(uint256) = 26
+INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
 
 
 @deploy
@@ -155,6 +155,14 @@ def _getInstantBondLaneAddr() -> address:
     lane: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(INSTANT_BOND_LANE_ID)
     assert lane != empty(address) # dev: invalid lane
     return lane
+
+
+@view
+@internal
+def _getInstantBondClaimsAddr() -> address:
+    claims: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(INSTANT_BOND_CLAIMS_ID)
+    assert claims != empty(address) and claims.is_contract # dev: invalid claims
+    return claims
 
 
 #######################
@@ -305,8 +313,7 @@ def setInstantBondPaymentToken(_token: address):
 def setInstantBondRemainingAllocationBudget(_amount: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).CLAIMS() != empty(address) # dev: invalid claims
+    self._getInstantBondClaimsAddr()
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.REMAINING_ALLOCATION_BUDGET_SET
@@ -353,8 +360,7 @@ def executePendingAction(_aid: uint256) -> bool:
         extcall InstantBondLane(lane).cancelRateOverride()
         log RateOverrideCancellationExecuted(actionId=_aid)
     else:
-        claims: address = staticcall InstantBondLane(lane).CLAIMS()
-        assert claims != empty(address) # dev: invalid claims
+        claims: address = self._getInstantBondClaimsAddr()
         extcall InstantBondClaims(claims).setRemainingAllocationBudget(self.pendingRemainingAllocationBudget[_aid])
         log InstantBondRemainingAllocationBudgetExecuted(actionId=_aid)
 

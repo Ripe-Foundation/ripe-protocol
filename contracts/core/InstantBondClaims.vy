@@ -31,11 +31,10 @@ interface RipeToken:
     def isPaused() -> bool: view
 
 interface RipeHq:
-    def ripeToken() -> address: view
+    def getAddr(_regId: uint256) -> address: view
     def canMintRipe(_addr: address) -> bool: view
 
 interface InstantBondLane:
-    def CLAIMS() -> address: view
     def settleVestedRipe(_beneficiary: address, _amount: uint256, _autoDeposit: bool, _lockDuration: uint256) -> bool: nonpayable
 
 struct VestingPosition:
@@ -70,7 +69,8 @@ totalAllocatedRipe: public(uint256)
 totalClaimedRipe: public(uint256)
 remainingAllocationBudget: public(uint256)
 
-RIPE_TOKEN: public(immutable(address))
+RIPE_TOKEN_ID: constant(uint256) = 3
+INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
 MAX_VESTING_LENGTH: public(constant(uint256)) = 7_884_000
 
 
@@ -78,12 +78,6 @@ MAX_VESTING_LENGTH: public(constant(uint256)) = 7_884_000
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(True, False, False) # starts paused; no mint capability
-
-    ripeToken: address = staticcall RipeHq(_ripeHq).ripeToken()
-    assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
-    RIPE_TOKEN = ripeToken
-    assert staticcall RipeHq(_ripeHq).ripeToken() == RIPE_TOKEN # dev: invalid ripe token
-    assert staticcall RipeToken(RIPE_TOKEN).ripeHq() == _ripeHq # dev: invalid token hq
 
 
 #####################
@@ -95,6 +89,7 @@ def __init__(_ripeHq: address):
 @external
 def setRemainingAllocationBudget(_amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert staticcall RipeHq(addys._getRipeHq()).getAddr(INSTANT_BOND_CLAIMS_ID) == self # dev: retired claims
     self.remainingAllocationBudget = _amount
     log RemainingAllocationBudgetSet(amount=_amount)
 
@@ -115,12 +110,13 @@ def createVestingPosition(
 
     lane: address = addys._getInstantBondLaneAddr()
     assert msg.sender == lane # dev: invalid lane
-    assert staticcall InstantBondLane(msg.sender).CLAIMS() == self # dev: incompatible lane
 
     ripeHq: address = addys._getRipeHq()
-    assert staticcall RipeHq(ripeHq).ripeToken() == RIPE_TOKEN # dev: invalid ripe token
-    assert staticcall RipeToken(RIPE_TOKEN).ripeHq() == ripeHq # dev: invalid token hq
-    assert not staticcall RipeToken(RIPE_TOKEN).isPaused() # dev: ripe token paused
+    assert staticcall RipeHq(ripeHq).getAddr(INSTANT_BOND_CLAIMS_ID) == self # dev: retired claims
+    ripeToken: address = staticcall RipeHq(ripeHq).getAddr(RIPE_TOKEN_ID)
+    assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
+    assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
+    assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe token paused
     assert staticcall RipeHq(ripeHq).canMintRipe(msg.sender) # dev: cannot mint ripe
 
     assert _beneficiary != empty(address) # dev: invalid beneficiary
@@ -181,16 +177,17 @@ def claimVestedRipe(
 
     lane: address = addys._getInstantBondLaneAddr()
     assert lane != empty(address) # dev: invalid lane
-    assert staticcall InstantBondLane(lane).CLAIMS() == self # dev: incompatible lane
 
     ripeHq: address = addys._getRipeHq()
-    assert staticcall RipeHq(ripeHq).ripeToken() == RIPE_TOKEN # dev: invalid ripe token
-    assert staticcall RipeToken(RIPE_TOKEN).ripeHq() == ripeHq # dev: invalid token hq
-    assert not staticcall RipeToken(RIPE_TOKEN).isPaused() # dev: ripe token paused
+    assert staticcall RipeHq(ripeHq).getAddr(INSTANT_BOND_CLAIMS_ID) == self # dev: retired claims
+    ripeToken: address = staticcall RipeHq(ripeHq).getAddr(RIPE_TOKEN_ID)
+    assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
+    assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
+    assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe token paused
 
     balanceBefore: uint256 = 0
     if not _autoDeposit:
-        balanceBefore = staticcall IERC20(RIPE_TOKEN).balanceOf(msg.sender)
+        balanceBefore = staticcall IERC20(ripeToken).balanceOf(msg.sender)
 
     position.ripeClaimed += claimableRipe
     self.positions[msg.sender][_positionIndex] = position
@@ -199,7 +196,7 @@ def claimVestedRipe(
     assert extcall InstantBondLane(lane).settleVestedRipe(msg.sender, claimableRipe, _autoDeposit, _lockDuration) # dev: settlement failed
 
     if not _autoDeposit:
-        balanceAfter: uint256 = staticcall IERC20(RIPE_TOKEN).balanceOf(msg.sender)
+        balanceAfter: uint256 = staticcall IERC20(ripeToken).balanceOf(msg.sender)
         assert balanceAfter >= balanceBefore # dev: ripe receipt mismatch
         assert balanceAfter - balanceBefore == claimableRipe # dev: ripe receipt mismatch
 
