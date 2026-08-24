@@ -116,8 +116,6 @@ ETH: public(immutable(address))
 BTC: public(immutable(address))
 
 NORMALIZED_DECIMALS: constant(uint256) = 18
-# The floor applies only to explicit local overrides. The maximum is this
-# source's absolute ceiling; deployment-level Switchboard maxima must not exceed it.
 MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
 MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
 
@@ -217,7 +215,7 @@ def _getPrice(
     if not self._isSafeConversionRoute(_asset, _feed, _needsEthToUsd, _needsBtcToUsd):
         return 0
 
-    # Cache the forwarded or MissionControl global once. A conversion route can
+    # cache the forwarded or MissionControl global once. A conversion route can
     # consume it for both its primary and anchor legs when either inherits.
     globalStaleTime: uint256 = _globalStaleTime
     hasGlobalStaleTime: bool = globalStaleTime != 0
@@ -270,7 +268,7 @@ def _getPrice(
 @view
 @internal
 def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
-    # A route has at most one conversion leg. The chosen anchor must itself be
+    # a route has at most one conversion leg. The chosen anchor must itself be
     # a direct USD feed, and neither the anchor asset nor its feed may recurse
     # through that same anchor.
     if _needsEthToUsd and _needsBtcToUsd:
@@ -284,7 +282,7 @@ def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool
         anchorAsset = BTC
     anchorConfig: ChainlinkConfig = self.feedConfig[anchorAsset]
 
-    # Conversion legs consume the anchor feed directly as USD.
+    # conversion legs consume the anchor feed directly as USD
     if _asset == anchorAsset or _feed == anchorConfig.feed:
         return False
     if anchorConfig.needsEthToUsd or anchorConfig.needsBtcToUsd:
@@ -298,7 +296,7 @@ def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool
 @view
 @internal
 def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
-    # Zero is the direct-call sentinel. A nonzero value is accepted only as the
+    # zero is the direct-call sentinel. A nonzero value is accepted only as the
     # global policy forwarded by the canonical PriceDesk.
     if _staleTime == 0:
         return True
@@ -532,7 +530,7 @@ def updatePriceFeed(
     assert not priceData.isPaused # dev: contract paused
     assert _newFeed != self.feedConfig[_asset].feed # dev: invalid feed
 
-    # Zero on a feed rotation preserves the active policy. Governance uses the
+    # zero on a feed rotation preserves the active policy. Governance uses the
     # dedicated updateStaleTime entry point to explicitly reset to inheritance.
     staleTime: uint256 = _staleTime
     if staleTime == 0:
@@ -598,7 +596,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert oldFeed != empty(address) # dev: no pending update feed
     isStaleTimeOnly: bool = d.config.feed == oldFeed
     if not self._isValidUpdateFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
-        # A stale-only candidate can fail transiently when its unchanged oracle
+        # a stale-only candidate can fail transiently when its unchanged oracle
         # is unavailable or stale. Keep it pending so governance may retry or
         # explicitly cancel it. Feed replacements retain fail-and-cancel.
         if not isStaleTimeOnly:
@@ -645,7 +643,7 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
-    # Stale-only preflight validates against the complete active feed config.
+    # stale-only preflight validates against the complete active feed config
     config: ChainlinkConfig = self.feedConfig[_asset]
     return self._isValidUpdateFeed(_asset, config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime)
 
@@ -653,8 +651,8 @@ def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
 @view
 @external
 def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
-    # Feed-changing preflight mirrors updatePriceFeed: zero preserves the
-    # active stale policy. Same-feed updates belong to isValidStaleTimeUpdate.
+    # feed-changing preflight mirrors updatePriceFeed: zero preserves the
+    # active stale policy. same-feed updates belong to isValidStaleTimeUpdate
     currentConfig: ChainlinkConfig = self.feedConfig[_asset]
     if _newFeed == currentConfig.feed:
         return False

@@ -116,8 +116,6 @@ pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
 STORK: public(immutable(address))
 MAX_PRICE_UPDATES: constant(uint256) = 20
-# The floor applies only to explicit local overrides; zero means inheritance.
-# This ceiling is absolute, so deployment Switchboard maxima must not exceed it.
 MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
 MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
 
@@ -195,7 +193,7 @@ def _validatePriceData(_data: TemporalNumericValue, _staleTime: uint256) -> uint
         return 0
 
     # validate publish time and staleness
-    # Sub-second future values within the current second truncate to current time.
+    # sub-second future values within the current second truncate to current time
     publishTime: uint256 = convert(_data.timestampNs, uint256) // 1_000_000_000
     if publishTime == 0 or publishTime > block.timestamp:
         return 0
@@ -211,7 +209,7 @@ def _validatePriceData(_data: TemporalNumericValue, _staleTime: uint256) -> uint
 @view
 @internal
 def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
-    # Only canonical PriceDesk may supply a nonzero forwarded global policy.
+    # only canonical PriceDesk may supply a nonzero forwarded global policy
     if _staleTime == 0:
         return True
     priceDesk: address = addys._getPriceDeskAddr()
@@ -377,7 +375,7 @@ def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) 
     assert not priceData.isPaused # dev: contract paused
     assert _feedId != self.feedConfig[_asset].feedId # dev: invalid feed
 
-    # Feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
+    # feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
     # remains the explicit path for resetting a feed to MissionControl inheritance.
     staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
 
@@ -434,7 +432,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     assert oldFeedId != empty(bytes32) # dev: no pending update feed
     if not self._isValidUpdateFeed(_asset, d.config.feedId, d.config.staleTime):
-        # A stale-only update can fail transiently when its unchanged oracle is
+        # a stale-only update can fail transiently when its unchanged oracle is
         # unavailable. Preserve the timelocked action so governance can retry.
         if d.config.feedId == oldFeedId:
             return False
@@ -481,7 +479,7 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
-    # Feed-changing preflight intentionally rejects the active feed. Use
+    # feed-changing preflight intentionally rejects the active feed. Use
     # `isValidStaleTimeUpdate` for a same-feed policy change.
     if _feedId == self.feedConfig[_asset].feedId:
         return False
@@ -492,7 +490,7 @@ def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) ->
 @view
 @external
 def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
-    # Stale-only preflight validates against the active feed configuration.
+    # stale-only preflight validates against the active feed configuration
     config: StorkFeedConfig = self.feedConfig[_asset]
     return self._isValidUpdateFeed(_asset, config.feedId, _staleTime)
 
@@ -515,8 +513,8 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
     if _asset == empty(address):
         return False
 
-    # Fetch first to preserve the Stork network's NotFound behavior for unknown
-    # feed IDs, then reuse the exact runtime data validation below.
+    # fetch first to preserve the Stork network's NotFound behavior for unknown
+    # feed IDs, then reuse the exact runtime data validation below
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
     staleTime: uint256 = 0
     isValid: bool = False

@@ -42,8 +42,8 @@ from interfaces import Department
 
 interface MissionControl:
     def getPriceConfig() -> PriceConfig: view
-    def getPriceStaleTime() -> uint256: view
     def underscoreRegistry() -> address: view
+    def getPriceStaleTime() -> uint256: view
 
 interface UnderscoreRegistry:
     def getAddr(_regId: uint256) -> address: view
@@ -151,11 +151,13 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256:
     if _asset == empty(address):
         return 0
-    # Preserve the selector while rejecting the retired caller cap for real assets.
+
+    # preserve the selector while rejecting the retired caller cap for real assets
     if _staleTime != 0:
         if _shouldRaise:
             raise "caller stale time unsupported"
         return 0
+
     return self._getPrice(_asset, _shouldRaise)
 
 
@@ -193,7 +195,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
                 if sourceStatus != 0:
                     mustRaiseOnZero = True
 
-    # A failed source leaves feed coverage uncertain, so strict callers still
+    # a failed source leaves feed coverage uncertain, so strict callers still
     # fail closed if no later healthy source establishes a usable price.
     if price == 0 and mustRaiseOnZero and _shouldRaise:
         raise "has price config, no price"

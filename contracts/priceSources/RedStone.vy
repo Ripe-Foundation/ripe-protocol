@@ -108,8 +108,6 @@ pendingUpdates: public(HashMap[address, PendingRedStoneConfig]) # asset -> pendi
 
 ETH: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
-# The floor applies only to explicit local overrides; zero means inheritance.
-# This ceiling is absolute, so deployment Switchboard maxima must not exceed it.
 MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
 MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
 
@@ -205,9 +203,9 @@ def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool
     if not _needsEthToUsd:
         return True
 
-    # Conversion asks PriceDesk for ETH/USD. Reject routes that recurse through
+    # conversion asks PriceDesk for ETH/USD. Reject routes that recurse through
     # this asset or through an ETH config that itself needs ETH conversion.
-    # A shared feed is also unsafe: it would treat the ETH/USD feed as asset/ETH
+    # a shared feed is also unsafe: it would treat the ETH/USD feed as asset/ETH
     # and multiply the same economic input into itself.
     ethConfig: RedStoneConfig = self.feedConfig[ETH]
     if _asset == ETH or ethConfig.needsEthToUsd:
@@ -221,7 +219,7 @@ def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool
 @view
 @internal
 def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
-    # Only canonical PriceDesk may supply a nonzero forwarded global policy.
+    # only canonical PriceDesk may supply a nonzero forwarded global policy
     if _staleTime == 0:
         return True
     priceDesk: address = addys._getPriceDeskAddr()
@@ -456,7 +454,7 @@ def updatePriceFeed(
     assert not priceData.isPaused # dev: contract paused
     assert _newFeed != self.feedConfig[_asset].feed # dev: invalid feed
 
-    # Feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
+    # feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
     # remains the explicit path for resetting a feed to MissionControl inheritance.
     staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
 
@@ -525,7 +523,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     oldFeed: address = self.feedConfig[_asset].feed
     assert oldFeed != empty(address) # dev: no pending update feed
     if not self._isValidUpdateFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
-        # A stale-only update can fail transiently when its unchanged oracle is
+        # a stale-only update can fail transiently when its unchanged oracle is
         # unavailable. Preserve the timelocked action so governance can retry.
         if d.config.feed == oldFeed:
             return False
@@ -572,7 +570,7 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _staleTime: uint256) -> bool:
-    # Feed-changing preflight intentionally rejects the active feed. Use
+    # feed-changing preflight intentionally rejects the active feed. Use
     # `isValidStaleTimeUpdate` for a same-feed policy change.
     if _newFeed == self.feedConfig[_asset].feed:
         return False
@@ -583,7 +581,7 @@ def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _n
 @view
 @external
 def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
-    # Stale-only preflight validates against the active feed configuration.
+    # stale-only preflight validates against the active feed configuration
     config: RedStoneConfig = self.feedConfig[_asset]
     return self._isValidUpdateFeed(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime)
 
