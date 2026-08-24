@@ -184,8 +184,11 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
-    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
-        return 0
+    # A nonzero value is only the global policy forwarded by canonical PriceDesk.
+    if _staleTime != 0:
+        priceDesk: address = addys._getPriceDeskAddr()
+        if msg.sender != priceDesk or _priceDesk != priceDesk:
+            return 0
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime)
 
 
@@ -195,8 +198,11 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
-    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
-        return 0, True
+    # A nonzero value is only the global policy forwarded by canonical PriceDesk.
+    if _staleTime != 0:
+        priceDesk: address = addys._getPriceDeskAddr()
+        if msg.sender != priceDesk or _priceDesk != priceDesk:
+            return 0, True
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime), True
 
 
@@ -480,6 +486,7 @@ def updatePriceFeed(
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert _newFeed != self.feedConfig[_asset].feed # dev: invalid feed
 
     # validation
     decimals: uint256 = 0
@@ -507,7 +514,7 @@ def _initiatePriceFeedUpdate(
     _staleTime: uint256,
 ) -> bool:
     oldFeed: address = self.feedConfig[_asset].feed
-    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -537,7 +544,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending update feed
     oldFeed: address = self.feedConfig[_asset].feed
-    if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
+    if not self._isValidUpdateFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -578,73 +585,27 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
-    return self._isValidUpdateFeed(_asset, _newFeed, self.feedConfig[_asset].feed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
+    if _newFeed == self.feedConfig[_asset].feed:
+        return False
+    return self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
 
 
 @view
 @internal
-def _isValidUpdateFeed(_asset: address, _newFeed: address, _oldFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
-    if priceData.indexOfAsset[_asset] == 0 or _oldFeed == empty(address): # use the `addNewPriceFeed` function instead
-        return False
-
+def _isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
     currentConfig: ChainlinkConfig = self.feedConfig[_asset]
-    if _oldFeed != currentConfig.feed:
+    if priceData.indexOfAsset[_asset] == 0 or currentConfig.feed == empty(address): # use the `addNewPriceFeed` function instead
         return False
-    if (
-        _newFeed == currentConfig.feed
-        and _decimals == currentConfig.decimals
-        and _needsEthToUsd == currentConfig.needsEthToUsd
-        and _needsBtcToUsd == currentConfig.needsBtcToUsd
-        and _staleTime == currentConfig.staleTime
-    ):
-        return False
-
-    if self._isStaleTimeOnlyTightening(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime):
-        return self._isValidFeedConfig(
-            _asset,
-            currentConfig.feed,
-            currentConfig.decimals,
-            currentConfig.needsEthToUsd,
-            currentConfig.needsBtcToUsd,
-            currentConfig.staleTime,
-        )
-    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
-
-
-@view
-@internal
-def _isStaleTimeOnlyTightening(
-    _asset: address,
-    _newFeed: address,
-    _decimals: uint256,
-    _needsEthToUsd: bool,
-    _needsBtcToUsd: bool,
-    _staleTime: uint256,
-) -> bool:
-    currentConfig: ChainlinkConfig = self.feedConfig[_asset]
-    if (
-        _newFeed != currentConfig.feed
-        or _decimals != currentConfig.decimals
-        or _needsEthToUsd != currentConfig.needsEthToUsd
-        or _needsBtcToUsd != currentConfig.needsBtcToUsd
-        or _staleTime == currentConfig.staleTime
-    ):
-        return False
-
-    globalStaleTime: uint256 = 0
-    if currentConfig.staleTime == 0 or _staleTime == 0:
-        hasValidGlobal: bool = False
-        globalStaleTime, hasValidGlobal = self._getGlobalStaleTime()
-        if not hasValidGlobal:
+    if _newFeed == currentConfig.feed:
+        if (
+            _decimals != currentConfig.decimals
+            or _needsEthToUsd != currentConfig.needsEthToUsd
+            or _needsBtcToUsd != currentConfig.needsBtcToUsd
+            or _staleTime == currentConfig.staleTime
+        ):
             return False
 
-    currentStaleTime: uint256 = 0
-    candidateStaleTime: uint256 = 0
-    isValidCurrent: bool = False
-    isValidCandidate: bool = False
-    currentStaleTime, isValidCurrent = self._resolveStaleTime(globalStaleTime, currentConfig.staleTime)
-    candidateStaleTime, isValidCandidate = self._resolveStaleTime(globalStaleTime, _staleTime)
-    return isValidCurrent and isValidCandidate and candidateStaleTime < currentStaleTime
+    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
 
 
 @view
@@ -705,6 +666,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     oldFeed: address = self.feedConfig[_asset].feed
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feed == empty(address) # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeed):
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False

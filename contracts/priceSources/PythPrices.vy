@@ -152,8 +152,11 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
-    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
-        return 0
+    # A nonzero value is only the canonical PriceDesk-forwarded global.
+    if _staleTime != 0:
+        priceDesk: address = addys._getPriceDeskAddr()
+        if msg.sender != priceDesk or _priceDesk != priceDesk:
+            return 0
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -168,8 +171,11 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
-    if _staleTime != 0 and (_priceDesk == empty(address) or msg.sender != _priceDesk):
-        return 0, True
+    # A nonzero value is only the canonical PriceDesk-forwarded global.
+    if _staleTime != 0:
+        priceDesk: address = addys._getPriceDeskAddr()
+        if msg.sender != priceDesk or _priceDesk != priceDesk:
+            return 0, True
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -398,6 +404,7 @@ def _isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> b
 def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert _feedId != self.feedConfig[_asset].feedId # dev: invalid feed
 
     return self._initiatePriceFeedUpdate(_asset, _feedId, _staleTime)
 
@@ -416,7 +423,7 @@ def _initiatePriceFeedUpdate(_asset: address, _feedId: bytes32, _staleTime: uint
 
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
-    assert self._isValidUpdateFeed(_asset, _feedId, oldFeedId, _staleTime) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, _feedId, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -441,7 +448,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingPythFeed = self.pendingUpdates[_asset]
     assert d.config.feedId != empty(bytes32) # dev: no pending update feed
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
-    if not self._isValidUpdateFeed(_asset, d.config.feedId, oldFeedId, d.config.staleTime):
+    if not self._isValidUpdateFeed(_asset, d.config.feedId, d.config.staleTime):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -482,35 +489,19 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
-    return self._isValidUpdateFeed(_asset, _feedId, self.feedConfig[_asset].feedId, _staleTime)
+    if _feedId == self.feedConfig[_asset].feedId:
+        return False
+    return self._isValidUpdateFeed(_asset, _feedId, _staleTime)
 
 
 @view
 @internal
-def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _oldFeedId: bytes32, _staleTime: uint256) -> bool:
-    if priceData.indexOfAsset[_asset] == 0 or _oldFeedId == empty(bytes32): # use the `addNewPriceFeed` function instead
-        return False
-
+def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
     oldConfig: PythFeedConfig = self.feedConfig[_asset]
-    if _oldFeedId != oldConfig.feedId:
+    if priceData.indexOfAsset[_asset] == 0 or oldConfig.feedId == empty(bytes32): # use the `addNewPriceFeed` function instead
         return False
-    if _feedId == oldConfig.feedId:
-        if _staleTime == oldConfig.staleTime:
-            return False
-
-        candidateStaleTime: uint256 = 0
-        currentStaleTime: uint256 = 0
-        isCandidateValid: bool = False
-        isCurrentValid: bool = False
-        candidateStaleTime, isCandidateValid = self._resolveStaleTime(0, _staleTime)
-        currentStaleTime, isCurrentValid = self._resolveStaleTime(0, oldConfig.staleTime)
-
-        # A stale-time-only tightening may deliberately make the current
-        # observation stale. Require the feed to be live under its current
-        # policy, while all other updates must be live under the candidate.
-        if isCandidateValid and isCurrentValid and candidateStaleTime < currentStaleTime:
-            if self._isValidFeedConfig(_asset, oldConfig.feedId, oldConfig.staleTime):
-                return True
+    if _feedId == oldConfig.feedId and _staleTime == oldConfig.staleTime:
+        return False
 
     return self._isValidFeedConfig(_asset, _feedId, _staleTime)
 
@@ -572,6 +563,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     d: PendingPythFeed = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feedId == empty(bytes32) # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeedId):
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False
