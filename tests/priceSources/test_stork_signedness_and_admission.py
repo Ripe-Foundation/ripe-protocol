@@ -133,10 +133,10 @@ def test_stork_admission_uses_exact_feed_override_over_global_default(
             sender=governance.address,
         )
 
-        _write_feed(mock_stork, feed_tight, EIGHTEEN_DECIMALS, now - 50)
+        _write_feed(mock_stork, feed_tight, EIGHTEEN_DECIMALS, now - 350)
         setGeneralConfig(_priceStaleTime=1000)
         with boa.reverts("invalid feed"):
-            stork_prices.addNewPriceFeed(bravo_token, feed_tight, 10, sender=governance.address)
+            stork_prices.addNewPriceFeed(bravo_token, feed_tight, 300, sender=governance.address)
 
         _write_feed(mock_stork, both_ok, EIGHTEEN_DECIMALS, now - 50)
         setGeneralConfig(_priceStaleTime=1000)

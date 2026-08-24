@@ -12,13 +12,18 @@ Includes:
 
 Usage:
     python scripts/params/prices.py
+    python scripts/params/prices.py --strict-activation
+    python scripts/params/prices.py --strict-activation \
+        --chainlink-anchor ETH --proposed-anchor-feed 0x...
 """
 
+import argparse
 import os
 import sys
 import time
 
 import boa
+from eth_hash.auto import keccak
 
 # Import shared utilities
 from params_utils import (
@@ -46,6 +51,35 @@ from params_utils import (
 # ============================================================================
 # Global state
 # ============================================================================
+
+
+STALE_TIME_GENERATION_LEGACY = "legacy"
+STALE_TIME_GENERATION_CURRENT = "current"
+STALE_TIME_GENERATION_NEW_COMPATIBLE = "new-compatible"
+STALE_TIME_GENERATION_UNKNOWN = "unknown"
+MIN_LOCAL_STALE_TIME = 300
+MAX_EFFECTIVE_STALE_TIME = 604_800
+DEFAULT_EXPECTED_ACTIVATION_GLOBAL_STALE_TIME = 86_400
+
+# Deployment-specific, exact runtime fingerprints collected from the
+# repository's current Base manifest addresses. Vyper appends immutables to
+# deployed runtime code, so a source-template hash is not a deployed identity.
+# Add a current-generation hash only from a reviewed completion manifest.
+KNOWN_LEGACY_STALE_TIME_RUNTIME_HASHES = {
+    # ChainlinkPrices 0xD11B23b6391e294DF49961E64231bddDE5bB5E89
+    "0xb9a7cbdb193aeefb73fff5c17edd408dfe607cdbf1e2ea4aefe13da92682e99a",
+    # PythPrices 0x16371fAf6f603f8d8D6cef8C46253c80AdEe8b98
+    "0xd9fac1cfeddae2b19e47dbea1b59d0eccd2df32e96f420e801ee4fc4d974e482",
+    # RedStone 0x9f20F25f037046721A292B19A486932ef390EAf9
+    "0x8b690e5d15f204e5656e084832d8805a5b921913c237cc0132074494dd87c648",
+    # StorkPrices 0xceE8Ed804f72b6EcB6B2D679ca17B545bD654bF6
+    "0x6ed75e536af6436a82fb3372b22795fb601ac11c3ea2c3f60ee7b78fb0cc7351",
+}
+KNOWN_CURRENT_STALE_TIME_RUNTIME_HASHES = set()
+# PriceDesk also contains immutable constructor values, so its reviewed
+# deployed runtime identity must be bound separately from the four sources.
+# Populate only from the reviewed deployment completion record.
+EXPECTED_CURRENT_PRICE_DESK_RUNTIME_HASH = None
 
 
 class PriceState:
@@ -125,6 +159,22 @@ def initialize_prices():
             "contract": source,
         }
 
+    # Classify each loaded source once. Runtime reads and cross-source
+    # discovery are report-scoped caches used by both active and pending output.
+    for source_info in state.price_sources.values():
+        generation, runtime_hash = _classify_stale_time_generation(
+            source_info["contract"]
+        )
+        source_info["stale_time_generation"] = generation
+        source_info["runtime_hash"] = runtime_hash
+
+    for source_info in state.price_sources.values():
+        source = source_info["contract"]
+        if _is_redstone_source(source, source_info["description"]):
+            source_info["cross_source_inventory"] = (
+                _discover_eth_route_primary_feeds(source)
+            )
+
     print("  All price sources loaded.\n", file=sys.stderr)
 
 
@@ -153,23 +203,148 @@ def _read_mission_control_stale_time(mission_control):
         return None
 
 
-def _format_price_feed_stale_time(stored_stale_time, global_stale_time=None):
-    """Render feed overrides without misrepresenting the zero sentinel."""
+def _runtime_code_hash(source):
+    """Return the exact immutable-bound runtime hash, or None if unreadable."""
+    try:
+        code = boa.env.get_code(source.address)
+        if isinstance(code, str):
+            code = bytes.fromhex(code.removeprefix("0x"))
+        else:
+            code = bytes(code)
+        if not code:
+            return None
+        return "0x" + keccak(code).hex()
+    except Exception:
+        return None
+
+
+def _classify_stale_time_generation(
+    source,
+    known_legacy_hashes=None,
+    known_current_hashes=None,
+):
+    """Classify exact known runtimes; never infer legacy from source names."""
+    legacy_hashes = (
+        KNOWN_LEGACY_STALE_TIME_RUNTIME_HASHES
+        if known_legacy_hashes is None
+        else known_legacy_hashes
+    )
+    current_hashes = (
+        KNOWN_CURRENT_STALE_TIME_RUNTIME_HASHES
+        if known_current_hashes is None
+        else known_current_hashes
+    )
+    runtime_hash = _runtime_code_hash(source)
+    if runtime_hash in legacy_hashes:
+        return STALE_TIME_GENERATION_LEGACY, runtime_hash
+    if runtime_hash in current_hashes:
+        return STALE_TIME_GENERATION_CURRENT, runtime_hash
+    if hasattr(source, "isValidStaleTimeUpdate"):
+        return STALE_TIME_GENERATION_NEW_COMPATIBLE, runtime_hash
+    return STALE_TIME_GENERATION_UNKNOWN, runtime_hash
+
+
+def _stale_time_generation_label(generation, runtime_hash=None):
+    if generation == STALE_TIME_GENERATION_LEGACY:
+        label = "legacy semantics (recognized exact runtime)"
+    elif generation == STALE_TIME_GENERATION_CURRENT:
+        label = "current exact-override semantics (recognized exact runtime)"
+    elif generation == STALE_TIME_GENERATION_NEW_COMPATIBLE:
+        label = "new-compatible ABI, unrecognized codehash"
+    else:
+        label = "unknown generation; stale-time semantics not asserted"
+    if runtime_hash is not None:
+        return f"{label}; runtime `{runtime_hash}`"
+    return f"{label}; runtime hash unavailable"
+
+
+def _format_price_feed_stale_time(
+    stored_stale_time,
+    global_stale_time=None,
+    generation=STALE_TIME_GENERATION_UNKNOWN,
+):
+    """Render stored/global policy under an explicitly classified generation."""
     stored = int(stored_stale_time)
-    if stored != 0:
-        return f"{stored}s"
-    if global_stale_time is None:
-        return "inherit MissionControl (stored 0; effective value unavailable)"
+    global_value = (
+        None if global_stale_time is None else int(global_stale_time)
+    )
+    global_label = (
+        "unavailable" if global_value is None else f"{global_value}s"
+    )
+    prefix = f"stored {stored}s; global {global_label}; "
+
+    if generation == STALE_TIME_GENERATION_LEGACY:
+        if global_value is None:
+            return prefix + "legacy cap/fallback; effective value unavailable"
+        if stored != 0 and global_value != 0:
+            return (
+                prefix
+                + f"legacy cap; effective {min(stored, global_value)}s"
+            )
+        if stored != 0 or global_value != 0:
+            return prefix + f"legacy fallback; effective {stored or global_value}s"
+        return prefix + "legacy zero/zero; freshness unenforced"
+
+    if generation == STALE_TIME_GENERATION_CURRENT:
+        if stored != 0:
+            if (
+                stored < MIN_LOCAL_STALE_TIME
+                or stored > MAX_EFFECTIVE_STALE_TIME
+            ):
+                return prefix + "local override out of range; invalid/fail-closed"
+            return prefix + f"exact local override; effective {stored}s"
+        if global_value is None:
+            return prefix + "inherit MissionControl; effective value unavailable"
+        if global_value == 0 or global_value > MAX_EFFECTIVE_STALE_TIME:
+            return prefix + "inherited global out of range; invalid/fail-closed"
+        return prefix + f"inherit MissionControl; effective {global_value}s"
+
+    if generation == STALE_TIME_GENERATION_NEW_COMPATIBLE:
+        current_meaning = _format_price_feed_stale_time(
+            stored,
+            global_value,
+            STALE_TIME_GENERATION_CURRENT,
+        )
+        return (
+            "new-compatible ABI, unrecognized codehash; expected new meaning: "
+            + current_meaning
+        )
+
     return (
-        "inherit MissionControl "
-        f"(stored 0; effective {int(global_stale_time)}s)"
+        prefix
+        + "unknown generation; effective stale-time semantics not asserted"
     )
 
 
-def _matching_cross_source_eth_usd_feeds(
+def _format_route_stale_time(
+    stored_stale_time,
+    global_stale_time,
+    generation,
+    needs_eth_to_usd=False,
+    needs_btc_to_usd=False,
+):
+    policy = _format_price_feed_stale_time(
+        stored_stale_time,
+        global_stale_time,
+        generation,
+    )
+    anchors = []
+    if needs_eth_to_usd:
+        anchors.append("ETH")
+    if needs_btc_to_usd:
+        anchors.append("BTC")
+    if not anchors:
+        return policy
+    return (
+        f"primary-feed policy: {policy}; final route also depends on the "
+        f"{' and '.join(anchors)} anchor's independently resolved policy"
+    )
+
+
+def _matching_cross_source_eth_route_primary_feeds(
     primary_feed,
     needs_eth_to_usd,
-    discovered_eth_usd_feeds,
+    discovered_eth_route_primary_feeds,
 ):
     """Return source labels only for an exact cross-source feed-address match."""
     if not needs_eth_to_usd:
@@ -177,7 +352,7 @@ def _matching_cross_source_eth_usd_feeds(
     feed = str(primary_feed).lower()
     if feed == ZERO_ADDRESS:
         return ()
-    return tuple(discovered_eth_usd_feeds.get(feed, ()))
+    return tuple(discovered_eth_route_primary_feeds.get(feed, ()))
 
 
 def _is_redstone_source(source, source_name):
@@ -185,8 +360,32 @@ def _is_redstone_source(source, source_name):
     return "redstone" in normalized_name or hasattr(source, "getRedStoneData")
 
 
-def _discover_direct_eth_usd_feeds(excluded_source=None):
-    """Best-effort direct ETH/USD feed inventory and unreadable RPC surfaces."""
+def _is_chainlink_source(source, source_name):
+    normalized_name = str(source_name).lower().replace(" ", "")
+    return "chainlink" in normalized_name or hasattr(source, "getChainlinkData")
+
+
+def _is_stale_time_feed_source(
+    source=None,
+    source_name="",
+    runtime_hash=None,
+):
+    if runtime_hash in (
+        KNOWN_LEGACY_STALE_TIME_RUNTIME_HASHES
+        | KNOWN_CURRENT_STALE_TIME_RUNTIME_HASHES
+    ):
+        return True
+    if source is not None and hasattr(source, "isValidStaleTimeUpdate"):
+        return True
+    normalized_name = str(source_name).lower().replace(" ", "")
+    return any(
+        source_type in normalized_name
+        for source_type in ("chainlink", "pyth", "redstone", "stork")
+    )
+
+
+def _discover_eth_route_primary_feeds(excluded_source=None):
+    """Inventory address-valued ETH-route primary feeds and unreadable surfaces."""
     discovered = {}
     incomplete_reads = set()
     excluded_address = str(getattr(excluded_source, "address", "")).lower()
@@ -230,32 +429,51 @@ def _discover_direct_eth_usd_feeds(excluded_source=None):
             if normalized_asset in checked_assets:
                 continue
             checked_assets.add(normalized_asset)
+            configs = []
             try:
-                config = source.feedConfig(eth_asset)
+                configs.append(("active", source.feedConfig(eth_asset)))
             except Exception:
                 label = (
                     f"{source_info['description']} "
                     f"(registry {reg_id}).feedConfig"
                 )
                 incomplete_reads.add(label)
-                continue
 
-            # Feed-id sources cannot match RedStone's address-valued feed.
-            if not hasattr(config, "feed"):
-                continue
-            feed = str(config.feed).lower()
-            if feed == ZERO_ADDRESS:
-                continue
-            # Only a direct USD anchor is evidence for this diagnostic.
-            if getattr(config, "needsEthToUsd", False) or getattr(
-                config,
-                "needsBtcToUsd",
-                False,
-            ):
-                continue
+            if hasattr(source, "pendingUpdates"):
+                try:
+                    pending = source.pendingUpdates(eth_asset)
+                    if getattr(pending, "actionId", 0) != 0:
+                        if not hasattr(pending, "config"):
+                            incomplete_reads.add(
+                                f"{source_info['description']} "
+                                f"(registry {reg_id}).pendingUpdates.config"
+                            )
+                        else:
+                            configs.append(("pending", pending.config))
+                except Exception:
+                    incomplete_reads.add(
+                        f"{source_info['description']} "
+                        f"(registry {reg_id}).pendingUpdates"
+                    )
 
-            label = f"{source_info['description']} (registry {reg_id})"
-            discovered.setdefault(feed, set()).add(label)
+            for config_state, config in configs:
+                # Feed-id sources cannot match RedStone's address-valued feed.
+                if not hasattr(config, "feed"):
+                    continue
+                feed = str(config.feed).lower()
+                if feed == ZERO_ADDRESS:
+                    continue
+                label = f"{source_info['description']} (registry {reg_id})"
+                if config_state == "pending":
+                    label += ", pending"
+                route_dependencies = []
+                if getattr(config, "needsEthToUsd", False):
+                    route_dependencies.append("ETH")
+                if getattr(config, "needsBtcToUsd", False):
+                    route_dependencies.append("BTC")
+                if route_dependencies:
+                    label += ", converts via " + "/".join(route_dependencies)
+                discovered.setdefault(feed, set()).add(label)
 
     return (
         {
@@ -276,6 +494,797 @@ def _print_incomplete_cross_source_discovery(incomplete_reads):
         "self-conversion warning is not conclusive; retry the report before "
         "confirmation or activation."
     )
+
+
+def _unmatched_live_action_ids(source, matched_action_ids):
+    """Find live timelock actions not attributable to enumerated assets."""
+    incomplete_reads = set()
+    try:
+        next_action_id = int(source.actionId())
+    except Exception:
+        return (), ("actionId",)
+    if next_action_id < 1:
+        return (), ("actionId(invalid)",)
+
+    live_action_ids = []
+    for action_id in range(1, next_action_id):
+        try:
+            if source.hasPendingAction(action_id):
+                live_action_ids.append(action_id)
+        except Exception:
+            incomplete_reads.add(f"hasPendingAction({action_id})")
+
+    matched = {int(action_id) for action_id in matched_action_ids}
+    live = set(live_action_ids)
+    incomplete_reads.update(
+        f"inactiveMappedAction({action_id})"
+        for action_id in matched
+        if action_id not in live
+    )
+    return (
+        tuple(action_id for action_id in live_action_ids if action_id not in matched),
+        tuple(sorted(incomplete_reads)),
+    )
+
+
+def _redstone_cross_source_collisions(
+    source,
+    num_assets,
+    discovered_eth_route_primary_feeds,
+):
+    """Inspect active and pending RedStone routes without another inventory."""
+    collisions = []
+    local_hazards = set()
+    incomplete_reads = set()
+    matched_action_ids = set()
+
+    eth_asset = None
+    eth_configs = []
+    try:
+        eth_asset = source.ETH()
+    except Exception:
+        incomplete_reads.add("ETH")
+    if eth_asset is not None:
+        try:
+            eth_configs.append(("active", source.feedConfig(eth_asset)))
+        except Exception:
+            incomplete_reads.add(f"feedConfig({eth_asset})")
+        try:
+            pending_eth = source.pendingUpdates(eth_asset)
+            pending_eth_action_id = int(getattr(pending_eth, "actionId", 0))
+            if pending_eth_action_id != 0:
+                matched_action_ids.add(pending_eth_action_id)
+                if not hasattr(pending_eth, "config"):
+                    incomplete_reads.add(f"pendingUpdates({eth_asset}).config")
+                else:
+                    eth_configs.append(("pending", pending_eth.config))
+        except Exception:
+            incomplete_reads.add(f"pendingUpdates({eth_asset})")
+
+    for index in range(1, int(num_assets)):
+        try:
+            asset = source.assets(index)
+        except Exception:
+            incomplete_reads.add(f"assets({index})")
+            continue
+        try:
+            config = source.feedConfig(asset)
+        except Exception:
+            incomplete_reads.add(f"feedConfig({asset})")
+            continue
+        configs = (("active", config),)
+        if hasattr(source, "pendingUpdates"):
+            try:
+                pending = source.pendingUpdates(asset)
+            except Exception:
+                incomplete_reads.add(f"pendingUpdates({asset})")
+                pending = None
+            pending_action_id = int(getattr(pending, "actionId", 0))
+            if pending_action_id != 0:
+                matched_action_ids.add(pending_action_id)
+                if not hasattr(pending, "config"):
+                    incomplete_reads.add(f"pendingUpdates({asset}).config")
+                else:
+                    configs += (("pending", pending.config),)
+
+        for config_state, candidate in configs:
+            if not hasattr(candidate, "feed"):
+                continue
+            matching_sources = _matching_cross_source_eth_route_primary_feeds(
+                candidate.feed,
+                getattr(candidate, "needsEthToUsd", False),
+                discovered_eth_route_primary_feeds,
+            )
+            if matching_sources:
+                collisions.append(
+                    (
+                        config_state,
+                        str(asset),
+                        str(candidate.feed),
+                        tuple(matching_sources),
+                    )
+                )
+
+            if not getattr(candidate, "needsEthToUsd", False):
+                continue
+            candidate_feed = str(candidate.feed).lower()
+            if eth_asset is not None and str(asset).lower() == str(eth_asset).lower():
+                local_hazards.add(
+                    (config_state, str(asset), str(candidate.feed), "asset is ETH")
+                )
+            for eth_state, eth_config in eth_configs:
+                if getattr(eth_config, "needsEthToUsd", False):
+                    local_hazards.add(
+                        (
+                            config_state,
+                            str(asset),
+                            str(candidate.feed),
+                            f"{eth_state} ETH config also needs ETH conversion",
+                        )
+                    )
+                if (
+                    candidate_feed != ZERO_ADDRESS
+                    and candidate_feed == str(getattr(eth_config, "feed", "")).lower()
+                ):
+                    local_hazards.add(
+                        (
+                            config_state,
+                            str(asset),
+                            str(candidate.feed),
+                            f"primary feed equals {eth_state} ETH feed",
+                        )
+                    )
+
+    unmatched_actions, action_incomplete = _unmatched_live_action_ids(
+        source,
+        matched_action_ids,
+    )
+    incomplete_reads.update(action_incomplete)
+    return (
+        tuple(collisions),
+        tuple(sorted(local_hazards)),
+        unmatched_actions,
+        tuple(sorted(incomplete_reads)),
+    )
+
+
+def _qualify_redstone_activation(
+    source,
+    num_assets,
+    cross_source_inventory=None,
+):
+    """Fail closed on RedStone collisions or incomplete RPC discovery."""
+    if cross_source_inventory is None:
+        cross_source_inventory = _discover_eth_route_primary_feeds(source)
+    discovered, discovery_incomplete = cross_source_inventory
+    (
+        collisions,
+        local_hazards,
+        unmatched_actions,
+        config_incomplete,
+    ) = _redstone_cross_source_collisions(
+        source,
+        num_assets,
+        discovered,
+    )
+    incomplete = tuple(sorted(set(discovery_incomplete + config_incomplete)))
+    if collisions or local_hazards or unmatched_actions or incomplete:
+        details = []
+        if collisions:
+            details.append(
+                "collisions="
+                + ";".join(
+                    f"{config_state}:{asset}:{feed}:{','.join(labels)}"
+                    for config_state, asset, feed, labels in collisions
+                )
+            )
+        if local_hazards:
+            details.append(
+                "local-hazards="
+                + ";".join(
+                    f"{config_state}:{asset}:{feed}:{reason}"
+                    for config_state, asset, feed, reason in local_hazards
+                )
+            )
+        if unmatched_actions:
+            details.append(
+                "unmatched-actions="
+                + ",".join(str(action_id) for action_id in unmatched_actions)
+            )
+        if incomplete:
+            details.append("incomplete=" + ",".join(incomplete))
+        raise RuntimeError(
+            "REDSTONE_ACTIVATION_QUALIFICATION_FAILED:" + "|".join(details)
+        )
+    return True
+
+
+def _chainlink_anchor_rotation_dependents(
+    source,
+    anchor,
+    proposed_feed,
+    proposed_needs_eth_to_usd=False,
+    proposed_needs_btc_to_usd=False,
+):
+    """Enumerate configured routes a proposed ETH/BTC anchor would invalidate."""
+    anchor_name = str(anchor).upper()
+    if anchor_name not in ("ETH", "BTC"):
+        raise ValueError(f"CHAINLINK_ANCHOR_INVALID:{anchor}")
+    proposed_feed_normalized = str(proposed_feed).lower()
+    required_flag = (
+        "needsEthToUsd" if anchor_name == "ETH" else "needsBtcToUsd"
+    )
+    affected = []
+    incomplete_reads = set()
+    matched_action_ids = set()
+    try:
+        num_assets = int(source.numAssets())
+    except Exception:
+        return (), ("numAssets",)
+
+    for index in range(1, num_assets):
+        try:
+            asset = source.assets(index)
+        except Exception:
+            incomplete_reads.add(f"assets({index})")
+            continue
+        try:
+            config = source.feedConfig(asset)
+        except Exception:
+            incomplete_reads.add(f"feedConfig({asset})")
+            continue
+        configs = (("active", config),)
+        if hasattr(source, "pendingUpdates"):
+            try:
+                pending = source.pendingUpdates(asset)
+            except Exception:
+                incomplete_reads.add(f"pendingUpdates({asset})")
+                pending = None
+            pending_action_id = int(getattr(pending, "actionId", 0))
+            if pending_action_id != 0:
+                matched_action_ids.add(pending_action_id)
+                if not hasattr(pending, "config"):
+                    incomplete_reads.add(f"pendingUpdates({asset}).config")
+                else:
+                    configs += (("pending", pending.config),)
+
+        for config_state, candidate in configs:
+            if not getattr(candidate, required_flag, False):
+                continue
+
+            reason = None
+            if proposed_feed_normalized == ZERO_ADDRESS:
+                reason = "zero anchor feed"
+            elif proposed_needs_eth_to_usd or proposed_needs_btc_to_usd:
+                reason = "anchor is not a direct USD route"
+            elif str(candidate.feed).lower() == proposed_feed_normalized:
+                reason = "primary feed equals proposed anchor feed"
+            if reason is not None:
+                affected.append(
+                    (
+                        config_state,
+                        str(asset),
+                        str(candidate.feed),
+                        reason,
+                    )
+                )
+
+    unmatched_actions, action_incomplete = _unmatched_live_action_ids(
+        source,
+        matched_action_ids,
+    )
+    incomplete_reads.update(action_incomplete)
+    incomplete_reads.update(
+        f"unmatchedPendingAction({action_id})"
+        for action_id in unmatched_actions
+    )
+    return tuple(affected), tuple(sorted(incomplete_reads))
+
+
+def _qualify_chainlink_anchor_rotation(source, anchor, proposed_feed):
+    """Fail closed when an anchor rotation breaks a dependent or is unreadable."""
+    if str(proposed_feed).lower() == ZERO_ADDRESS:
+        raise RuntimeError(
+            "CHAINLINK_ANCHOR_ROTATION_QUALIFICATION_FAILED:zero-feed"
+        )
+    affected, incomplete = _chainlink_anchor_rotation_dependents(
+        source,
+        anchor,
+        proposed_feed,
+    )
+    if affected or incomplete:
+        details = []
+        if affected:
+            details.append(
+                "affected="
+                + ";".join(
+                    f"{config_state}:{asset}:{feed}:{reason}"
+                    for config_state, asset, feed, reason in affected
+                )
+            )
+        if incomplete:
+            details.append("incomplete=" + ",".join(incomplete))
+        raise RuntimeError(
+            "CHAINLINK_ANCHOR_ROTATION_QUALIFICATION_FAILED:"
+            + "|".join(details)
+        )
+    return True
+
+
+def _active_and_pending_feed_configs(
+    source,
+    asset,
+    matched_action_ids,
+    incomplete_reads,
+):
+    configs = []
+    try:
+        configs.append(("active", source.feedConfig(asset)))
+    except Exception:
+        incomplete_reads.add(f"feedConfig({asset})")
+
+    if not hasattr(source, "pendingUpdates"):
+        incomplete_reads.add("pendingUpdates(unavailable)")
+        return tuple(configs)
+    try:
+        pending = source.pendingUpdates(asset)
+    except Exception:
+        incomplete_reads.add(f"pendingUpdates({asset})")
+        return tuple(configs)
+    pending_action_id = int(getattr(pending, "actionId", 0))
+    if pending_action_id == 0:
+        return tuple(configs)
+    matched_action_ids.add(pending_action_id)
+    if not hasattr(pending, "config"):
+        incomplete_reads.add(f"pendingUpdates({asset}).config")
+        return tuple(configs)
+    configs.append(("pending", pending.config))
+    return tuple(configs)
+
+
+def _chainlink_conversion_route_hazards(source):
+    """Mirror current Chainlink route invariants across active/pending state."""
+    hazards = set()
+    incomplete_reads = set()
+    matched_action_ids = set()
+    try:
+        num_assets = int(source.numAssets())
+    except Exception:
+        return (), (), ("numAssets",)
+
+    anchor_assets = {}
+    for anchor_name in ("ETH", "BTC"):
+        try:
+            anchor_assets[anchor_name] = getattr(source, anchor_name)()
+        except Exception:
+            incomplete_reads.add(anchor_name)
+
+    anchor_configs = {
+        anchor_name: _active_and_pending_feed_configs(
+            source,
+            anchor_asset,
+            matched_action_ids,
+            incomplete_reads,
+        )
+        for anchor_name, anchor_asset in anchor_assets.items()
+    }
+
+    for index in range(1, num_assets):
+        try:
+            asset = source.assets(index)
+        except Exception:
+            incomplete_reads.add(f"assets({index})")
+            continue
+        configs = _active_and_pending_feed_configs(
+            source,
+            asset,
+            matched_action_ids,
+            incomplete_reads,
+        )
+        for config_state, candidate in configs:
+            needs_eth = getattr(candidate, "needsEthToUsd", False)
+            needs_btc = getattr(candidate, "needsBtcToUsd", False)
+            if not needs_eth and not needs_btc:
+                continue
+            candidate_feed = str(getattr(candidate, "feed", ZERO_ADDRESS))
+            if needs_eth and needs_btc:
+                hazards.add(
+                    (
+                        config_state,
+                        str(asset),
+                        candidate_feed,
+                        "both conversion flags are set",
+                    )
+                )
+                continue
+
+            anchor_name = "ETH" if needs_eth else "BTC"
+            if anchor_name not in anchor_assets:
+                continue
+            anchor_asset = anchor_assets[anchor_name]
+            if str(asset).lower() == str(anchor_asset).lower():
+                hazards.add(
+                    (
+                        config_state,
+                        str(asset),
+                        candidate_feed,
+                        f"asset is {anchor_name}",
+                    )
+                )
+            for anchor_state, anchor_config in anchor_configs[anchor_name]:
+                anchor_feed = str(
+                    getattr(anchor_config, "feed", ZERO_ADDRESS)
+                ).lower()
+                if anchor_feed == ZERO_ADDRESS:
+                    hazards.add(
+                        (
+                            config_state,
+                            str(asset),
+                            candidate_feed,
+                            f"{anchor_state} {anchor_name} anchor feed is zero",
+                        )
+                    )
+                if getattr(anchor_config, "needsEthToUsd", False) or getattr(
+                    anchor_config,
+                    "needsBtcToUsd",
+                    False,
+                ):
+                    hazards.add(
+                        (
+                            config_state,
+                            str(asset),
+                            candidate_feed,
+                            f"{anchor_state} {anchor_name} anchor also converts",
+                        )
+                    )
+                if candidate_feed.lower() == anchor_feed:
+                    hazards.add(
+                        (
+                            config_state,
+                            str(asset),
+                            candidate_feed,
+                            f"primary feed equals {anchor_state} {anchor_name} feed",
+                        )
+                    )
+
+    unmatched_actions, action_incomplete = _unmatched_live_action_ids(
+        source,
+        matched_action_ids,
+    )
+    incomplete_reads.update(action_incomplete)
+    return (
+        tuple(sorted(hazards)),
+        unmatched_actions,
+        tuple(sorted(incomplete_reads)),
+    )
+
+
+def _qualify_chainlink_conversion_routes(source):
+    hazards, unmatched_actions, incomplete = (
+        _chainlink_conversion_route_hazards(source)
+    )
+    if hazards or unmatched_actions or incomplete:
+        details = []
+        if hazards:
+            details.append(
+                "hazards="
+                + ";".join(
+                    f"{config_state}:{asset}:{feed}:{reason}"
+                    for config_state, asset, feed, reason in hazards
+                )
+            )
+        if unmatched_actions:
+            details.append(
+                "unmatched-actions="
+                + ",".join(str(action_id) for action_id in unmatched_actions)
+            )
+        if incomplete:
+            details.append("incomplete=" + ",".join(incomplete))
+        raise RuntimeError(
+            "CHAINLINK_ROUTE_QUALIFICATION_FAILED:" + "|".join(details)
+        )
+    return True
+
+
+def _find_loaded_price_source(source_type):
+    matches = [
+        source_info
+        for source_info in state.price_sources.values()
+        if (
+            _is_chainlink_source(
+                source_info["contract"],
+                source_info["description"],
+            )
+            if source_type.lower() == "chainlink"
+            else source_type.lower()
+            in str(source_info["description"]).lower().replace(" ", "")
+        )
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"PRICE_SOURCE_DISCOVERY_FAILED:{source_type}:found={len(matches)}"
+        )
+    return matches[0]
+
+
+def _qualify_price_desk_registry_stability():
+    """Fail on enumerable pending changes to any existing PriceDesk reg ID."""
+    pending_changes = []
+    incomplete_reads = set()
+    try:
+        num_addrs = int(state.pd.numAddrs())
+    except Exception:
+        raise RuntimeError(
+            "PRICE_DESK_REGISTRY_QUALIFICATION_FAILED:incomplete=numAddrs"
+        ) from None
+
+    for reg_id in range(1, num_addrs):
+        try:
+            pending_update = state.pd.pendingAddrUpdate(reg_id)
+            if int(getattr(pending_update, "confirmBlock", 0)) != 0:
+                pending_changes.append(
+                    f"update:{reg_id}:{getattr(pending_update, 'newAddr', 'unknown')}"
+                )
+        except Exception:
+            incomplete_reads.add(f"pendingAddrUpdate({reg_id})")
+        try:
+            pending_disable = state.pd.pendingAddrDisable(reg_id)
+            if int(getattr(pending_disable, "confirmBlock", 0)) != 0:
+                pending_changes.append(f"disable:{reg_id}")
+        except Exception:
+            incomplete_reads.add(f"pendingAddrDisable({reg_id})")
+
+    if pending_changes or incomplete_reads:
+        details = []
+        if pending_changes:
+            details.append("pending=" + ",".join(pending_changes))
+        if incomplete_reads:
+            details.append("incomplete=" + ",".join(sorted(incomplete_reads)))
+        raise RuntimeError(
+            "PRICE_DESK_REGISTRY_QUALIFICATION_FAILED:" + "|".join(details)
+        )
+    return True
+
+
+def _source_stale_time_policy_issues(source):
+    """Census active/pending local policy and all live source timelock actions."""
+    invalid_policies = []
+    incomplete_reads = set()
+    matched_action_ids = set()
+    try:
+        num_assets = int(source.numAssets())
+    except Exception:
+        return (), (), ("numAssets",)
+
+    for index in range(1, num_assets):
+        try:
+            asset = source.assets(index)
+        except Exception:
+            incomplete_reads.add(f"assets({index})")
+            continue
+        configs = _active_and_pending_feed_configs(
+            source,
+            asset,
+            matched_action_ids,
+            incomplete_reads,
+        )
+        for config_state, config in configs:
+            if not hasattr(config, "staleTime"):
+                incomplete_reads.add(f"{config_state}.staleTime({asset})")
+                continue
+            stale_time = int(config.staleTime)
+            if stale_time != 0 and (
+                stale_time < MIN_LOCAL_STALE_TIME
+                or stale_time > MAX_EFFECTIVE_STALE_TIME
+            ):
+                invalid_policies.append(
+                    (config_state, str(asset), stale_time)
+                )
+
+    unmatched_actions, action_incomplete = _unmatched_live_action_ids(
+        source,
+        matched_action_ids,
+    )
+    incomplete_reads.update(action_incomplete)
+    return (
+        tuple(invalid_policies),
+        unmatched_actions,
+        tuple(sorted(incomplete_reads)),
+    )
+
+
+def _qualify_source_stale_time_policies(reg_id, source):
+    invalid_policies, unmatched_actions, incomplete = (
+        _source_stale_time_policy_issues(source)
+    )
+    if invalid_policies or unmatched_actions or incomplete:
+        details = []
+        if invalid_policies:
+            details.append(
+                "invalid="
+                + ";".join(
+                    f"{config_state}:{asset}:{stale_time}"
+                    for config_state, asset, stale_time in invalid_policies
+                )
+            )
+        if unmatched_actions:
+            details.append(
+                "unmatched-actions="
+                + ",".join(str(action_id) for action_id in unmatched_actions)
+            )
+        if incomplete:
+            details.append("incomplete=" + ",".join(incomplete))
+        raise RuntimeError(
+            f"PRICE_SOURCE_STALE_POLICY_QUALIFICATION_FAILED:registry-{reg_id}:"
+            + "|".join(details)
+        )
+    return True
+
+
+def _qualify_source_has_no_pending_actions(reg_id, source):
+    live_actions, incomplete = _unmatched_live_action_ids(source, ())
+    if live_actions or incomplete:
+        details = []
+        if live_actions:
+            details.append(
+                "live=" + ",".join(str(action_id) for action_id in live_actions)
+            )
+        if incomplete:
+            details.append("incomplete=" + ",".join(incomplete))
+        raise RuntimeError(
+            f"PRICE_SOURCE_PENDING_ACTION_QUALIFICATION_FAILED:registry-{reg_id}:"
+            + "|".join(details)
+        )
+    return True
+
+
+def _qualify_exact_price_desk_runtime():
+    expected_hash = EXPECTED_CURRENT_PRICE_DESK_RUNTIME_HASH
+    if not expected_hash:
+        raise RuntimeError(
+            "PRICE_DESK_RUNTIME_QUALIFICATION_FAILED:expected-runtime=empty"
+        )
+
+    observed_hash = (
+        _runtime_code_hash(state.pd) if state.pd is not None else None
+    )
+    if observed_hash != expected_hash:
+        raise RuntimeError(
+            "PRICE_DESK_RUNTIME_QUALIFICATION_FAILED:"
+            f"observed={observed_hash or 'unavailable'}:expected={expected_hash}"
+        )
+    return True
+
+
+def _qualify_exact_stale_time_generations_and_global_policy(
+    expected_global_stale_time=DEFAULT_EXPECTED_ACTIVATION_GLOBAL_STALE_TIME,
+):
+    failures = []
+    expected_current_hashes = set(KNOWN_CURRENT_STALE_TIME_RUNTIME_HASHES)
+    observed_current_hashes = []
+    if not expected_current_hashes:
+        failures.append("expected-current-runtime-inventory=empty")
+    global_stale_time = state.mission_control_stale_time
+    expected_global = int(expected_global_stale_time)
+    if expected_global <= 0 or expected_global > MAX_EFFECTIVE_STALE_TIME:
+        failures.append(f"expected-global={expected_global}")
+    if (
+        global_stale_time is None
+        or int(global_stale_time) <= 0
+        or int(global_stale_time) > MAX_EFFECTIVE_STALE_TIME
+        or int(global_stale_time) != expected_global
+    ):
+        failures.append(
+            f"global={global_stale_time}:expected={expected_global}"
+        )
+
+    for reg_id, source_info in sorted(state.price_sources.items()):
+        if not _is_stale_time_feed_source(
+            source_info.get("contract"),
+            source_info["description"],
+            source_info.get("runtime_hash"),
+        ):
+            continue
+        generation = source_info.get(
+            "stale_time_generation",
+            STALE_TIME_GENERATION_UNKNOWN,
+        )
+        runtime_hash = source_info.get("runtime_hash")
+        if generation == STALE_TIME_GENERATION_CURRENT and runtime_hash is not None:
+            observed_current_hashes.append(runtime_hash)
+        if (
+            generation != STALE_TIME_GENERATION_CURRENT
+            or runtime_hash not in expected_current_hashes
+        ):
+            failures.append(
+                f"registry-{reg_id}={generation}:{runtime_hash or 'unavailable'}"
+            )
+    observed_current_set = set(observed_current_hashes)
+    missing_hashes = sorted(expected_current_hashes - observed_current_set)
+    extra_hashes = sorted(observed_current_set - expected_current_hashes)
+    duplicate_hashes = sorted(
+        runtime_hash
+        for runtime_hash in observed_current_set
+        if observed_current_hashes.count(runtime_hash) != 1
+    )
+    if missing_hashes:
+        failures.append("missing-current=" + ",".join(missing_hashes))
+    if extra_hashes:
+        failures.append("extra-current=" + ",".join(extra_hashes))
+    if duplicate_hashes:
+        failures.append("duplicate-current=" + ",".join(duplicate_hashes))
+    if failures:
+        raise RuntimeError(
+            "PRICE_SOURCE_GENERATION_QUALIFICATION_FAILED:"
+            + "|".join(failures)
+        )
+    return True
+
+
+def _run_strict_activation_qualifications(
+    chainlink_anchor=None,
+    proposed_anchor_feed=None,
+    expected_global_stale_time=DEFAULT_EXPECTED_ACTIVATION_GLOBAL_STALE_TIME,
+):
+    _qualify_price_desk_registry_stability()
+    _qualify_exact_price_desk_runtime()
+    _qualify_exact_stale_time_generations_and_global_policy(
+        expected_global_stale_time
+    )
+    for reg_id, source_info in sorted(state.price_sources.items()):
+        if _is_stale_time_feed_source(
+            source_info.get("contract"),
+            source_info["description"],
+            source_info.get("runtime_hash"),
+        ):
+            _qualify_source_stale_time_policies(
+                reg_id,
+                source_info["contract"],
+            )
+    chainlink_sources = [
+        source_info
+        for source_info in state.price_sources.values()
+        if _is_chainlink_source(
+            source_info["contract"],
+            source_info["description"],
+        )
+    ]
+    for source_info in chainlink_sources:
+        _qualify_chainlink_conversion_routes(source_info["contract"])
+    redstone_sources = [
+        source_info
+        for source_info in state.price_sources.values()
+        if _is_redstone_source(
+            source_info["contract"],
+            source_info["description"],
+        )
+    ]
+    for source_info in redstone_sources:
+        source = source_info["contract"]
+        _qualify_redstone_activation(
+            source,
+            source.numAssets(),
+            source_info.get("cross_source_inventory"),
+        )
+
+    if chainlink_anchor is not None:
+        chainlink_info = _find_loaded_price_source("chainlink")
+        _qualify_chainlink_anchor_rotation(
+            chainlink_info["contract"],
+            chainlink_anchor,
+            proposed_anchor_feed,
+        )
+    for reg_id, source_info in sorted(state.price_sources.items()):
+        if _is_stale_time_feed_source(
+            source_info.get("contract"),
+            source_info["description"],
+            source_info.get("runtime_hash"),
+        ):
+            _qualify_source_has_no_pending_actions(
+                reg_id,
+                source_info["contract"],
+            )
+    return True
 
 
 def print_table_of_contents():
@@ -324,6 +1333,12 @@ def print_price_source_config(reg_id: int, source_info: dict):
     """Print detailed configuration for a single price source."""
     source = source_info["contract"]
     source_name = source_info["description"]
+    stale_time_generation = source_info.get(
+        "stale_time_generation",
+        STALE_TIME_GENERATION_UNKNOWN,
+    )
+    runtime_hash = source_info.get("runtime_hash")
+    cross_source_inventory = source_info.get("cross_source_inventory")
     anchor = source_name.lower().replace(" ", "-")
 
     print(f"\n<a id=\"{anchor}\"></a>")
@@ -334,6 +1349,27 @@ def print_price_source_config(reg_id: int, source_info: dict):
     rows = []
     if hasattr(source, 'isPaused'):
         rows.append(("isPaused", source.isPaused()))
+
+    if _is_stale_time_feed_source(source, source_name, runtime_hash):
+        rows.append(
+            (
+                "staleTimeSemantics",
+                _stale_time_generation_label(
+                    stale_time_generation,
+                    runtime_hash,
+                ),
+            )
+        )
+        rows.append(
+            (
+                "MissionControl global stale time",
+                (
+                    "unavailable"
+                    if state.mission_control_stale_time is None
+                    else f"{state.mission_control_stale_time}s"
+                ),
+            )
+        )
 
     if hasattr(source, 'maxConfidenceRatio'):
         rows.append(("maxConfidenceRatio", format_percent(source.maxConfidenceRatio())))
@@ -346,6 +1382,14 @@ def print_price_source_config(reg_id: int, source_info: dict):
     if rows:
         print_table("Global Config", ["Parameter", "Value"], rows, level=4)
 
+    if hasattr(source, 'isPaused') and source.isPaused():
+        print("\n#### ⚠️ Source Administration Paused")
+        print(
+            "- Pause freezes administrative mutation; it is not a price "
+            "circuit breaker. Existing price reads continue, and governance "
+            "must unpause the source before feed remediation."
+        )
+
     # LocalGov Module params
     print_local_gov_params(source, state.get_known_addresses, level=4)
 
@@ -354,7 +1398,13 @@ def print_price_source_config(reg_id: int, source_info: dict):
 
     # Per-asset configurations
     if num_assets > 1:
-        _print_price_source_assets(source, source_name, num_assets)
+        _print_price_source_assets(
+            source,
+            source_name,
+            num_assets,
+            stale_time_generation,
+            cross_source_inventory,
+        )
 
     # GREEN Reference Pool config (Curve Prices only)
     if hasattr(source, 'greenRefPoolConfig'):
@@ -362,7 +1412,13 @@ def print_price_source_config(reg_id: int, source_info: dict):
 
     # Pending price feed changes
     if num_assets > 1:
-        _print_pending_price_changes(source, source_name, num_assets)
+        _print_pending_price_changes(
+            source,
+            source_name,
+            num_assets,
+            stale_time_generation,
+            cross_source_inventory,
+        )
 
 
 def _print_green_ref_pool_config(source):
@@ -419,7 +1475,13 @@ def _print_green_ref_pool_config(source):
         print(f"  - Update: {data.lastSnapshot.update} ({time_ago})")
 
 
-def _print_pending_price_changes(source, source_name: str, num_assets: int):
+def _print_pending_price_changes(
+    source,
+    source_name: str,
+    num_assets: int,
+    stale_time_generation=STALE_TIME_GENERATION_UNKNOWN,
+    cross_source_inventory=None,
+):
     """Print pending price feed updates for a price source."""
     # Check if source has pending update checking method
     if not hasattr(source, 'hasPendingPriceFeedUpdate'):
@@ -449,13 +1511,18 @@ def _print_pending_price_changes(source, source_name: str, num_assets: int):
     if not pending_assets:
         return
 
-    cross_source_eth_usd_feeds = {}
+    cross_source_eth_route_primary_feeds = {}
     incomplete_cross_source_reads = ()
-    if _is_redstone_source(source, source_name):
+    if cross_source_inventory is not None:
         (
-            cross_source_eth_usd_feeds,
+            cross_source_eth_route_primary_feeds,
             incomplete_cross_source_reads,
-        ) = _discover_direct_eth_usd_feeds(source)
+        ) = cross_source_inventory
+    elif _is_redstone_source(source, source_name):
+        (
+            cross_source_eth_route_primary_feeds,
+            incomplete_cross_source_reads,
+        ) = _discover_eth_route_primary_feeds(source)
 
     print(f"\n#### ⏳ Pending Price Feed Updates ({len(pending_assets)})")
     _print_incomplete_cross_source_discovery(incomplete_cross_source_reads)
@@ -474,11 +1541,13 @@ def _print_pending_price_changes(source, source_name: str, num_assets: int):
                 if hasattr(pending, 'actionId') and pending.actionId > 0:
                     print(f"- Action ID: {pending.actionId}")
 
-                    # Try to get action info from TimeLock
-                    if hasattr(source, 'actions'):
-                        action = source.actions(pending.actionId)
-                        if hasattr(action, 'confirmBlock') and action.confirmBlock > 0:
-                            print(f"- Confirm Block: {action.confirmBlock}")
+                    # Read confirmation timing from the shared TimeLock API.
+                    if hasattr(source, 'getActionConfirmationBlock'):
+                        confirm_block = source.getActionConfirmationBlock(
+                            pending.actionId
+                        )
+                        if confirm_block > 0:
+                            print(f"- Confirm Block: {confirm_block}")
 
                     # Show pending config details
                     if hasattr(pending, 'config'):
@@ -486,10 +1555,10 @@ def _print_pending_price_changes(source, source_name: str, num_assets: int):
                         if hasattr(config, 'feed') and str(config.feed) != ZERO_ADDRESS:
                             print(f"- Pending Feed: `{config.feed}`")
                             matching_sources = (
-                                _matching_cross_source_eth_usd_feeds(
+                                _matching_cross_source_eth_route_primary_feeds(
                                     config.feed,
                                     getattr(config, 'needsEthToUsd', False),
-                                    cross_source_eth_usd_feeds,
+                                    cross_source_eth_route_primary_feeds,
                                 )
                             )
                             if matching_sources:
@@ -497,17 +1566,20 @@ def _print_pending_price_changes(source, source_name: str, num_assets: int):
                                 print(
                                     "- ⚠️ Cross-source ETH conversion warning: "
                                     "`needsEthToUsd=True`, but pending feed "
-                                    f"`{config.feed}` is also a direct ETH/USD "
-                                    f"feed in {sources}. PriceDesk resolves the "
+                                    f"`{config.feed}` is also the primary feed "
+                                    f"of an ETH route in {sources}. PriceDesk resolves the "
                                     "ETH conversion outside RedStone; investigate "
                                     "before confirmation or activation."
                                 )
                         if hasattr(config, 'feedId') and config.feedId:
                             print(f"- Pending Feed ID: `0x{config.feedId.hex()}`")
                         if hasattr(config, 'staleTime'):
-                            stale_time = _format_price_feed_stale_time(
+                            stale_time = _format_route_stale_time(
                                 config.staleTime,
                                 state.mission_control_stale_time,
+                                stale_time_generation,
+                                getattr(config, 'needsEthToUsd', False),
+                                getattr(config, 'needsBtcToUsd', False),
                             )
                             print(f"- Pending Stale Time: {stale_time}")
                         if hasattr(config, 'pool') and str(config.pool) != ZERO_ADDRESS:
@@ -519,11 +1591,13 @@ def _print_pending_price_changes(source, source_name: str, num_assets: int):
                 if hasattr(pending, 'actionId') and pending.actionId > 0:
                     print(f"- Action ID: {pending.actionId}")
 
-                    # Try to get action info from TimeLock
-                    if hasattr(source, 'actions'):
-                        action = source.actions(pending.actionId)
-                        if hasattr(action, 'confirmBlock') and action.confirmBlock > 0:
-                            print(f"- Confirm Block: {action.confirmBlock}")
+                    # Read confirmation timing from the shared TimeLock API.
+                    if hasattr(source, 'getActionConfirmationBlock'):
+                        confirm_block = source.getActionConfirmationBlock(
+                            pending.actionId
+                        )
+                        if confirm_block > 0:
+                            print(f"- Confirm Block: {confirm_block}")
 
                     # Show pending config details
                     if hasattr(pending, 'config'):
@@ -540,7 +1614,13 @@ def _print_pending_price_changes(source, source_name: str, num_assets: int):
             print(f"- Error retrieving pending config: {e}")
 
 
-def _print_price_source_assets(source, source_name: str, num_assets: int):
+def _print_price_source_assets(
+    source,
+    source_name: str,
+    num_assets: int,
+    stale_time_generation=STALE_TIME_GENERATION_UNKNOWN,
+    cross_source_inventory=None,
+):
     """Print per-asset config for a price source."""
     asset_rows = []  # For Chainlink (table format)
     curve_configs = []
@@ -549,13 +1629,18 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
     stork_configs = []
     aero_configs = []  # AeroRipePrices (priceConfigs without underlyingAsset)
     redstone_warnings = []
-    cross_source_eth_usd_feeds = {}
+    cross_source_eth_route_primary_feeds = {}
     incomplete_cross_source_reads = ()
-    if _is_redstone_source(source, source_name):
+    if cross_source_inventory is not None:
         (
-            cross_source_eth_usd_feeds,
+            cross_source_eth_route_primary_feeds,
             incomplete_cross_source_reads,
-        ) = _discover_direct_eth_usd_feeds(source)
+        ) = cross_source_inventory
+    elif _is_redstone_source(source, source_name):
+        (
+            cross_source_eth_route_primary_feeds,
+            incomplete_cross_source_reads,
+        ) = _discover_eth_route_primary_feeds(source)
 
     for j in range(1, num_assets):
         time.sleep(RPC_DELAY)
@@ -574,10 +1659,10 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
                 needs_eth = getattr(config, 'needsEthToUsd', False)
                 needs_btc = getattr(config, 'needsBtcToUsd', False)
                 stale = getattr(config, 'staleTime', 0)
-                matching_sources = _matching_cross_source_eth_usd_feeds(
+                matching_sources = _matching_cross_source_eth_route_primary_feeds(
                     config.feed,
                     needs_eth,
-                    cross_source_eth_usd_feeds,
+                    cross_source_eth_route_primary_feeds,
                 )
                 if matching_sources:
                     redstone_warnings.append(
@@ -587,9 +1672,12 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
                     asset_name,
                     feed_addr,
                     f"ETH:{needs_eth}, BTC:{needs_btc}",
-                    _format_price_feed_stale_time(
+                    _format_route_stale_time(
                         stale,
                         state.mission_control_stale_time,
+                        stale_time_generation,
+                        needs_eth,
+                        needs_btc,
                     )
                 ])
             elif hasattr(config, 'feedId'):
@@ -652,7 +1740,7 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
             sources = ", ".join(matching_sources)
             print(
                 f"- **{asset_name}**: `needsEthToUsd=True`, but primary feed "
-                f"`{feed}` is also a direct ETH/USD feed in {sources}. "
+                f"`{feed}` is also the primary feed of an ETH route in {sources}. "
                 "PriceDesk resolves the ETH conversion outside RedStone; "
                 "investigate this self-conversion hazard before activation."
             )
@@ -748,6 +1836,7 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
                 + _format_price_feed_stale_time(
                     stale,
                     state.mission_control_stale_time,
+                    stale_time_generation,
                 )
             )
 
@@ -770,6 +1859,7 @@ def _print_price_source_assets(source, source_name: str, num_assets: int):
                 + _format_price_feed_stale_time(
                     stale,
                     state.mission_control_stale_time,
+                    stale_time_generation,
                 )
             )
 
@@ -822,8 +1912,71 @@ def print_all_price_sources():
 # ============================================================================
 
 
-def main():
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Report Base price-source configuration and policy.",
+    )
+    parser.add_argument(
+        "--strict-activation",
+        action="store_true",
+        help=(
+            "require recognized current-generation source runtimes and fail "
+            "closed on enumerable registry changes, invalid policy, unsafe "
+            "routes, or incomplete discovery; pending-new registry entries "
+            "still require separate event evidence"
+        ),
+    )
+    parser.add_argument(
+        "--chainlink-anchor",
+        choices=("ETH", "BTC"),
+        help="anchor kind for a strict proposed-feed rotation preflight",
+    )
+    parser.add_argument(
+        "--proposed-anchor-feed",
+        help="proposed Chainlink ETH/USD or BTC/USD feed address",
+    )
+    parser.add_argument(
+        "--expected-global-stale-time",
+        type=int,
+        default=None,
+        help=(
+            "exact deployment-policy global required by strict checks "
+            "(default: 86400 seconds)"
+        ),
+    )
+    args = parser.parse_args(argv)
+    if (args.chainlink_anchor is None) != (args.proposed_anchor_feed is None):
+        parser.error(
+            "--chainlink-anchor and --proposed-anchor-feed must be supplied together"
+        )
+    if args.chainlink_anchor is not None:
+        feed = str(args.proposed_anchor_feed)
+        if (
+            len(feed) != 42
+            or not feed.lower().startswith("0x")
+            or any(char not in "0123456789abcdefABCDEF" for char in feed[2:])
+            or feed.lower() == ZERO_ADDRESS
+        ):
+            parser.error("--proposed-anchor-feed must be a 20-byte hex address")
+    if (
+        args.expected_global_stale_time is not None
+        and not args.strict_activation
+        and args.chainlink_anchor is None
+    ):
+        parser.error(
+            "--expected-global-stale-time requires --strict-activation or "
+            "a complete Chainlink anchor preflight"
+        )
+    if args.expected_global_stale_time is None:
+        args.expected_global_stale_time = (
+            DEFAULT_EXPECTED_ACTIVATION_GLOBAL_STALE_TIME
+        )
+    return args
+
+
+def main(argv=None):
     """Main entry point."""
+    args = _parse_args(argv)
     # Output file path
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_file = os.path.join(script_dir, "prices_output.md")
@@ -839,6 +1992,18 @@ def main():
 
         # Load all price source configurations
         initialize_prices()
+
+        if args.strict_activation or args.chainlink_anchor is not None:
+            _run_strict_activation_qualifications(
+                args.chainlink_anchor,
+                args.proposed_anchor_feed,
+                args.expected_global_stale_time,
+            )
+            print(
+                "Strict enumerable price-source checks passed; pending-new "
+                "registry entries require separate event evidence.",
+                file=sys.stderr,
+            )
 
         print(f"Writing output to {output_file}...", file=sys.stderr)
 

@@ -117,7 +117,10 @@ PYTH: public(immutable(address))
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICE_UPDATES: constant(uint256) = 20
-MAX_FEED_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
+# The floor applies only to explicit local overrides. The maximum is this
+# source's absolute ceiling; deployment-level Switchboard maxima must not exceed it.
+MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
+MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
 
 
 @deploy
@@ -152,11 +155,8 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
-    # A nonzero value is only the canonical PriceDesk-forwarded global.
-    if _staleTime != 0:
-        priceDesk: address = addys._getPriceDeskAddr()
-        if msg.sender != priceDesk or _priceDesk != priceDesk:
-            return 0
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -171,11 +171,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
-    # A nonzero value is only the canonical PriceDesk-forwarded global.
-    if _staleTime != 0:
-        priceDesk: address = addys._getPriceDeskAddr()
-        if msg.sender != priceDesk or _priceDesk != priceDesk:
-            return 0, True
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0, True
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -253,6 +250,17 @@ def _getLastPriceAndLastUpdate(_feedId: bytes32, _staleTime: uint256) -> (uint25
 
 
 @view
+@internal
+def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
+    # Zero is the direct-call sentinel. A nonzero value is accepted only as the
+    # global policy forwarded by the canonical PriceDesk.
+    if _staleTime == 0:
+        return True
+    priceDesk: address = addys._getPriceDeskAddr()
+    return msg.sender == priceDesk and _priceDesk == priceDesk
+
+
+@view
 @external
 def hasPriceFeed(_asset: address) -> bool:
     return self.feedConfig[_asset].feedId != empty(bytes32)
@@ -273,7 +281,7 @@ def addPriceSnapshot(_asset: address) -> bool:
 @internal
 def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (uint256, bool):
     if _feedStaleTime != 0:
-        if _feedStaleTime > MAX_FEED_STALE_TIME:
+        if _feedStaleTime < MIN_LOCAL_STALE_TIME or _feedStaleTime > MAX_EFFECTIVE_STALE_TIME:
             return 0, False
         return _feedStaleTime, True
 
@@ -283,7 +291,7 @@ def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (ui
         globalStaleTime, isValid = self._getGlobalStaleTime()
         if not isValid:
             return 0, False
-    elif globalStaleTime > MAX_FEED_STALE_TIME:
+    elif globalStaleTime > MAX_EFFECTIVE_STALE_TIME:
         return 0, False
     return globalStaleTime, True
 
@@ -296,7 +304,7 @@ def _getGlobalStaleTime() -> (uint256, bool):
         return 0, False
 
     staleTime: uint256 = staticcall MissionControl(missionControl).getPriceStaleTime()
-    if staleTime == 0 or staleTime > MAX_FEED_STALE_TIME:
+    if staleTime == 0 or staleTime > MAX_EFFECTIVE_STALE_TIME:
         return 0, False
     return staleTime, True
 
@@ -411,7 +419,12 @@ def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) 
     assert not priceData.isPaused # dev: contract paused
     assert _feedId != self.feedConfig[_asset].feedId # dev: invalid feed
 
-    return self._initiatePriceFeedUpdate(_asset, _feedId, _staleTime)
+    # Zero on a feed rotation preserves the active policy. Governance uses the
+    # dedicated updateStaleTime entry point to explicitly reset to inheritance.
+    staleTime: uint256 = _staleTime
+    if staleTime == 0:
+        staleTime = self.feedConfig[_asset].staleTime
+    return self._initiatePriceFeedUpdate(_asset, _feedId, staleTime)
 
 
 @external
@@ -455,8 +468,13 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert d.config.feedId != empty(bytes32) # dev: no pending update feed
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     assert oldFeedId != empty(bytes32) # dev: no pending update feed
+    isStaleTimeOnly: bool = d.config.feedId == oldFeedId
     if not self._isValidUpdateFeed(_asset, d.config.feedId, d.config.staleTime):
-        self._cancelPriceFeedUpdate(_asset, d.actionId)
+        # A stale-only candidate can fail transiently when its unchanged oracle
+        # is unavailable or stale. Keep it pending so governance may retry or
+        # explicitly cancel it. Feed replacements retain fail-and-cancel.
+        if not isStaleTimeOnly:
+            self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
     # check time lock
@@ -499,14 +517,21 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
-    if _feedId == self.feedConfig[_asset].feedId:
+    # Feed-changing preflight mirrors updatePriceFeed: zero preserves the
+    # active stale policy. Same-feed updates belong to isValidStaleTimeUpdate.
+    currentConfig: PythFeedConfig = self.feedConfig[_asset]
+    if _feedId == currentConfig.feedId:
         return False
-    return self._isValidUpdateFeed(_asset, _feedId, _staleTime)
+    staleTime: uint256 = _staleTime
+    if staleTime == 0:
+        staleTime = currentConfig.staleTime
+    return self._isValidUpdateFeed(_asset, _feedId, staleTime)
 
 
 @view
 @external
 def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    # Stale-only preflight validates against the complete active feed config.
     config: PythFeedConfig = self.feedConfig[_asset]
     return self._isValidUpdateFeed(_asset, config.feedId, _staleTime)
 

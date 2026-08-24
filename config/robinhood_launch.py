@@ -90,9 +90,11 @@ STALE_WINDOW_EQUITY = 345_600  # 4 days, fixed feed-level override
 STALE_WINDOW_DEFAULT = 86_400
 STALE_WINDOW_USDG = 86_400
 
-# These are normalized addresses, not symbolic route names. Keeping the
-# policy table independent from BluePrint bindings is deliberate: rebinding a
-# symbol cannot silently reclassify an asset's production oracle policy.
+# Post-PR206/PR208 target policy only: no current migration consumes this table or
+# classifier. These are normalized addresses, not symbolic route names.
+# Keeping the policy table independent from BluePrint bindings is deliberate:
+# rebinding a symbol cannot silently reclassify an asset's future oracle
+# policy.
 ROBINHOOD_STALE_TIME_INHERIT_ASSETS = frozenset(
     (
         "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",  # native ETH
@@ -125,7 +127,7 @@ def _normalize_stale_time_policy_address(asset):
 
 
 def stale_time_override_for_asset(asset):
-    """Return the exact RH feed override, rejecting every unclassified asset."""
+    """Return the post-PR206/PR208 RH target; reject unclassified assets."""
     normalized = _normalize_stale_time_policy_address(asset)
     if normalized in ROBINHOOD_STALE_TIME_INHERIT_ASSETS:
         return STALE_WINDOW_INHERIT

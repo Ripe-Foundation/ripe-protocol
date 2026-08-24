@@ -7,6 +7,7 @@ from config.BluePrint import CORE_TOKENS
 
 MONTH_IN_SECONDS = 30 * 24 * 60 * 60
 MAX_FEED_STALE_TIME = 7 * 24 * 60 * 60
+MIN_LOCAL_STALE_TIME = 5 * 60
 NOT_FOUND_REVERT = "Revert(b'\\xc5r;Q')"
 
 
@@ -687,7 +688,7 @@ def test_stork_price_stale_edge_cases(
     addStorkFeed,
 ):
     data_feed_id = bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
-    addStorkFeed(alpha_token, data_feed_id, 1)
+    addStorkFeed(alpha_token, data_feed_id, MIN_LOCAL_STALE_TIME)
 
     # Give authorized_caller enough ETH for all tests
     boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
@@ -699,7 +700,7 @@ def test_stork_price_stale_edge_cases(
 
     # Test price just at stale boundary (should still be valid)
     assert stork_prices.getPrice(alpha_token) != 0
-    boa.env.time_travel(seconds=1)
+    boa.env.time_travel(seconds=MIN_LOCAL_STALE_TIME)
     assert stork_prices.getPrice(alpha_token) != 0
 
     # Test price just over stale boundary
@@ -951,11 +952,11 @@ def test_stork_omitted_add_and_update_stale_time_inherit_global(
     [
         (0, 100, 100, True),
         (0, 100, 101, False),
-        (200, 100, 150, True),
-        (50, 100, 75, False),
-        (50, 0, 50, True),
-        (50, 0, 51, False),
-        (50, MAX_FEED_STALE_TIME + 1, 50, True),
+        (600, 100, 450, True),
+        (MIN_LOCAL_STALE_TIME, 100, 375, False),
+        (MIN_LOCAL_STALE_TIME, 0, MIN_LOCAL_STALE_TIME, True),
+        (MIN_LOCAL_STALE_TIME, 0, MIN_LOCAL_STALE_TIME + 1, False),
+        (MIN_LOCAL_STALE_TIME, MAX_FEED_STALE_TIME + 1, MIN_LOCAL_STALE_TIME, True),
         (MAX_FEED_STALE_TIME, 0, MAX_FEED_STALE_TIME, True),
         (MAX_FEED_STALE_TIME, 100, MAX_FEED_STALE_TIME + 1, False),
         (0, 0, 0, False),
@@ -1084,12 +1085,17 @@ def test_stork_invalid_stale_bounds_fail_closed_at_admission_and_runtime(
 
         setGeneralConfig(_priceStaleTime=100)
         _set_sc20_stork_price(mock_stork, boa.env.timestamp)
-        stork_prices.eval(
-            f"self.feedConfig[{alpha_token.address}].staleTime = "
-            f"{MAX_FEED_STALE_TIME + 1}"
-        )
-        assert stork_prices.getPrice(alpha_token) == 0
-        assert stork_prices.getPriceAndHasFeed(alpha_token) == (0, True)
+        for invalid_local in (
+            MIN_LOCAL_STALE_TIME - 1,
+            MAX_FEED_STALE_TIME + 1,
+        ):
+            with boa.env.anchor():
+                stork_prices.eval(
+                    f"self.feedConfig[{alpha_token.address}].staleTime = "
+                    f"{invalid_local}"
+                )
+                assert stork_prices.getPrice(alpha_token) == 0
+                assert stork_prices.getPriceAndHasFeed(alpha_token) == (0, True)
 
 
 def test_stork_stale_time_update_lifecycle_noop_cancel_and_liveness(
@@ -1104,29 +1110,33 @@ def test_stork_stale_time_update_lifecycle_noop_cancel_and_liveness(
     with boa.env.anchor():
         setGeneralConfig(_priceStaleTime=100)
         assert not stork_prices.hasPriceFeed(bravo_token)
-        assert not stork_prices.isValidStaleTimeUpdate(bravo_token, 200)
+        assert not stork_prices.isValidStaleTimeUpdate(bravo_token, 600)
         with boa.reverts("invalid feed"):
             stork_prices.updateStaleTime(
-                bravo_token, 200, sender=governance.address
+                bravo_token, 600, sender=governance.address
             )
         assert stork_prices.pendingUpdates(bravo_token).actionId == 0
 
         _add_sc20_stork_feed(
-            stork_prices, mock_stork, alpha_token, governance, 100
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            MIN_LOCAL_STALE_TIME,
         )
         _set_sc20_stork_price(mock_stork, boa.env.timestamp)
 
         with boa.reverts("no perms"):
-            stork_prices.updateStaleTime(alpha_token, 200, sender=bob)
+            stork_prices.updateStaleTime(alpha_token, 600, sender=bob)
 
         assert stork_prices.updateStaleTime(
-            alpha_token, 200, sender=governance.address
+            alpha_token, 600, sender=governance.address
         )
         pending = stork_prices.pendingUpdates(alpha_token)
         assert pending.actionId != 0
         assert pending.config.feedId == SC20_STORK_FEED_ID
-        assert pending.config.staleTime == 200
-        assert stork_prices.feedConfig(alpha_token).staleTime == 100
+        assert pending.config.staleTime == 600
+        assert stork_prices.feedConfig(alpha_token).staleTime == MIN_LOCAL_STALE_TIME
         assert stork_prices.getPrice(alpha_token) == SC20_STORK_PRICE
 
         with boa.reverts("time lock not reached"):
@@ -1138,12 +1148,12 @@ def test_stork_stale_time_update_lifecycle_noop_cancel_and_liveness(
         assert stork_prices.confirmPriceFeedUpdate(
             alpha_token, sender=governance.address
         )
-        assert stork_prices.feedConfig(alpha_token).staleTime == 200
+        assert stork_prices.feedConfig(alpha_token).staleTime == 600
 
-        assert not stork_prices.isValidStaleTimeUpdate(alpha_token, 200)
+        assert not stork_prices.isValidStaleTimeUpdate(alpha_token, 600)
         with boa.reverts("invalid feed"):
             stork_prices.updateStaleTime(
-                alpha_token, 200, sender=governance.address
+                alpha_token, 600, sender=governance.address
             )
 
         assert stork_prices.updateStaleTime(
@@ -1152,26 +1162,35 @@ def test_stork_stale_time_update_lifecycle_noop_cancel_and_liveness(
         assert stork_prices.cancelPriceFeedUpdate(
             alpha_token, sender=governance.address
         )
-        assert stork_prices.feedConfig(alpha_token).staleTime == 200
+        assert stork_prices.feedConfig(alpha_token).staleTime == 600
         assert stork_prices.pendingUpdates(alpha_token).actionId == 0
 
     with boa.env.anchor():
         setGeneralConfig(_priceStaleTime=100)
         _add_sc20_stork_feed(
-            stork_prices, mock_stork, alpha_token, governance, 100
+            stork_prices, mock_stork, alpha_token, governance, 600
         )
         _set_sc20_stork_price(mock_stork, boa.env.timestamp)
         assert stork_prices.updateStaleTime(
-            alpha_token, 10, sender=governance.address
+            alpha_token, MIN_LOCAL_STALE_TIME, sender=governance.address
         )
         advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
-        boa.env.time_travel(seconds=11)
+        boa.env.time_travel(seconds=MIN_LOCAL_STALE_TIME + 1)
 
         assert stork_prices.getPrice(alpha_token) == SC20_STORK_PRICE
         assert not stork_prices.confirmPriceFeedUpdate(
             alpha_token, sender=governance.address
         )
-        assert stork_prices.feedConfig(alpha_token).staleTime == 100
+        assert stork_prices.feedConfig(alpha_token).staleTime == 600
+        retry_pending = stork_prices.pendingUpdates(alpha_token)
+        assert retry_pending.actionId != 0
+        assert retry_pending.config.staleTime == MIN_LOCAL_STALE_TIME
+
+        _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+        assert stork_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert stork_prices.feedConfig(alpha_token).staleTime == MIN_LOCAL_STALE_TIME
         assert stork_prices.pendingUpdates(alpha_token).actionId == 0
 
 
@@ -1185,7 +1204,7 @@ def test_stork_stale_time_update_to_zero_confirms_global_inheritance(
     with boa.env.anchor():
         setGeneralConfig(_priceStaleTime=100)
         _add_sc20_stork_feed(
-            stork_prices, mock_stork, alpha_token, governance, 200
+            stork_prices, mock_stork, alpha_token, governance, 600
         )
 
         assert stork_prices.updateStaleTime(
@@ -1195,7 +1214,7 @@ def test_stork_stale_time_update_to_zero_confirms_global_inheritance(
         assert pending.actionId != 0
         assert pending.config.feedId == SC20_STORK_FEED_ID
         assert pending.config.staleTime == 0
-        assert stork_prices.feedConfig(alpha_token).staleTime == 200
+        assert stork_prices.feedConfig(alpha_token).staleTime == 600
 
         advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
         _set_sc20_stork_price(mock_stork, boa.env.timestamp)
@@ -1218,11 +1237,59 @@ def test_stork_stale_time_update_to_zero_confirms_global_inheritance(
         assert stork_prices.getPriceAndHasFeed(alpha_token) == (0, True)
 
 
+def test_stork_failed_feed_replacement_confirmation_auto_cancels(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    governance,
+):
+    with boa.env.anchor():
+        _add_sc20_stork_feed(
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            600,
+        )
+        active = stork_prices.feedConfig(alpha_token)
+        _set_sc20_stork_price(
+            mock_stork,
+            boa.env.timestamp,
+            SC20_STORK_ALT_FEED_ID,
+        )
+        assert stork_prices.updatePriceFeed(
+            alpha_token,
+            SC20_STORK_ALT_FEED_ID,
+            600,
+            sender=governance.address,
+        )
+        action_id = stork_prices.pendingUpdates(alpha_token).actionId
+        assert action_id != 0
+        advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
+        boa.env.time_travel(seconds=1)
+        invalid_payload = mock_stork.createPriceFeedUpdateData(
+            SC20_STORK_ALT_FEED_ID,
+            -1,
+            boa.env.timestamp,
+        )
+        boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)
+        mock_stork.updateTemporalNumericValuesV1([invalid_payload], value=1)
+
+        assert not stork_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert stork_prices.pendingUpdates(alpha_token).actionId == 0
+        assert not stork_prices.hasPendingAction(action_id)
+        stored = stork_prices.feedConfig(alpha_token)
+        assert stored.feedId == active.feedId
+        assert stored.staleTime == active.staleTime
+
+
 @pytest.mark.parametrize(
     "invalid_global", [0, MAX_FEED_STALE_TIME + 1]
 )
 @pytest.mark.parametrize(
-    "pending_stale_time,should_confirm", [(0, False), (200, True)]
+    "pending_stale_time,should_confirm", [(0, False), (600, True)]
 )
 def test_stork_stale_time_confirmation_revalidates_inherited_policy(
     stork_prices,
@@ -1258,11 +1325,16 @@ def test_stork_stale_time_confirmation_revalidates_inherited_policy(
         ) is should_confirm
         stored = stork_prices.feedConfig(alpha_token)
         assert stored.feedId == SC20_STORK_FEED_ID
-        assert stored.staleTime == (200 if should_confirm else 300)
-        cleared = stork_prices.pendingUpdates(alpha_token)
-        assert cleared.actionId == 0
-        assert cleared.config.feedId == bytes(32)
-        assert cleared.config.staleTime == 0
+        assert stored.staleTime == (600 if should_confirm else 300)
+        pending_after = stork_prices.pendingUpdates(alpha_token)
+        if should_confirm:
+            assert pending_after.actionId == 0
+            assert pending_after.config.feedId == bytes(32)
+            assert pending_after.config.staleTime == 0
+        else:
+            assert pending_after.actionId == pending.actionId
+            assert pending_after.config.feedId == SC20_STORK_FEED_ID
+            assert pending_after.config.staleTime == 0
         assert stork_prices.getPrice(alpha_token) == SC20_STORK_PRICE
         assert stork_prices.getPriceAndHasFeed(alpha_token) == (
             SC20_STORK_PRICE,
@@ -1295,7 +1367,7 @@ def test_stork_inherited_policy_fails_closed_without_mission_control(
 
 @pytest.mark.parametrize(
     "candidate",
-    [0, 1, 100, MAX_FEED_STALE_TIME, MAX_FEED_STALE_TIME + 1],
+    [0, 299, MIN_LOCAL_STALE_TIME, MAX_FEED_STALE_TIME, MAX_FEED_STALE_TIME + 1],
 )
 def test_stork_stale_time_preflight_matches_initiation(
     stork_prices,
@@ -1308,10 +1380,10 @@ def test_stork_stale_time_preflight_matches_initiation(
     with boa.env.anchor():
         setGeneralConfig(_priceStaleTime=100)
         _add_sc20_stork_feed(
-            stork_prices, mock_stork, alpha_token, governance, 100
+            stork_prices, mock_stork, alpha_token, governance, 600
         )
         _set_sc20_stork_price(mock_stork, boa.env.timestamp)
-        expected = candidate not in (100, MAX_FEED_STALE_TIME + 1)
+        expected = candidate in (0, MIN_LOCAL_STALE_TIME, MAX_FEED_STALE_TIME)
         assert stork_prices.isValidStaleTimeUpdate(
             alpha_token, candidate
         ) is expected
@@ -1337,7 +1409,11 @@ def test_stork_inherited_zero_preflight_rejects_zero_global(
     with boa.env.anchor():
         setGeneralConfig(_priceStaleTime=100)
         _add_sc20_stork_feed(
-            stork_prices, mock_stork, alpha_token, governance, 100
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            MIN_LOCAL_STALE_TIME,
         )
         setGeneralConfig(_priceStaleTime=0)
         assert not stork_prices.isValidStaleTimeUpdate(alpha_token, 0)
@@ -1360,23 +1436,30 @@ def _start_stork_pending_action(
     )
     if kind == "add":
         assert stork_prices.addNewPriceFeed(
-            asset, SC20_STORK_FEED_ID, 100, sender=governance.address
+            asset,
+            SC20_STORK_FEED_ID,
+            MIN_LOCAL_STALE_TIME,
+            sender=governance.address,
         )
         return
 
     _add_sc20_stork_feed(
-        stork_prices, mock_stork, asset, governance, 100
+        stork_prices,
+        mock_stork,
+        asset,
+        governance,
+        MIN_LOCAL_STALE_TIME,
     )
     if kind == "update":
         assert stork_prices.updatePriceFeed(
             asset,
             SC20_STORK_ALT_FEED_ID,
-            100,
+            MIN_LOCAL_STALE_TIME,
             sender=governance.address,
         )
     elif kind == "stale":
         assert stork_prices.updateStaleTime(
-            asset, 200, sender=governance.address
+            asset, 600, sender=governance.address
         )
     else:
         assert kind == "disable"
@@ -1447,13 +1530,13 @@ def test_stork_pending_action_blocks_initiators_and_wrong_selectors(
             lambda: stork_prices.addNewPriceFeed(
                 alpha_token,
                 SC20_STORK_FEED_ID,
-                100,
+                MIN_LOCAL_STALE_TIME,
                 sender=governance.address,
             ),
             lambda: stork_prices.updatePriceFeed(
                 alpha_token,
                 SC20_STORK_ALT_FEED_ID,
-                100,
+                MIN_LOCAL_STALE_TIME,
                 sender=governance.address,
             ),
             lambda: stork_prices.updateStaleTime(
@@ -1510,7 +1593,7 @@ def test_stork_expired_pending_action_requires_cleanup(
             assert stork_prices.addNewPriceFeed(
                 alpha_token,
                 SC20_STORK_FEED_ID,
-                100,
+                MIN_LOCAL_STALE_TIME,
                 sender=governance.address,
             )
         elif pending_kind in ("update", "stale"):
@@ -1518,7 +1601,7 @@ def test_stork_expired_pending_action_requires_cleanup(
                 alpha_token, sender=governance.address
             )
             assert stork_prices.updateStaleTime(
-                alpha_token, 300, sender=governance.address
+                alpha_token, 600, sender=governance.address
             )
         else:
             assert stork_prices.cancelDisablePriceFeed(
@@ -1537,7 +1620,11 @@ def test_stork_timestamp_conversion_matches_admission_and_runtime(
     governance,
 ):
     _add_sc20_stork_feed(
-        stork_prices, mock_stork, alpha_token, governance, 100
+        stork_prices,
+        mock_stork,
+        alpha_token,
+        governance,
+        MIN_LOCAL_STALE_TIME,
     )
     current_second_ns = boa.env.timestamp * 1_000_000_000
     cases = (
@@ -1561,7 +1648,7 @@ def test_stork_timestamp_conversion_matches_admission_and_runtime(
             True,
         )
         assert stork_prices.isValidNewFeed(
-            bravo_token, SC20_STORK_FEED_ID, 100
+            bravo_token, SC20_STORK_FEED_ID, MIN_LOCAL_STALE_TIME
         ) is expected_valid
 
 
@@ -1578,13 +1665,13 @@ def test_stork_zero_and_subsecond_timestamp_rejected_at_admission(
             raw_timestamp_ns,
         )
         assert not stork_prices.isValidNewFeed(
-            alpha_token, SC20_STORK_ALT_FEED_ID, 100
+            alpha_token, SC20_STORK_ALT_FEED_ID, MIN_LOCAL_STALE_TIME
         )
         with boa.reverts("invalid feed"):
             stork_prices.addNewPriceFeed(
                 alpha_token,
                 SC20_STORK_ALT_FEED_ID,
-                100,
+                MIN_LOCAL_STALE_TIME,
                 sender=governance.address,
             )
 
@@ -1596,7 +1683,11 @@ def test_stork_future_whole_second_is_fail_soft_and_recovers(
     governance,
 ):
     _add_sc20_stork_feed(
-        stork_prices, mock_stork, alpha_token, governance, 100
+        stork_prices,
+        mock_stork,
+        alpha_token,
+        governance,
+        MIN_LOCAL_STALE_TIME,
     )
     future_time = boa.env.timestamp + 100
     _set_sc20_stork_price(mock_stork, future_time)
@@ -1615,7 +1706,284 @@ def test_stork_current_timestamp_is_valid(
     governance,
 ):
     _add_sc20_stork_feed(
-        stork_prices, mock_stork, alpha_token, governance, 1
+        stork_prices,
+        mock_stork,
+        alpha_token,
+        governance,
+        MIN_LOCAL_STALE_TIME,
     )
     _set_sc20_stork_price(mock_stork, boa.env.timestamp)
     assert stork_prices.getPrice(alpha_token) == SC20_STORK_PRICE
+
+
+@pytest.mark.parametrize("explicit_zero", [False, True])
+def test_stork_feed_rotation_zero_preserves_active_stale_policy(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    governance,
+    explicit_zero,
+):
+    with boa.env.anchor():
+        _add_sc20_stork_feed(
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            3_600,
+        )
+        _set_sc20_stork_price(
+            mock_stork,
+            boa.env.timestamp,
+            SC20_STORK_ALT_FEED_ID,
+        )
+
+        assert stork_prices.isValidUpdateFeed(
+            alpha_token, SC20_STORK_ALT_FEED_ID, 0
+        )
+        if explicit_zero:
+            assert stork_prices.updatePriceFeed(
+                alpha_token,
+                SC20_STORK_ALT_FEED_ID,
+                0,
+                sender=governance.address,
+            )
+        else:
+            assert stork_prices.updatePriceFeed(
+                alpha_token,
+                SC20_STORK_ALT_FEED_ID,
+                sender=governance.address,
+            )
+        pending_log = filter_logs(
+            stork_prices, "StorkFeedUpdatePending"
+        )[0]
+        pending = stork_prices.pendingUpdates(alpha_token)
+        assert pending.config.staleTime == 3_600
+        assert pending_log.staleTime == 3_600
+
+        advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
+        _set_sc20_stork_price(
+            mock_stork,
+            boa.env.timestamp,
+            SC20_STORK_ALT_FEED_ID,
+        )
+        assert stork_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        updated_log = filter_logs(stork_prices, "StorkFeedUpdated")[0]
+        stored = stork_prices.feedConfig(alpha_token)
+        assert stored.feedId == SC20_STORK_ALT_FEED_ID
+        assert stored.staleTime == 3_600
+        assert updated_log.staleTime == 3_600
+
+
+@pytest.mark.parametrize(
+    "candidate,is_valid",
+    [
+        (MIN_LOCAL_STALE_TIME - 1, False),
+        (MIN_LOCAL_STALE_TIME, True),
+        (MAX_FEED_STALE_TIME, True),
+        (MAX_FEED_STALE_TIME + 1, False),
+    ],
+)
+def test_stork_local_stale_bounds_cover_feed_lifecycles(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    governance,
+    candidate,
+    is_valid,
+):
+    with boa.env.anchor():
+        _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+        assert stork_prices.isValidNewFeed(
+            alpha_token, SC20_STORK_FEED_ID, candidate
+        ) is is_valid
+        if is_valid:
+            assert stork_prices.addNewPriceFeed(
+                alpha_token,
+                SC20_STORK_FEED_ID,
+                candidate,
+                sender=governance.address,
+            )
+            assert (
+                stork_prices.pendingUpdates(alpha_token).config.staleTime
+                == candidate
+            )
+            advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
+            _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+            assert stork_prices.confirmNewPriceFeed(
+                alpha_token, sender=governance.address
+            )
+        else:
+            with boa.reverts("invalid feed"):
+                stork_prices.addNewPriceFeed(
+                    alpha_token,
+                    SC20_STORK_FEED_ID,
+                    candidate,
+                    sender=governance.address,
+                )
+
+    with boa.env.anchor():
+        _add_sc20_stork_feed(
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            600,
+        )
+        _set_sc20_stork_price(
+            mock_stork,
+            boa.env.timestamp,
+            SC20_STORK_ALT_FEED_ID,
+        )
+        assert stork_prices.isValidUpdateFeed(
+            alpha_token, SC20_STORK_ALT_FEED_ID, candidate
+        ) is is_valid
+        if is_valid:
+            assert stork_prices.updatePriceFeed(
+                alpha_token,
+                SC20_STORK_ALT_FEED_ID,
+                candidate,
+                sender=governance.address,
+            )
+            advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
+            _set_sc20_stork_price(
+                mock_stork,
+                boa.env.timestamp,
+                SC20_STORK_ALT_FEED_ID,
+            )
+            assert stork_prices.confirmPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+            assert stork_prices.feedConfig(alpha_token).staleTime == candidate
+        else:
+            with boa.reverts("invalid feed"):
+                stork_prices.updatePriceFeed(
+                    alpha_token,
+                    SC20_STORK_ALT_FEED_ID,
+                    candidate,
+                    sender=governance.address,
+                )
+
+    with boa.env.anchor():
+        _add_sc20_stork_feed(
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            600,
+        )
+        assert stork_prices.isValidStaleTimeUpdate(
+            alpha_token, candidate
+        ) is is_valid
+        if is_valid:
+            assert stork_prices.updateStaleTime(
+                alpha_token, candidate, sender=governance.address
+            )
+            advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
+            _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+            assert stork_prices.confirmPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+            assert stork_prices.feedConfig(alpha_token).staleTime == candidate
+        else:
+            with boa.reverts("invalid feed"):
+                stork_prices.updateStaleTime(
+                    alpha_token, candidate, sender=governance.address
+                )
+
+
+def test_stork_paused_source_keeps_pricing_but_freezes_pending_actions(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    governance,
+    switchboard_alpha,
+):
+    with boa.env.anchor():
+        _add_sc20_stork_feed(
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            600,
+        )
+        assert stork_prices.updateStaleTime(
+            alpha_token,
+            MIN_LOCAL_STALE_TIME,
+            sender=governance.address,
+        )
+        advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
+        _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+
+        stork_prices.pause(True, sender=switchboard_alpha.address)
+        assert stork_prices.getPrice(alpha_token) == SC20_STORK_PRICE
+        with boa.reverts("contract paused"):
+            stork_prices.updateStaleTime(
+                alpha_token, 1_200, sender=governance.address
+            )
+        with boa.reverts("contract paused"):
+            stork_prices.confirmPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+        with boa.reverts("contract paused"):
+            stork_prices.cancelPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+
+        stork_prices.pause(False, sender=switchboard_alpha.address)
+        assert stork_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert stork_prices.updateStaleTime(
+            alpha_token, 600, sender=governance.address
+        )
+        stork_prices.pause(True, sender=switchboard_alpha.address)
+        with boa.reverts("contract paused"):
+            stork_prices.cancelPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+        stork_prices.pause(False, sender=switchboard_alpha.address)
+        assert stork_prices.cancelPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert stork_prices.pendingUpdates(alpha_token).actionId == 0
+
+
+def test_stork_failed_stale_confirmation_can_cancel_after_expiry(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    governance,
+):
+    with boa.env.anchor():
+        _add_sc20_stork_feed(
+            stork_prices,
+            mock_stork,
+            alpha_token,
+            governance,
+            600,
+        )
+        assert stork_prices.updateStaleTime(
+            alpha_token,
+            MIN_LOCAL_STALE_TIME,
+            sender=governance.address,
+        )
+        advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
+        _set_sc20_stork_price(
+            mock_stork,
+            boa.env.timestamp - MIN_LOCAL_STALE_TIME - 1,
+        )
+        assert not stork_prices.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        action_id = stork_prices.pendingUpdates(alpha_token).actionId
+        assert action_id != 0
+
+        advance_timelock_blocks(stork_prices.expiration())
+        assert stork_prices.pendingUpdates(alpha_token).actionId == action_id
+        assert stork_prices.cancelPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert stork_prices.pendingUpdates(alpha_token).actionId == 0

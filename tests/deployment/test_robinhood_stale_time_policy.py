@@ -1,3 +1,4 @@
+import ast
 import re
 from pathlib import Path
 
@@ -29,6 +30,8 @@ EXPECTED_EQUITY_NAMES = ("SPCX", "NVDA", "TSLA", "AAPL", "GOOGL", "GME")
 
 
 def test_stale_time_policy_values_and_bounds_are_exact():
+    assert policy.STALE_WINDOW_MIN == 300
+    assert policy.STALE_WINDOW_MAX == 604_800
     assert policy.STALE_WINDOW_GLOBAL == 86_400
     assert policy.STALE_WINDOW_INHERIT == 0
     assert policy.STALE_WINDOW_EQUITY == 345_600
@@ -49,6 +52,86 @@ def test_stale_time_policy_values_and_bounds_are_exact():
     # consume the classifier rather than either legacy name.
     assert policy.STALE_WINDOW_DEFAULT == 86_400
     assert policy.STALE_WINDOW_USDG == 86_400
+
+
+def test_every_post_pr206_target_override_is_zero_or_within_source_bounds():
+    classified_assets = (
+        policy.ROBINHOOD_STALE_TIME_INHERIT_ASSETS
+        | policy.ROBINHOOD_STALE_TIME_EQUITY_ASSETS
+    )
+    for asset in classified_assets:
+        override = policy.stale_time_override_for_asset(asset)
+        assert override == policy.STALE_WINDOW_INHERIT or (
+            policy.STALE_WINDOW_MIN
+            <= override
+            <= policy.STALE_WINDOW_MAX
+        )
+
+
+def test_post_pr206_policy_has_no_current_migration_consumer():
+    migration_dir = (
+        Path(__file__).resolve().parents[2]
+        / "migrations"
+        / "robinhood-mainnet"
+    )
+    target_names = {
+        "stale_time_override_for_asset",
+        "ROBINHOOD_STALE_TIME_INHERIT_ASSETS",
+        "ROBINHOOD_STALE_TIME_EQUITY_ASSETS",
+        "STALE_WINDOW_INHERIT",
+        "STALE_WINDOW_EQUITY",
+    }
+    consumers = []
+
+    def dotted_name(node):
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            prefix = dotted_name(node.value)
+            if prefix is not None:
+                return f"{prefix}.{node.attr}"
+        return None
+
+    for path in sorted(migration_dir.glob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        module_aliases = set()
+        used_targets = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module == "config.robinhood_launch":
+                    for imported in node.names:
+                        if imported.name == "*":
+                            used_targets.update(target_names)
+                        elif imported.name in target_names:
+                            used_targets.add(imported.name)
+                elif node.module == "config":
+                    for imported in node.names:
+                        if imported.name == "robinhood_launch":
+                            module_aliases.add(
+                                imported.asname or imported.name
+                            )
+            elif isinstance(node, ast.Import):
+                for imported in node.names:
+                    if imported.name == "config.robinhood_launch":
+                        module_aliases.add(
+                            imported.asname or "config.robinhood_launch"
+                        )
+
+        for node in ast.walk(tree):
+            qualified = dotted_name(node)
+            if qualified is None:
+                continue
+            for module_alias in module_aliases:
+                prefix = f"{module_alias}."
+                if qualified.startswith(prefix):
+                    candidate = qualified.removeprefix(prefix)
+                    if candidate in target_names:
+                        used_targets.add(candidate)
+
+        if used_targets:
+            consumers.append((path.name, tuple(sorted(used_targets))))
+
+    assert consumers == []
 
 
 def test_stale_time_policy_asset_sets_are_exact_and_disjoint():

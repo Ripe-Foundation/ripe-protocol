@@ -108,7 +108,10 @@ pendingUpdates: public(HashMap[address, PendingRedStoneConfig]) # asset -> pendi
 
 ETH: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
-MAX_FEED_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
+# The floor applies only to explicit local overrides; zero means inheritance.
+# This ceiling is absolute, so deployment Switchboard maxima must not exceed it.
+MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
+MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
 
 
 @deploy
@@ -143,11 +146,8 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
-    # A nonzero value is only the global policy forwarded by canonical PriceDesk.
-    if _staleTime != 0:
-        priceDesk: address = addys._getPriceDeskAddr()
-        if msg.sender != priceDesk or _priceDesk != priceDesk:
-            return 0
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0
     return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk)
 
 
@@ -157,11 +157,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
-    # A nonzero value is only the global policy forwarded by canonical PriceDesk.
-    if _staleTime != 0:
-        priceDesk: address = addys._getPriceDeskAddr()
-        if msg.sender != priceDesk or _priceDesk != priceDesk:
-            return 0, True
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0, True
     return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk), True
 
 
@@ -179,16 +176,9 @@ def _getPrice(
     if not self._isSafeConversionRoute(_asset, _feed, _needsEthToUsd):
         return 0
 
-    globalStaleTime: uint256 = _globalStaleTime
-    hasGlobalStaleTime: bool = globalStaleTime != 0
-    if _feedStaleTime == 0 and not hasGlobalStaleTime:
-        globalStaleTime, hasGlobalStaleTime = self._getGlobalStaleTime()
-        if not hasGlobalStaleTime:
-            return 0
-
     staleTime: uint256 = 0
     isValidStaleTime: bool = False
-    staleTime, isValidStaleTime = self._resolveStaleTime(globalStaleTime, _feedStaleTime)
+    staleTime, isValidStaleTime = self._resolveStaleTime(_globalStaleTime, _feedStaleTime)
     if not isValidStaleTime:
         return 0
 
@@ -213,6 +203,10 @@ def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool
     if not _needsEthToUsd:
         return True
 
+    # Conversion asks PriceDesk for ETH/USD. Reject routes that recurse through
+    # this asset or through an ETH config that itself needs ETH conversion.
+    # A shared feed is also unsafe: it would treat the ETH/USD feed as asset/ETH
+    # and multiply the same economic input into itself.
     ethConfig: RedStoneConfig = self.feedConfig[ETH]
     if _asset == ETH or ethConfig.needsEthToUsd:
         return False
@@ -220,6 +214,16 @@ def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool
 
 
 # utilities
+
+
+@view
+@internal
+def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
+    # Only canonical PriceDesk may supply a nonzero forwarded global policy.
+    if _staleTime == 0:
+        return True
+    priceDesk: address = addys._getPriceDeskAddr()
+    return msg.sender == priceDesk and _priceDesk == priceDesk
 
 
 @view
@@ -247,23 +251,29 @@ def _getGlobalStaleTime() -> (uint256, bool):
         return 0, False
 
     staleTime: uint256 = staticcall MissionControl(missionControl).getPriceStaleTime()
-    if staleTime == 0 or staleTime > MAX_FEED_STALE_TIME:
+    if staleTime == 0 or staleTime > MAX_EFFECTIVE_STALE_TIME:
         return 0, False
     return staleTime, True
 
 
-@pure
+@view
 @internal
-def _resolveStaleTime(_globalBound: uint256, _feedBound: uint256) -> (uint256, bool):
-    feedPolicy: uint256 = _feedBound
-    if feedPolicy == 0:
-        if _globalBound == 0 or _globalBound > MAX_FEED_STALE_TIME:
+def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (uint256, bool):
+    staleTime: uint256 = _feedStaleTime
+    if staleTime != 0:
+        if staleTime < MIN_LOCAL_STALE_TIME or staleTime > MAX_EFFECTIVE_STALE_TIME:
             return 0, False
-        feedPolicy = _globalBound
-    elif feedPolicy > MAX_FEED_STALE_TIME:
-        return 0, False
+        return staleTime, True
 
-    return feedPolicy, True
+    staleTime = _globalStaleTime
+    if staleTime == 0:
+        isValid: bool = False
+        staleTime, isValid = self._getGlobalStaleTime()
+        if not isValid:
+            return 0, False
+    elif staleTime > MAX_EFFECTIVE_STALE_TIME:
+        return 0, False
+    return staleTime, True
 
 
 #################
@@ -437,18 +447,22 @@ def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _nee
 def updatePriceFeed(
     _asset: address,
     _newFeed: address,
-    _staleTime: uint256 = 0, # inherit MissionControl
+    _staleTime: uint256 = 0, # preserve current policy when omitted
     _needsEthToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
     assert _newFeed != self.feedConfig[_asset].feed # dev: invalid feed
 
+    # Feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
+    # remains the explicit path for resetting a feed to MissionControl inheritance.
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
+
     # validation
     decimals: uint256 = 0
     if _newFeed != empty(address):
         decimals = convert(staticcall ChainlinkInterface(_newFeed).decimals(), uint256)
-    return self._initiatePriceFeedUpdate(_asset, _newFeed, decimals, _needsEthToUsd, _staleTime)
+    return self._initiatePriceFeedUpdate(_asset, _newFeed, decimals, _needsEthToUsd, staleTime)
 
 
 @external
@@ -458,6 +472,14 @@ def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
 
     config: RedStoneConfig = self.feedConfig[_asset]
     return self._initiatePriceFeedUpdate(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime)
+
+
+@view
+@internal
+def _normalizeFeedUpdateStaleTime(_asset: address, _staleTime: uint256) -> uint256:
+    if _staleTime == 0:
+        return self.feedConfig[_asset].staleTime
+    return _staleTime
 
 
 @internal
@@ -501,6 +523,10 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     oldFeed: address = self.feedConfig[_asset].feed
     assert oldFeed != empty(address) # dev: no pending update feed
     if not self._isValidUpdateFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
+        # A stale-only update can fail transiently when its unchanged oracle is
+        # unavailable. Preserve the timelocked action so governance can retry.
+        if d.config.feed == oldFeed:
+            return False
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -544,14 +570,18 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _staleTime: uint256) -> bool:
+    # Feed-changing preflight intentionally rejects the active feed. Use
+    # `isValidStaleTimeUpdate` for a same-feed policy change.
     if _newFeed == self.feedConfig[_asset].feed:
         return False
-    return self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _staleTime)
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
+    return self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, staleTime)
 
 
 @view
 @external
 def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    # Stale-only preflight validates against the active feed configuration.
     config: RedStoneConfig = self.feedConfig[_asset]
     return self._isValidUpdateFeed(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime)
 

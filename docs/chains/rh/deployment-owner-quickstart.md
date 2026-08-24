@@ -226,6 +226,98 @@ permitted actions, stop rules, and evidence destination. Treat deployment,
 migration execution, production configuration, activation, and release as
 separate lifecycle events.
 
+## PR206/PR208 stale-time activation handoff
+
+This is a future handoff, not an executable migration or deployment authority.
+Do not begin until PR #206 and this stale-time PR #208 are merged and both
+merge commits/trees are bound. PR #206 supplies the migration frontier; PR #208
+supplies the reviewed source generation, policy semantics, and qualification
+logic. Then:
+
+1. Deploy all five reviewed contracts: the replacement PriceDesk plus the
+   Chainlink, Pyth, RedStone, and Stork price sources. Preserve the prior
+   PriceDesk and source generation, with its configuration, as the rollback
+   target.
+2. On the candidate PriceDesk, configure and read back the complete source
+   graph before changing the authoritative registry pointer: both unchanged
+   source registrations and all four replacement source registrations, with
+   their exact IDs, priority order, and feed configuration. Core routes store
+   stale time `0`; read back MissionControl's global stale time as exactly
+   `86400` seconds. Apply a
+   nonzero equity override only to a feed whose address and acceptance evidence
+   have been separately approved; the policy table is not feed evidence.
+3. Bind the pure strict qualifiers to the staged candidate objects. Run the
+   RedStone local- and cross-source route census and abort on any collision,
+   unsafe conversion route, unmatched timelock action, or incomplete RPC
+   discovery. Run the same generation-independent conversion-graph census for
+   Chainlink. Before rotating either Chainlink ETH/USD or BTC/USD anchor,
+   enumerate all active and pending dependents and abort if the proposed anchor
+   makes any dependent unusable or any required read is incomplete.
+4. Confirm every source runtime identity, pending action, active feed, stored
+   stale time, effective stale-time interpretation, and pause state. Source
+   pause freezes administrative mutation; it is not a price circuit breaker,
+   and the source must be unpaused before governance can remediate a feed.
+5. Flip RipeHq PriceDesk ID `7` last. Immediately read back ID `7`, source IDs,
+   priority order, global and local stale times, representative direct and
+   conversion prices, and the absence of pending actions.
+6. Preserve the old PriceDesk and source generation in the completion record.
+   Rollback means restoring that exact recorded generation and its policy—not
+   deploying an improvised third configuration.
+
+Stop on PR #206 or PR #208 frontier drift, unaccepted equity binding, unknown runtime,
+incomplete discovery, failed price/readback, unexpected pending action, or any
+configuration difference. Add the executable migration only after these inputs
+are reviewed; this PR intentionally adds none.
+
+The current operator CLI is hard-coded to Base mainnet (`RipeHq`, Base Alchemy
+RPC, and Etherscan chain ID `8453`) and resolves PriceDesk from canonical
+RipeHq ID `7`. It is therefore a post-pointer readback check, not a pre-flip
+candidate-graph gate. It also requires exact reviewed current-generation
+runtime hashes. `EXPECTED_CURRENT_PRICE_DESK_RUNTIME_HASH` and
+`KNOWN_CURRENT_STALE_TIME_RUNTIME_HASHES` intentionally remain empty until a
+reviewed deployment completion record supplies those immutable-bound hashes.
+With Base credentials already exported by the operator's approved secret
+mechanism, its exact post-pointer diagnostic commands are:
+
+```sh
+: "${WEB3_ALCHEMY_API_KEY:?missing Base Alchemy credential}"
+: "${ETHERSCAN_API_KEY:?missing Etherscan v2 credential}"
+python scripts/params/prices.py --strict-activation
+```
+
+That command requires the observed global stale time to equal the reviewed
+default of `86400` seconds, requires every stored active/pending local value to
+be `0` or within `300..604800`, rejects every live source timelock action, and
+rejects pending updates/disables for every existing PriceDesk registry ID. A
+different intentional global must be passed explicitly with
+`--expected-global-stale-time` and supported by separate policy approval.
+PriceDesk's address-keyed `pendingNewAddr` mapping is not enumerable, so an
+event-backed absence check remains mandatory. The Base CLI also does not assert
+RH's exact asset-by-asset target map; the RH candidate-bound migration must
+compare each active feed against `stale_time_override_for_asset` and its
+separately approved feed/address evidence.
+
+For a separately reviewed Base Chainlink anchor candidate:
+
+```sh
+: "${WEB3_ALCHEMY_API_KEY:?missing Base Alchemy credential}"
+: "${ETHERSCAN_API_KEY:?missing Etherscan v2 credential}"
+RIPE_PROPOSED_CHAINLINK_FEED='<20-byte-0x-feed-address>'
+python scripts/params/prices.py \
+  --strict-activation \
+  --chainlink-anchor ETH \
+  --proposed-anchor-feed "$RIPE_PROPOSED_CHAINLINK_FEED"
+```
+
+Use `BTC` instead of `ETH` only for a reviewed BTC/USD anchor rotation. These
+commands are Base-only post-pointer diagnostics and cannot be cited as
+Robinhood activation evidence or as Base pre-flip candidate evidence. Before
+the pointer flip, migration code must invoke the same pure qualification logic
+with explicitly candidate-bound objects. After both merges, the RH migration
+and readback must do so with RH-bound RPC, RipeHq, and ABI inputs, or use a
+separately reviewed chain-parameterized successor. Neither command grants RPC,
+deployment, migration, configuration, or activation authority.
+
 ## Conditional post-deployment asset retirement
 
 This procedure applies only after a separately reviewed MissionControl runtime

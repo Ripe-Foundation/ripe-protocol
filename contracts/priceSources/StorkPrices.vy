@@ -116,7 +116,10 @@ pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
 STORK: public(immutable(address))
 MAX_PRICE_UPDATES: constant(uint256) = 20
-MAX_FEED_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
+# The floor applies only to explicit local overrides; zero means inheritance.
+# This ceiling is absolute, so deployment Switchboard maxima must not exceed it.
+MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
+MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
 
 
 @deploy
@@ -150,11 +153,8 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
-    # A nonzero value is only the canonical PriceDesk-forwarded global.
-    if _staleTime != 0:
-        priceDesk: address = addys._getPriceDeskAddr()
-        if msg.sender != priceDesk or _priceDesk != priceDesk:
-            return 0
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -169,11 +169,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
-    # A nonzero value is only the canonical PriceDesk-forwarded global.
-    if _staleTime != 0:
-        priceDesk: address = addys._getPriceDeskAddr()
-        if msg.sender != priceDesk or _priceDesk != priceDesk:
-            return 0, True
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0, True
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
@@ -186,23 +183,39 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 @internal
 def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
+    return self._validatePriceData(data, _staleTime)
+
+
+@view
+@internal
+def _validatePriceData(_data: TemporalNumericValue, _staleTime: uint256) -> uint256:
 
     # official 1e18 as-is; reject non-positive int192
-    if data.quantizedValue <= 0:
+    if _data.quantizedValue <= 0:
         return 0
 
     # validate publish time and staleness
     # Sub-second future values within the current second truncate to current time.
-    publishTime: uint256 = convert(data.timestampNs, uint256) // 1_000_000_000
+    publishTime: uint256 = convert(_data.timestampNs, uint256) // 1_000_000_000
     if publishTime == 0 or publishTime > block.timestamp:
         return 0
     if _staleTime != 0 and block.timestamp - publishTime > _staleTime:
         return 0
 
-    return convert(data.quantizedValue, uint256)
+    return convert(_data.quantizedValue, uint256)
 
 
 # utilities
+
+
+@view
+@internal
+def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
+    # Only canonical PriceDesk may supply a nonzero forwarded global policy.
+    if _staleTime == 0:
+        return True
+    priceDesk: address = addys._getPriceDeskAddr()
+    return msg.sender == priceDesk and _priceDesk == priceDesk
 
 
 @view
@@ -226,7 +239,7 @@ def addPriceSnapshot(_asset: address) -> bool:
 @internal
 def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (uint256, bool):
     if _feedStaleTime != 0:
-        if _feedStaleTime > MAX_FEED_STALE_TIME:
+        if _feedStaleTime < MIN_LOCAL_STALE_TIME or _feedStaleTime > MAX_EFFECTIVE_STALE_TIME:
             return 0, False
         return _feedStaleTime, True
 
@@ -236,7 +249,7 @@ def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (ui
         globalStaleTime, isValid = self._getGlobalStaleTime()
         if not isValid:
             return 0, False
-    elif globalStaleTime > MAX_FEED_STALE_TIME:
+    elif globalStaleTime > MAX_EFFECTIVE_STALE_TIME:
         return 0, False
     return globalStaleTime, True
 
@@ -249,7 +262,7 @@ def _getGlobalStaleTime() -> (uint256, bool):
         return 0, False
 
     staleTime: uint256 = staticcall MissionControl(missionControl).getPriceStaleTime()
-    if staleTime == 0 or staleTime > MAX_FEED_STALE_TIME:
+    if staleTime == 0 or staleTime > MAX_EFFECTIVE_STALE_TIME:
         return 0, False
     return staleTime, True
 
@@ -364,7 +377,11 @@ def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) 
     assert not priceData.isPaused # dev: contract paused
     assert _feedId != self.feedConfig[_asset].feedId # dev: invalid feed
 
-    return self._initiatePriceFeedUpdate(_asset, _feedId, _staleTime)
+    # Feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
+    # remains the explicit path for resetting a feed to MissionControl inheritance.
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
+
+    return self._initiatePriceFeedUpdate(_asset, _feedId, staleTime)
 
 
 @external
@@ -374,6 +391,14 @@ def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
 
     config: StorkFeedConfig = self.feedConfig[_asset]
     return self._initiatePriceFeedUpdate(_asset, config.feedId, _staleTime)
+
+
+@view
+@internal
+def _normalizeFeedUpdateStaleTime(_asset: address, _staleTime: uint256) -> uint256:
+    if _staleTime == 0:
+        return self.feedConfig[_asset].staleTime
+    return _staleTime
 
 
 @internal
@@ -409,6 +434,10 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     assert oldFeedId != empty(bytes32) # dev: no pending update feed
     if not self._isValidUpdateFeed(_asset, d.config.feedId, d.config.staleTime):
+        # A stale-only update can fail transiently when its unchanged oracle is
+        # unavailable. Preserve the timelocked action so governance can retry.
+        if d.config.feedId == oldFeedId:
+            return False
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -452,14 +481,18 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    # Feed-changing preflight intentionally rejects the active feed. Use
+    # `isValidStaleTimeUpdate` for a same-feed policy change.
     if _feedId == self.feedConfig[_asset].feedId:
         return False
-    return self._isValidUpdateFeed(_asset, _feedId, _staleTime)
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
+    return self._isValidUpdateFeed(_asset, _feedId, staleTime)
 
 
 @view
 @external
 def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    # Stale-only preflight validates against the active feed configuration.
     config: StorkFeedConfig = self.feedConfig[_asset]
     return self._isValidUpdateFeed(_asset, config.feedId, _staleTime)
 
@@ -482,21 +515,15 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
     if _asset == empty(address):
         return False
 
+    # Fetch first to preserve the Stork network's NotFound behavior for unknown
+    # feed IDs, then reuse the exact runtime data validation below.
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
-    if data.quantizedValue <= 0:
-        return False
-    publishTime: uint256 = convert(data.timestampNs, uint256) // 1_000_000_000
-    if publishTime == 0 or publishTime > block.timestamp:
-        return False
-
     staleTime: uint256 = 0
     isValid: bool = False
     staleTime, isValid = self._resolveStaleTime(0, _staleTime)
     if not isValid:
         return False
-    if block.timestamp - publishTime > staleTime:
-        return False
-    return True
+    return self._validatePriceData(data, staleTime) != 0
 
 
 ################

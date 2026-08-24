@@ -35,13 +35,11 @@ if STALE_WINDOW_GLOBAL != QUALIFIED_GLOBAL_STALE_TIME:
 
 
 @pytest.fixture(autouse=True)
-def valid_global_stale_time(mission_control):
+def valid_global_stale_time(setGeneralConfig):
     """Run gas qualifications with the production one-day global policy."""
 
     with boa.env.anchor():
-        mission_control.eval(
-            f"self.genConfig.priceStaleTime = {STALE_WINDOW_GLOBAL}"
-        )
+        setGeneralConfig(_priceStaleTime=STALE_WINDOW_GLOBAL)
         yield
 
 
@@ -512,18 +510,25 @@ def test_selected_morpho_v2_full_ring_nested_pricedesk_gas(
         deploy3r,
         [chainlink, curve_prices, blue_chip],
     )
-    # Candidate snapshot authorization accepts any registered Ripe department.
-    # Register this isolated three-slot desk solely for the test transaction.
-    assert ripe_hq.startAddNewAddressToRegistry(
+    # Install the isolated three-slot desk at canonical PriceDesk ID 7. The
+    # sources intentionally reject forwarded global policy from any other
+    # caller, so merely appending the desk to RipeHq is not production-shaped.
+    assert ripe_hq.startAddressUpdateToRegistry(
+        7,
         desk,
-        "Morpho V2 gas desk",
         sender=governance.address,
     )
     advance_timelock_blocks(ripe_hq.registryChangeTimeLock() + 1)
-    assert ripe_hq.confirmNewAddressToRegistry(desk, sender=governance.address)
-    # The registry timelock advances past the configured feed/snapshot stale
-    # windows; refresh both without changing the already-filled ring capacity.
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        7,
+        sender=governance.address,
+    )
+    assert ripe_hq.getAddr(7) == desk.address
+    # The block-only registry timelock leaves the wall clock unchanged. Move it
+    # forward before replacing the newest ring entry: BlueChip correctly
+    # rejects two snapshots with the same timestamp.
     mock_chainlink_feed_one.setMockData(10**8)
+    boa.env.time_travel(seconds=1)
     assert blue_chip.addPriceSnapshot(vault, sender=teller.address)
     _set_priorities(mission_control, switchboard_alpha, [1, 2])
     assert desk.numAddrs() - 1 == 3
