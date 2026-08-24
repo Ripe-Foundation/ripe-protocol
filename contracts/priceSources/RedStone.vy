@@ -108,6 +108,8 @@ pendingUpdates: public(HashMap[address, PendingRedStoneConfig]) # asset -> pendi
 
 ETH: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
+MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
+MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
 
 
 @deploy
@@ -142,8 +144,9 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
-    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, staleTime, _priceDesk)
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0
+    return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk)
 
 
 @view
@@ -152,20 +155,32 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
-    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, staleTime, _priceDesk), True
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0, True
+    return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk), True
 
 
 @view
 @internal
 def _getPrice(
+    _asset: address,
     _feed: address, 
     _decimals: uint256,
     _needsEthToUsd: bool,
-    _staleTime: uint256,
+    _globalStaleTime: uint256,
+    _feedStaleTime: uint256,
     _priceDesk: address,
 ) -> uint256:
-    price: uint256 = self._getRedStoneData(_feed, _decimals, _staleTime)
+    if not self._isSafeConversionRoute(_asset, _feed, _needsEthToUsd):
+        return 0
+
+    staleTime: uint256 = 0
+    isValidStaleTime: bool = False
+    staleTime, isValidStaleTime = self._resolveStaleTime(_globalStaleTime, _feedStaleTime)
+    if not isValidStaleTime:
+        return 0
+
+    price: uint256 = self._getRedStoneData(_feed, _decimals, staleTime)
     if price == 0:
         return 0
 
@@ -174,13 +189,41 @@ def _getPrice(
         priceDesk: address = _priceDesk
         if _priceDesk == empty(address):
             priceDesk = addys._getPriceDeskAddr()
-        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True, _staleTime)
+        # A missing ETH/USD anchor must fail closed without reverting so feed
+        # confirmation can follow its retry-or-cancel lifecycle.
+        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, False)
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
 
 
+@view
+@internal
+def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool) -> bool:
+    if not _needsEthToUsd:
+        return True
+
+    # conversion asks PriceDesk for ETH/USD. Reject routes that recurse through
+    # this asset or through an ETH config that itself needs ETH conversion.
+    # a shared feed is also unsafe: it would treat the ETH/USD feed as asset/ETH
+    # and multiply the same economic input into itself.
+    ethConfig: RedStoneConfig = self.feedConfig[ETH]
+    if _asset == ETH or ethConfig.needsEthToUsd:
+        return False
+    return _feed != ethConfig.feed
+
+
 # utilities
+
+
+@view
+@internal
+def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
+    # only canonical PriceDesk may supply a nonzero forwarded global policy
+    if _staleTime == 0:
+        return True
+    priceDesk: address = addys._getPriceDeskAddr()
+    return msg.sender == priceDesk and _priceDesk == priceDesk
 
 
 @view
@@ -200,14 +243,37 @@ def addPriceSnapshot(_asset: address) -> bool:
     return False
 
 
-@pure
+@view
 @internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
+def _getGlobalStaleTime() -> (uint256, bool):
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl == empty(address):
+        return 0, False
+
+    staleTime: uint256 = staticcall MissionControl(missionControl).getPriceStaleTime()
+    if staleTime == 0 or staleTime > MAX_EFFECTIVE_STALE_TIME:
+        return 0, False
+    return staleTime, True
+
+
+@view
+@internal
+def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (uint256, bool):
+    staleTime: uint256 = _feedStaleTime
+    if staleTime != 0:
+        if staleTime < MIN_LOCAL_STALE_TIME or staleTime > MAX_EFFECTIVE_STALE_TIME:
+            return 0, False
+        return staleTime, True
+
+    staleTime = _globalStaleTime
+    if staleTime == 0:
+        isValid: bool = False
+        staleTime, isValid = self._getGlobalStaleTime()
+        if not isValid:
+            return 0, False
+    elif staleTime > MAX_EFFECTIVE_STALE_TIME:
+        return 0, False
+    return staleTime, True
 
 
 @view
@@ -303,11 +369,12 @@ def _getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256) ->
 def addNewPriceFeed(
     _asset: address,
     _newFeed: address,
-    _staleTime: uint256 = 60 * 60 * 24, # 1 day
+    _staleTime: uint256 = 0, # inherit MissionControl
     _needsEthToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     hasDecimals: bool = False
@@ -342,6 +409,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingRedStoneConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending new feed
+    assert self.feedConfig[_asset].feed == empty(address) # dev: no pending new feed
     if not self._hasExpectedFeedDecimals(d.config.feed, d.config.decimals) or not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
@@ -367,6 +435,9 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingRedStoneConfig = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending new feed
+    assert d.config.feed != empty(address) # dev: no pending new feed
+    assert self.feedConfig[_asset].feed == empty(address) # dev: no pending new feed
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
     log NewRedStoneFeedCancelled(asset=_asset, feed=d.config.feed)
     return True
@@ -407,18 +478,53 @@ def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _nee
 def updatePriceFeed(
     _asset: address,
     _newFeed: address,
-    _staleTime: uint256 = 60 * 60 * 24, # 1 day
+    _staleTime: uint256 = 0, # preserve current policy when omitted
     _needsEthToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert _newFeed != self.feedConfig[_asset].feed # dev: invalid feed
+
+    # feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
+    # remains the explicit path for resetting a feed to MissionControl inheritance.
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
 
     # validation
     hasDecimals: bool = False
     decimals: uint256 = 0
     hasDecimals, decimals = self._readFeedDecimals(_newFeed)
+    assert hasDecimals # dev: invalid feed
+    return self._initiatePriceFeedUpdate(_asset, _newFeed, decimals, _needsEthToUsd, staleTime)
+
+
+@external
+def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+
+    config: RedStoneConfig = self.feedConfig[_asset]
+    return self._initiatePriceFeedUpdate(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime)
+
+
+@view
+@internal
+def _normalizeFeedUpdateStaleTime(_asset: address, _staleTime: uint256) -> uint256:
+    if _staleTime == 0:
+        return self.feedConfig[_asset].staleTime
+    return _staleTime
+
+
+@internal
+def _initiatePriceFeedUpdate(
+    _asset: address,
+    _newFeed: address,
+    _decimals: uint256,
+    _needsEthToUsd: bool,
+    _staleTime: uint256,
+) -> bool:
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
     oldFeed: address = self.feedConfig[_asset].feed
-    assert hasDecimals and self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _staleTime) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -426,7 +532,7 @@ def updatePriceFeed(
         actionId=aid,
         config=RedStoneConfig(
             feed=_newFeed,
-            decimals=decimals,
+            decimals=_decimals,
             needsEthToUsd=_needsEthToUsd,
             staleTime=_staleTime,
         ),
@@ -447,7 +553,15 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingRedStoneConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending update feed
     oldFeed: address = self.feedConfig[_asset].feed
-    if not self._hasExpectedFeedDecimals(d.config.feed, d.config.decimals) or not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
+    assert oldFeed != empty(address) # dev: no pending update feed
+    if not self._hasExpectedFeedDecimals(d.config.feed, d.config.decimals):
+        self._cancelPriceFeedUpdate(_asset, d.actionId)
+        return False
+    if not self._isValidUpdateFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.staleTime):
+        # a stale-only update can fail transiently when its unchanged oracle is
+        # unavailable. Preserve the timelocked action so governance can retry.
+        if d.config.feed == oldFeed:
+            return False
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -471,6 +585,9 @@ def cancelPriceFeedUpdate(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingRedStoneConfig = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending update feed
+    assert d.config.feed != empty(address) # dev: no pending update feed
+    assert self.feedConfig[_asset].feed != empty(address) # dev: no pending update feed
     self._cancelPriceFeedUpdate(_asset, d.actionId)
     log RedStoneFeedUpdateCancelled(asset=_asset, feed=d.config.feed, oldFeed=self.feedConfig[_asset].feed)
     return True
@@ -488,16 +605,36 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _staleTime: uint256) -> bool:
-    return self._isValidUpdateFeed(_asset, _newFeed, self.feedConfig[_asset].feed, _decimals, _needsEthToUsd, _staleTime)
+    # feed-changing preflight intentionally rejects the active feed. Use
+    # `isValidStaleTimeUpdate` for a same-feed policy change.
+    if _newFeed == self.feedConfig[_asset].feed:
+        return False
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
+    return self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, staleTime)
+
+
+@view
+@external
+def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    # stale-only preflight validates against the active feed configuration
+    config: RedStoneConfig = self.feedConfig[_asset]
+    return self._isValidUpdateFeed(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime)
 
 
 @view
 @internal
-def _isValidUpdateFeed(_asset: address, _newFeed: address, _oldFeed: address, _decimals: uint256, _needsEthToUsd: bool, _staleTime: uint256) -> bool:
-    if _newFeed == _oldFeed:
+def _isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _staleTime: uint256) -> bool:
+    currentConfig: RedStoneConfig = self.feedConfig[_asset]
+    if priceData.indexOfAsset[_asset] == 0 or currentConfig.feed == empty(address): # use the `addNewPriceFeed` function instead
         return False
-    if priceData.indexOfAsset[_asset] == 0 or _oldFeed == empty(address): # use the `addNewPriceFeed` function instead
-        return False
+    if _newFeed == currentConfig.feed:
+        if (
+            _decimals != currentConfig.decimals
+            or _needsEthToUsd != currentConfig.needsEthToUsd
+            or _staleTime == currentConfig.staleTime
+        ):
+            return False
+
     return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _staleTime)
 
 
@@ -513,13 +650,7 @@ def _isValidFeedConfig(
     if empty(address) in [_asset, _feed]:
         return False
 
-    globalStaleTime: uint256 = 0
-    missionControl: address = addys._getMissionControlAddr()
-    if missionControl != empty(address):
-        globalStaleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
-
-    staleTime: uint256 = self._resolveStaleTime(globalStaleTime, _staleTime)
-    return self._getPrice(_feed, _decimals, _needsEthToUsd, staleTime, addys._getPriceDeskAddr()) != 0
+    return self._getPrice(_asset, _feed, _decimals, _needsEthToUsd, 0, _staleTime, addys._getPriceDeskAddr()) != 0
 
 
 ################
@@ -534,6 +665,7 @@ def _isValidFeedConfig(
 def disablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     oldFeed: address = self.feedConfig[_asset].feed
@@ -562,6 +694,8 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     oldFeed: address = self.feedConfig[_asset].feed
     d: PendingRedStoneConfig = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feed == empty(address) # dev: no pending disable feed
+    assert oldFeed != empty(address) # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeed):
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False
@@ -586,7 +720,11 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    self._cancelDisablePriceFeed(_asset, self.pendingUpdates[_asset].actionId)
+    d: PendingRedStoneConfig = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feed == empty(address) # dev: no pending disable feed
+    assert self.feedConfig[_asset].feed != empty(address) # dev: no pending disable feed
+    self._cancelDisablePriceFeed(_asset, d.actionId)
     log DisableRedStoneFeedCancelled(asset=_asset, feed=self.feedConfig[_asset].feed)
     return True
 

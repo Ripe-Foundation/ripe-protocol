@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import boa
 import pytest
 
-from conf_utils import clear_transient_storage, filter_logs
+from conf_utils import advance_timelock_blocks, clear_transient_storage, filter_logs
 from constants import (
     BLUE_CHIP_PROTOCOL_MORPHO_V2,
     EIGHTEEN_DECIMALS,
@@ -270,7 +270,7 @@ def _install_price_desk(
         desk,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
+    advance_timelock_blocks(ripe_hq.registryChangeTimeLock() + 1)
     assert ripe_hq.confirmAddressUpdateToRegistry(
         7,
         sender=governance.address,
@@ -299,7 +299,7 @@ def _configure_chainlink_feeds(chainlink, governance, feed, assets):
             False,
             sender=governance.address,
         )
-    boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+    advance_timelock_blocks(chainlink.actionTimeLock() + 1)
     for asset in assets:
         assert chainlink.confirmNewPriceFeed(asset, sender=governance.address)
     feed.setMockData(10**8)
@@ -465,6 +465,11 @@ def _build_scenario(
     createDebtTerms,
     performDeposit,
 ):
+    # Feed admission happens before the broader protocol configuration below.
+    # Bind the production global policy first so stored zero means inheritance
+    # throughout setup as well as on the measured aggregate path.
+    setGeneralConfig(_priceStaleTime=ROBINHOOD_PRICE_STALE_TIME)
+
     borrowers = (bob,) + tuple(
         boa.env.generate_address() for _ in range(user_count - 1)
     )
@@ -527,6 +532,8 @@ def _build_scenario(
         deploy3r,
         source_rows,
     )
+    for asset in assets:
+        desk.syncTokenScale(asset, sender=deploy3r)
     _set_priority_sources(mission_control, switchboard_alpha, priorities)
 
     if topology != "stipend_saturated":

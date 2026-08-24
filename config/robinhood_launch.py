@@ -87,8 +87,60 @@ HR_MAX_TIMELOCK = WEEK_IN_BLOCKS
 # feeds. Writing DAY_IN_BLOCKS here would make every staleness check 12x tighter.
 STALE_WINDOW_MIN = 300  # 5 minutes
 STALE_WINDOW_MAX = 604_800  # 7 days
-STALE_WINDOW_DEFAULT = 86_400  # 1 day
-STALE_WINDOW_USDG = 86_400  # 1 day
+STALE_WINDOW_GLOBAL = 86_400  # 1 day, stored in MissionControl
+STALE_WINDOW_INHERIT = 0  # feed-level sentinel: inherit MissionControl
+STALE_WINDOW_EQUITY = 345_600  # 4 days, fixed feed-level override
+
+# Historical migration 0003 imported these names and deployed one-day fixed
+# feed policies. Keep its inputs stable; forward migrations must use the exact
+# address classifier below instead of either legacy name.
+STALE_WINDOW_DEFAULT = 86_400
+STALE_WINDOW_USDG = 86_400
+
+# Post-PR206/PR208 target policy only: no current migration consumes this table or
+# classifier. These are normalized addresses, not symbolic route names.
+# Keeping the policy table independent from BluePrint bindings is deliberate:
+# rebinding a symbol cannot silently reclassify an asset's future oracle
+# policy.
+ROBINHOOD_STALE_TIME_INHERIT_ASSETS = frozenset(
+    (
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",  # native ETH
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73",  # WETH
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",  # BTC sentinel
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168",  # USDG
+    )
+)
+ROBINHOOD_STALE_TIME_EQUITY_ASSETS = frozenset(
+    (
+        "0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea",  # SPCX
+        "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",  # NVDA
+        "0x322f0929c4625ed5bad873c95208d54e1c003b2d",  # TSLA
+        "0xaf3d76f1834a1d425780943c99ea8a608f8a93f9",  # AAPL
+        "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",  # GOOGL
+        "0x1b0e319c6a659f002271b69db8a7df2f911c153e",  # GME
+    )
+)
+
+
+def _normalize_stale_time_policy_address(asset):
+    if (
+        not isinstance(asset, str)
+        or len(asset) != 42
+        or asset[:2].lower() != "0x"
+        or any(char not in "0123456789abcdefABCDEF" for char in asset[2:])
+    ):
+        raise ValueError(f"RH_ORACLE_STALE_POLICY_INVALID_ADDRESS:{asset!r}")
+    return asset.lower()
+
+
+def stale_time_override_for_asset(asset):
+    """Return the post-PR206/PR208 RH target; reject unclassified assets."""
+    normalized = _normalize_stale_time_policy_address(asset)
+    if normalized in ROBINHOOD_STALE_TIME_INHERIT_ASSETS:
+        return STALE_WINDOW_INHERIT
+    if normalized in ROBINHOOD_STALE_TIME_EQUITY_ASSETS:
+        return STALE_WINDOW_EQUITY
+    raise ValueError(f"RH_ORACLE_STALE_POLICY_UNKNOWN_ASSET:{normalized}")
 
 # --- initial supply ---------------------------------------------------------
 GREEN_INITIAL_SUPPLY = 100 * 10**18  # to the deployer, which seeds the pool

@@ -6,6 +6,7 @@ from constants import EIGHTEEN_DECIMALS
 
 
 ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 RAW_CANONICAL = 0
 RAW_REVERT = 1
 RAW_EMPTY = 2
@@ -98,6 +99,46 @@ def getPriceAndHasFeed(
 """
 
 
+QUALIFICATION_STALE_TIME_PROBE = """
+# @version 0.4.3
+
+interface PriceDesk:
+    def qualifyCallerPriceSource(
+        _asset: address,
+        _staleTime: uint256 = 0,
+    ) -> (uint256, uint256): view
+
+@view
+@external
+def getPriceAndHasFeed(
+    _asset: address,
+    _staleTime: uint256 = 0,
+    _priceDesk: address = empty(address),
+) -> (uint256, bool):
+    return _staleTime, True
+
+@view
+@external
+def qualifyDefault(
+    _priceDesk: address,
+    _asset: address,
+) -> (uint256, uint256):
+    return staticcall PriceDesk(_priceDesk).qualifyCallerPriceSource(_asset)
+
+@view
+@external
+def qualifyExplicit(
+    _priceDesk: address,
+    _asset: address,
+    _staleTime: uint256,
+) -> (uint256, uint256):
+    return staticcall PriceDesk(_priceDesk).qualifyCallerPriceSource(
+        _asset,
+        _staleTime,
+    )
+"""
+
+
 def _set_priorities(mission_control, switchboard_alpha, source_ids):
     mission_control.setPriorityPriceSourceIds(
         source_ids,
@@ -132,7 +173,7 @@ def _count_calls(computation, address, selector):
     ) + sum(_count_calls(child, address, selector) for child in computation.children)
 
 
-def test_caller_stale_bound_cannot_loosen_mission_control_bound(
+def test_price_uses_one_config_read_and_forwards_exact_global_stale_time(
     ripe_hq,
     deploy3r,
     alpha_token,
@@ -140,22 +181,149 @@ def test_caller_stale_bound_cannot_loosen_mission_control_bound(
     switchboard_alpha,
     setGeneralConfig,
 ):
-    # Existing min-bound behavior: callers can tighten MissionControl's stale
-    # bound but cannot loosen it. The probe echoes the forwarded stale time
-    # as its price so a shared source graph cannot make this vacuous.
     with boa.env.anchor():
+        failed = _raw_source(price_mode=RAW_REVERT)
         probe = boa.loads(STALE_TIME_PROBE)
-        desk = _isolated_price_desk(ripe_hq, deploy3r, [probe])
+        desk = _isolated_price_desk(ripe_hq, deploy3r, [failed, probe])
         _set_priorities(mission_control, switchboard_alpha, [1])
+        global_stale_time = 345_600
+        setGeneralConfig(_priceStaleTime=global_stale_time)
 
-        for mc_bound, caller_bound in (
-            (10, 100),
-            (100, 10),
-            (0, 10),
-            (10, 0),
-        ):
-            setGeneralConfig(_priceStaleTime=mc_bound)
-            assert desk.getPrice(alpha_token, False, caller_bound) == 10
+        assert desk.getPrice(alpha_token, True) == global_stale_time
+
+        config_selector = bytes(
+            mission_control.getPriceConfig.prepare_calldata()[:4]
+        )
+        scalar_selector = bytes(
+            mission_control.getPriceStaleTime.prepare_calldata()[:4]
+        )
+        assert _count_calls(
+            desk._computation,
+            mission_control.address,
+            config_selector,
+        ) == 1
+        assert _count_calls(
+            desk._computation,
+            mission_control.address,
+            scalar_selector,
+        ) == 0
+
+
+def test_nonzero_legacy_caller_cap_is_rejected_before_any_external_read(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+):
+    source = _raw_source(EIGHTEEN_DECIMALS, True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [source])
+    config_selector = bytes(
+        mission_control.getPriceConfig.prepare_calldata()[:4]
+    )
+    source_selector = bytes(
+        source.getPriceAndHasFeed.prepare_calldata(
+            alpha_token,
+            0,
+            desk,
+        )[:4]
+    )
+
+    assert desk.getPrice(alpha_token, False, 1) == 0
+    assert _count_calls(
+        desk._computation,
+        mission_control.address,
+        config_selector,
+    ) == 0
+    assert _count_calls(desk._computation, source.address, source_selector) == 0
+
+    with boa.reverts("caller stale time unsupported"):
+        desk.getPrice(alpha_token, True, 1)
+    assert _count_calls(
+        desk._computation,
+        mission_control.address,
+        config_selector,
+    ) == 0
+    assert _count_calls(desk._computation, source.address, source_selector) == 0
+
+
+@pytest.mark.parametrize("should_raise", (False, True), ids=("tolerant", "strict"))
+def test_empty_asset_precedes_legacy_caller_cap_rejection(
+    should_raise,
+    ripe_hq,
+    deploy3r,
+    mission_control,
+):
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [])
+
+    assert desk.getPrice(ZERO_ADDRESS, should_raise, 1) == 0
+    config_selector = bytes(
+        mission_control.getPriceConfig.prepare_calldata()[:4]
+    )
+    assert _count_calls(
+        desk._computation,
+        mission_control.address,
+        config_selector,
+    ) == 0
+
+
+def test_source_qualification_uses_scalar_global_stale_time_getter(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    setGeneralConfig,
+):
+    with boa.env.anchor():
+        global_stale_time = 345_600
+        setGeneralConfig(_priceStaleTime=global_stale_time)
+        desk = _isolated_price_desk(ripe_hq, deploy3r, [])
+        probe = boa.loads(QUALIFICATION_STALE_TIME_PROBE)
+
+        expected = (global_stale_time, 1)
+        assert tuple(probe.qualifyDefault(desk, alpha_token)) == expected
+        scalar_selector = bytes(
+            mission_control.getPriceStaleTime.prepare_calldata()[:4]
+        )
+        config_selector = bytes(
+            mission_control.getPriceConfig.prepare_calldata()[:4]
+        )
+        assert _count_calls(
+            probe._computation,
+            mission_control.address,
+            scalar_selector,
+        ) == 1
+        assert _count_calls(
+            probe._computation,
+            mission_control.address,
+            config_selector,
+        ) == 0
+
+        assert tuple(probe.qualifyExplicit(desk, alpha_token, 0)) == (
+            global_stale_time,
+            1,
+        )
+        assert _count_calls(
+            probe._computation,
+            mission_control.address,
+            scalar_selector,
+        ) == 1
+        assert _count_calls(
+            probe._computation,
+            mission_control.address,
+            config_selector,
+        ) == 0
+
+        assert tuple(probe.qualifyExplicit(desk, alpha_token, 1)) == (0, 2)
+        assert _count_calls(
+            probe._computation,
+            mission_control.address,
+            scalar_selector,
+        ) == 0
+        assert _count_calls(
+            probe._computation,
+            mission_control.address,
+            config_selector,
+        ) == 0
 
 
 def test_reverting_priority_source_falls_through_to_healthy_source(

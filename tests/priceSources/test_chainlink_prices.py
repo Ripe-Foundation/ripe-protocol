@@ -62,6 +62,15 @@ def mock_chainlink(ripe_hq, fork):
 
 
 CHAINLINK_DECIMALS = 10 ** 8
+MAX_FEED_STALE_TIME = 7 * ONE_DAY_IN_SECS
+MIN_LOCAL_STALE_TIME = 5 * 60
+
+
+@pytest.fixture(autouse=True)
+def valid_global_stale_time(setGeneralConfig):
+    """Local defaults are zero; source tests exercise zero as global inheritance."""
+
+    setGeneralConfig(_priceStaleTime=ONE_DAY_IN_SECS)
 
 # tests
 
@@ -97,7 +106,7 @@ def test_chainlink_add_price_feed(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
-    assert log.staleTime == ONE_DAY_IN_SECS
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -118,7 +127,7 @@ def test_chainlink_add_price_feed(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedAdded")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
-    assert log.staleTime == ONE_DAY_IN_SECS
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -127,7 +136,7 @@ def test_chainlink_add_price_feed(
     assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
 
     # Test canceling non-existent feed
-    with boa.reverts("cannot cancel action"):
+    with boa.reverts("no pending new feed"):
         mock_chainlink.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
 
     # Test adding feed for existing asset
@@ -151,7 +160,7 @@ def test_chainlink_add_price_feed_cancel(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
-    assert log.staleTime == ONE_DAY_IN_SECS
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -177,6 +186,7 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
     alpha_token,
     mock_chainlink_alpha,
     mock_chainlink_bravo,  # ETH feed
+    mock_chainlink_charlie,  # BTC-denominated primary feed
     mock_chainlink_delta,  # BTC feed
     governance,
 ):
@@ -222,31 +232,36 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
     mock_chainlink_delta.setMockData(50000 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
     assert mock_chainlink.confirmNewPriceFeed(mock_chainlink.BTC(), sender=governance.address)
 
-    # Update feed with BTC conversion using a different feed (explicit staleTime=0)
-    assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_delta, 0, False, True, sender=governance.address)
+    # Update to a distinct BTC-denominated feed. Reusing the BTC/USD anchor as
+    # the primary feed is rejected by the conversion-route guard.
+    mock_chainlink_charlie.setMockData(
+        500 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp
+    )
+    assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_charlie, 0, False, True, sender=governance.address)
 
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
-    assert log.feed == mock_chainlink_delta.address
+    assert log.feed == mock_chainlink_charlie.address
     assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert log.needsBtcToUsd
 
     # Confirm update
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_charlie.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
     mock_chainlink_delta.setMockData(50000 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
     assert mock_chainlink.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
     # Verify price with BTC conversion
+    # mock_chainlink_charlie price: 500 * CHAINLINK_DECIMALS
     # mock_chainlink_delta price: 50000 * CHAINLINK_DECIMALS
-    # mock_chainlink_delta price: 50000 * CHAINLINK_DECIMALS
-    expected_price = 50000 * 50000 * EIGHTEEN_DECIMALS
+    expected_price = 500 * 50000 * EIGHTEEN_DECIMALS
     assert mock_chainlink.getPrice(alpha_token) == expected_price
 
     # Test invalid conversion (both ETH and BTC)
     with boa.reverts("invalid feed"):
-        mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_delta, 0, True, True, sender=governance.address)
+        mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_alpha, 0, True, True, sender=governance.address)
 
 
 def test_chainlink_update_price_feed(
@@ -291,7 +306,7 @@ def test_chainlink_update_price_feed(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
-    assert log.staleTime == ONE_DAY_IN_SECS
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -312,7 +327,7 @@ def test_chainlink_update_price_feed(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdated")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
-    assert log.staleTime == ONE_DAY_IN_SECS
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -321,7 +336,7 @@ def test_chainlink_update_price_feed(
     assert mock_chainlink.getPrice(alpha_token) == 1000 * EIGHTEEN_DECIMALS
 
     # Test canceling non-existent update
-    with boa.reverts("cannot cancel action"):
+    with boa.reverts("no pending update feed"):
         mock_chainlink.cancelPriceFeedUpdate(alpha_token, sender=governance.address)
 
 
@@ -347,7 +362,7 @@ def test_chainlink_update_price_feed_cancel(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
-    assert log.staleTime == ONE_DAY_IN_SECS
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -416,7 +431,7 @@ def test_chainlink_disable_price_feed(
     assert mock_chainlink.getPrice(alpha_token) == 0
 
     # Test canceling non-existent disable
-    with boa.reverts("cannot cancel action"):
+    with boa.reverts("no pending disable feed"):
         mock_chainlink.cancelDisablePriceFeed(alpha_token, sender=governance.address)
 
 
@@ -473,31 +488,36 @@ def test_chainlink_disable_default_feeds(
         mock_chainlink.disablePriceFeed(mock_chainlink.BTC(), sender=governance.address)
 
 
-def test_chainlink_price_stale(
+def test_chainlink_zero_stale_inherits_global(
     mock_chainlink,
     alpha_token,
     mock_chainlink_alpha,
     governance,
 ):
-    # Add feed with current timestamp and explicit staleTime=0 (so call param controls staleness)
+    # A stored zero inherits MissionControl's one-day policy.
     mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
     assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, 0, False, False, sender=governance.address)
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
     mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
     assert mock_chainlink.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
-    # Refresh the feed's updatedAt to current block.timestamp
-    mock_chainlink_alpha.setMockData(500 * 10**8, 1, 1, boa.env.timestamp, boa.env.timestamp)
-
-    # Test price with no stale time
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - ONE_DAY_IN_SECS,
+    )
     assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
 
-    # Test price with stale time (not stale yet)
-    assert mock_chainlink.getPrice(alpha_token, 1) == 500 * EIGHTEEN_DECIMALS
-
-    # Make price stale by advancing time
-    boa.env.time_travel(seconds=2)  # Advance 2 seconds, making price stale for _staleTime=1
-    assert mock_chainlink.getPrice(alpha_token, 1) == 0  # Price should be 0 when stale
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - ONE_DAY_IN_SECS - 1,
+    )
+    assert mock_chainlink.getPrice(alpha_token) == 0
 
 
 def test_chainlink_price_stale_with_feed_config(
@@ -531,8 +551,8 @@ def test_chainlink_price_stale_with_feed_config(
     # Test price with feed's stale time
     assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
 
-    # Test price with additional stale time (should use max of both)
-    assert mock_chainlink.getPrice(alpha_token, 7200) == 500 * EIGHTEEN_DECIMALS  # 2 hours > 1 hour
+    # Nonzero second-argument values are reserved for canonical PriceDesk.
+    assert mock_chainlink.getPrice(alpha_token, 7200) == 0
 
     # Make price stale by advancing time (less than feed's stale time)
     boa.env.time_travel(seconds=1800)  # Advance 30 minutes
@@ -692,45 +712,30 @@ def test_chainlink_stale_price_edge_cases(
     mock_chainlink_alpha,
     governance,
 ):
-    # Add feed with current timestamp and explicit staleTime=0 (so call param controls staleness)
+    # A nonzero local policy is exact and includes its boundary second.
     mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
-    assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, 0, False, False, sender=governance.address)
+    assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, 300, False, False, sender=governance.address)
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
     mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
     assert mock_chainlink.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
-    # Refresh the feed's updatedAt to current block.timestamp
-    mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - 300,
+    )
+    assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
 
-    # Test price exactly at stale time boundary (should still be valid)
-    assert mock_chainlink.getPrice(alpha_token, 1) == 500 * EIGHTEEN_DECIMALS
-    boa.env.time_travel(seconds=2)  # Advance by _staleTime + 1
-    assert mock_chainlink.getPrice(alpha_token, 1) == 0  # Price should be stale
-
-    # Test price just before stale time boundary
-    mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS)
-    assert mock_chainlink.getPrice(alpha_token, 2) == 500 * EIGHTEEN_DECIMALS
-    boa.env.time_travel(seconds=1)
-    assert mock_chainlink.getPrice(alpha_token, 2) == 500 * EIGHTEEN_DECIMALS  # Price should not be stale
-
-    # Test multiple stale checks in sequence
-    mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS)
-    assert mock_chainlink.getPrice(alpha_token, 1) == 500 * EIGHTEEN_DECIMALS
-    boa.env.time_travel(seconds=2)
-    assert mock_chainlink.getPrice(alpha_token, 1) == 0  # First stale check
-    assert mock_chainlink.getPrice(alpha_token, 1) == 0  # Second stale check
-
-    # Test with maximum uint256 stale time
-    mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS)
-    assert mock_chainlink.getPrice(alpha_token, 2**256 - 1) == 500 * EIGHTEEN_DECIMALS
-    boa.env.time_travel(seconds=1)
-    assert mock_chainlink.getPrice(alpha_token, 2**256 - 1) == 500 * EIGHTEEN_DECIMALS  # Price should not be stale
-
-    # Test with zero stale time
-    mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS)
-    assert mock_chainlink.getPrice(alpha_token, 0) == 500 * EIGHTEEN_DECIMALS
-    boa.env.time_travel(seconds=1)
-    assert mock_chainlink.getPrice(alpha_token, 0) == 500 * EIGHTEEN_DECIMALS  # Price should not be stale
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - 301,
+    )
+    assert mock_chainlink.getPrice(alpha_token) == 0
 
 
 def test_chainlink_time_lock_edge_cases(
@@ -802,18 +807,39 @@ def test_chainlink_governance_edge_cases(
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
     mock_chainlink_bravo.setMockData(1000 * CHAINLINK_DECIMALS, 1, 1, boa.env.timestamp, boa.env.timestamp)
     assert mock_chainlink.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
+    expected_price = 1000 * EIGHTEEN_DECIMALS
+    assert mock_chainlink.getPrice(alpha_token) == expected_price
+    assert mock_chainlink.updateStaleTime(
+        alpha_token, 3_600, sender=governance.address
+    )
 
     # Test governance actions during pause (using MissionControl address)
     mock_chainlink.pause(True, sender=switchboard_alpha.address)
+    assert mock_chainlink.getPrice(alpha_token) == expected_price
     with boa.reverts("contract paused"):
         mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
     with boa.reverts("contract paused"):
         mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
     with boa.reverts("contract paused"):
+        mock_chainlink.updateStaleTime(
+            alpha_token, 3_600, sender=governance.address
+        )
+    with boa.reverts("contract paused"):
         mock_chainlink.disablePriceFeed(alpha_token, sender=governance.address)
+    with boa.reverts("contract paused"):
+        mock_chainlink.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+    with boa.reverts("contract paused"):
+        mock_chainlink.cancelPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
 
     # Test governance actions after pause
     mock_chainlink.pause(False, sender=switchboard_alpha.address)
+    assert mock_chainlink.cancelPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
     # First disable the existing feed
     assert mock_chainlink.disablePriceFeed(alpha_token, sender=governance.address)
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
@@ -946,28 +972,220 @@ def _set_sc20_chainlink_global_bound(
     assert mission_control.getPriceStaleTime() == stale_time
 
 
+@pytest.mark.parametrize("explicit_zero", [False, True])
+def test_chainlink_zero_stale_time_on_feed_rotation_preserves_active_policy(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    governance,
+    explicit_zero,
+):
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        600,
+    )
+    mock_chainlink_bravo.setDecimals(8)
+    mock_chainlink_bravo.setMockData(
+        2_500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+
+    assert mock_chainlink.isValidUpdateFeed(
+        alpha_token,
+        mock_chainlink_bravo,
+        8,
+        False,
+        False,
+        0,
+    )
+    if explicit_zero:
+        assert mock_chainlink.updatePriceFeed(
+            alpha_token,
+            mock_chainlink_bravo,
+            0,
+            sender=governance.address,
+        )
+    else:
+        assert mock_chainlink.updatePriceFeed(
+            alpha_token,
+            mock_chainlink_bravo,
+            sender=governance.address,
+        )
+
+    log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
+    assert log.feed == mock_chainlink_bravo.address
+    assert log.staleTime == 600
+    pending = mock_chainlink.pendingUpdates(alpha_token)
+    assert pending.config.feed == mock_chainlink_bravo.address
+    assert pending.config.staleTime == 600
+
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_bravo.setMockData(
+        2_500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.confirmPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
+    stored = mock_chainlink.feedConfig(alpha_token)
+    assert stored.feed == mock_chainlink_bravo.address
+    assert stored.staleTime == 600
+
+
 @pytest.mark.parametrize(
-    "caller_bound,feed_bound,age,expected_valid",
+    "candidate,expected_valid",
     [
-        (0, 0, 100_000, True),
-        (20, 0, 21, False),
-        (0, 20, 21, False),
-        (10, 20, 11, False),
-        (20, 10, 11, False),
-        (10, 10, 5, True),
-        (10, 20, 10, True),
+        (299, False),
+        (300, True),
+        (MAX_FEED_STALE_TIME, True),
+        (MAX_FEED_STALE_TIME + 1, False),
     ],
 )
-def test_sc20_chainlink_stale_resolver_matrix(
+def test_chainlink_local_stale_time_boundaries_on_add_and_feed_update(
+    mock_chainlink,
+    alpha_token,
+    bravo_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    governance,
+    candidate,
+    expected_valid,
+):
+    mock_chainlink_alpha.setDecimals(8)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.isValidNewFeed(
+        alpha_token,
+        mock_chainlink_alpha,
+        8,
+        False,
+        False,
+        candidate,
+    ) is expected_valid
+    if expected_valid:
+        assert mock_chainlink.addNewPriceFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            candidate,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+        mock_chainlink_alpha.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert mock_chainlink.confirmNewPriceFeed(
+            alpha_token, sender=governance.address
+        )
+        assert mock_chainlink.feedConfig(alpha_token).staleTime == candidate
+    else:
+        with boa.reverts("invalid feed"):
+            mock_chainlink.addNewPriceFeed(
+                alpha_token,
+                mock_chainlink_alpha,
+                candidate,
+                sender=governance.address,
+            )
+
+    with boa.env.anchor():
+        _add_sc20_chainlink_feed(
+            mock_chainlink,
+            bravo_token,
+            mock_chainlink_alpha,
+            governance,
+            600,
+        )
+        mock_chainlink_bravo.setDecimals(8)
+        mock_chainlink_bravo.setMockData(
+            2_500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert mock_chainlink.isValidUpdateFeed(
+            bravo_token,
+            mock_chainlink_bravo,
+            8,
+            False,
+            False,
+            candidate,
+        ) is expected_valid
+        if expected_valid:
+            assert mock_chainlink.updatePriceFeed(
+                bravo_token,
+                mock_chainlink_bravo,
+                candidate,
+                sender=governance.address,
+            )
+            boa.env.time_travel(
+                blocks=mock_chainlink.actionTimeLock() + 1
+            )
+            mock_chainlink_bravo.setMockData(
+                2_500 * CHAINLINK_DECIMALS,
+                1,
+                1,
+                boa.env.timestamp,
+                boa.env.timestamp,
+            )
+            assert mock_chainlink.confirmPriceFeedUpdate(
+                bravo_token, sender=governance.address
+            )
+            assert mock_chainlink.feedConfig(bravo_token).staleTime == candidate
+        else:
+            with boa.reverts("invalid feed"):
+                mock_chainlink.updatePriceFeed(
+                    bravo_token,
+                    mock_chainlink_bravo,
+                    candidate,
+                    sender=governance.address,
+                )
+
+
+@pytest.mark.parametrize(
+    "global_bound,feed_bound,age,expected_valid",
+    [
+        (7_200, 0, 5_400, True),
+        (3_600, 0, 5_400, False),
+        (3_600, 7_200, 5_400, True),
+        (7_200, 3_600, 5_400, False),
+        (7_200, 3_600, 3_600, True),
+        (3_600, 7_200, 7_201, False),
+    ],
+)
+def test_chainlink_global_default_and_exact_feed_override_matrix(
     mock_chainlink,
     alpha_token,
     mock_chainlink_alpha,
     governance,
-    caller_bound,
+    mission_control,
+    switchboard_alpha,
+    global_bound,
     feed_bound,
     age,
     expected_valid,
 ):
+    _set_sc20_chainlink_global_bound(
+        switchboard_alpha, governance, mission_control, global_bound
+    )
     _add_sc20_chainlink_feed(
         mock_chainlink,
         alpha_token,
@@ -984,39 +1202,162 @@ def test_sc20_chainlink_stale_resolver_matrix(
     )
 
     expected_price = 500 * EIGHTEEN_DECIMALS if expected_valid else 0
-    assert mock_chainlink.getPrice(alpha_token, caller_bound) == expected_price
-    assert mock_chainlink.getPriceAndHasFeed(alpha_token, caller_bound) == (
+    assert mock_chainlink.getPrice(alpha_token) == expected_price
+    assert mock_chainlink.getPriceAndHasFeed(alpha_token) == (
         expected_price,
         True,
     )
 
 
-def test_sc20_chainlink_get_price_and_has_feed_uses_stricter_feed_bound(
+def test_chainlink_nonzero_global_requires_canonical_pricedesk_forwarding(
     mock_chainlink,
     alpha_token,
+    bravo_token,
     mock_chainlink_alpha,
     governance,
+    mission_control,
+    switchboard_alpha,
+    price_desk,
 ):
+    _set_sc20_chainlink_global_bound(
+        switchboard_alpha, governance, mission_control, 7_200
+    )
     _add_sc20_chainlink_feed(
         mock_chainlink,
         alpha_token,
         mock_chainlink_alpha,
         governance,
-        10,
+        0,
     )
     mock_chainlink_alpha.setMockData(
         500 * CHAINLINK_DECIMALS,
         1,
         1,
         boa.env.timestamp,
-        boa.env.timestamp - 11,
+        boa.env.timestamp - 100,
     )
-    assert mock_chainlink.getPriceAndHasFeed(alpha_token, 20) == (0, True)
+    expected = 500 * EIGHTEEN_DECIMALS
+
+    assert mock_chainlink.getPrice(alpha_token, 300) == 0
+    assert mock_chainlink.getPrice(alpha_token, 300, price_desk.address) == 0
+    assert mock_chainlink.getPrice(
+        alpha_token, 300, ZERO_ADDRESS, sender=price_desk.address
+    ) == 0
+    assert mock_chainlink.getPriceAndHasFeed(alpha_token, 300) == (0, True)
+    assert mock_chainlink.getPriceAndHasFeed(bravo_token, 300) == (0, False)
+
+    assert mock_chainlink.getPrice(
+        alpha_token,
+        300,
+        price_desk.address,
+        sender=price_desk.address,
+    ) == expected
+    assert mock_chainlink.getPriceAndHasFeed(
+        alpha_token,
+        300,
+        price_desk.address,
+        sender=price_desk.address,
+    ) == (expected, True)
+
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - 301,
+    )
+    assert mock_chainlink.getPrice(
+        alpha_token,
+        300,
+        price_desk.address,
+        sender=price_desk.address,
+    ) == 0
+
+
+def test_chainlink_pricedesk_forwards_live_global_policy(
+    chainlink,
+    price_desk,
+    alpha_token,
+    mock_chainlink_alpha,
+    governance,
+    mission_control,
+    switchboard_alpha,
+):
+    _set_sc20_chainlink_global_bound(
+        switchboard_alpha, governance, mission_control, 3_600
+    )
+    _add_sc20_chainlink_feed(
+        chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        0,
+    )
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - 3_600,
+    )
+    expected = 500 * EIGHTEEN_DECIMALS
+    assert price_desk.getPrice(alpha_token) == expected
+    assert chainlink.getPrice(alpha_token) == expected
+
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - 3_601,
+    )
+    assert price_desk.getPrice(alpha_token) == 0
+    assert chainlink.getPrice(alpha_token) == 0
+
+
+def test_chainlink_exact_override_ignores_invalid_global_policy(
+    chainlink,
+    price_desk,
+    alpha_token,
+    mock_chainlink_alpha,
+    governance,
+    setGeneralConfig,
+):
+    _add_sc20_chainlink_feed(
+        chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        300,
+    )
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - 200,
+    )
+    expected = 500 * EIGHTEEN_DECIMALS
+
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=100)
+        assert chainlink.getPrice(alpha_token) == expected
+        assert price_desk.getPrice(alpha_token) == expected
+
+    for invalid_global in (0, MAX_FEED_STALE_TIME + 1):
+        with boa.env.anchor():
+            setGeneralConfig(_priceStaleTime=invalid_global)
+            assert chainlink.getPrice(alpha_token) == expected
+            assert chainlink.getPriceAndHasFeed(alpha_token) == (
+                expected,
+                True,
+            )
+            assert price_desk.getPrice(alpha_token) == expected
 
 
 @pytest.mark.parametrize("conversion_kind", ["eth", "btc"])
 @pytest.mark.parametrize("stale_leg", ["conversion", "primary", "none"])
-def test_sc20_chainlink_conversion_legs_are_independent(
+def test_chainlink_feed_overrides_are_independent_per_conversion_leg(
     mock_chainlink,
     alpha_token,
     mock_chainlink_alpha,
@@ -1037,8 +1378,8 @@ def test_sc20_chainlink_conversion_legs_are_independent(
         if conversion_kind == "eth"
         else 50_000 * CHAINLINK_DECIMALS
     )
-    conversion_bound = 10 if stale_leg == "conversion" else 20
-    primary_bound = 10 if stale_leg == "primary" else 20
+    conversion_bound = 300 if stale_leg == "conversion" else 600
+    primary_bound = 300 if stale_leg == "primary" else 600
     _add_sc20_chainlink_feed(
         mock_chainlink,
         conversion_asset,
@@ -1060,8 +1401,8 @@ def test_sc20_chainlink_conversion_legs_are_independent(
         refresh_feeds=((conversion_feed, conversion_price),),
     )
 
-    primary_age = 11 if stale_leg == "primary" else 5
-    conversion_age = 11 if stale_leg == "conversion" else 5
+    primary_age = 301 if stale_leg == "primary" else 5
+    conversion_age = 301 if stale_leg == "conversion" else 5
     mock_chainlink_alpha.setMockData(
         500 * CHAINLINK_DECIMALS,
         1,
@@ -1090,13 +1431,16 @@ def test_sc20_chainlink_conversion_legs_are_independent(
 
 @pytest.mark.parametrize("conversion_kind", ["eth", "btc"])
 @pytest.mark.parametrize("aged_leg", ["conversion", "primary"])
-def test_sc20_chainlink_raw_bound_applies_to_each_conversion_leg(
+def test_chainlink_forwarded_global_applies_to_each_zero_config_leg(
     mock_chainlink,
     alpha_token,
     mock_chainlink_alpha,
     mock_chainlink_bravo,
     mock_chainlink_delta,
     governance,
+    mission_control,
+    switchboard_alpha,
+    price_desk,
     conversion_kind,
     aged_leg,
 ):
@@ -1111,8 +1455,11 @@ def test_sc20_chainlink_raw_bound_applies_to_each_conversion_leg(
         if conversion_kind == "eth"
         else 50_000 * CHAINLINK_DECIMALS
     )
+    _set_sc20_chainlink_global_bound(
+        switchboard_alpha, governance, mission_control, 600
+    )
     _add_sc20_chainlink_feed(
-        mock_chainlink, conversion_asset, conversion_feed, governance, 20
+        mock_chainlink, conversion_asset, conversion_feed, governance, 0
     )
     conversion_feed.setMockData(
         conversion_price, 1, 1, boa.env.timestamp, boa.env.timestamp
@@ -1122,13 +1469,13 @@ def test_sc20_chainlink_raw_bound_applies_to_each_conversion_leg(
         alpha_token,
         mock_chainlink_alpha,
         governance,
-        20,
+        0,
         needs_eth=conversion_kind == "eth",
         needs_btc=conversion_kind == "btc",
         refresh_feeds=((conversion_feed, conversion_price),),
     )
-    primary_age = 11 if aged_leg == "primary" else 5
-    conversion_age = 11 if aged_leg == "conversion" else 5
+    primary_age = 301 if aged_leg == "primary" else 5
+    conversion_age = 301 if aged_leg == "conversion" else 5
     mock_chainlink_alpha.setMockData(
         500 * CHAINLINK_DECIMALS,
         1,
@@ -1143,20 +1490,49 @@ def test_sc20_chainlink_raw_bound_applies_to_each_conversion_leg(
         boa.env.timestamp,
         boa.env.timestamp - conversion_age,
     )
-    assert mock_chainlink.getPrice(alpha_token, 10) == 0
+    normalized_conversion_price = (
+        2_500 * EIGHTEEN_DECIMALS
+        if conversion_kind == "eth"
+        else 50_000 * EIGHTEEN_DECIMALS
+    )
+    assert mock_chainlink.getPrice(alpha_token) == (
+        500 * normalized_conversion_price
+    )
+    assert mock_chainlink.getPrice(
+        alpha_token,
+        300,
+        price_desk.address,
+        sender=price_desk.address,
+    ) == 0
 
 
 @pytest.mark.parametrize("conversion_kind", ["eth", "btc"])
 @pytest.mark.parametrize("bounded_leg", ["conversion", "primary"])
-def test_sc20_chainlink_zero_layer_preserves_other_leg_bound(
+@pytest.mark.parametrize(
+    "global_bound,local_bound,local_age,inherited_age,expected_valid",
+    [
+        (600, 300, 301, 5, False),
+        (600, 300, 5, 301, True),
+        (300, 600, 301, 5, True),
+    ],
+)
+def test_chainlink_zero_leg_inherits_global_and_preserves_other_leg_override(
     mock_chainlink,
     alpha_token,
     mock_chainlink_alpha,
     mock_chainlink_bravo,
     mock_chainlink_delta,
     governance,
+    mission_control,
+    switchboard_alpha,
+    price_desk,
     conversion_kind,
     bounded_leg,
+    global_bound,
+    local_bound,
+    local_age,
+    inherited_age,
+    expected_valid,
 ):
     conversion_asset = (
         mock_chainlink.ETH() if conversion_kind == "eth" else mock_chainlink.BTC()
@@ -1169,8 +1545,11 @@ def test_sc20_chainlink_zero_layer_preserves_other_leg_bound(
         if conversion_kind == "eth"
         else 50_000 * CHAINLINK_DECIMALS
     )
-    conversion_bound = 10 if bounded_leg == "conversion" else 0
-    primary_bound = 10 if bounded_leg == "primary" else 0
+    _set_sc20_chainlink_global_bound(
+        switchboard_alpha, governance, mission_control, global_bound
+    )
+    conversion_bound = local_bound if bounded_leg == "conversion" else 0
+    primary_bound = local_bound if bounded_leg == "primary" else 0
     _add_sc20_chainlink_feed(
         mock_chainlink,
         conversion_asset,
@@ -1191,8 +1570,8 @@ def test_sc20_chainlink_zero_layer_preserves_other_leg_bound(
         needs_btc=conversion_kind == "btc",
         refresh_feeds=((conversion_feed, conversion_price),),
     )
-    primary_age = 11 if bounded_leg == "primary" else 5
-    conversion_age = 11 if bounded_leg == "conversion" else 5
+    primary_age = local_age if bounded_leg == "primary" else inherited_age
+    conversion_age = local_age if bounded_leg == "conversion" else inherited_age
     mock_chainlink_alpha.setMockData(
         500 * CHAINLINK_DECIMALS,
         1,
@@ -1207,10 +1586,101 @@ def test_sc20_chainlink_zero_layer_preserves_other_leg_bound(
         boa.env.timestamp,
         boa.env.timestamp - conversion_age,
     )
-    assert mock_chainlink.getPrice(alpha_token, 0) == 0
+    normalized_conversion_price = (
+        2_500 * EIGHTEEN_DECIMALS
+        if conversion_kind == "eth"
+        else 50_000 * EIGHTEEN_DECIMALS
+    )
+    expected = 500 * normalized_conversion_price if expected_valid else 0
+    assert mock_chainlink.getPrice(alpha_token, 0) == expected
+    assert mock_chainlink.getPrice(
+        alpha_token,
+        global_bound,
+        price_desk.address,
+        sender=price_desk.address,
+    ) == expected
 
 
-def test_sc20_chainlink_validation_uses_stricter_candidate_bound(
+@pytest.mark.parametrize("conversion_kind", ["eth", "btc"])
+def test_chainlink_stale_time_update_preserves_active_conversion_route(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    mock_chainlink_delta,
+    governance,
+    conversion_kind,
+):
+    conversion_asset = (
+        mock_chainlink.ETH() if conversion_kind == "eth" else mock_chainlink.BTC()
+    )
+    conversion_feed = (
+        mock_chainlink_bravo if conversion_kind == "eth" else mock_chainlink_delta
+    )
+    conversion_price = (
+        2_500 * CHAINLINK_DECIMALS
+        if conversion_kind == "eth"
+        else 50_000 * CHAINLINK_DECIMALS
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        conversion_asset,
+        conversion_feed,
+        governance,
+        600,
+    )
+    conversion_feed.setMockData(
+        conversion_price, 1, 1, boa.env.timestamp, boa.env.timestamp
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        600,
+        needs_eth=conversion_kind == "eth",
+        needs_btc=conversion_kind == "btc",
+        refresh_feeds=((conversion_feed, conversion_price),),
+    )
+    before = mock_chainlink.feedConfig(alpha_token)
+    normalized_conversion_price = (
+        2_500 * EIGHTEEN_DECIMALS
+        if conversion_kind == "eth"
+        else 50_000 * EIGHTEEN_DECIMALS
+    )
+    expected = 500 * normalized_conversion_price
+    assert mock_chainlink.getPrice(alpha_token) == expected
+
+    assert mock_chainlink.isValidStaleTimeUpdate(alpha_token, 300)
+    assert mock_chainlink.updateStaleTime(
+        alpha_token, 300, sender=governance.address
+    )
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    conversion_feed.setMockData(
+        conversion_price, 1, 1, boa.env.timestamp, boa.env.timestamp
+    )
+    assert mock_chainlink.confirmPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
+
+    after = mock_chainlink.feedConfig(alpha_token)
+    assert after.feed == before.feed
+    assert after.decimals == before.decimals
+    assert after.needsEthToUsd is before.needsEthToUsd
+    assert after.needsBtcToUsd is before.needsBtcToUsd
+    assert after.staleTime == 300
+    assert mock_chainlink.pendingUpdates(alpha_token).actionId == 0
+    assert mock_chainlink.getPrice(alpha_token) == expected
+
+
+def test_chainlink_candidate_validation_uses_exact_feed_override(
     mock_chainlink,
     alpha_token,
     mock_chainlink_alpha,
@@ -1248,7 +1718,7 @@ def test_sc20_chainlink_validation_uses_stricter_candidate_bound(
 
 
 @pytest.mark.parametrize("conversion_kind", ["eth", "btc"])
-def test_sc20_chainlink_validation_uses_conversion_feed_bound(
+def test_chainlink_candidate_validation_checks_conversion_leg_override(
     mock_chainlink,
     alpha_token,
     mock_chainlink_alpha,
@@ -1345,7 +1815,955 @@ def test_sc21_chainlink_future_timestamp_characterization(
         boa.env.timestamp,
         boa.env.timestamp,
     )
-    assert mock_chainlink.getPrice(alpha_token, 1) == 500 * EIGHTEEN_DECIMALS
+    assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
+
+
+def test_chainlink_stale_time_update_lifecycle_and_validator_parity(
+    mock_chainlink,
+    alpha_token,
+    bravo_token,
+    mock_chainlink_alpha,
+    governance,
+    bob,
+):
+    assert not mock_chainlink.hasPriceFeed(bravo_token)
+    assert not mock_chainlink.isValidStaleTimeUpdate(bravo_token, 3_600)
+    with boa.reverts("invalid feed"):
+        mock_chainlink.updateStaleTime(
+            bravo_token, 3_600, sender=governance.address
+        )
+    assert mock_chainlink.pendingUpdates(bravo_token).actionId == 0
+
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        7_200,
+    )
+    current = mock_chainlink.feedConfig(alpha_token)
+
+    with boa.reverts("no perms"):
+        mock_chainlink.updateStaleTime(
+            alpha_token, 3_600, sender=bob
+        )
+
+    assert not mock_chainlink.isValidUpdateFeed(
+        alpha_token,
+        current.feed,
+        current.decimals,
+        current.needsEthToUsd,
+        current.needsBtcToUsd,
+        3_600,
+    )
+    with boa.reverts("invalid feed"):
+        mock_chainlink.updatePriceFeed(
+            alpha_token,
+            current.feed,
+            3_600,
+            current.needsEthToUsd,
+            current.needsBtcToUsd,
+            sender=governance.address,
+        )
+
+    for candidate, expected_valid in (
+        (0, True),
+        (299, False),
+        (300, True),
+        (3_600, True),
+        (7_200, False),
+        (MAX_FEED_STALE_TIME, True),
+        (MAX_FEED_STALE_TIME + 1, False),
+    ):
+        assert (
+            mock_chainlink.isValidStaleTimeUpdate(alpha_token, candidate)
+            is expected_valid
+        )
+        with boa.env.anchor():
+            if expected_valid:
+                assert mock_chainlink.updateStaleTime(
+                    alpha_token, candidate, sender=governance.address
+                )
+            else:
+                with boa.reverts("invalid feed"):
+                    mock_chainlink.updateStaleTime(
+                        alpha_token, candidate, sender=governance.address
+                    )
+
+    assert mock_chainlink.updateStaleTime(
+        alpha_token, 3_600, sender=governance.address
+    )
+    log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
+    assert log.feed == current.feed
+    assert log.oldFeed == current.feed
+    assert log.staleTime == 3_600
+    pending = mock_chainlink.pendingUpdates(alpha_token)
+    assert pending.actionId != 0
+    assert pending.config.feed == current.feed
+    assert pending.config.decimals == current.decimals
+    assert pending.config.needsEthToUsd is current.needsEthToUsd
+    assert pending.config.needsBtcToUsd is current.needsBtcToUsd
+    assert pending.config.staleTime == 3_600
+    with boa.reverts("time lock not reached"):
+        mock_chainlink.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.confirmPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
+    stored = mock_chainlink.feedConfig(alpha_token)
+    assert stored.feed == current.feed
+    assert stored.decimals == current.decimals
+    assert stored.needsEthToUsd is current.needsEthToUsd
+    assert stored.needsBtcToUsd is current.needsBtcToUsd
+    assert stored.staleTime == 3_600
+    assert mock_chainlink.pendingUpdates(alpha_token).actionId == 0
+
+    assert mock_chainlink.updateStaleTime(
+        alpha_token, 0, sender=governance.address
+    )
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.confirmPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
+    assert mock_chainlink.feedConfig(alpha_token).staleTime == 0
+
+    assert mock_chainlink.updateStaleTime(
+        alpha_token, 7_200, sender=governance.address
+    )
+    assert mock_chainlink.cancelPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
+    assert mock_chainlink.feedConfig(alpha_token).staleTime == 0
+    assert mock_chainlink.pendingUpdates(alpha_token).actionId == 0
+    with boa.reverts("no pending update feed"):
+        mock_chainlink.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.updateStaleTime(
+        alpha_token, 300, sender=governance.address
+    )
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp - 301,
+    )
+    assert not mock_chainlink.confirmPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
+    pending = mock_chainlink.pendingUpdates(alpha_token)
+    assert pending.actionId != 0
+    assert pending.config.staleTime == 300
+    assert mock_chainlink.feedConfig(alpha_token).staleTime == 0
+
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.confirmPriceFeedUpdate(
+        alpha_token, sender=governance.address
+    )
+    assert mock_chainlink.pendingUpdates(alpha_token).actionId == 0
+    assert mock_chainlink.feedConfig(alpha_token).staleTime == 300
+
+
+def test_chainlink_failed_feed_replacement_confirmation_auto_cancels(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    governance,
+):
+    with boa.env.anchor():
+        _add_sc20_chainlink_feed(
+            mock_chainlink,
+            alpha_token,
+            mock_chainlink_alpha,
+            governance,
+            600,
+        )
+        active = mock_chainlink.feedConfig(alpha_token)
+        mock_chainlink_bravo.setMockData(
+            1_000 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert mock_chainlink.updatePriceFeed(
+            alpha_token,
+            mock_chainlink_bravo,
+            600,
+            False,
+            False,
+            sender=governance.address,
+        )
+        action_id = mock_chainlink.pendingUpdates(alpha_token).actionId
+        assert action_id != 0
+        boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+        mock_chainlink_bravo.setMockData(
+            0,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+
+        assert not mock_chainlink.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert mock_chainlink.pendingUpdates(alpha_token).actionId == 0
+        assert not mock_chainlink.hasPendingAction(action_id)
+        stored = mock_chainlink.feedConfig(alpha_token)
+        assert stored.feed == active.feed
+        assert stored.staleTime == active.staleTime
+
+
+@pytest.mark.parametrize("invalid_global", [0, MAX_FEED_STALE_TIME + 1])
+@pytest.mark.parametrize(
+    "candidate_stale_time,should_confirm",
+    [(0, False), (MAX_FEED_STALE_TIME, True)],
+)
+def test_chainlink_stale_time_confirmation_revalidates_live_global_policy(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    governance,
+    setGeneralConfig,
+    invalid_global,
+    candidate_stale_time,
+    should_confirm,
+):
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        600,
+    )
+    before = mock_chainlink.feedConfig(alpha_token)
+    expected = 500 * EIGHTEEN_DECIMALS
+    assert mock_chainlink.getPrice(alpha_token) == expected
+    assert mock_chainlink.isValidStaleTimeUpdate(
+        alpha_token, candidate_stale_time
+    )
+    assert mock_chainlink.updateStaleTime(
+        alpha_token, candidate_stale_time, sender=governance.address
+    )
+
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    setGeneralConfig(_priceStaleTime=invalid_global)
+    assert (
+        mock_chainlink.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        is should_confirm
+    )
+
+    after = mock_chainlink.feedConfig(alpha_token)
+    assert after.feed == before.feed
+    assert after.decimals == before.decimals
+    assert after.needsEthToUsd is before.needsEthToUsd
+    assert after.needsBtcToUsd is before.needsBtcToUsd
+    assert after.staleTime == (
+        candidate_stale_time if should_confirm else before.staleTime
+    )
+    afterPending = mock_chainlink.pendingUpdates(alpha_token)
+    if should_confirm:
+        assert afterPending.actionId == 0
+    else:
+        assert afterPending.actionId != 0
+        assert afterPending.config.staleTime == candidate_stale_time
+        assert mock_chainlink.cancelPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert mock_chainlink.pendingUpdates(alpha_token).actionId == 0
+    assert mock_chainlink.getPrice(alpha_token) == expected
+
+
+def _start_chainlink_pending_action(
+    kind,
+    source,
+    asset,
+    primary_feed,
+    alternate_feed,
+    governance,
+):
+    primary_feed.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    if kind == "add":
+        assert source.addNewPriceFeed(
+            asset, primary_feed, 300, sender=governance.address
+        )
+        return
+
+    _add_sc20_chainlink_feed(
+        source,
+        asset,
+        primary_feed,
+        governance,
+        300,
+    )
+    alternate_feed.setMockData(
+        1_000 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    if kind == "update":
+        assert source.updatePriceFeed(
+            asset, alternate_feed, 300, sender=governance.address
+        )
+    elif kind == "stale":
+        assert source.updateStaleTime(
+            asset, 600, sender=governance.address
+        )
+    else:
+        assert kind == "disable"
+        assert source.disablePriceFeed(asset, sender=governance.address)
+
+
+def _chainlink_pending_state(source, asset):
+    pending = source.pendingUpdates(asset)
+    return (
+        pending.actionId,
+        pending.config.feed,
+        pending.config.decimals,
+        pending.config.needsEthToUsd,
+        pending.config.needsBtcToUsd,
+        pending.config.staleTime,
+    )
+
+
+def _chainlink_active_state(source, asset):
+    active = source.feedConfig(asset)
+    return (
+        source.hasPriceFeed(asset),
+        active.feed,
+        active.decimals,
+        active.needsEthToUsd,
+        active.needsBtcToUsd,
+        active.staleTime,
+    )
+
+
+def _chainlink_action_state(source, asset):
+    return (
+        source.hasPendingPriceFeedUpdate(asset),
+        _chainlink_pending_state(source, asset),
+        _chainlink_active_state(source, asset),
+    )
+
+
+def _chainlink_wrong_action_selectors(pending_kind):
+    if pending_kind == "add":
+        return (
+            ("no pending update feed", "confirmPriceFeedUpdate"),
+            ("no pending update feed", "cancelPriceFeedUpdate"),
+            ("no pending disable feed", "confirmDisablePriceFeed"),
+            ("no pending disable feed", "cancelDisablePriceFeed"),
+        )
+    if pending_kind in ("update", "stale"):
+        return (
+            ("no pending new feed", "confirmNewPriceFeed"),
+            ("no pending new feed", "cancelNewPendingPriceFeed"),
+            ("no pending disable feed", "confirmDisablePriceFeed"),
+            ("no pending disable feed", "cancelDisablePriceFeed"),
+        )
+    assert pending_kind == "disable"
+    return (
+        ("no pending new feed", "confirmNewPriceFeed"),
+        ("no pending new feed", "cancelNewPendingPriceFeed"),
+        ("no pending update feed", "confirmPriceFeedUpdate"),
+        ("no pending update feed", "cancelPriceFeedUpdate"),
+    )
+
+
+@pytest.mark.parametrize("pending_kind", ["add", "update", "stale", "disable"])
+def test_chainlink_pending_action_collisions_and_cleanup(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    governance,
+    pending_kind,
+):
+    _start_chainlink_pending_action(
+        pending_kind,
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        mock_chainlink_bravo,
+        governance,
+    )
+    before = _chainlink_action_state(mock_chainlink, alpha_token)
+
+    initiators = (
+        lambda: mock_chainlink.addNewPriceFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            300,
+            sender=governance.address,
+        ),
+        lambda: mock_chainlink.updatePriceFeed(
+            alpha_token,
+            mock_chainlink_bravo,
+            300,
+            sender=governance.address,
+        ),
+        lambda: mock_chainlink.updateStaleTime(
+            alpha_token, 300, sender=governance.address
+        ),
+        lambda: mock_chainlink.disablePriceFeed(
+            alpha_token, sender=governance.address
+        ),
+    )
+    for initiate in initiators:
+        with boa.reverts("pending feed action"):
+            initiate()
+        assert _chainlink_action_state(mock_chainlink, alpha_token) == before
+
+    for reason, selector in _chainlink_wrong_action_selectors(pending_kind):
+        with boa.reverts(reason):
+            getattr(mock_chainlink, selector)(
+                alpha_token, sender=governance.address
+            )
+        assert _chainlink_action_state(mock_chainlink, alpha_token) == before
+
+    active_before = _chainlink_active_state(mock_chainlink, alpha_token)
+    if pending_kind == "add":
+        assert mock_chainlink.cancelNewPendingPriceFeed(
+            alpha_token, sender=governance.address
+        )
+    elif pending_kind in ("update", "stale"):
+        assert mock_chainlink.cancelPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+    else:
+        assert mock_chainlink.cancelDisablePriceFeed(
+            alpha_token, sender=governance.address
+        )
+    assert not mock_chainlink.hasPendingPriceFeedUpdate(alpha_token)
+    assert _chainlink_active_state(mock_chainlink, alpha_token) == active_before
+
+
+@pytest.mark.parametrize("pending_kind", ["add", "update", "stale", "disable"])
+def test_chainlink_expired_pending_action_requires_explicit_cleanup(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    governance,
+    pending_kind,
+):
+    with boa.env.anchor():
+        _start_chainlink_pending_action(
+            pending_kind,
+            mock_chainlink,
+            alpha_token,
+            mock_chainlink_alpha,
+            mock_chainlink_bravo,
+            governance,
+        )
+        before = _chainlink_pending_state(mock_chainlink, alpha_token)
+        _advance_timelock_blocks(
+            mock_chainlink.actionTimeLock() + mock_chainlink.expiration()
+        )
+        assert mock_chainlink.hasPendingPriceFeedUpdate(alpha_token)
+
+        with boa.reverts("pending feed action"):
+            mock_chainlink.updateStaleTime(
+                alpha_token, 300, sender=governance.address
+            )
+        assert _chainlink_pending_state(mock_chainlink, alpha_token) == before
+
+        if pending_kind == "add":
+            assert mock_chainlink.cancelNewPendingPriceFeed(
+                alpha_token, sender=governance.address
+            )
+            assert mock_chainlink.addNewPriceFeed(
+                alpha_token,
+                mock_chainlink_alpha,
+                300,
+                sender=governance.address,
+            )
+        elif pending_kind in ("update", "stale"):
+            assert mock_chainlink.cancelPriceFeedUpdate(
+                alpha_token, sender=governance.address
+            )
+            assert mock_chainlink.updateStaleTime(
+                alpha_token, 600, sender=governance.address
+            )
+        else:
+            assert mock_chainlink.cancelDisablePriceFeed(
+                alpha_token, sender=governance.address
+            )
+            assert mock_chainlink.disablePriceFeed(
+                alpha_token, sender=governance.address
+            )
+
+        after = _chainlink_pending_state(mock_chainlink, alpha_token)
+        assert after[0] != 0
+        assert after[0] != before[0]
+
+
+def test_chainlink_invalid_effective_stale_policies_fail_closed(
+    mock_chainlink,
+    alpha_token,
+    bravo_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    governance,
+    setGeneralConfig,
+    price_desk,
+    ripe_hq,
+):
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        0,
+    )
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
+    assert not mock_chainlink.isValidNewFeed(
+        bravo_token,
+        mock_chainlink_bravo,
+        8,
+        False,
+        False,
+        MAX_FEED_STALE_TIME + 1,
+    )
+    assert not mock_chainlink.isValidStaleTimeUpdate(
+        alpha_token, MAX_FEED_STALE_TIME + 1
+    )
+
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=0)
+        assert mock_chainlink.getPrice(alpha_token) == 0
+        assert mock_chainlink.getPriceAndHasFeed(alpha_token) == (0, True)
+
+    with boa.env.anchor():
+        setGeneralConfig(_priceStaleTime=MAX_FEED_STALE_TIME + 1)
+        assert mock_chainlink.getPrice(alpha_token) == 0
+        assert mock_chainlink.getPriceAndHasFeed(alpha_token) == (0, True)
+
+    with boa.env.anchor():
+        ripe_hq.eval("registry.addrInfo[5].addr = empty(address)")
+        assert ripe_hq.getAddr(5) == ZERO_ADDRESS
+        assert mock_chainlink.getPrice(alpha_token) == 0
+        assert mock_chainlink.getPriceAndHasFeed(alpha_token) == (0, True)
+
+    assert mock_chainlink.getPrice(
+        alpha_token,
+        MAX_FEED_STALE_TIME + 1,
+        price_desk.address,
+        sender=price_desk.address,
+    ) == 0
+
+    for invalid_local in (MIN_LOCAL_STALE_TIME - 1, MAX_FEED_STALE_TIME + 1):
+        with boa.env.anchor():
+            mock_chainlink.eval(
+                f"self.feedConfig[{alpha_token.address}].staleTime = "
+                f"{invalid_local}"
+            )
+            assert mock_chainlink.getPrice(alpha_token) == 0
+            assert mock_chainlink.getPriceAndHasFeed(alpha_token) == (0, True)
+
+
+def test_chainlink_conversion_validation_preserves_legitimate_routes(
+    mock_chainlink,
+    alpha_token,
+    bravo_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    mock_chainlink_charlie,
+    mock_chainlink_delta,
+    governance,
+):
+    mock_chainlink_bravo.setMockData(
+        2_500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        mock_chainlink.ETH(),
+        mock_chainlink_bravo,
+        governance,
+        3_600,
+    )
+    mock_chainlink_delta.setMockData(
+        50_000 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        mock_chainlink.BTC(),
+        mock_chainlink_delta,
+        governance,
+        3_600,
+        refresh_feeds=((mock_chainlink_bravo, 2_500 * CHAINLINK_DECIMALS),),
+    )
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    mock_chainlink_charlie.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+
+    assert not mock_chainlink.isValidUpdateFeed(
+        mock_chainlink.ETH(),
+        mock_chainlink_alpha,
+        8,
+        True,
+        False,
+        3_600,
+    )
+    assert not mock_chainlink.isValidUpdateFeed(
+        mock_chainlink.BTC(),
+        mock_chainlink_alpha,
+        8,
+        False,
+        True,
+        3_600,
+    )
+    assert not mock_chainlink.isValidNewFeed(
+        alpha_token,
+        mock_chainlink_alpha,
+        8,
+        True,
+        True,
+        3_600,
+    )
+    assert not mock_chainlink.isValidNewFeed(
+        alpha_token,
+        mock_chainlink_bravo,
+        8,
+        True,
+        False,
+        3_600,
+    )
+    assert not mock_chainlink.isValidNewFeed(
+        alpha_token,
+        mock_chainlink_delta,
+        8,
+        False,
+        True,
+        3_600,
+    )
+    assert mock_chainlink.isValidNewFeed(
+        alpha_token,
+        mock_chainlink_alpha,
+        8,
+        True,
+        False,
+        3_600,
+    )
+    assert mock_chainlink.isValidNewFeed(
+        alpha_token,
+        mock_chainlink_alpha,
+        8,
+        False,
+        True,
+        3_600,
+    )
+
+    with boa.env.anchor():
+        _add_sc20_chainlink_feed(
+            mock_chainlink,
+            alpha_token,
+            mock_chainlink_alpha,
+            governance,
+            3_600,
+            needs_eth=True,
+            refresh_feeds=(
+                (mock_chainlink_bravo, 2_500 * CHAINLINK_DECIMALS),
+            ),
+        )
+        assert mock_chainlink.getPrice(alpha_token) == (
+            500 * 2_500 * EIGHTEEN_DECIMALS
+        )
+
+    with boa.env.anchor():
+        _add_sc20_chainlink_feed(
+            mock_chainlink,
+            alpha_token,
+            mock_chainlink_alpha,
+            governance,
+            3_600,
+            needs_btc=True,
+            refresh_feeds=(
+                (mock_chainlink_delta, 50_000 * CHAINLINK_DECIMALS),
+            ),
+        )
+        assert mock_chainlink.getPrice(alpha_token) == (
+            500 * 50_000 * EIGHTEEN_DECIMALS
+        )
+
+    # BTC/ETH * direct ETH/USD is a legitimate BTC/USD route, but it cannot
+    # then serve as the supposedly direct BTC/USD anchor for another route.
+    with boa.env.anchor():
+        assert mock_chainlink.updatePriceFeed(
+            mock_chainlink.BTC(),
+            mock_chainlink_charlie,
+            3_600,
+            True,
+            False,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+        mock_chainlink_charlie.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        mock_chainlink_bravo.setMockData(
+            2_500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert mock_chainlink.confirmPriceFeedUpdate(
+            mock_chainlink.BTC(), sender=governance.address
+        )
+        assert mock_chainlink.getPrice(mock_chainlink.BTC()) == (
+            500 * 2_500 * EIGHTEEN_DECIMALS
+        )
+        assert not mock_chainlink.isValidNewFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            8,
+            False,
+            True,
+            3_600,
+        )
+
+    # ETH/BTC * direct BTC/USD is the symmetric legitimate route.
+    with boa.env.anchor():
+        assert mock_chainlink.updatePriceFeed(
+            mock_chainlink.ETH(),
+            mock_chainlink_charlie,
+            3_600,
+            False,
+            True,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+        mock_chainlink_charlie.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        mock_chainlink_delta.setMockData(
+            50_000 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert mock_chainlink.confirmPriceFeedUpdate(
+            mock_chainlink.ETH(), sender=governance.address
+        )
+        assert mock_chainlink.getPrice(mock_chainlink.ETH()) == (
+            500 * 50_000 * EIGHTEEN_DECIMALS
+        )
+        assert not mock_chainlink.isValidNewFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            8,
+            True,
+            False,
+            3_600,
+        )
+
+
+def test_chainlink_legacy_unsafe_conversion_states_fail_closed(
+    mock_chainlink,
+    alpha_token,
+    bravo_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    mock_chainlink_charlie,
+    mock_chainlink_delta,
+    governance,
+):
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        mock_chainlink.ETH(),
+        mock_chainlink_bravo,
+        governance,
+        3_600,
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        mock_chainlink.BTC(),
+        mock_chainlink_delta,
+        governance,
+        3_600,
+        refresh_feeds=((mock_chainlink_bravo, 2_500 * CHAINLINK_DECIMALS),),
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        3_600,
+        needs_eth=True,
+        refresh_feeds=((mock_chainlink_bravo, 2_500 * CHAINLINK_DECIMALS),),
+    )
+    mock_chainlink_delta.setMockData(
+        50_000 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        bravo_token,
+        mock_chainlink_charlie,
+        governance,
+        3_600,
+        needs_btc=True,
+        refresh_feeds=((mock_chainlink_delta, 50_000 * CHAINLINK_DECIMALS),),
+    )
+    for feed, price in (
+        (mock_chainlink_alpha, 500 * CHAINLINK_DECIMALS),
+        (mock_chainlink_charlie, 500 * CHAINLINK_DECIMALS),
+        (mock_chainlink_bravo, 2_500 * CHAINLINK_DECIMALS),
+        (mock_chainlink_delta, 50_000 * CHAINLINK_DECIMALS),
+    ):
+        feed.setMockData(
+            price, 1, 1, boa.env.timestamp, boa.env.timestamp
+        )
+    assert mock_chainlink.getPrice(alpha_token) != 0
+    assert mock_chainlink.getPrice(bravo_token) != 0
+
+    with boa.env.anchor():
+        mock_chainlink.eval(
+            f"self.feedConfig[{alpha_token.address}].needsBtcToUsd = True"
+        )
+        mock_chainlink.eval(
+            f"self.feedConfig[{bravo_token.address}].needsEthToUsd = True"
+        )
+        assert mock_chainlink.getPrice(alpha_token) == 0
+        assert mock_chainlink.getPrice(bravo_token) == 0
+
+    with boa.env.anchor():
+        mock_chainlink.eval(
+            f"self.feedConfig[{alpha_token.address}].feed = "
+            f"{mock_chainlink_bravo.address}"
+        )
+        mock_chainlink.eval(
+            f"self.feedConfig[{bravo_token.address}].feed = "
+            f"{mock_chainlink_delta.address}"
+        )
+        assert mock_chainlink.getPrice(alpha_token) == 0
+        assert mock_chainlink.getPrice(bravo_token) == 0
+
+    with boa.env.anchor():
+        mock_chainlink.eval(
+            f"self.feedConfig[{mock_chainlink.ETH()}].needsEthToUsd = True"
+        )
+        mock_chainlink.eval(
+            f"self.feedConfig[{mock_chainlink.BTC()}].needsBtcToUsd = True"
+        )
+        assert mock_chainlink.getPrice(mock_chainlink.ETH()) == 0
+        assert mock_chainlink.getPrice(mock_chainlink.BTC()) == 0
+
+    with boa.env.anchor():
+        mock_chainlink.eval(
+            f"self.feedConfig[{mock_chainlink.ETH()}].needsBtcToUsd = True"
+        )
+        assert mock_chainlink.getPrice(mock_chainlink.ETH()) != 0
+        assert mock_chainlink.getPrice(alpha_token) == 0
+
+    with boa.env.anchor():
+        mock_chainlink.eval(
+            f"self.feedConfig[{mock_chainlink.BTC()}].needsEthToUsd = True"
+        )
+        assert mock_chainlink.getPrice(mock_chainlink.BTC()) != 0
+        assert mock_chainlink.getPrice(bravo_token) == 0
+
+    with boa.env.anchor():
+        mock_chainlink.eval(
+            f"self.feedConfig[{mock_chainlink.ETH()}].needsBtcToUsd = True"
+        )
+        mock_chainlink.eval(
+            f"self.feedConfig[{mock_chainlink.BTC()}].needsEthToUsd = True"
+        )
+        assert mock_chainlink.getPrice(mock_chainlink.ETH()) == 0
+        assert mock_chainlink.getPrice(mock_chainlink.BTC()) == 0
+        assert mock_chainlink.getPrice(alpha_token) == 0
+        assert mock_chainlink.getPrice(bravo_token) == 0
 
 
 def _advance_timelock_blocks(blocks):

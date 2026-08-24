@@ -157,12 +157,16 @@ def _set_up_source(kind, ripe_hq, fork, governance):
 
 
 def _propose_new(source, asset, feed, governance):
-    assert source.addNewPriceFeed(asset, feed, sender=governance.address)
+    assert source.addNewPriceFeed(
+        asset, feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     return source.pendingUpdates(asset).actionId
 
 
 def _propose_update(source, asset, feed, governance):
-    assert source.updatePriceFeed(asset, feed, sender=governance.address)
+    assert source.updatePriceFeed(
+        asset, feed, ONE_DAY_IN_SECS, sender=governance.address
+    )
     return source.pendingUpdates(asset).actionId
 
 
@@ -313,7 +317,12 @@ def test_reverting_or_malformed_decimals_is_rejected_at_proposal_without_state(
     next_action_id = source.actionId()
 
     with boa.reverts("invalid feed"):
-        source.addNewPriceFeed(charlie_token, feed, sender=governance.address)
+        source.addNewPriceFeed(
+            charlie_token,
+            feed,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
 
     assert source.actionId() == next_action_id
     assert source.pendingUpdates(charlie_token).actionId == 0
@@ -371,7 +380,7 @@ def test_reverting_or_malformed_decimals_at_confirmation_cancels_atomically(
 
 
 @pytest.mark.parametrize("kind", SOURCE_KINDS)
-def test_latest_proposal_snapshot_replaces_prior_candidate(
+def test_pending_new_proposal_cannot_replace_decimals_snapshot(
     kind,
     ripe_hq,
     governance,
@@ -383,36 +392,34 @@ def test_latest_proposal_snapshot_replaces_prior_candidate(
     second = _feed(6)
 
     first_action = _propose_new(source, charlie_token, first, governance)
-    second_action = _propose_new(source, charlie_token, second, governance)
-    assert second_action != first_action
-    assert source.hasPendingAction(first_action)
-    assert source.hasPendingAction(second_action)
-    pending = source.pendingUpdates(charlie_token)
-    assert pending.actionId == second_action
-    assert pending.config.feed == second.address
-    assert pending.config.decimals == 6
+    next_action_id = source.actionId()
+    with boa.reverts("pending feed action"):
+        source.addNewPriceFeed(
+            charlie_token,
+            second,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
 
-    # Only the latest proposal is validated and activated.
-    first.setResponseMode(REVERT)
-    _advance(source)
-    _fresh_round(second, 10**6)
-    assert source.confirmNewPriceFeed(charlie_token, sender=governance.address)
-    assert source.feedConfig(charlie_token).feed == second.address
-    assert source.feedConfig(charlie_token).decimals == 6
-    assert source.getPrice(charlie_token) == EIGHTEEN_DECIMALS
-    assert not source.hasPendingAction(second_action)
-    # Replacing a proposal does not cancel its TimeLock record. It remains
-    # confirmable in isolation but is inert because pendingUpdates references
-    # only the latest proposal and is cleared when that proposal activates.
+    assert source.actionId() == next_action_id
     assert source.hasPendingAction(first_action)
-    assert source.canConfirmAction(first_action)
+    pending = source.pendingUpdates(charlie_token)
+    assert pending.actionId == first_action
+    assert pending.config.feed == first.address
+    assert pending.config.decimals == 8
+
+    _advance(source)
+    _fresh_round(first, 10**8)
+    assert source.confirmNewPriceFeed(charlie_token, sender=governance.address)
+    assert source.feedConfig(charlie_token).feed == first.address
+    assert source.feedConfig(charlie_token).decimals == 8
+    assert source.getPrice(charlie_token) == EIGHTEEN_DECIMALS
+    assert not source.hasPendingAction(first_action)
     assert source.pendingUpdates(charlie_token).actionId == 0
-    with boa.reverts("no pending new feed"):
-        source.confirmNewPriceFeed(charlie_token, sender=governance.address)
 
 
 @pytest.mark.parametrize("kind", SOURCE_KINDS)
-def test_latest_update_snapshot_replaces_prior_candidate(
+def test_pending_update_cannot_replace_decimals_snapshot(
     kind,
     ripe_hq,
     governance,
@@ -425,28 +432,30 @@ def test_latest_update_snapshot_replaces_prior_candidate(
     second = _feed(6, 3 * 10**6)
 
     first_action = _propose_update(source, charlie_token, first, governance)
-    second_action = _propose_update(source, charlie_token, second, governance)
-    assert second_action != first_action
-    assert source.hasPendingAction(first_action)
-    assert source.hasPendingAction(second_action)
-    pending = source.pendingUpdates(charlie_token)
-    assert pending.actionId == second_action
-    assert pending.config.feed == second.address
-    assert pending.config.decimals == 6
+    next_action_id = source.actionId()
+    with boa.reverts("pending feed action"):
+        source.updatePriceFeed(
+            charlie_token,
+            second,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
 
-    first.setResponseMode(REVERT)
-    _advance(source)
-    _fresh_round(second, 3 * 10**6)
-    assert source.confirmPriceFeedUpdate(charlie_token, sender=governance.address)
-    assert source.feedConfig(charlie_token).feed == second.address
-    assert source.feedConfig(charlie_token).decimals == 6
-    assert source.getPrice(charlie_token) == 3 * EIGHTEEN_DECIMALS
-    assert not source.hasPendingAction(second_action)
+    assert source.actionId() == next_action_id
     assert source.hasPendingAction(first_action)
-    assert source.canConfirmAction(first_action)
+    pending = source.pendingUpdates(charlie_token)
+    assert pending.actionId == first_action
+    assert pending.config.feed == first.address
+    assert pending.config.decimals == 8
+
+    _advance(source)
+    _fresh_round(first, 2 * 10**8)
+    assert source.confirmPriceFeedUpdate(charlie_token, sender=governance.address)
+    assert source.feedConfig(charlie_token).feed == first.address
+    assert source.feedConfig(charlie_token).decimals == 8
+    assert source.getPrice(charlie_token) == 2 * EIGHTEEN_DECIMALS
+    assert not source.hasPendingAction(first_action)
     assert source.pendingUpdates(charlie_token).actionId == 0
-    with boa.reverts("no pending update feed"):
-        source.confirmPriceFeedUpdate(charlie_token, sender=governance.address)
 
 
 @pytest.mark.parametrize("kind", SOURCE_KINDS)
