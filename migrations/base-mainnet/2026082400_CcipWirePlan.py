@@ -357,7 +357,7 @@ def migrate(migration: Migration):
                     )
                 log.info(
                     f"\t{remote_chain} rate/lane mutation is Safe-pending; "
-                    "rerun for full revalidation after execution"
+                    "run 2026082401 activation finalization after execution"
                 )
             else:
                 ccip.assert_lane_configuration(

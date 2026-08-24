@@ -529,14 +529,16 @@ def test_execute_transaction_failure_never_logs_exception_text(capsys):
         assert component not in rendered
 
 
+@pytest.mark.parametrize("scheme", ("http", "https", "ws", "wss"))
 def test_execute_transaction_trace_redacts_complete_authenticated_rpc_url(
+    scheme,
     monkeypatch,
     capsys,
 ):
     monkeypatch.setenv("RIPE_MIGRATE_TRACE", "1")
     failure_text = (
         "synthetic provider failure "
-        "https://synthetic-user:synthetic-password@rpc.invalid.example/"
+        f"{scheme}://synthetic-user:synthetic-password@rpc.invalid.example/"
         "path-token?api=query-token#fragment-token"
     )
 
@@ -552,7 +554,7 @@ def test_execute_transaction_trace_redacts_complete_authenticated_rpc_url(
     assert "RuntimeError: synthetic provider failure" in rendered
     assert "<redacted-url>" in rendered
     for component in (
-        "https://",
+        f"{scheme}://",
         "synthetic-user",
         "synthetic-password",
         "rpc.invalid.example",

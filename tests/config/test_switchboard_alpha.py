@@ -251,7 +251,7 @@ def test_set_vault_limits_validation(switchboard_alpha, governance):
         switchboard_alpha.setVaultLimits(10, MAX_UINT256, sender=governance.address)  # max uint256
 
 
-def test_set_vault_limits_success(switchboard_alpha, governance):
+def test_set_vault_limits_success(switchboard_alpha, mission_control, governance):
     # Test valid vault limits
     action_id = switchboard_alpha.setVaultLimits(20, 10, sender=governance.address)
     assert action_id > 0
@@ -268,6 +268,7 @@ def test_set_vault_limits_success(switchboard_alpha, governance):
     pending = switchboard_alpha.pendingGeneralConfig(action_id)
     assert pending.perUserMaxVaults == 20
     assert pending.perUserMaxAssetsPerVault == 10
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_execute_vault_limits(switchboard_alpha, mission_control, governance):
@@ -418,6 +419,7 @@ def test_global_debt_limits_success(switchboard_alpha, mission_control, governan
     assert log.globalDebtLimit == 50000
     assert log.minDebtAmount == 100
     assert log.numAllowedBorrowers == 100
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_borrow_interval_config_validation(switchboard_alpha, governance):
@@ -694,7 +696,7 @@ def test_daowry_enable_disable(switchboard_alpha, mission_control, governance):
     assert logs[0].isDaowryEnabled
 
 
-def test_ripe_per_block(switchboard_alpha, governance):
+def test_ripe_per_block(switchboard_alpha, mission_control, governance):
     action_id = switchboard_alpha.setRipePerBlock(1000, sender=governance.address)
     assert action_id > 0
     
@@ -702,6 +704,7 @@ def test_ripe_per_block(switchboard_alpha, governance):
     logs = filter_logs(switchboard_alpha, "PendingRipeRewardsPerBlockChange")
     assert len(logs) == 1
     assert logs[0].ripePerBlock == 1000
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_rewards_allocs_validation(switchboard_alpha, governance):

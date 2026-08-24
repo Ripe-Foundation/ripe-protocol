@@ -258,7 +258,7 @@ def execute_transaction(transaction, *args, **kwargs):
             # may carry HTTP basic-auth credentials as userinfo.
             if os.environ.get("RIPE_MIGRATE_TRACE"):
                 detail = re.sub(
-                    r"(?i)\bhttps?://[^\s\"'<>]+",
+                    r"(?i)\b(?:https?|wss?)://[^\s\"'<>]+",
                     "<redacted-url>",
                     f"{type(exception).__name__}: {exception}",
                 )

@@ -1220,6 +1220,14 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
     if vaultData.indexOfAsset[_stabAsset] == 0 or vaultData.indexOfAsset[_claimAsset] != 0:
         return False
 
+    # AuctionHouse sizes a Stability Pool swap from raw custody, while the
+    # settlement path can spend only unreserved custody. Any reservation in
+    # the stabilization asset can therefore make its requested payment exceed
+    # the amount this cohort may transfer. Reject it before collateral moves
+    # so AuctionHouse can use its ordinary-auction fallback.
+    if self.totalClaimableBalances[_stabAsset] != 0:
+        return False
+
     activeCount: uint256 = self._getNumActiveClaimAssets(_stabAsset)
     if self.indexOfClaimableAsset[_stabAsset][_claimAsset] == 0 and activeCount >= MAX_ACTIVE_CLAIM_ASSETS:
         return False
@@ -1227,10 +1235,10 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
         return False
 
     if vaultData.totalBalances[_stabAsset] == 0 and activeCount == 0:
-        # A configured empty cohort may receive its first liquidation, but any
-        # legacy cross-cohort reservation makes AuctionHouse's raw-custody
-        # sizing unsafe because it cannot distinguish the reserved amount.
-        return self.totalClaimableBalances[_stabAsset] == 0
+        # The reservation guard above already established that raw custody is
+        # fully spendable, so a configured empty cohort may receive its first
+        # liquidation.
+        return True
 
     return self._getCohortLiquidationAmount(_stabAsset) != 0
 

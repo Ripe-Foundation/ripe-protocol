@@ -15,8 +15,9 @@ EIP170_LIMIT = 24_576
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
-# StabilityPool headroom is 300 bytes after the deferred claim checkpoint,
-# exact-payment, and Stability-local claimable-aware retirement remediations.
+# StabilityPool headroom is 279 bytes after the deferred claim checkpoint,
+# exact-payment, claimable-aware retirement, and partial-reservation admission
+# remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
 # SwitchboardBravo retains only 26 bytes of headroom. CurvePrices retains 1,170
@@ -49,7 +50,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Endaoment": 23351,
     "PriceDesk": 17578,
     "Deleverage": 24459,
-    "StabilityPool": 24276,
+    "StabilityPool": 24297,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 14597,
     "CurvePrices": 23406,

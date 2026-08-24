@@ -145,10 +145,13 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     assert all(a < b for a, b in zip(withdrawal_gas, withdrawal_gas[1:]))
     # These are not production chain gas limits. Starting head (458235d):
     # deposit=523,770, withdrawal=462,115. After the PriceDesk scale helper:
-    # deposit=521,145, withdrawal=459,490. Existing 530,000 and 470,000
-    # ceilings remain (1.699% and 2.287% headroom).
-    assert deposit_gas[-1] < 530_000
-    assert withdrawal_gas[-1] < 470_000
+    # deposit=521,145, withdrawal=459,490. F15's exact source-debit and
+    # recipient-delivery checks intentionally moved the merge-ref measurements
+    # to deposit=532,546 and withdrawal=472,242. The 540,000 and 480,000
+    # ceilings retain 1.40% and 1.64% headroom while continuing to catch an
+    # accidental extra external call or traversal.
+    assert deposit_gas[-1] < 540_000
+    assert withdrawal_gas[-1] < 480_000
 
     gas_before = boa.env.get_gas_used()
     assert stability_pool.canAcceptLiquidationAsset(alpha_token, claim_tokens[0])
