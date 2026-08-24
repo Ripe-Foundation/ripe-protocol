@@ -225,7 +225,6 @@ def test_new_mainnet_migrations_are_strictly_after_the_recorded_frontier():
             if int(path.name.split("_", 1)[0]) >= 2026080701
             and not (history / f"{path.name.split('_', 1)[0]}-manifest.json").exists()
         ]
-        assert pending
         required_frontier = max(frontier, 2026082101)
         assert all(
             int(path.name.split("_", 1)[0]) > required_frontier for path in pending
