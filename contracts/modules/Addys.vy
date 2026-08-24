@@ -62,7 +62,7 @@ ENDAOMENT_PSM_ID: constant(uint256) = 22
 RIPE_CCIP_POOL_ID: constant(uint256) = 23
 GREEN_CCIP_POOL_ID: constant(uint256) = 24
 VAULT_MIGRATOR_ID: constant(uint256) = 25
-INSTANT_BOND_LANE_ID: constant(uint256) = 26
+RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
 
 
 @deploy
@@ -498,16 +498,16 @@ def _getVaultMigratorAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_MIGRATOR_ID)
 
 
-# instant bond lane
+# ripe reserve engine
 
 
 @view
 @internal
-def _getInstantBondLaneId() -> uint256:
-    return INSTANT_BOND_LANE_ID
+def _getRipeReserveEngineId() -> uint256:
+    return RIPE_RESERVE_ENGINE_ID
 
 
 @view
 @internal
-def _getInstantBondLaneAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(INSTANT_BOND_LANE_ID)
+def _getRipeReserveEngineAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_RESERVE_ENGINE_ID)

@@ -1,0 +1,356 @@
+# @version 0.4.3
+
+
+struct ReserveEngineConfig:
+    paymentCapPerEpoch: uint256
+    minPaymentAmount: uint256
+    maxAllInPayoutRate: uint256
+    seedBasePayoutRate: uint256
+    uHighBps: uint256
+    uLowBps: uint256
+    minPriceIncreaseBps: uint256
+    maxPriceIncreaseBps: uint256
+    minPriceDecreaseBps: uint256
+    maxPriceDecreaseBps: uint256
+    decayBps: uint256
+    maxDecayEpochs: uint256
+    maxOverrideDeviationBps: uint256
+    maxOverrideLeadEpochs: uint256
+
+
+struct ReserveEngineRunTerms:
+    paymentToken: address
+    epochLength: uint256
+    claimCliffBlocks: uint256
+    minFullVestingBlocks: uint256
+    maxFullVestingBlocks: uint256
+    durationStepBlocks: uint256
+    maxDurationAdjustmentBps: uint256
+    maxOverrideApplicationsPerRun: uint256
+
+
+struct EpochSnapshot:
+    epoch: uint256
+    controllerBasePayoutRate: uint256
+    basePayoutRate: uint256
+    rateSource: uint8
+    rateNonce: uint256
+    epochConfigVersion: uint256
+    paymentCap: uint256
+    minPaymentAmount: uint256
+    acceptedPayment: uint256
+    paymentWeightedLateness: uint256
+    timingEligible: bool
+
+
+struct RateOverride:
+    targetBasePayoutRate: uint256
+    targetEpoch: uint256
+    runId: uint256
+    runRegistryVersion: uint256
+    installedConfigVersion: uint256
+    closureNonce: uint256
+    installedRateNonce: uint256
+
+
+struct PendingRipeRecovery:
+    actionId: uint256
+    positionId: uint256
+    beneficiary: address
+    amount: uint256
+    expectedPositionVersion: uint256
+    expectedPositionOutstanding: uint256
+    governanceRecipientSnapshot: address
+    governanceGenerationSnapshot: uint256
+    queuedBlock: uint256
+    executeAfterBlock: uint256
+    expiresAtBlock: uint256
+
+
+@external
+def setConfig(_newConfig: ReserveEngineConfig, _expectedCurrentConfigVersion: uint256):
+    ...
+
+
+@external
+def setRunTerms(_newRunTerms: ReserveEngineRunTerms, _expectedRunTermsVersion: uint256):
+    ...
+
+
+@external
+def setEngineEnabled(_shouldEnable: bool, _expectedClosureNonce: uint256):
+    ...
+
+
+@external
+def setActiveLimits(
+    _newLineageLimit: uint256,
+    _newOutstandingLimit: uint256,
+    _expectedCurrentLineageLimit: uint256,
+    _expectedCurrentOutstandingLimit: uint256,
+    _expectedCapacityReductionNonce: uint256,
+):
+    ...
+
+
+@external
+def start(
+    _genesisBlock: uint256,
+    _expectedRegistryVersion: uint256,
+    _expectedCurrentConfigVersion: uint256,
+    _expectedRunTermsVersion: uint256,
+    _expectedClosureNonce: uint256,
+):
+    ...
+
+
+@external
+def stop():
+    ...
+
+
+@external
+def installRateOverride(
+    _targetBasePayoutRate: uint256,
+    _targetEpoch: uint256,
+    _expectedRunId: uint256,
+    _expectedRunRegistryVersion: uint256,
+    _expectedCurrentConfigVersion: uint256,
+    _expectedClosureNonce: uint256,
+    _expectedRateNonce: uint256,
+):
+    ...
+
+
+@external
+def cancelRateOverride():
+    ...
+
+
+@external
+def queueRipeRecovery(_positionId: uint256, _amount: uint256) -> uint256:
+    ...
+
+
+@external
+def executeRipeRecovery(_recoveryActionId: uint256) -> bool:
+    ...
+
+
+@external
+def cancelRipeRecovery(_recoveryActionId: uint256) -> bool:
+    ...
+
+
+@external
+def recoverRipeSurplus(_amount: uint256) -> bool:
+    ...
+
+
+@external
+def pause(_shouldPause: bool):
+    ...
+
+
+@view
+@external
+def isValidConfig(_config: ReserveEngineConfig) -> bool:
+    ...
+
+
+@view
+@external
+def isValidRunTerms(_runTerms: ReserveEngineRunTerms) -> bool:
+    ...
+
+
+@view
+@external
+def isValidStart(_genesisBlock: uint256) -> bool:
+    ...
+
+
+@view
+@external
+def isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> bool:
+    ...
+
+
+@view
+@external
+def canCancelRateOverride() -> bool:
+    ...
+
+
+@view
+@external
+def isValidActiveLimits(_newLineageLimit: uint256, _newOutstandingLimit: uint256) -> bool:
+    ...
+
+
+@view
+@external
+def getConfig() -> ReserveEngineConfig:
+    ...
+
+
+@view
+@external
+def getRunTerms() -> ReserveEngineRunTerms:
+    ...
+
+
+@view
+@external
+def getActiveRunTerms() -> ReserveEngineRunTerms:
+    ...
+
+
+@view
+@external
+def configHash() -> bytes32:
+    ...
+
+
+@view
+@external
+def runTermsHash() -> bytes32:
+    ...
+
+
+@view
+@external
+def currentConfigVersion() -> uint256:
+    ...
+
+
+@view
+@external
+def runTermsVersion() -> uint256:
+    ...
+
+
+@view
+@external
+def runId() -> uint256:
+    ...
+
+
+@view
+@external
+def runRegistryVersion() -> uint256:
+    ...
+
+
+@view
+@external
+def closureNonce() -> uint256:
+    ...
+
+
+@view
+@external
+def capacityReductionNonce() -> uint256:
+    ...
+
+
+@view
+@external
+def rateNonce() -> uint256:
+    ...
+
+
+@view
+@external
+def isPaused() -> bool:
+    ...
+
+
+@view
+@external
+def isEngineEnabled() -> bool:
+    ...
+
+
+@view
+@external
+def isRunning() -> bool:
+    ...
+
+
+@view
+@external
+def activeLineageAllocationLimit() -> uint256:
+    ...
+
+
+@view
+@external
+def activeOutstandingRipeLimit() -> uint256:
+    ...
+
+
+@view
+@external
+def escrowSurplus() -> uint256:
+    ...
+
+
+@view
+@external
+def installedRateOverride() -> RateOverride:
+    ...
+
+
+@view
+@external
+def epochState() -> EpochSnapshot:
+    ...
+
+
+@view
+@external
+def genesisBlock() -> uint256:
+    ...
+
+
+@view
+@external
+def paymentToken() -> address:
+    ...
+
+
+@view
+@external
+def paymentDecimals() -> uint8:
+    ...
+
+
+@view
+@external
+def paymentScale() -> uint256:
+    ...
+
+
+@view
+@external
+def pinnedRipe() -> address:
+    ...
+
+
+@view
+@external
+def ripeHq() -> address:
+    ...
+
+
+@view
+@external
+def pendingRipeRecoveries(_recoveryActionId: uint256) -> PendingRipeRecovery:
+    ...
+
+
+@view
+@external
+def hasPendingRipeRecovery(_recoveryActionId: uint256) -> bool:
+    ...
