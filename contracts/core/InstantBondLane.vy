@@ -44,6 +44,7 @@ interface InstantBondClaims:
     def getRipeHq() -> address: view
     def RIPE_TOKEN() -> address: view
     def isPaused() -> bool: view
+    def remainingAllocationBudget() -> uint256: view
     def createVestingPosition(_beneficiary: address, _ripePayout: uint256, _vestingLength: uint256) -> uint256: nonpayable
 
 interface RipeToken:
@@ -59,7 +60,6 @@ struct InstantBondConfig:
     canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    mintBudget: uint256
     maxEffectiveRate: uint256
     seedRate: uint256
     uHighBps: uint256
@@ -162,7 +162,6 @@ event InstantBondConfigSet:
     canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    mintBudget: uint256
     maxEffectiveRate: uint256
     seedRate: uint256
     uHighBps: uint256
@@ -193,9 +192,6 @@ event PaymentTokenSet:
     decimals: uint8
     scale: uint256
 
-event CumulativeAllocatedSet:
-    amount: uint256
-
 event RateOverrideInstalled:
     targetRate: uint256
 
@@ -223,9 +219,6 @@ paymentToken: public(address)
 paymentDecimals: public(uint8)
 paymentScale: public(uint256)
 genesisBlock: public(uint256)
-
-# overall
-cumulativeAllocated: public(uint256)
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_VESTING_BONUS: constant(uint256) = 1000_00 # 1000.00%
@@ -310,13 +303,12 @@ def buyNow(
     assert payout.vestingLength == _expectedVestingLength # dev: vesting length moved
 
     assert payout.totalRipe >= _minRipeOut # dev: slippage
-    budgetRemaining: uint256 = config.mintBudget - self.cumulativeAllocated
-    assert payout.totalRipe <= budgetRemaining # dev: mint budget
+    budgetRemaining: uint256 = staticcall InstantBondClaims(CLAIMS).remainingAllocationBudget()
+    assert payout.totalRipe <= budgetRemaining # dev: allocation budget
 
     # consume against this epoch before the state-changing external calls below
     self.epochState.acceptedPayment += _paymentAmount
     self.epochState.weightedLateness += _paymentAmount * self._getLatenessBps(block.number)
-    self.cumulativeAllocated += payout.totalRipe
 
     # collect payment amount, move to endaoment funds
     endaoFunds: address = addys._getEndaomentFundsAddr()
@@ -735,7 +727,6 @@ def setConfig(_newConfig: InstantBondConfig):
         canBuyNow=_newConfig.canBuyNow,
         paymentCapPerEpoch=_newConfig.paymentCapPerEpoch,
         minPaymentAmount=_newConfig.minPaymentAmount,
-        mintBudget=_newConfig.mintBudget,
         maxEffectiveRate=_newConfig.maxEffectiveRate,
         seedRate=_newConfig.seedRate,
         uHighBps=_newConfig.uHighBps,
@@ -883,35 +874,6 @@ def _isValidPaymentToken(_token: address) -> bool:
     return paymentDecimals <= MAX_PAYMENT_DECIMALS
 
 
-###############
-# Allocation Budget #
-###############
-
-
-@nonreentrant
-@external
-def setCumulativeAllocated(_amount: uint256):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert self._isValidCumulativeAllocated(_amount) # dev: invalid cumulative allocation
-    self.cumulativeAllocated = _amount
-    log CumulativeAllocatedSet(amount=_amount)
-
-
-# validation
-
-
-@view
-@external
-def isValidCumulativeAllocated(_amount: uint256) -> bool:
-    return self._isValidCumulativeAllocated(_amount)
-
-
-@view
-@internal
-def _isValidCumulativeAllocated(_amount: uint256) -> bool:
-    return _amount >= self.cumulativeAllocated and _amount <= self.bondConfig.mintBudget
-
-
 ##############
 # Validation #
 ##############
@@ -999,10 +961,6 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
     if _config.seedRate < MIN_BASE_RATE or _config.seedRate > baseRateCeiling:
         return False
 
-    # cannot cut the mint budget below RIPE already allocated
-    if _config.mintBudget < self.cumulativeAllocated:
-        return False
-
     # epoch length must be a valid clock
     if not self._isValidEpochLength(_config.epochLength):
         return False
@@ -1045,7 +1003,7 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
     transition: RateTransition = empty(RateTransition)
     snap, transition = self._getEpochSnapshot(self.epochState, config)
     remainingPayment: uint256 = snap.paymentCap - snap.acceptedPayment
-    budgetRemaining: uint256 = config.mintBudget - self.cumulativeAllocated
+    budgetRemaining: uint256 = staticcall InstantBondClaims(CLAIMS).remainingAllocationBudget()
 
     quote.epoch = snap.epoch
     quote.rate = snap.rate

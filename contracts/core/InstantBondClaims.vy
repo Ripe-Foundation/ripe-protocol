@@ -61,10 +61,14 @@ event VestedRipeClaimed:
     autoDeposited: bool
     lockDuration: uint256
 
+event RemainingAllocationBudgetSet:
+    amount: uint256
+
 positions: public(HashMap[address, HashMap[uint256, VestingPosition]])
 positionCount: public(HashMap[address, uint256])
 totalAllocatedRipe: public(uint256)
 totalClaimedRipe: public(uint256)
+remainingAllocationBudget: public(uint256)
 
 RIPE_TOKEN: public(immutable(address))
 MAX_VESTING_LENGTH: public(constant(uint256)) = 7_884_000
@@ -80,6 +84,19 @@ def __init__(_ripeHq: address):
     RIPE_TOKEN = ripeToken
     assert staticcall RipeHq(_ripeHq).ripeToken() == RIPE_TOKEN # dev: invalid ripe token
     assert staticcall RipeToken(RIPE_TOKEN).ripeHq() == _ripeHq # dev: invalid token hq
+
+
+#####################
+# Allocation Budget #
+#####################
+
+
+@nonreentrant
+@external
+def setRemainingAllocationBudget(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.remainingAllocationBudget = _amount
+    log RemainingAllocationBudgetSet(amount=_amount)
 
 
 #############
@@ -110,6 +127,7 @@ def createVestingPosition(
     assert _ripePayout != 0 # dev: invalid payout
     assert _vestingLength != 0 and _vestingLength <= MAX_VESTING_LENGTH # dev: invalid vesting length
     assert _vestingLength <= max_value(uint256) - block.number # dev: maturity overflow
+    assert _ripePayout <= self.remainingAllocationBudget # dev: allocation budget
 
     positionIndex: uint256 = self.positionCount[_beneficiary] + 1
     creationBlock: uint256 = block.number
@@ -122,6 +140,7 @@ def createVestingPosition(
         creationBlock=creationBlock,
         maturityBlock=maturityBlock,
     )
+    self.remainingAllocationBudget -= _ripePayout
     self.totalAllocatedRipe += _ripePayout
 
     log VestingPositionCreated(

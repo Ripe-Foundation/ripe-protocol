@@ -23,21 +23,23 @@ import contracts.modules.TimeLock as timeLock
 
 interface InstantBondLane:
     def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
-    def isValidCumulativeAllocated(_amount: uint256) -> bool: view
     def isValidRateOverride(_targetRate: uint256) -> bool: view
     def isValidConfig(_config: InstantBondConfig) -> bool: view
     def isValidEpochLength(_epochLength: uint256) -> bool: view
     def setConfig(_newConfig: InstantBondConfig): nonpayable
     def isValidPaymentToken(_token: address) -> bool: view
     def setRateOverride(_targetRate: uint256): nonpayable
-    def setCumulativeAllocated(_amount: uint256): nonpayable
     def setPaymentToken(_token: address): nonpayable
     def setCanBuyNow(_canBuyNow: bool): nonpayable
     def bondConfig() -> InstantBondConfig: view
     def canCancelRateOverride() -> bool: view
     def cancelRateOverride(): nonpayable
     def isRunning() -> bool: view
+    def CLAIMS() -> address: view
     def stop(): nonpayable
+
+interface InstantBondClaims:
+    def setRemainingAllocationBudget(_amount: uint256): nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -46,12 +48,12 @@ flag ActionType:
     INSTANT_BOND_CONFIG
     RATE_OVERRIDE_SET
     RATE_OVERRIDE_CANCEL
+    REMAINING_ALLOCATION_BUDGET_SET
 
 struct InstantBondConfig:
     canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    mintBudget: uint256
     maxEffectiveRate: uint256
     seedRate: uint256
     uHighBps: uint256
@@ -73,7 +75,6 @@ event PendingInstantBondConfigSet:
     canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    mintBudget: uint256
     maxEffectiveRate: uint256
     seedRate: uint256
     uHighBps: uint256
@@ -90,6 +91,14 @@ event PendingInstantBondConfigSet:
     epochLength: uint256
 
 event InstantBondConfigExecuted:
+    actionId: uint256
+
+event PendingInstantBondRemainingAllocationBudgetSet:
+    actionId: uint256
+    confirmationBlock: uint256
+    amount: uint256
+
+event InstantBondRemainingAllocationBudgetExecuted:
     actionId: uint256
 
 event PendingRateOverrideSet:
@@ -111,9 +120,6 @@ event InstantBondStarted:
     genesisBlock: uint256
     epochLength: uint256
 
-event InstantBondCumulativeAllocatedSet:
-    amount: uint256
-
 event InstantBondPaymentTokenSet:
     token: indexed(address)
 
@@ -123,6 +129,7 @@ event InstantBondCanBuyNowSet:
 # pending actions
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingConfig: public(HashMap[uint256, InstantBondConfig]) # aid -> config
+pendingRemainingAllocationBudget: public(HashMap[uint256, uint256]) # aid -> amount
 pendingRateOverride: public(HashMap[uint256, uint256]) # aid -> target rate
 
 INSTANT_BOND_LANE_ID: constant(uint256) = 26
@@ -173,7 +180,6 @@ def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
         canBuyNow=_config.canBuyNow,
         paymentCapPerEpoch=_config.paymentCapPerEpoch,
         minPaymentAmount=_config.minPaymentAmount,
-        mintBudget=_config.mintBudget,
         maxEffectiveRate=_config.maxEffectiveRate,
         seedRate=_config.seedRate,
         uHighBps=_config.uHighBps,
@@ -275,9 +281,9 @@ def stopInstantBond():
     extcall InstantBondLane(lane).stop()
 
 
-####################
-# Cumulative Allocation #
-####################
+#################
+# Payment Token #
+#################
 
 
 @external
@@ -290,14 +296,29 @@ def setInstantBondPaymentToken(_token: address):
     log InstantBondPaymentTokenSet(token=_token)
 
 
+#####################
+# Allocation Budget #
+#####################
+
+
 @external
-def setInstantBondCumulativeAllocated(_amount: uint256):
+def setInstantBondRemainingAllocationBudget(_amount: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isValidCumulativeAllocated(_amount) # dev: invalid cumulative allocation
-    extcall InstantBondLane(lane).setCumulativeAllocated(_amount)
-    log InstantBondCumulativeAllocatedSet(amount=_amount)
+    assert staticcall InstantBondLane(lane).CLAIMS() != empty(address) # dev: invalid claims
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.REMAINING_ALLOCATION_BUDGET_SET
+    self.pendingRemainingAllocationBudget[aid] = _amount
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingInstantBondRemainingAllocationBudgetSet(
+        actionId=aid,
+        confirmationBlock=confirmationBlock,
+        amount=_amount,
+    )
+    return aid
 
 
 #############
@@ -327,10 +348,15 @@ def executePendingAction(_aid: uint256) -> bool:
         assert staticcall InstantBondLane(lane).isValidRateOverride(self.pendingRateOverride[_aid]) # dev: invalid rate override
         extcall InstantBondLane(lane).setRateOverride(self.pendingRateOverride[_aid])
         log RateOverrideExecuted(actionId=_aid)
-    else:
+    elif actionType == ActionType.RATE_OVERRIDE_CANCEL:
         assert staticcall InstantBondLane(lane).canCancelRateOverride() # dev: no rate override
         extcall InstantBondLane(lane).cancelRateOverride()
         log RateOverrideCancellationExecuted(actionId=_aid)
+    else:
+        claims: address = staticcall InstantBondLane(lane).CLAIMS()
+        assert claims != empty(address) # dev: invalid claims
+        extcall InstantBondClaims(claims).setRemainingAllocationBudget(self.pendingRemainingAllocationBudget[_aid])
+        log InstantBondRemainingAllocationBudgetExecuted(actionId=_aid)
 
     self.actionType[_aid] = empty(ActionType)
     return True
