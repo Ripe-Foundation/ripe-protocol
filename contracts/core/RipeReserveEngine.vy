@@ -39,6 +39,11 @@ interface RipeHq:
     def getAddrInfo(_regId: uint256) -> AddressInfo: view
 
 
+flag ActiveLimitDirection:
+    REDUCTION
+    RAISE
+
+
 struct AddressInfo:
     addr: address
     version: uint256
@@ -328,8 +333,8 @@ nextPositionId: uint256
 nextRecoveryActionId: uint256
 
 # pinned instance identity
-ripeHq: public(immutable(address))
-pinnedRipe: public(immutable(address))
+RIPE_HQ: immutable(address)
+PINNED_RIPE: immutable(address)
 
 # immutable bounds
 HARD_LINEAGE_ALLOCATION_CAP: immutable(uint256)
@@ -345,7 +350,7 @@ RECOVERY_DORMANCY_BLOCKS: immutable(uint256)
 RECOVERY_NOTICE_BLOCKS: immutable(uint256)
 RECOVERY_EXECUTION_WINDOW_BLOCKS: immutable(uint256)
 
-HUNDRED_PERCENT: constant(uint256) = 100_00
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_DURATION_ADJUSTMENT_BPS: constant(uint256) = 100_00
 MAX_DURATION_GRID_POINTS: constant(uint256) = 256
 MAX_PRICE_STEP_BPS: constant(uint256) = 100_00
@@ -369,11 +374,6 @@ BELOW_MINIMUM_PAYMENT: constant(uint256) = 512
 PAYMENT_CAP_EXCEEDED: constant(uint256) = 1024
 LINEAGE_CAP_EXCEEDED: constant(uint256) = 2048
 OUTSTANDING_CAP_EXCEEDED: constant(uint256) = 4096
-
-# active-limit directions
-ACTIVE_LIMIT_INVALID: constant(uint8) = 0
-ACTIVE_LIMIT_REDUCTION: constant(uint8) = 1
-ACTIVE_LIMIT_RAISE: constant(uint8) = 2
 
 # fixed rate sources
 RATE_SOURCE_NONE: constant(uint8) = 0
@@ -424,7 +424,7 @@ def __init__(
     _recoveryExecutionWindowBlocks: uint256,
 ):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(True, False, True)
+    deptBasics.__init__(True, False, True) # starts paused; can mint ripe only
 
     assert _ripeHq != empty(address) and _ripeHq.is_contract # dev: invalid ripe hq
     assert _ripeToken != empty(address) and _ripeToken.is_contract # dev: invalid ripe token
@@ -443,8 +443,8 @@ def __init__(
     assert _recoveryNoticeBlocks != 0 # dev: invalid recovery notice
     assert _recoveryExecutionWindowBlocks != 0 # dev: invalid recovery window
 
-    ripeHq = _ripeHq
-    pinnedRipe = _ripeToken
+    RIPE_HQ = _ripeHq
+    PINNED_RIPE = _ripeToken
     HARD_LINEAGE_ALLOCATION_CAP = _hardLineageAllocationCap
     PRIOR_LINEAGE_ALLOCATED = _priorLineageAllocated
     MIN_CLAIM_CLIFF_BLOCKS = _minClaimCliffBlocks
@@ -458,11 +458,11 @@ def __init__(
     RECOVERY_NOTICE_BLOCKS = _recoveryNoticeBlocks
     RECOVERY_EXECUTION_WINDOW_BLOCKS = _recoveryExecutionWindowBlocks
 
-    validPayment: bool = False
+    isValidPayment: bool = False
     initialDecimals: uint8 = 0
     initialScale: uint256 = 0
-    validPayment, initialDecimals, initialScale = self._paymentDetails(_initialRunTerms.paymentToken)
-    assert validPayment # dev: invalid payment token
+    isValidPayment, initialDecimals, initialScale = self._getPaymentDetails(_initialRunTerms.paymentToken)
+    assert isValidPayment # dev: invalid payment token
     assert self._isValidRunTermsCore(_initialRunTerms) # dev: invalid run terms
     assert self._isValidConfigFor(_initialConfig, _initialRunTerms, initialScale) # dev: invalid config
 
@@ -477,6 +477,23 @@ def __init__(
 
     log ReserveEngineConfigSet(currentConfigVersion=1, configHash=self._configHash(_initialConfig))
     log ReserveEngineRunTermsSet(runTermsVersion=1, runTermsHash=self._runTermsHash(_initialRunTerms))
+
+
+###################
+# Pinned Identity #
+###################
+
+
+@view
+@external
+def ripeHq() -> address:
+    return RIPE_HQ
+
+
+@view
+@external
+def pinnedRipe() -> address:
+    return PINNED_RIPE
 
 
 #######################
@@ -510,7 +527,7 @@ def pause(_shouldPause: bool):
 def recoverFunds(_recipient: address, _asset: address):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _recipient != empty(address) and _asset != empty(address) # dev: invalid recovery
-    assert _asset != pinnedRipe # dev: pinned ripe
+    assert _asset != PINNED_RIPE # dev: pinned ripe
     deptBasics._recoverFunds(_recipient, _asset)
 
 
@@ -520,7 +537,7 @@ def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _recipient != empty(address) # dev: invalid recipient
     for asset: address in _assets:
-        assert asset != empty(address) and asset != pinnedRipe # dev: invalid recovery asset
+        assert asset != empty(address) and asset != PINNED_RIPE # dev: invalid recovery asset
     for recoverAsset: address in _assets:
         deptBasics._recoverFunds(_recipient, recoverAsset)
 
@@ -623,11 +640,11 @@ def setConfig(_newConfig: ire.ReserveEngineConfig, _expectedCurrentConfigVersion
 def isValidRunTerms(_runTerms: ire.ReserveEngineRunTerms) -> bool:
     if self.isRunning:
         return False
-    validPayment: bool = False
+    isValidPayment: bool = False
     decimals: uint8 = 0
     scale: uint256 = 0
-    validPayment, decimals, scale = self._paymentDetails(_runTerms.paymentToken)
-    if not validPayment or not self._isValidRunTermsCore(_runTerms):
+    isValidPayment, decimals, scale = self._getPaymentDetails(_runTerms.paymentToken)
+    if not isValidPayment or not self._isValidRunTermsCore(_runTerms):
         return False
     return self._isValidConfigFor(self.currentConfig, _runTerms, scale)
 
@@ -639,11 +656,11 @@ def setRunTerms(_newRunTerms: ire.ReserveEngineRunTerms, _expectedRunTermsVersio
     assert not self.isRunning # dev: running
     assert _expectedRunTermsVersion == self.runTermsVersion # dev: run terms moved
 
-    validPayment: bool = False
+    isValidPayment: bool = False
     decimals: uint8 = 0
     scale: uint256 = 0
-    validPayment, decimals, scale = self._paymentDetails(_newRunTerms.paymentToken)
-    assert validPayment # dev: invalid payment token
+    isValidPayment, decimals, scale = self._getPaymentDetails(_newRunTerms.paymentToken)
+    assert isValidPayment # dev: invalid payment token
     assert self._isValidRunTermsCore(_newRunTerms) # dev: invalid run terms
     assert self._isValidConfigFor(self.currentConfig, _newRunTerms, scale) # dev: invalid config
 
@@ -683,7 +700,7 @@ def setEngineEnabled(_shouldEnable: bool, _expectedClosureNonce: uint256):
 @view
 @external
 def isValidActiveLimits(_newLineageLimit: uint256, _newOutstandingLimit: uint256) -> bool:
-    return self._activeLimitDirection(_newLineageLimit, _newOutstandingLimit) != ACTIVE_LIMIT_INVALID
+    return self._activeLimitDirection(_newLineageLimit, _newOutstandingLimit) != empty(ActiveLimitDirection)
 
 
 @nonreentrant
@@ -700,9 +717,9 @@ def setActiveLimits(
     assert _expectedCurrentOutstandingLimit == self.activeOutstandingRipeLimit # dev: outstanding limit moved
     assert _expectedCapacityReductionNonce == self.capacityReductionNonce # dev: capacity moved
 
-    direction: uint8 = self._activeLimitDirection(_newLineageLimit, _newOutstandingLimit)
-    assert direction != ACTIVE_LIMIT_INVALID # dev: invalid limit direction
-    if direction == ACTIVE_LIMIT_REDUCTION:
+    direction: ActiveLimitDirection = self._activeLimitDirection(_newLineageLimit, _newOutstandingLimit)
+    assert direction != empty(ActiveLimitDirection) # dev: invalid limit direction
+    if direction == ActiveLimitDirection.REDUCTION:
         self.capacityReductionNonce += 1
 
     self.activeLineageAllocationLimit = _newLineageLimit
@@ -716,9 +733,9 @@ def setActiveLimits(
 
 @view
 @internal
-def _activeLimitDirection(_newLineageLimit: uint256, _newOutstandingLimit: uint256) -> uint8:
+def _activeLimitDirection(_newLineageLimit: uint256, _newOutstandingLimit: uint256) -> ActiveLimitDirection:
     if _newLineageLimit > HARD_LINEAGE_ALLOCATION_CAP:
-        return ACTIVE_LIMIT_INVALID
+        return empty(ActiveLimitDirection)
 
     currentLineage: uint256 = self.activeLineageAllocationLimit
     currentOutstanding: uint256 = self.activeOutstandingRipeLimit
@@ -728,26 +745,26 @@ def _activeLimitDirection(_newLineageLimit: uint256, _newOutstandingLimit: uint2
         and (_newLineageLimit < currentLineage or _newOutstandingLimit < currentOutstanding)
     )
     if isReduction:
-        return ACTIVE_LIMIT_REDUCTION
+        return ActiveLimitDirection.REDUCTION
 
     isRaise: bool = (
         _newLineageLimit >= currentLineage
         and _newOutstandingLimit >= currentOutstanding
         and (_newLineageLimit > currentLineage or _newOutstandingLimit > currentOutstanding)
     )
-    return ACTIVE_LIMIT_RAISE if isRaise else ACTIVE_LIMIT_INVALID
+    return ActiveLimitDirection.RAISE if isRaise else empty(ActiveLimitDirection)
 
 
 @view
 @external
 def isValidStart(_genesisBlock: uint256) -> bool:
     terms: ire.ReserveEngineRunTerms = self.stagedRunTerms
-    validPayment: bool = False
+    isValidPayment: bool = False
     decimals: uint8 = 0
     scale: uint256 = 0
-    validPayment, decimals, scale = self._paymentDetails(terms.paymentToken)
-    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
-    return self._isValidStart(_genesisBlock, terms, validPayment, scale, slot)
+    isValidPayment, decimals, scale = self._getPaymentDetails(terms.paymentToken)
+    slot: AddressInfo = staticcall RipeHq(RIPE_HQ).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
+    return self._isValidStart(_genesisBlock, terms, isValidPayment, scale, slot)
 
 
 @nonreentrant
@@ -766,14 +783,14 @@ def start(
     assert _expectedClosureNonce == self.closureNonce # dev: closure moved
 
     terms: ire.ReserveEngineRunTerms = self.stagedRunTerms
-    validPayment: bool = False
+    isValidPayment: bool = False
     decimals: uint8 = 0
     scale: uint256 = 0
-    validPayment, decimals, scale = self._paymentDetails(terms.paymentToken)
+    isValidPayment, decimals, scale = self._getPaymentDetails(terms.paymentToken)
 
-    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
+    slot: AddressInfo = staticcall RipeHq(RIPE_HQ).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
     assert slot.addr == self and slot.version == _expectedRegistryVersion # dev: engine identity moved
-    assert self._isValidStart(_genesisBlock, terms, validPayment, scale, slot) # dev: invalid start
+    assert self._isValidStart(_genesisBlock, terms, isValidPayment, scale, slot) # dev: invalid start
 
     self._terminateInstalledOverride(OVERRIDE_NEW_RUN)
     self.runId += 1
@@ -819,8 +836,8 @@ def stop():
 
 @view
 @internal
-def _paymentDetails(_token: address) -> (bool, uint8, uint256):
-    if _token == empty(address) or not _token.is_contract or _token == pinnedRipe:
+def _getPaymentDetails(_token: address) -> (bool, uint8, uint256):
+    if _token == empty(address) or not _token.is_contract or _token == PINNED_RIPE:
         return False, 0, 0
     decimals: uint8 = staticcall IERC20Detailed(_token).decimals()
     if decimals > MAX_PAYMENT_DECIMALS:
@@ -832,11 +849,11 @@ def _paymentDetails(_token: address) -> (bool, uint8, uint256):
 @internal
 def _isValidConfigWithApplicableTerms(_config: ire.ReserveEngineConfig) -> bool:
     terms: ire.ReserveEngineRunTerms = self.activeRunTerms if self.isRunning else self.stagedRunTerms
-    validPayment: bool = False
+    isValidPayment: bool = False
     decimals: uint8 = 0
     scale: uint256 = 0
-    validPayment, decimals, scale = self._paymentDetails(terms.paymentToken)
-    if not validPayment or not self._isValidRunTermsCore(terms):
+    isValidPayment, decimals, scale = self._getPaymentDetails(terms.paymentToken)
+    if not isValidPayment or not self._isValidRunTermsCore(terms):
         return False
     if self.isRunning:
         if terms.paymentToken != self.paymentToken:
@@ -997,7 +1014,7 @@ def _isValidRunTermsCore(_runTerms: ire.ReserveEngineRunTerms) -> bool:
 def _isValidStart(
     _genesisBlock: uint256,
     _terms: ire.ReserveEngineRunTerms,
-    _validPayment: bool,
+    _isValidPayment: bool,
     _paymentScale: uint256,
     _slot: AddressInfo,
 ) -> bool:
@@ -1008,10 +1025,10 @@ def _isValidStart(
 
     if _slot.addr != self or _slot.version == 0:
         return False
-    if staticcall RipeHq(ripeHq).ripeToken() != pinnedRipe:
+    if staticcall RipeHq(RIPE_HQ).ripeToken() != PINNED_RIPE:
         return False
 
-    if not _validPayment or not self._isValidRunTermsCore(_terms):
+    if not _isValidPayment or not self._isValidRunTermsCore(_terms):
         return False
     return self._isValidConfigFor(self.currentConfig, _terms, _paymentScale)
 
@@ -1029,11 +1046,11 @@ def _hasCoherentActiveRunBinding() -> bool:
     if terms.paymentToken == empty(address) or terms.paymentToken != self.paymentToken:
         return False
 
-    validPayment: bool = False
+    isValidPayment: bool = False
     decimals: uint8 = 0
     scale: uint256 = 0
-    validPayment, decimals, scale = self._paymentDetails(terms.paymentToken)
-    if not validPayment:
+    isValidPayment, decimals, scale = self._getPaymentDetails(terms.paymentToken)
+    if not isValidPayment:
         return False
     return decimals == self.paymentDecimals and scale == self.paymentScale
 
@@ -1139,7 +1156,7 @@ def _isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) 
     if self.installedRateOverride.targetBasePayoutRate != 0:
         return False
 
-    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
+    slot: AddressInfo = staticcall RipeHq(RIPE_HQ).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
     if slot.addr != self or slot.version != self.runRegistryVersion:
         return False
 
@@ -1428,7 +1445,7 @@ def _nextBaseRate(
 
         decaySteps = min(_elapsedEpochs - 1, _config.maxDecayEpochs)
 
-    for i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS):
+    for _i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS):
         rate = min(
             rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.decayBps),
             ceiling,
@@ -1569,38 +1586,38 @@ def _remainingOutstandingCapacity() -> uint256:
 @view
 @external
 def isEscrowCovered() -> bool:
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
-    return covered
+    isCovered, deficit, surplus = self._getEscrowData()
+    return isCovered
 
 
 @view
 @external
 def escrowCoverageDeficit() -> uint256:
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
+    isCovered, deficit, surplus = self._getEscrowData()
     return deficit
 
 
 @view
 @external
 def escrowSurplus() -> uint256:
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
+    isCovered, deficit, surplus = self._getEscrowData()
     return surplus
 
 
 @view
 @internal
-def _escrowData() -> (bool, uint256, uint256):
+def _getEscrowData() -> (bool, uint256, uint256):
     outstanding: uint256 = self._totalOutstandingRipe()
-    balance: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
+    balance: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
     if balance >= outstanding:
         return True, 0, balance - outstanding
     return False, outstanding - balance, 0
@@ -1648,13 +1665,13 @@ def _previewAcquireRipe(
     quote.remainingLineageCapacity = self._remainingLineageCapacity()
     quote.remainingOutstandingCapacity = self._remainingOutstandingCapacity()
 
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
-    quote.isEscrowCovered = covered
+    isCovered, deficit, surplus = self._getEscrowData()
+    quote.isEscrowCovered = isCovered
     quote.escrowCoverageDeficit = deficit
-    if not covered:
+    if not isCovered:
         quote.reasonFlags |= ESCROW_COVERAGE_DEFICIT
 
     if not self.isRunning:
@@ -1684,14 +1701,14 @@ def _previewAcquireRipe(
     if not self._hasCoherentActiveRunBinding():
         quote.reasonFlags |= INVALID_CONFIGURATION
 
-    if staticcall RipeHq(ripeHq).ripeToken() != pinnedRipe:
+    if staticcall RipeHq(RIPE_HQ).ripeToken() != PINNED_RIPE:
         quote.reasonFlags |= INVALID_CONFIGURATION
 
-    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
+    slot: AddressInfo = staticcall RipeHq(RIPE_HQ).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
     if slot.addr != self or slot.version != self.runRegistryVersion:
         quote.reasonFlags |= NOT_CURRENT_INSTANCE
 
-    if not staticcall RipeHq(ripeHq).canMintRipe(self):
+    if not staticcall RipeHq(RIPE_HQ).canMintRipe(self):
         quote.reasonFlags |= NO_MINT_AUTHORIZATION
 
     proceedsRecipient: address = addys._getEndaomentFundsAddr()
@@ -1699,8 +1716,8 @@ def _previewAcquireRipe(
     if proceedsRecipient == empty(address):
         quote.reasonFlags |= INVALID_CONFIGURATION
 
-    validDuration: bool = self._isValidDurationFor(_selectedFullVestingBlocks, terms)
-    if not validDuration:
+    isDurationValid: bool = self._isValidDurationFor(_selectedFullVestingBlocks, terms)
+    if not isDurationValid:
         quote.reasonFlags |= INVALID_DURATION
 
     snapshot: ire.EpochSnapshot = empty(ire.EpochSnapshot)
@@ -1743,7 +1760,7 @@ def _previewAcquireRipe(
     if _paymentAmount > quote.remainingPaymentCapacity:
         quote.reasonFlags |= PAYMENT_CAP_EXCEEDED
 
-    if validDuration:
+    if isDurationValid:
         quote.durationAdjustmentBps = self._durationAdjustmentForTerms(
             _selectedFullVestingBlocks,
             terms,
@@ -1758,7 +1775,7 @@ def _previewAcquireRipe(
             quote.projectedFullyVestedBlock = block.number + _selectedFullVestingBlocks
 
     canCalculate: bool = (
-        validDuration
+        isDurationValid
         and _paymentAmount >= snapshot.minPaymentAmount
         and _paymentAmount <= quote.remainingPaymentCapacity
     )
@@ -1824,12 +1841,12 @@ def acquireRipe(
     assert not deptBasics.isPaused # dev: acquisition unavailable
     assert block.number >= self.genesisBlock # dev: acquisition unavailable
     assert block.number <= _constraints.deadlineBlock # dev: deadline passed
-    assert staticcall RipeHq(ripeHq).ripeToken() == pinnedRipe # dev: invalid configuration
+    assert staticcall RipeHq(RIPE_HQ).ripeToken() == PINNED_RIPE # dev: invalid configuration
 
-    slot: AddressInfo = staticcall RipeHq(ripeHq).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
+    slot: AddressInfo = staticcall RipeHq(RIPE_HQ).getAddrInfo(RIPE_RESERVE_ENGINE_ID)
     assert slot.addr == self and slot.version == self.runRegistryVersion # dev: engine identity moved
     assert self._hasCoherentActiveRunBinding() # dev: invalid configuration
-    assert staticcall RipeHq(ripeHq).canMintRipe(self) # dev: no mint authorization
+    assert staticcall RipeHq(RIPE_HQ).canMintRipe(self) # dev: no mint authorization
 
     proceedsRecipient: address = addys._getEndaomentFundsAddr()
     assert proceedsRecipient != empty(address) # dev: invalid configuration
@@ -1837,11 +1854,11 @@ def acquireRipe(
     terms: ire.ReserveEngineRunTerms = self.activeRunTerms
     assert self._isValidDurationFor(_selectedFullVestingBlocks, terms) # dev: invalid duration
 
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
-    assert covered # dev: escrow coverage deficit
+    isCovered, deficit, surplus = self._getEscrowData()
+    assert isCovered # dev: escrow coverage deficit
 
     previous: ire.EpochSnapshot = self.epochState
     snapshot: ire.EpochSnapshot = empty(ire.EpochSnapshot)
@@ -1965,14 +1982,14 @@ def acquireRipe(
     assert paymentBalanceAfter >= paymentBalanceBefore # dev: payment receipt mismatch
     assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount # dev: payment receipt mismatch
 
-    ripeBalanceBefore: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
-    assert extcall RipeToken(pinnedRipe).mint(self, quote.totalAllocation) # dev: ripe mint failed
-    ripeBalanceAfter: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
+    ripeBalanceBefore: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
+    assert extcall RipeToken(PINNED_RIPE).mint(self, quote.totalAllocation) # dev: ripe mint failed
+    ripeBalanceAfter: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
     assert ripeBalanceAfter >= ripeBalanceBefore # dev: ripe mint mismatch
     assert ripeBalanceAfter - ripeBalanceBefore == quote.totalAllocation # dev: ripe mint mismatch
 
-    covered, deficit, surplus = self._escrowData()
-    assert covered # dev: escrow coverage deficit
+    isCovered, deficit, surplus = self._getEscrowData()
+    assert isCovered # dev: escrow coverage deficit
 
     log RipeAllocated(
         beneficiary=msg.sender,
@@ -2053,11 +2070,11 @@ def claimVestedRipe(_positionId: uint256) -> uint256:
     amount: uint256 = self._claimableRipe(position)
     assert amount != 0 # dev: nothing claimable
 
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
-    assert covered # dev: escrow coverage deficit
+    isCovered, deficit, surplus = self._getEscrowData()
+    assert isCovered # dev: escrow coverage deficit
 
     position.claimed += amount
     self.totalClaimed += amount
@@ -2068,22 +2085,22 @@ def claimVestedRipe(_positionId: uint256) -> uint256:
         RECOVERY_BENEFICIARY_ACTIVITY,
     )
 
-    engineBalanceBefore: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
-    beneficiaryBalanceBefore: uint256 = staticcall IERC20(pinnedRipe).balanceOf(position.beneficiary)
-    assert extcall IERC20(pinnedRipe).transfer(
+    engineBalanceBefore: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
+    beneficiaryBalanceBefore: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(position.beneficiary)
+    assert extcall IERC20(PINNED_RIPE).transfer(
         position.beneficiary,
         amount,
         default_return_value=True,
     ) # dev: ripe claim failed
-    engineBalanceAfter: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
-    beneficiaryBalanceAfter: uint256 = staticcall IERC20(pinnedRipe).balanceOf(position.beneficiary)
+    engineBalanceAfter: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
+    beneficiaryBalanceAfter: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(position.beneficiary)
     assert engineBalanceBefore >= engineBalanceAfter # dev: ripe claim mismatch
     assert engineBalanceBefore - engineBalanceAfter == amount # dev: ripe claim mismatch
     assert beneficiaryBalanceAfter >= beneficiaryBalanceBefore # dev: ripe claim mismatch
     assert beneficiaryBalanceAfter - beneficiaryBalanceBefore == amount # dev: ripe claim mismatch
 
-    covered, deficit, surplus = self._escrowData()
-    assert covered # dev: escrow coverage deficit
+    isCovered, deficit, surplus = self._getEscrowData()
+    assert isCovered # dev: escrow coverage deficit
 
     remaining: uint256 = self._positionOutstanding(position)
     log VestedRipeClaimed(
@@ -2139,9 +2156,9 @@ def queueRipeRecovery(_positionId: uint256, _amount: uint256) -> uint256:
     assert executeAfterBlock <= max_value(uint256) - RECOVERY_EXECUTION_WINDOW_BLOCKS # dev: recovery schedule overflow
     expiresAtBlock: uint256 = executeAfterBlock + RECOVERY_EXECUTION_WINDOW_BLOCKS
 
-    governanceRecipient: address = staticcall RipeHq(ripeHq).governance()
+    governanceRecipient: address = staticcall RipeHq(RIPE_HQ).governance()
     assert governanceRecipient != empty(address) # dev: invalid governance
-    governanceGeneration: uint256 = staticcall RipeHq(ripeHq).numGovChanges()
+    governanceGeneration: uint256 = staticcall RipeHq(RIPE_HQ).numGovChanges()
 
     actionId: uint256 = self.nextRecoveryActionId
     self.nextRecoveryActionId = actionId + 1
@@ -2189,8 +2206,8 @@ def executeRipeRecovery(_recoveryActionId: uint256) -> bool:
         self._terminatePendingRecovery(pending, RECOVERY_EXPIRED)
         return False
 
-    governanceRecipient: address = staticcall RipeHq(ripeHq).governance()
-    governanceGeneration: uint256 = staticcall RipeHq(ripeHq).numGovChanges()
+    governanceRecipient: address = staticcall RipeHq(RIPE_HQ).governance()
+    governanceGeneration: uint256 = staticcall RipeHq(RIPE_HQ).numGovChanges()
     if (
         governanceRecipient != pending.governanceRecipientSnapshot
         or governanceGeneration != pending.governanceGenerationSnapshot
@@ -2212,11 +2229,11 @@ def executeRipeRecovery(_recoveryActionId: uint256) -> bool:
         self._terminatePendingRecovery(pending, RECOVERY_POSITION_STALE)
         return False
 
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
-    if not covered:
+    isCovered, deficit, surplus = self._getEscrowData()
+    if not isCovered:
         return False
 
     self.pendingRipeRecoveries[_recoveryActionId] = empty(ire.PendingRipeRecovery)
@@ -2226,22 +2243,22 @@ def executeRipeRecovery(_recoveryActionId: uint256) -> bool:
     self.positions[pending.positionId] = position
     self.totalRecovered += pending.amount
 
-    engineBalanceBefore: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
-    recipientBalanceBefore: uint256 = staticcall IERC20(pinnedRipe).balanceOf(governanceRecipient)
-    assert extcall IERC20(pinnedRipe).transfer(
+    engineBalanceBefore: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
+    recipientBalanceBefore: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(governanceRecipient)
+    assert extcall IERC20(PINNED_RIPE).transfer(
         governanceRecipient,
         pending.amount,
         default_return_value=True,
     ) # dev: ripe recovery failed
-    engineBalanceAfter: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
-    recipientBalanceAfter: uint256 = staticcall IERC20(pinnedRipe).balanceOf(governanceRecipient)
+    engineBalanceAfter: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
+    recipientBalanceAfter: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(governanceRecipient)
     assert engineBalanceBefore >= engineBalanceAfter # dev: ripe recovery mismatch
     assert engineBalanceBefore - engineBalanceAfter == pending.amount # dev: ripe recovery mismatch
     assert recipientBalanceAfter >= recipientBalanceBefore # dev: ripe recovery mismatch
     assert recipientBalanceAfter - recipientBalanceBefore == pending.amount # dev: ripe recovery mismatch
 
-    covered, deficit, surplus = self._escrowData()
-    assert covered # dev: escrow coverage deficit
+    isCovered, deficit, surplus = self._getEscrowData()
+    assert isCovered # dev: escrow coverage deficit
 
     remaining: uint256 = self._positionOutstanding(position)
     log RipeRecoveredForPosition(
@@ -2311,32 +2328,32 @@ def recoverRipeSurplus(_amount: uint256) -> bool:
     if _amount == 0:
         return False
 
-    covered: bool = False
+    isCovered: bool = False
     deficit: uint256 = 0
     surplus: uint256 = 0
-    covered, deficit, surplus = self._escrowData()
-    if not covered or _amount > surplus:
+    isCovered, deficit, surplus = self._getEscrowData()
+    if not isCovered or _amount > surplus:
         return False
 
-    governanceRecipient: address = staticcall RipeHq(ripeHq).governance()
+    governanceRecipient: address = staticcall RipeHq(RIPE_HQ).governance()
     assert governanceRecipient != empty(address) # dev: invalid governance
 
-    engineBalanceBefore: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
-    recipientBalanceBefore: uint256 = staticcall IERC20(pinnedRipe).balanceOf(governanceRecipient)
-    assert extcall IERC20(pinnedRipe).transfer(
+    engineBalanceBefore: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
+    recipientBalanceBefore: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(governanceRecipient)
+    assert extcall IERC20(PINNED_RIPE).transfer(
         governanceRecipient,
         _amount,
         default_return_value=True,
     ) # dev: ripe recovery failed
-    engineBalanceAfter: uint256 = staticcall IERC20(pinnedRipe).balanceOf(self)
-    recipientBalanceAfter: uint256 = staticcall IERC20(pinnedRipe).balanceOf(governanceRecipient)
+    engineBalanceAfter: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(self)
+    recipientBalanceAfter: uint256 = staticcall IERC20(PINNED_RIPE).balanceOf(governanceRecipient)
     assert engineBalanceBefore >= engineBalanceAfter # dev: ripe recovery mismatch
     assert engineBalanceBefore - engineBalanceAfter == _amount # dev: ripe recovery mismatch
     assert recipientBalanceAfter >= recipientBalanceBefore # dev: ripe recovery mismatch
     assert recipientBalanceAfter - recipientBalanceBefore == _amount # dev: ripe recovery mismatch
 
-    covered, deficit, surplus = self._escrowData()
-    assert covered # dev: escrow coverage deficit
+    isCovered, deficit, surplus = self._getEscrowData()
+    assert isCovered # dev: escrow coverage deficit
     log RipeSurplusRecovered(
         governanceRecipient=governanceRecipient,
         amount=_amount,
