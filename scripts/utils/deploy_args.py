@@ -40,12 +40,26 @@ class BluePrint:
 
 
 class DeployArgs:
-    def __init__(self, sender, chain, ignore_logs, blueprint, rpc):
+    def __init__(
+        self,
+        sender,
+        chain,
+        ignore_logs,
+        blueprint,
+        rpc,
+        *,
+        local_preview=False,
+    ):
         self.sender = sender
         self.chain = chain
         self.ignore_logs = ignore_logs
         self.blueprint = BluePrint(blueprint)
         self.rpc = rpc
+        # This is execution-mode authority, not an inference from the RPC
+        # string. A live run and a fork can use the same upstream URL, so only
+        # the CLI branch that actually enters boa.fork may enable preview-only
+        # validation skips.
+        self.local_preview = local_preview is True
         # Installed only by the post-gate Robinhood execution branch.
         self.robinhood_execution_plan = None
         self.robinhood_repository_root = None

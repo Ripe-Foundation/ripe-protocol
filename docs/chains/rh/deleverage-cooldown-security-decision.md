@@ -44,7 +44,7 @@ instruction on 24 July 2026
 
 **Branch:** `rh-track-6-s4-deleverage-cooldown`
 
-**Worktree:** `/Users/wigglez/dev/ripe-protocol-track-6-s4-deleverage-cooldown`
+**Worktree:** `${HOME}/dev/ripe-protocol-track-6-s4-deleverage-cooldown`
 
 ## Authorization and stop condition
 
@@ -174,7 +174,7 @@ initial-launch risks:
 
 | Item | Frozen result |
 | --- | --- |
-| Repository | `/Users/wigglez/dev/ripe-protocol` |
+| Repository | `${HOME}/dev/ripe-protocol` |
 | Integration branch | `rh` |
 | Local `rh` at bootstrap | `3e6e6f230169fc445d0b29454457480c62efd89a` |
 | `origin/rh` and live `ls-remote` result | `3e6e6f230169fc445d0b29454457480c62efd89a` |

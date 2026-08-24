@@ -12,4 +12,5 @@ def migrate(migration: Migration):
         hq,
         migration.blueprint().ADDYS["WETH"],
         migration.blueprint().ADDYS["ETH"],
+        migration.blueprint().PARAMS["CURVE_PRICES_ID"],
     )

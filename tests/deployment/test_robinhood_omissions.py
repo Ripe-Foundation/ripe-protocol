@@ -297,7 +297,7 @@ def test_stock_stability_swap_false():
     )
 
 
-def test_unselected_oracles_are_unreachable_and_bluechip_source_is_selected():
+def test_unselected_oracles_are_unreachable_and_bluechip_source_is_deferred():
     omitted_oracle_components = {
         "CM-019",
         "CM-020",
@@ -311,27 +311,25 @@ def test_unselected_oracles_are_unreachable_and_bluechip_source_is_selected():
         for component_id in omitted_oracle_components
     )
     bluechip = get_component("CM-018")
-    assert bluechip.deployment is Disposition.REQUIRED
-    assert bluechip.blocker_ids == ("B-P1-EXTERNAL-VERIFY",)
+    assert bluechip.deployment is Disposition.DEFERRED
+    assert bluechip.blocker_ids == ()
+    assert bluechip.registry_expectations == ()
     topology = registry_map()
     policy = blueprint_policy()
-    assert [
-        topology[(RegistryDomain.PRICE_DESK, value)].semantic_name
-        for value in range(2, 6)
-    ] == ["Curve", "BlueChipYield", "Pyth", "Stork"]
-    assert topology[(RegistryDomain.PRICE_DESK, 3)].disposition is (
-        Disposition.REQUIRED
-    )
-    assert all(
-        topology[(RegistryDomain.PRICE_DESK, value)].disposition
-        is Disposition.OMITTED
-        for value in (4, 5)
-    )
-    assert topology[(RegistryDomain.PRICE_DESK, 2)].disposition is Disposition.REQUIRED
     assert {
-        key for key in policy.reserved_registries if key[0] == "price_desk"
-    } == {("price_desk", value) for value in (4, 5)}
-    assert ("price_desk", 3) in policy.required_registries
+        key: row.semantic_name
+        for key, row in topology.items()
+        if key[0] == RegistryDomain.PRICE_DESK
+    } == {
+        (RegistryDomain.PRICE_DESK, 1): "Chainlink",
+        (RegistryDomain.PRICE_DESK, 2): "Curve",
+    }
+    assert topology[(RegistryDomain.PRICE_DESK, 2)].disposition is Disposition.REQUIRED
+    assert not {key for key in policy.reserved_registries if key[0] == "price_desk"}
+    assert {key for key in policy.required_registries if key[0] == "price_desk"} == {
+        ("price_desk", 1),
+        ("price_desk", 2),
+    }
 
 
 def test_ccip_capability_is_live_while_operational_gates_remain_explicit():
@@ -475,18 +473,12 @@ def test_slot_scaffolds_have_exact_disabled_capabilities():
     assert surfaces["S-003-DEPOSIT"].disposition is Disposition.REQUIRED
 
 
-def test_pricedesk_curve_selection_and_empty_slots_cannot_be_repurposed():
+def test_pricedesk_curve_selection_is_exact_without_future_slot_reservations():
     topology = registry_map()
-    reserved = tuple(
-        topology[(RegistryDomain.PRICE_DESK, value)] for value in (4, 5)
-    )
-    assert all(item.disposition is Disposition.OMITTED for item in reserved)
-    assert topology[(RegistryDomain.PRICE_DESK, 3)].semantic_name == (
-        "BlueChipYield"
-    )
-    assert topology[(RegistryDomain.PRICE_DESK, 3)].disposition is (
-        Disposition.REQUIRED
-    )
+    assert {key for key in topology if key[0] == RegistryDomain.PRICE_DESK} == {
+        (RegistryDomain.PRICE_DESK, 1),
+        (RegistryDomain.PRICE_DESK, 2),
+    }
     component = get_component("CM-017")
     row = component.registry_expectations[0]
     assert_code(
@@ -741,7 +733,13 @@ def test_curve_launch_graph_and_registry_selection_are_exact():
         for relation in get_component("CM-015").relations
     }
     assert price_desk_relations["R-289"] == "CM-017"
-    assert price_desk_relations["R-290"] == "CM-018"
+    bluechip_relation = next(
+        relation
+        for relation in get_component("CM-018").relations
+        if relation.relation_id == "R-290"
+    )
+    assert bluechip_relation.target_component_id == "CM-015"
+    assert bluechip_relation.phase is RelationPhase.REGISTRATION_ORDER
 
     topology = registry_map()
     policy = blueprint_policy()

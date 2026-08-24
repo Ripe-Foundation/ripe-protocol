@@ -25,6 +25,8 @@ def _args(*, ignore_logs: bool = False):
         ignore_logs=ignore_logs,
         rpc="redacted",
         sender=SimpleNamespace(address="0x" + "1" * 40),
+        chain="robinhood-mainnet",
+        blueprint=None,
     )
 
 
@@ -194,6 +196,7 @@ def set_stored(new_value: uint256):
     deploy_args = SimpleNamespace(
         ignore_logs=False,
         rpc="redacted",
+        chain="robinhood-mainnet",
         sender=SimpleNamespace(address=boa.env.eoa),
     )
 
@@ -203,13 +206,22 @@ def set_stored(new_value: uint256):
     assert result == NO_OUTPUT_TRANSACTION_RESULT
     assert result
     assert contract.stored() == 41
-    assert json.loads((tmp_path / "2-log.json").read_text()) == {
-        "transactions": [NO_OUTPUT_TRANSACTION_RESULT]
+    record = json.loads((tmp_path / "2-log.json").read_text())["transactions"][0]
+    assert record == {
+        **migration._transaction_intent(contract.set_stored, (41,), {}),
+        "receipt": NO_OUTPUT_TRANSACTION_RESULT,
     }
 
     resumed = Migration(deploy_args, {}, "2", "1", str(tmp_path))
-    assert resumed.execute(contract.set_stored, 99) == NO_OUTPUT_TRANSACTION_RESULT
+    assert resumed.execute(contract.set_stored, 41) == NO_OUTPUT_TRANSACTION_RESULT
     assert contract.stored() == 41
+
+    changed = Migration(deploy_args, {}, "2", "1", str(tmp_path))
+    with pytest.raises(
+        RuntimeError,
+        match="MIGRATION_TRANSACTION_CALLDATA_MISMATCH",
+    ):
+        changed.execute(contract.set_stored, 99)
 
 
 @pytest.mark.parametrize("explicit_amount", (False, True))
@@ -229,6 +241,7 @@ def bump(amount: uint256 = 1):
     deploy_args = SimpleNamespace(
         ignore_logs=False,
         rpc="redacted",
+        chain="robinhood-mainnet",
         sender=SimpleNamespace(address=boa.env.eoa),
     )
     call_args = (7,) if explicit_amount else ()
@@ -239,8 +252,10 @@ def bump(amount: uint256 = 1):
 
     assert result == NO_OUTPUT_TRANSACTION_RESULT
     assert contract.count() == expected
-    assert json.loads((tmp_path / "2-log.json").read_text()) == {
-        "transactions": [NO_OUTPUT_TRANSACTION_RESULT]
+    record = json.loads((tmp_path / "2-log.json").read_text())["transactions"][0]
+    assert record == {
+        **migration._transaction_intent(contract.bump, call_args, {}),
+        "receipt": NO_OUTPUT_TRANSACTION_RESULT,
     }
 
     resumed = Migration(deploy_args, {}, "2", "1", str(tmp_path))
@@ -275,22 +290,39 @@ def test_raised_zero_output_function_remains_fail_closed():
     assert transaction.calls == 1
 
 
+class _ReconciledCall:
+    def __init__(self, callback):
+        self.contract = SimpleNamespace(address="0x" + "2" * 40)
+        self._callback = callback
+
+    def prepare_calldata(self):
+        return b"\x12\x34"
+
+    def __call__(self, **_kwargs):
+        return self._callback()
+
+
 def test_execute_reconciled_records_only_a_proven_frontier_call(tmp_path):
     _write_json(tmp_path / "current-manifest.json", {"contracts": {}})
     migration = Migration(_args(), {}, "2", "1", str(tmp_path))
     calls = []
+    transaction = _ReconciledCall(lambda: calls.append("broadcast"))
 
     result = migration.execute_reconciled(
-        lambda: calls.append("broadcast"),
+        transaction,
         lambda: True,
     )
 
     assert result is True
     assert calls == []
     assert migration._count == 1
-    assert migration._transactions == ["True"]
+    expected = {
+        **migration._transaction_intent(transaction, (), {}),
+        "receipt": True,
+    }
+    assert migration._transactions == [expected]
     saved = json.loads((tmp_path / "2-log.json").read_text())
-    assert saved == {"transactions": ["True"]}
+    assert saved == {"transactions": [expected]}
 
 
 def test_execute_reconciled_recovers_mined_success_from_driver_error(tmp_path):
@@ -302,21 +334,30 @@ def test_execute_reconciled_recovers_mined_success_from_driver_error(tmp_path):
         state["complete"] = True
         raise RuntimeError("synthetic post-receipt failure")
 
+    transaction = _ReconciledCall(mined_then_driver_failed)
     assert migration.execute_reconciled(
-        mined_then_driver_failed,
+        transaction,
         lambda: state["complete"],
     )
     assert migration._count == 1
-    assert migration._transactions == ["True"]
+    assert migration._transactions == [
+        {
+            **migration._transaction_intent(transaction, (), {}),
+            "receipt": True,
+        }
+    ]
 
 
 def test_execute_reconciled_keeps_real_failure_closed(tmp_path):
     _write_json(tmp_path / "current-manifest.json", {"contracts": {}})
     migration = Migration(_args(), {}, "2", "1", str(tmp_path))
+    transaction = _ReconciledCall(
+        lambda: (_ for _ in ()).throw(RuntimeError("real failure"))
+    )
 
     with pytest.raises(TransactionExecutionError):
         migration.execute_reconciled(
-            lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("real failure")),
+            transaction,
             lambda: False,
         )
 

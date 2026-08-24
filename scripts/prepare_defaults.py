@@ -27,11 +27,11 @@ read from there, so a replacement Ledger inherits what has already been
 emitted instead of resetting to the launch allocation.
 
 Not everything MissionControl holds can travel through Defaults. The
-interface has no slot for userConfig or userDelegation, and the vault-id
-fields added since the live deployments (coreRipeGovVaultId,
-preferredStabVaultId) are set by the constructor rather than read from
-defaults. The run prints an explicit accounting of what it carried and what
-it could not, so the gap is a decision rather than a surprise.
+interface has no slot for userConfig, userDelegation, the current vault-ID
+pointers, or historical vault classifications. The run prints an explicit
+accounting of what it carried and what it could not, so the gap is a decision
+rather than a surprise. verify_defaults.py rejects observable pointer or
+classification drift before a replacement is deployed.
 """
 
 from __future__ import annotations
@@ -234,6 +234,14 @@ NETWORKS: Mapping[str, Network] = {
 DEFAULT_NETWORK = NETWORKS["robinhood-mainnet"]
 EXPECTED_CHAIN_ID = DEFAULT_NETWORK.chain_id
 
+
+def _require_robinhood_chain_id(observed):
+    """Compatibility guard for callers that explicitly select Robinhood."""
+    if isinstance(observed, bool) or observed != EXPECTED_CHAIN_ID:
+        raise RuntimeError(
+            f"DEFAULTS_CHAIN_MISMATCH: expected {EXPECTED_CHAIN_ID}, got {observed!r}"
+        )
+
 HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
 # Ripe Foundation (C) 2026
 
@@ -273,8 +281,11 @@ HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-pro
 # override, allowing future clones to use the replacement generation.
 # MissionControl and Ledger copy these values into storage at construction.
 #
-# MissionControl state that Defaults has no slot for -- userConfig and
+# MissionControl per-user state that Defaults has no slot for -- userConfig and
 # userDelegation -- does NOT survive the redeploy and is not represented here.
+# Vault pointers and historical vault classifications are also not carried;
+# verify_defaults.py must exact-match their observable live state before this
+# contract is used for a replacement.
 #
 {cadence_note}
 
@@ -865,11 +876,12 @@ class BuildResult:
             "MissionControl starts empty and they need their own migration step:\n"
             "  userConfig (per-user deposit/repay/bond permissions)\n"
             "  userDelegation (per-user, per-delegate action grants)\n"
-            "set by the replacement MissionControl constructor rather than read\n"
-            f"from live {network.display_name} (the deployed contract has no such getter):\n"
-            "  preferredStabVaultId = 1, coreRipeGovVaultId = 2\n"
-            "rebuilt from the asset configs above, so no action needed:\n"
-            "  totalPointsAllocs, indexOfAsset, numAssets, isStabVaultId"
+            "  coreRipeGovVaultId and preferredStabVaultId (constructor defaults only)\n"
+            "  historical isStabVaultId and isRipeGovVaultId entries\n"
+            "verify_defaults.py must exact-match every one of those vault-topology\n"
+            f"values exposed by live {network.display_name}; otherwise replacement is blocked.\n"
+            "rebuilt completely from the asset configs above:\n"
+            "  totalPointsAllocs, indexOfAsset, numAssets"
         )
 
 

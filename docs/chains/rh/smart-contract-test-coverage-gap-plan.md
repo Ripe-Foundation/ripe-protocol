@@ -152,7 +152,7 @@ A fresh implementation agent **must** perform these steps before editing:
    do not check out or mutate `rh` directly:
 
    ```text
-   /Users/wigglez/dev/ripe-protocol-rh-smart-contract-test-coverage
+   ${HOME}/dev/ripe-protocol-rh-smart-contract-test-coverage
    ```
 
 1. Verify the checked-out branch is
@@ -1419,7 +1419,7 @@ fixture in `tests/conf_env.py` binds a socket, which a sandboxed run rejects wit
 that masquerades as a collection failure rather than a sandbox restriction.
 
 Use the verified local validation interpreter
-`/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python`
+`${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python`
 (Python 3.12.0, Titanoboa 0.2.7, Vyper 0.4.3, pytest 8.4.2) unless the owner
 provides a replacement. Use private mode-0700 temporary Boa/pytest caches and
 the repository's existing non-secret `ETHERSCAN_API_KEY=local-placeholder`
@@ -1461,7 +1461,7 @@ env \
   ETHERSCAN_API_KEY=local-placeholder \
   PYTHONHASHSEED=0 \
   RIPE_AUDIT_CACHE="$validation_root/boa" \
-  /Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python \
+  ${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python \
   -c 'import os, sys; from boa.interpret import set_cache_dir; set_cache_dir(os.environ["RIPE_AUDIT_CACHE"]); import pytest; raise SystemExit(pytest.main(sys.argv[1:]))' \
   -q \
   -p no:cacheprovider \
@@ -1622,7 +1622,7 @@ at the pinned `rh` head:
 
 ```text
 Branch: codex/rh-smart-contract-test-coverage
-Worktree: /Users/wigglez/dev/ripe-protocol-rh-smart-contract-test-coverage
+Worktree: ${HOME}/dev/ripe-protocol-rh-smart-contract-test-coverage
 Pinned RH base: 7d8c76e5134bf866ccbb051fdf5030b6e83cef8b
 Revision-5 parent plan commit: 37d8c26a0b372b68efa7a853838400952040b478
 ```

@@ -11,7 +11,7 @@
 - **Prepared:** 2026-08-07
 - **Implementation baseline:** `rh` and `origin/rh` at `610b43f4508e85628a1362532a79d68d71ea902c`
 - **Comparison baseline:** `master` at `91eda49ccd34a25090582aff0695075c4c806011`
-- **Repository:** `/Users/wigglez/dev/ripe-protocol`
+- **Repository:** `${HOME}/dev/ripe-protocol`
 - **Primary objective:** Make the active contract-development tree smaller and keep the already-integrated fast test workflow intact, without changing production Vyper, live deployment tooling, deployment-record formats, or security intent.
 
 > This is one long-running implementation task with one consolidated validation and review at the end. The three implementation trains are independently revertible recovery units, not micro-gates or review pauses.
@@ -71,10 +71,10 @@ master:       91eda49ccd34a25090582aff0695075c4c806011
 Create a new worktree; do not use the dirty reference RH worktree:
 
 ```bash
-git -C /Users/wigglez/dev/ripe-protocol rev-parse rh^{commit} origin/rh^{commit}
-git -C /Users/wigglez/dev/ripe-protocol cat-file -e 610b43f4508e85628a1362532a79d68d71ea902c^{commit}
-git -C /Users/wigglez/dev/ripe-protocol worktree add -b codex/rh-codebase-simplification /Users/wigglez/dev/ripe-protocol-rh-simplification 610b43f4508e85628a1362532a79d68d71ea902c
-git -C /Users/wigglez/dev/ripe-protocol-rh-simplification status --short --branch
+git -C ${HOME}/dev/ripe-protocol rev-parse rh^{commit} origin/rh^{commit}
+git -C ${HOME}/dev/ripe-protocol cat-file -e 610b43f4508e85628a1362532a79d68d71ea902c^{commit}
+git -C ${HOME}/dev/ripe-protocol worktree add -b codex/rh-codebase-simplification ${HOME}/dev/ripe-protocol-rh-simplification 610b43f4508e85628a1362532a79d68d71ea902c
+git -C ${HOME}/dev/ripe-protocol-rh-simplification status --short --branch
 ```
 
 Expected new-worktree status: clean, on `codex/rh-codebase-simplification`, at the exact commit above.
@@ -125,7 +125,7 @@ No numeric file or line target may override a retention rule. This plan intentio
 Use one named environment for every baseline and final measurement:
 
 ```text
-Interpreter: /Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+Interpreter: ${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
 Python:      3.12.0
 IPython:     9.8.0
 Machine:     the current local Mac running this task
@@ -136,7 +136,7 @@ The locked environment already exists. Do not modify it during the implementatio
 Canonical clean-environment provisioning, if the locked environment is unavailable:
 
 ```bash
-/Users/wigglez/.pyenv/versions/3.12.0/bin/python -m venv /private/tmp/ripe-rh-simplification-venv
+${HOME}/.pyenv/versions/3.12.0/bin/python -m venv /private/tmp/ripe-rh-simplification-venv
 /private/tmp/ripe-rh-simplification-venv/bin/python -m pip install -r requirements.txt
 ```
 
@@ -576,7 +576,7 @@ Before editing, run all Phase 0 commands from the temporary clean detached refer
 The checked-in speed document contains aggregate counts but not the 13 failing and 25 erroring identities. Capture both lanes now and keep their JUnit XML outside the worktree:
 
 ```bash
-PY=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+PY=${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
 baseline_evidence_root=$(mktemp -d /private/tmp/rh-simplification-baseline.XXXXXX)
 chmod 700 "$baseline_evidence_root"
 mkdir -p "$baseline_evidence_root/boa" "$baseline_evidence_root/pycache" "$baseline_evidence_root/xdg" "$baseline_evidence_root/hypothesis" "$baseline_evidence_root/tmp" "$baseline_evidence_root/pytest-cache" "$baseline_evidence_root/basetemp-lean" "$baseline_evidence_root/basetemp-comprehensive"
@@ -609,7 +609,7 @@ The full-suite wall times are capacity-planning context, not representative benc
 Only `tests/tokens` and `tests/data/test_mission_control.py` are performance benchmarks. This loop deliberately creates a fresh private runtime root for **each** target, then reuses that target’s root for its immediate warm rerun:
 
 ```bash
-PY=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+PY=${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
 for target in tests/tokens tests/data/test_mission_control.py; do
   benchmark_root=$(mktemp -d /private/tmp/rh-simplification-benchmark.XXXXXX)
   chmod 700 "$benchmark_root"
@@ -642,7 +642,7 @@ For each target, record the target, runtime-root path, cold/warm exit status, py
 `tests/clock/test_clock_profiles.py` is a 57-test purity gate, not a benchmark: its sub-second test work makes a 10% timing threshold meaningless. Give it its own fresh private runtime root:
 
 ```bash
-PY=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+PY=${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
 purity_root=$(mktemp -d /private/tmp/rh-simplification-purity.XXXXXX)
 chmod 700 "$purity_root"
 mkdir -p "$purity_root/boa" "$purity_root/pycache" "$purity_root/xdg" "$purity_root/hypothesis" "$purity_root/tmp" "$purity_root/pytest-cache" "$purity_root/basetemp"
@@ -815,7 +815,7 @@ No retained production artifact may drift. No expectation/authority hash may be 
 Run and retain full logs for:
 
 ```bash
-PY=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+PY=${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
 final_evidence_root=$(mktemp -d /private/tmp/rh-simplification-final.XXXXXX)
 chmod 700 "$final_evidence_root"
 mkdir -p "$final_evidence_root/boa" "$final_evidence_root/pycache" "$final_evidence_root/xdg" "$final_evidence_root/hypothesis" "$final_evidence_root/tmp" "$final_evidence_root/pytest-cache" "$final_evidence_root/basetemp-lean" "$final_evidence_root/basetemp-comprehensive"
@@ -1012,7 +1012,7 @@ The implementing agent’s final response and `docs/simplification/README.md` mu
 ### 14.1 State before implementation
 
 - Current `rh` already includes `codex/rh-test-speed-integration`; do not merge it again.
-- `/Users/wigglez/dev/ripe-protocol-rh` is user-owned and dirty. At plan finalization it had tracked edits under `config/`, `contracts/`, `docs/`, `scripts/abis/`, and `tests/`, plus untracked `docs/chains/rh/vault-migration/`. All are outside this task; protect the entire worktree even if its status changes again.
+- `${HOME}/dev/ripe-protocol-rh` is user-owned and dirty. At plan finalization it had tracked edits under `config/`, `contracts/`, `docs/`, `scripts/abis/`, and `tests/`, plus untracked `docs/chains/rh/vault-migration/`. All are outside this task; protect the entire worktree even if its status changes again.
 - `instant-bond-lane` diverges from RH: RH has 14 commits not in the lane; the lane has 5 commits and approximately 7,083 added lines not in RH.
 - Older remediation/test-plan worktrees are not implementation inputs.
 
@@ -1045,4 +1045,4 @@ Any authorized rebase that changes the final tree invalidates prior final-suite 
 
 ## 15. Copy-paste fresh-agent instruction
 
-> Read `/Users/wigglez/dev/ripe-protocol/RH-CODEBASE-SIMPLIFICATION-PLAN.md` completely and implement it end to end from exact baseline `610b43f4508e85628a1362532a79d68d71ea902c`. Work only in a new isolated `codex/rh-codebase-simplification` worktree, and add an exact tracked copy of the plan at `docs/simplification/implementation-plan.md`. This is one uninterrupted multi-day task: before editing, capture the one reference lean/comprehensive JUnit pair, the two named cold/warm wall benchmarks with a fresh cache per target, and the separate socket-purity gate; then execute the three independently revertible trains continuously with only targeted debugging checks; finally run the candidate lean/comprehensive suites, artifact/authority/dependency gates, recovery checks, benchmarks, and comprehensive review together at the end. Do not pause for train reviews or micro-gates. The current RH already contains the test-speed integration; this cleanup protects it but does not promise more speed. Preserve its pytest configuration, Boa cache, lazy port allocation, unraisable-exception setting, and Python workflow. Retain all 52 ABIs. Do not change production Vyper, requirements, migration CLI/runner/planning API, manifest schema/current-manifest format, or Uniswap. Retention and load-bearing coupling rules override size targets. If one train becomes unsafe, revert/de-scope that train, finish the others, and report it at the end. Unset RPC/secrets and all three `RIPE_RH_FORK_*` controls for local runs. Do not touch any existing worktree, including the user-owned tracked edits and untracked vault-migration material in the dirty RH worktree. Do not push, open a PR, merge, deploy, use secrets, rewrite history, or integrate another branch. Stop only for Section 0.4 hard stops. Deliver the clean locally committed branch, extraction manifest, out-of-tree JUnit/log evidence with hashes, final report, de-scopes, and exact landing recommendation for one end-of-task review.
+> Read `${HOME}/dev/ripe-protocol/RH-CODEBASE-SIMPLIFICATION-PLAN.md` completely and implement it end to end from exact baseline `610b43f4508e85628a1362532a79d68d71ea902c`. Work only in a new isolated `codex/rh-codebase-simplification` worktree, and add an exact tracked copy of the plan at `docs/simplification/implementation-plan.md`. This is one uninterrupted multi-day task: before editing, capture the one reference lean/comprehensive JUnit pair, the two named cold/warm wall benchmarks with a fresh cache per target, and the separate socket-purity gate; then execute the three independently revertible trains continuously with only targeted debugging checks; finally run the candidate lean/comprehensive suites, artifact/authority/dependency gates, recovery checks, benchmarks, and comprehensive review together at the end. Do not pause for train reviews or micro-gates. The current RH already contains the test-speed integration; this cleanup protects it but does not promise more speed. Preserve its pytest configuration, Boa cache, lazy port allocation, unraisable-exception setting, and Python workflow. Retain all 52 ABIs. Do not change production Vyper, requirements, migration CLI/runner/planning API, manifest schema/current-manifest format, or Uniswap. Retention and load-bearing coupling rules override size targets. If one train becomes unsafe, revert/de-scope that train, finish the others, and report it at the end. Unset RPC/secrets and all three `RIPE_RH_FORK_*` controls for local runs. Do not touch any existing worktree, including the user-owned tracked edits and untracked vault-migration material in the dirty RH worktree. Do not push, open a PR, merge, deploy, use secrets, rewrite history, or integrate another branch. Stop only for Section 0.4 hard stops. Deliver the clean locally committed branch, extraction manifest, out-of-tree JUnit/log evidence with hashes, final report, de-scopes, and exact landing recommendation for one end-of-task review.

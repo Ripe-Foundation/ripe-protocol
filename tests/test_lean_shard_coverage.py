@@ -192,10 +192,12 @@ def test_python_workflow_routes_validation_jobs_on_automatic_events():
         "workflow_dispatch",
     }
     assert workflow["on"]["pull_request"]["branches"] == [
+        "master",
         "rh",
         "rh-audit-remediation",
     ]
     assert workflow["on"]["merge_group"]["branches"] == [
+        "master",
         "rh",
         "rh-audit-remediation",
     ]
@@ -440,9 +442,18 @@ def test_python_workflow_cancels_superseded_branch_or_pr_runs():
 def test_python_workflow_exposes_stable_rh_pr_gate():
     job = _workflow()["jobs"]["rh-pr-gate"]
     assert job["name"] == "rh-pr-gate"
-    assert job["needs"] == ["test", "deployment-controls", "snapshot-gas"]
+    assert job["needs"] == [
+        "solidity",
+        "test",
+        "deployment-controls",
+        "snapshot-gas",
+    ]
 
     expected_results = {
+        "Require successful Solidity lane": (
+            "SOLIDITY_RESULT",
+            "${{ needs.solidity.result }}",
+        ),
         "Require successful lean lane": (
             "TEST_RESULT",
             "${{ needs.test.result }}",
@@ -494,6 +505,14 @@ def test_python_workflow_deployment_controls_keep_lean_marker_exclusions():
     ]
 
 
+def test_python_workflow_requires_byte_current_production_abis():
+    step = _step(
+        _workflow()["jobs"]["deployment-controls"],
+        "Verify production ABI exports",
+    )
+    assert step["run"] == "python scripts/export_abis.py --check"
+
+
 def test_unset_parser_rejects_credentials_that_are_only_mentioned():
     required = {
         "ETHERSCAN_API_KEY",
@@ -527,8 +546,18 @@ def test_python_workflow_enforces_all_snapshot_gas_suites():
         "tests/priceSources/blueChip/test_bluechip_local.py",
         "tests/priceSources/curve/test_robinhood_launch_route.py",
         "tests/core/test_sc24_gas_matrix.py",
+        "tests/registries/test_price_desk_gas.py",
+        (
+            "tests/registries/test_price_desk_aggregate_protocol_gas.py::"
+            "test_aggregate_protocol_gas[valuation-intended_prompt]"
+        ),
     }
     arguments = _pytest_args(command)
 
     for test_file in expected_test_files:
         assert arguments.count(test_file) == 1
+
+    assert not any(
+        argument.startswith("tests/registries/test_price_desk_gas.py::")
+        for argument in arguments
+    )

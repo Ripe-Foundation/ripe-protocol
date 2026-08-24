@@ -15,7 +15,7 @@ from config.robinhood_launch import (
 
 
 VAULT_MIGRATOR_ID = 25
-VAULT_MIGRATOR_CANDIDATE = "VaultMigratorCandidate0013"
+VAULT_MIGRATOR_CANDIDATE = "VaultMigratorCandidate2026082402"
 
 
 def migrate(migration: Migration):

@@ -58,11 +58,11 @@ Use an isolated worktree and a new codex/ branch. Do not work directly on rh, ma
 
 These paths were valid when this plan was revised and must be checked rather than guessed:
 
-- repository anchor: /Users/wigglez/dev/ripe-protocol
-- local RH reference worktree: /Users/wigglez/dev/ripe-protocol-rh
+- repository anchor: ${HOME}/dev/ripe-protocol
+- local RH reference worktree: ${HOME}/dev/ripe-protocol-rh
 - committed plan branch: codex/rh-deposit-vault-hardening-plan
-- plan worktree at handoff: /Users/wigglez/dev/ripe-protocol-rh-deposit-vault-hardening-plan
-- pinned validation environment: /Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312
+- plan worktree at handoff: ${HOME}/dev/ripe-protocol-rh-deposit-vault-hardening-plan
+- pinned validation environment: ${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312
 
 The validation environment currently resolves Python 3.12.0, Vyper 0.4.3, titanoboa 0.2.7, pytest 8.4.2, and Hypothesis 6.138.15. Re-record these versions in the startup report. Do not upgrade or substitute the compiler during this work.
 
@@ -861,7 +861,7 @@ Run behavior tests in increasing composition order. These commands are verificat
 From the candidate worktree, establish private writable caches so titanoboa does not attempt to write to an unavailable home cache:
 
 ```zsh
-RH_VAULT_PYTHON=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+RH_VAULT_PYTHON=${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
 RH_VAULT_TEST_ROOT=$(mktemp -d /private/tmp/rh-deposit-vault-tests.XXXXXX)
 chmod 700 "$RH_VAULT_TEST_ROOT"
 mkdir -p "$RH_VAULT_TEST_ROOT/boa" "$RH_VAULT_TEST_ROOT/pycache" "$RH_VAULT_TEST_ROOT/xdg" "$RH_VAULT_TEST_ROOT/hypothesis" "$RH_VAULT_TEST_ROOT/basetemp"
@@ -1003,7 +1003,7 @@ Use a clean detached worktree for the rebound baseline and the pinned compiler. 
 (
   set -euo pipefail
 
-  RH_VAULT_VYPER=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/vyper
+  RH_VAULT_VYPER=${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/vyper
   RH_VAULT_BASELINE_WORKTREE=/absolute/path/to/clean-rebound-baseline
   RH_VAULT_CANDIDATE_WORKTREE=/absolute/path/to/candidate
 
@@ -1042,7 +1042,7 @@ For each changed deployed source path, compare ABI, method identifiers, and stor
 (
   set -euo pipefail
 
-  RH_VAULT_VYPER=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/vyper
+  RH_VAULT_VYPER=${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/vyper
   RH_VAULT_BASELINE_WORKTREE=/absolute/path/to/clean-rebound-baseline
   RH_VAULT_CANDIDATE_WORKTREE=/absolute/path/to/candidate
   RH_VAULT_CONTRACT_PATH=contracts/vaults/RipeGov.vy

@@ -102,6 +102,56 @@ def isPaused() -> bool:
     )
 
 
+def _mutable_full_stability_pool(asset, name):
+    return boa.loads(
+        """
+asset: immutable(address)
+shouldRevert: public(bool)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+def setShouldRevert(_shouldRevert: bool):
+    self.shouldRevert = _shouldRevert
+
+@external
+@view
+def doesVaultHaveAnyFunds() -> bool:
+    return False
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256:
+    return 0
+
+@external
+@view
+def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool:
+    assert not self.shouldRevert
+    return False
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        asset,
+        name=name,
+    )
+
+
 @pytest.fixture(scope="function")
 def new_mission_control(ripe_hq, defaults):
     """Deploy a new MissionControl that is NOT registered in RipeHq.
@@ -128,6 +178,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
             100,  # max (less than min)
             50,   # min timelock
             500,  # max timelock
+            0,    # Pyth disabled
         )
     
     # Test equal values
@@ -140,6 +191,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
             100,  # max (equal to min)
             50,   # min timelock
             500,  # max timelock
+            0,    # Pyth disabled
         )
 
 
@@ -201,7 +253,7 @@ def test_set_vault_limits_validation(switchboard_alpha, governance):
         switchboard_alpha.setVaultLimits(10, MAX_UINT256, sender=governance.address)  # max uint256
 
 
-def test_set_vault_limits_success(switchboard_alpha, governance):
+def test_set_vault_limits_success(switchboard_alpha, mission_control, governance):
     # Test valid vault limits
     action_id = switchboard_alpha.setVaultLimits(20, 10, sender=governance.address)
     assert action_id > 0
@@ -218,6 +270,7 @@ def test_set_vault_limits_success(switchboard_alpha, governance):
     pending = switchboard_alpha.pendingGeneralConfig(action_id)
     assert pending.perUserMaxVaults == 20
     assert pending.perUserMaxAssetsPerVault == 10
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_execute_vault_limits(switchboard_alpha, mission_control, governance):
@@ -368,6 +421,7 @@ def test_global_debt_limits_success(switchboard_alpha, mission_control, governan
     assert log.globalDebtLimit == 50000
     assert log.minDebtAmount == 100
     assert log.numAllowedBorrowers == 100
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_borrow_interval_config_validation(switchboard_alpha, governance):
@@ -644,7 +698,7 @@ def test_daowry_enable_disable(switchboard_alpha, mission_control, governance):
     assert logs[0].isDaowryEnabled
 
 
-def test_ripe_per_block(switchboard_alpha, governance):
+def test_ripe_per_block(switchboard_alpha, mission_control, governance):
     action_id = switchboard_alpha.setRipePerBlock(1000, sender=governance.address)
     assert action_id > 0
     
@@ -652,6 +706,7 @@ def test_ripe_per_block(switchboard_alpha, governance):
     logs = filter_logs(switchboard_alpha, "PendingRipeRewardsPerBlockChange")
     assert len(logs) == 1
     assert logs[0].ripePerBlock == 1000
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_rewards_allocs_validation(switchboard_alpha, governance):
@@ -954,13 +1009,13 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
         [(1, savings_green.address)],
         sender=governance.address,
     )
-    legacy_pool = _legacy_partial_stability_pool(
+    replacement_pool = _mutable_full_stability_pool(
         savings_green,
-        "replacement_partial_priority_stability_pool",
+        "mutable_full_priority_stability_pool",
     )
     assert vault_book.startAddressUpdateToRegistry(
         1,
-        legacy_pool.address,
+        replacement_pool.address,
         sender=governance.address,
     )
     boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
@@ -968,6 +1023,7 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
         1,
         sender=governance.address,
     )
+    replacement_pool.setShouldRevert(True)
 
     confirmation_block = switchboard_alpha.getActionConfirmationBlock(action_id)
     current_block = boa.env.evm.patch.block_number
@@ -979,8 +1035,8 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
             sender=governance.address,
         )
     assert switchboard_alpha.hasPendingAction(action_id)
-    assert vault_book.getAddr(1) == legacy_pool.address
-    assert stability_pool.address != legacy_pool.address
+    assert vault_book.getAddr(1) == replacement_pool.address
+    assert stability_pool.address != replacement_pool.address
 
 
 def test_invalid_priority_vaults(switchboard_alpha, governance):

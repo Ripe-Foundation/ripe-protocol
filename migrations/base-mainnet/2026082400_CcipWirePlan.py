@@ -1,4 +1,10 @@
-"""Wire the CCIP pools to the remote chain and hand them to the Safe.
+"""Prepare CCIP wiring and print the remaining Safe execution plan.
+
+Base note: the tokens here have no getCCIPAdmin(), owner() or any other hook
+RegistryModuleOwnerCustom knows how to read, so the CCIP admin role cannot be
+self-claimed the way it can on Robinhood. Chainlink proposed the Safe as
+pending administrator for both tokens on 2026-08-07, so the Safe only has to
+accept -- there is no registerAdminViaGetCCIPAdmin step here.
 
 Run only after CcipPools has run on every chain in REMOTE_CHAINS -- the remote
 pool and token addresses are read from those chains' manifests.
@@ -13,7 +19,9 @@ replace the router, and a hostile router can nominate ramps that reach the
 pool's mint path -- so this ordering is what makes a deployer-run deployment
 safe without deploying from the Safe itself.
 
-Everything the Safe has to do is printed at the end as calldata.
+Everything the Safe has to do is printed at the end as calldata. Completion of
+this migration records only that the preparation stage ran; activation is not
+complete until ``2026082401_CcipActivationFinalized`` succeeds.
 """
 
 from config.Ccip import (
@@ -65,7 +73,9 @@ def _hq_append_plan(migration, hq, missing_labels):
                 {
                     "phase": 2,
                     "label": label,
-                    "description": f"{label} pool: confirm registration as exact id {reg_id}",
+                    "description": (
+                        f"{label} pool: confirm registration as exact id {reg_id}"
+                    ),
                     "target": str(hq.address),
                     "data": _calldata(
                         "confirmNewAddressToRegistry(address)",
@@ -347,7 +357,7 @@ def migrate(migration: Migration):
                     )
                 log.info(
                     f"\t{remote_chain} rate/lane mutation is Safe-pending; "
-                    "rerun for full revalidation after execution"
+                    "run 2026082401 activation finalization after execution"
                 )
             else:
                 ccip.assert_lane_configuration(
@@ -449,17 +459,15 @@ def migrate(migration: Migration):
 
     log.h1("What the Safe has to run")
 
-    log.h2("1. Claim the CCIP admin role, once per token")
+    log.h2("1. Accept the CCIP admin role, once per token")
     if admin_steps:
-        log.info(
-            f"\tRegistryModuleOwnerCustom {config['REGISTRY_MODULE_OWNER_CUSTOM']}"
-        )
+        log.info("\tRIPE and GREEN on Base predate getCCIPAdmin() on Erc20Token and")
+        log.info("\texpose no hook RegistryModuleOwnerCustom can read. Chainlink must")
+        log.info("\tpropose the Safe directly when it is not already pending.")
         for label, token, pending_administrator in admin_steps:
             if pending_administrator.lower() != governance.lower():
-                log.info(f"\t  {label} registerAdminViaGetCCIPAdmin(address)")
-                log.info(f"\t    to:   {config['REGISTRY_MODULE_OWNER_CUSTOM']}")
-                log.info(
-                    f"\t    data: {_calldata('registerAdminViaGetCCIPAdmin(address)', ['address'], [token])}"
+                log.error(
+                    f"\t  {label}: ACTION REQUIRED: Chainlink must propose {governance}"
                 )
             log.info(
                 f"\t  {label} acceptAdminRole(address) on {config['TOKEN_ADMIN_REGISTRY']}"
@@ -469,8 +477,8 @@ def migrate(migration: Migration):
                 f"\t    data: {_calldata('acceptAdminRole(address)', ['address'], [token])}"
             )
         log.info("")
-        log.info("\tThe token's getCCIPAdmin() returns RipeHq governance, so the")
-        log.info("\tSafe is the address proposed and the Safe is who accepts.")
+        log.info("\tacceptAdminRole must come before setPool below: setPool is")
+        log.info("\tadministrator-only, and the role is only pending until accepted.")
     else:
         log.info("\tgovernance is already administrator for both tokens")
 
@@ -507,3 +515,8 @@ def migrate(migration: Migration):
         )
     if hq_append_plan_sha256 is not None:
         log.info(f"\tApproved HQ append plan SHA-256: {hq_append_plan_sha256}")
+
+    log.info(
+        "\tActivation completion is recorded only by "
+        "2026082401_CcipActivationFinalized."
+    )

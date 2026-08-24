@@ -1,5 +1,17 @@
 # Robinhood Chain Technical Deployment Summary
 
+## 24 August 2026 PriceDesk currentness overlay
+
+The BlueChip-at-ID-3 and Uniswap-absent statements in the older summary below
+are superseded. BlueChip is deferred with chain-local ID `0`, and launch
+priority IDs remain `[1, 2]`. Before PR #206, live ID 3 is the legacy functional
+UniswapV2Prices fallback; the required PR #206 `2026082100/01` history promotes
+the authenticated inert monitoring replacement at the same ID before PR #207's
+forward stages can complete. Future price-source IDs are chain-local. Current
+authority is [`rh/current-owner-priorities.md`](rh/current-owner-priorities.md),
+[`rh/decision-register.md`](rh/decision-register.md), and
+[`rh/status.yaml`](rh/status.yaml).
+
 ## 11 August 2026 CCIP currentness overlay
 
 GREEN and RIPE CCIP registration, routing, reciprocal wiring, governance
@@ -57,8 +69,9 @@ qualification, rehearsal, and release preparation.
 
 The consolidated
 [`reassessment-and-qualification-synthesis.md`](rh/reassessment-and-qualification-synthesis.md)
-is the current coordination entry point for eight byte-identical source
-reports. It records one program package, not eight implementation trains.
+is the dated coordination entry point for eight byte-identical source reports.
+It records one program package, not eight implementation trains; the 24 August
+overlay above supersedes its PriceDesk topology.
 
 The accepted architecture preserves the current Ledger and Teller designs,
 uses protected `SimpleErc20` through the shared `BasicVault` module, selects Chainlink at PriceDesk

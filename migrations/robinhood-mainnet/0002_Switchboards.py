@@ -5,6 +5,7 @@ from tests.constants import ZERO_ADDRESS
 from config.robinhood_launch import (
     LOCAL_GOV_MAX_TIMELOCK,
     LOCAL_GOV_MIN_TIMELOCK,
+    PYTH_PRICES_ID,
     STALE_WINDOW_MAX,
     STALE_WINDOW_MIN,
     SWITCHBOARD_MAX_TIMELOCK,
@@ -45,6 +46,9 @@ def migrate(migration: Migration):
             SWITCHBOARD_MIN_TIMELOCK,
             SWITCHBOARD_MAX_TIMELOCK,
         ]
+        if name == "Alpha":
+            # Alpha binds the chain-local Pyth PriceDesk slot after timelocks.
+            args += [PYTH_PRICES_ID]
         board = migration.deploy(f"Switchboard{name}", *args)
 
         migration.execute(

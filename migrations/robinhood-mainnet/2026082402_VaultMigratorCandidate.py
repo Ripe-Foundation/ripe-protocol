@@ -4,7 +4,7 @@ RipeHq ids 23 and 24 belong to the two CCIP pools. AddressRegistry assigns the
 current ``numAddrs`` value to the next confirmed append, so this plan aborts
 unless those rows already exist and the next id is exactly 25. It deploys an
 unpaused Robinhood candidate with no Base legacy-vault binding, then emits the
-exact Safe calldata for the timelocked append. ``0014`` performs registry
+exact Safe calldata for the timelocked append. ``2026082403`` performs registry
 readback before creating the first canonical manifest record.
 
 The H-06 runner that rejected this legacy deploy/send API has been removed.
@@ -23,7 +23,7 @@ from config.robinhood_launch import (
 
 
 VAULT_MIGRATOR_ID = 25
-VAULT_MIGRATOR_CANDIDATE = "VaultMigratorCandidate0013"
+VAULT_MIGRATOR_CANDIDATE = "VaultMigratorCandidate2026082402"
 PRIOR_CCIP_POOL_IDS = (23, 24)
 
 

@@ -18,7 +18,7 @@ production-contract, defaults, migration, script, ABI, or test delta on which
 this analysis depends.
 
 The controlling architecture is
-`/Users/wigglez/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
+`${HOME}/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
 at Hightop Notes commit
 `a94decfd23e627e8079e7fcd6ce22b873f6371d0` (file blob
 `a64a895e0542ed2482d7d5e857960d78eef1ffd8`) and

@@ -11,6 +11,7 @@ def migrate(migration: Migration):
         "Teller",
         hq,
         True,
+        migration.blueprint().PARAMS["CURVE_PRICES_ID"],
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, teller, "Teller")

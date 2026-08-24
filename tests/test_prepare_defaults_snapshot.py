@@ -877,7 +877,9 @@ def test_coverage_report_names_what_defaults_cannot_carry():
     }
     report = result.coverage_report(ROBINHOOD)
     assert "userConfig" in report and "userDelegation" in report
-    assert "preferredStabVaultId = 1, coreRipeGovVaultId = 2" in report
+    assert "coreRipeGovVaultId and preferredStabVaultId" in report
+    assert "historical isStabVaultId and isRipeGovVaultId" in report
+    assert "otherwise replacement is blocked" in report
     assert "assetConfigs: 1" in report
 
 

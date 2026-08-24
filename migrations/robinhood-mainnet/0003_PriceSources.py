@@ -3,12 +3,6 @@ from scripts.utils.migration import Migration
 from tests.constants import ZERO_ADDRESS
 
 from config.robinhood_launch import (
-    BLUECHIP_AAVE_PROVIDER,
-    BLUECHIP_COMPOUND_CONFIGURATOR,
-    BLUECHIP_EULER_FACTORIES,
-    BLUECHIP_FLUID_RESOLVER,
-    BLUECHIP_MOONWELL_COMPTROLLER,
-    BLUECHIP_MORPHO_FACTORIES,
     PRICE_CHANGE_MAX_TIMELOCK,
     PRICE_CHANGE_MIN_TIMELOCK,
     PRICE_MAX_TIMELOCK,
@@ -104,8 +98,8 @@ def migrate(migration: Migration):
     )
     migration.execute(chainlink.confirmNewPriceFeed, usdg)
 
-    # PriceDesk ids 1 and 2. CurvePrices MUST be id 2: Teller, Endaoment and
-    # CreditEngine all hard-code CURVE_PRICES_ID = 2.
+    # Robinhood's assigned launch PriceDesk ids are Chainlink 1 and Curve 2.
+    # Curve consumers receive this chain-local id as a constructor argument.
     migration.execute(price_desk.startAddNewAddressToRegistry, chainlink, "ChainlinkPrices")
     assert int(migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)) == 1
 
@@ -143,27 +137,5 @@ def migrate(migration: Migration):
     migration.execute(hq.startAddNewAddressToRegistry, price_desk, "PriceDesk")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7
 
-    # log.h1("Deploying BlueChipYieldPrices")
-
-    # # Only Morpho V2 exists on Robinhood; the other six registries are zero and
-    # # fail closed, because Vyper checks extcodesize before an external call.
-    # blue_chip = migration.deploy(
-    #     "BlueChipYieldPrices",
-    #     hq,
-    #     ZERO_ADDRESS,
-    #     PRICE_MIN_TIMELOCK,
-    #     PRICE_MAX_TIMELOCK,
-    #     BLUECHIP_MORPHO_FACTORIES,
-    #     BLUECHIP_EULER_FACTORIES,
-    #     BLUECHIP_FLUID_RESOLVER,
-    #     BLUECHIP_COMPOUND_CONFIGURATOR,
-    #     BLUECHIP_MOONWELL_COMPTROLLER,
-    #     BLUECHIP_AAVE_PROVIDER,
-    #     address("MORPHO_V2_FACTORY"),
-    # )
-    # migration.execute(
-    #     price_desk.startAddNewAddressToRegistry, blue_chip, "BlueChipYieldPrices"
-    # )
-    # assert int(
-    #     migration.execute(price_desk.confirmNewAddressToRegistry, blue_chip)
-    # ) == 3
+    # BlueChipYield is owner-deferred and unassigned (ID 0). This launch stage
+    # deliberately emits no deployment, registration, or activation action.

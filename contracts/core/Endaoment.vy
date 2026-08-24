@@ -147,19 +147,20 @@ MAX_ASSETS: constant(uint256) = 10
 MAX_LEGOS: constant(uint256) = 10
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 LEGO_BOOK_ID: constant(uint256) = 3
-CURVE_PRICES_ID: constant(uint256) = 2
 MAX_PROOFS: constant(uint256) = 25
 
+CURVE_PRICES_ID: immutable(uint256)
 WETH: public(immutable(address))
 ETH: public(immutable(address))
 
 
 @deploy
-def __init__(_ripeHq: address, _weth: address, _eth: address):
+def __init__(_ripeHq: address, _weth: address, _eth: address, _curvePricesId: uint256):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, True, False) # can mint green only
 
     assert empty(address) not in [_weth, _eth] # dev: invalid addys
+    CURVE_PRICES_ID = _curvePricesId
     WETH = _weth
     ETH = _eth
 

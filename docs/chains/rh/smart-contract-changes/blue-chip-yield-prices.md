@@ -1,5 +1,13 @@
 # BlueChipYieldPrices: Morpho V2 compatibility rationale
 
+> **24 August 2026 topology supersession:** the slot-3 selection section below
+> is historical. Robinhood now defers BlueChip with chain-local ID `0`; future
+> activation must select an ID from the then-live topology. Before PR #206,
+> live slot 3 is the legacy functional UniswapV2Prices fallback. The required
+> PR #206 fresh-generation history promotes the authenticated inert monitoring
+> replacement there before PR #207's forward stages can complete. See
+> [`../current-owner-priorities.md`](../current-owner-priorities.md).
+
 ## Current `rh` rebind
 
 This rationale is bound to current `rh` commit

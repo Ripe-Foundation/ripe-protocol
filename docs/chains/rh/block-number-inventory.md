@@ -47,7 +47,7 @@ BN-012 behind a configuration/no-change necessity gate, and selected BN-002's
 portable same-execution-block direction while leaving its exact abstraction to
 Stage A.
 
-**Controlling architecture:** `/Users/wigglez/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
+**Controlling architecture:** `${HOME}/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
 
 This is an analysis artifact. It does not approve a clock policy or change contracts,
 defaults, migrations, tests, or deployment state.

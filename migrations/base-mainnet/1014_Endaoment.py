@@ -11,6 +11,8 @@ def migrate(migration: Migration):
         "Endaoment",
         hq,
         migration.blueprint().ADDYS["WETH"],
+        migration.blueprint().ADDYS["ETH"],
+        migration.blueprint().PARAMS["CURVE_PRICES_ID"],
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, endaoment, "Endaoment")

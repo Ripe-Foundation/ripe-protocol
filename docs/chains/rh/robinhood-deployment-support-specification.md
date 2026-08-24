@@ -1,5 +1,12 @@
 # Robinhood deployment-support specification
 
+> **PriceDesk supersession note (2026-08-24):** the BlueChip-at-ID-3 and
+> Uniswap-absent planning statements below are historical. BlueChip is deferred
+> at chain-local ID `0`; before PR #206, live ID 3 is the legacy functional
+> UniswapV2Prices fallback, and the required PR #206 `2026082100/01` history
+> promotes the authenticated inert monitoring replacement there. Launch
+> priorities remain `[1, 2]`. See [`current-owner-priorities.md`](current-owner-priorities.md).
+
 > **CCIP supersession note (2026-08-11):** this specification's CCIP rows are
 > predeployment planning history. GREEN/RIPE CCIP is now live; current topology,
 > unresolved exact live-creation source identity, and remaining operational gates are in
@@ -39,7 +46,7 @@
 - Scope not authorized: implementation, production values, push, merge, or live actions
 - Starting commit: `68a76dcd5ea9b95b9148d3e6ebdd12107d5cc88e`
 - Track branch: `rh-track-7-deployment-support`
-- Worktree: `/Users/wigglez/dev/ripe-protocol-track-7-deployment-support`
+- Worktree: `${HOME}/dev/ripe-protocol-track-7-deployment-support`
 - Evidence date: 2026-07-23, America/Denver
 - Planning correction: on 2026-07-24, the proposed deployment clock-profile
   test was renamed to `tests/deployment/test_network_clock_profiles.py` and
@@ -99,7 +106,7 @@ network action was performed.
 | `rh` integration commit | `68a76dcd5ea9b95b9148d3e6ebdd12107d5cc88e` |
 | Brief present in integration commit | Yes |
 | Track branch | `rh-track-7-deployment-support` |
-| Track worktree | `/Users/wigglez/dev/ripe-protocol-track-7-deployment-support` |
+| Track worktree | `${HOME}/dev/ripe-protocol-track-7-deployment-support` |
 | Track worktree initial state | Clean at the starting commit |
 | Latest numeric migration identifier | `2026043000` |
 | Latest numeric step-manifest identifier | `2026043000` |

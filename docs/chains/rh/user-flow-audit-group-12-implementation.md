@@ -75,7 +75,7 @@ fallback.
 ## Workspace — isolate first
 
 Do **not** edit the dirty checkout at
-`/Users/wigglez/dev/ripe-protocol-user-flow-audit` (other groups are
+`${HOME}/dev/ripe-protocol-user-flow-audit` (other groups are
 writing there). Do not edit `ripe-protocol` or `ripe-protocol-rh`.
 
 New branch + new worktree from the pinned token baseline
@@ -83,13 +83,13 @@ New branch + new worktree from the pinned token baseline
 commit — copy it in.
 
 ```
-git -C /Users/wigglez/dev/ripe-protocol-user-flow-audit worktree add \
+git -C ${HOME}/dev/ripe-protocol-user-flow-audit worktree add \
   -b docs/rh-g12-impl \
-  /Users/wigglez/dev/ripe-protocol-user-flow-audit-g12 \
+  ${HOME}/dev/ripe-protocol-user-flow-audit-g12 \
   3822a59273a3b1baaff5831d288954ac2c072fc6
-cp /Users/wigglez/dev/ripe-protocol-user-flow-audit/docs/chains/rh/user-flow-audit-group-12-implementation.md \
-  /Users/wigglez/dev/ripe-protocol-user-flow-audit-g12/docs/chains/rh/
-cd /Users/wigglez/dev/ripe-protocol-user-flow-audit-g12
+cp ${HOME}/dev/ripe-protocol-user-flow-audit/docs/chains/rh/user-flow-audit-group-12-implementation.md \
+  ${HOME}/dev/ripe-protocol-user-flow-audit-g12/docs/chains/rh/
+cd ${HOME}/dev/ripe-protocol-user-flow-audit-g12
 ```
 
 Optional: also copy
@@ -105,7 +105,7 @@ Local commits on `docs/rh-g12-impl` are fine. Do not push, and do
 not merge back, unless the owner asks.
 
 ```
-RIPE_PYTHON=/Users/wigglez/dev/ripe-protocol/.venv/bin/python
+RIPE_PYTHON=${HOME}/dev/ripe-protocol/.venv/bin/python
 RIPE_BOA_CACHE_DIR="${RIPE_BOA_CACHE_DIR:-$TMPDIR/ripe-boa-cache-g12}"
 G12_TMP="${TMPDIR:-/tmp}/ripe-pytest-g12"
 mkdir -p "$G12_TMP"

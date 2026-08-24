@@ -51,6 +51,23 @@ def __init__(
     _usdgToken: address,
     _wethToken: address,
 ):
+    assert empty(address) not in [
+        _contribTemplate,
+        _trainingWheels,
+        _ripeToken,
+        _greenToken,
+        _sgreenToken,
+        _usdgToken,
+        _wethToken,
+    ] # dev: invalid defaults address
+
+    assert _contribTemplate not in [_trainingWheels, _ripeToken, _greenToken, _sgreenToken, _usdgToken, _wethToken] # dev: duplicate defaults address
+    assert _trainingWheels not in [_ripeToken, _greenToken, _sgreenToken, _usdgToken, _wethToken] # dev: duplicate defaults address
+    assert _ripeToken not in [_greenToken, _sgreenToken, _usdgToken, _wethToken] # dev: duplicate defaults address
+    assert _greenToken not in [_sgreenToken, _usdgToken, _wethToken] # dev: duplicate defaults address
+    assert _sgreenToken not in [_usdgToken, _wethToken] # dev: duplicate defaults address
+    assert _usdgToken != _wethToken # dev: duplicate defaults address
+
     CONTRIB_TEMPLATE = _contribTemplate
     TRAINING_WHEELS = _trainingWheels
     RIPE_TOKEN = _ripeToken

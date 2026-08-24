@@ -75,7 +75,7 @@ a different size reduction yourself.
 Work only in:
 
 ```text
-/Users/wigglez/dev/ripe-protocol-rh-stability-pool-hardening-spec
+${HOME}/dev/ripe-protocol-rh-stability-pool-hardening-spec
 ```
 
 Expected branch:

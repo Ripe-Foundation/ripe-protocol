@@ -48,7 +48,7 @@ all deployment and live-state gates remain open
 **Branch:** `rh-track-6-s3-lootbox-floor`
 
 **Worktree:**
-`/Users/wigglez/dev/ripe-protocol-track-6-s3-lootbox-floor`
+`${HOME}/dev/ripe-protocol-track-6-s3-lootbox-floor`
 
 This record covers Stage 1, its Gate 1 approval provenance, Phase G, and the
 independent Gate 2 integration review under
@@ -168,7 +168,7 @@ CLOCK_INVENTORY_NONPROD_CADENCE mock=0 testing=0 test=130
 ### Controlling Hightop Notes source
 
 The locally required
-`/Users/wigglez/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
+`${HOME}/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
 was available and read in full. Its SHA-256 on 24 July 2026 was
 `358372baedf3efec8ff5e3c990e1e8202589ba5c3ed0c1ae64d8633233950a5a`.
 
