@@ -15,23 +15,28 @@ EIP170_LIMIT = 24_576
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
-# StabilityPool headroom is 12 bytes after the deferred claim checkpoint,
+# StabilityPool headroom is 300 bytes after the deferred claim checkpoint,
 # exact-payment, and Stability-local claimable-aware retirement remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
+# SwitchboardBravo and CurvePrices retain only 26 and 124 bytes of headroom,
+# respectively. Any edit to either contract must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
     "SwitchboardAlpha": 24557,
-    "SwitchboardBravo": 24541,
+    "SwitchboardBravo": 24550,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
-    "VaultBook": 13833,
+    "VaultBook": 14410,
     "Teller": 24508,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
     "Lootbox": 24456,
+    "GreenToken": 8706,
+    "SavingsGreen": 13112,
+    "RipeToken": 8706,
     "RebaseErc20": 11602,
     "RipeGov": 24116,
     "HumanResources": 14777,
@@ -41,12 +46,12 @@ EXPECTED_RUNTIME_BYTES = {
     "Endaoment": 23351,
     "PriceDesk": 17578,
     "Deleverage": 24459,
-    "StabilityPool": 24564,
+    "StabilityPool": 24276,
     "BlueChipYieldPrices": 20857,
-    "ChainlinkPrices": 14272,
-    "CurvePrices": 23966,
+    "ChainlinkPrices": 14597,
+    "CurvePrices": 24452,
     "PythPrices": 14811,
-    "RedStone": 13657,
+    "RedStone": 13982,
     "StorkPrices": 13832,
     "UndyVaultPrices": 17689,
     "wsuperOETHbPrices": 8336,
@@ -66,6 +71,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     bond_room,
     ledger,
     lootbox,
+    green_token,
+    savings_green,
+    ripe_token,
     rebase_erc20_vault,
     ripe_gov_vault,
     human_resources,
@@ -106,6 +114,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "BondRoom": len(bond_room.env.get_code(bond_room.address)),
         "Ledger": len(ledger.env.get_code(ledger.address)),
         "Lootbox": len(lootbox.env.get_code(lootbox.address)),
+        "GreenToken": len(green_token.env.get_code(green_token.address)),
+        "SavingsGreen": len(savings_green.env.get_code(savings_green.address)),
+        "RipeToken": len(ripe_token.env.get_code(ripe_token.address)),
         "RebaseErc20": len(
             rebase_erc20_vault.env.get_code(rebase_erc20_vault.address)
         ),
@@ -139,10 +150,18 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     oversized = {
         name: size
         for name, size in deployed_runtime_bytes.items()
-        if size >= EIP170_LIMIT
+        if size > EIP170_LIMIT
     }
-    assert not oversized, f"EIP-170 runtime limit reached or exceeded: {oversized}"
-    assert deployed_runtime_bytes == EXPECTED_RUNTIME_BYTES, (
+    assert not oversized, f"EIP-170 runtime limit exceeded: {oversized}"
+    runtime_diff = {
+        name: (
+            EXPECTED_RUNTIME_BYTES.get(name),
+            deployed_runtime_bytes.get(name),
+        )
+        for name in sorted(EXPECTED_RUNTIME_BYTES.keys() | deployed_runtime_bytes.keys())
+        if EXPECTED_RUNTIME_BYTES.get(name) != deployed_runtime_bytes.get(name)
+    }
+    assert not runtime_diff, (
         "Deployed runtime changed; update EXPECTED_RUNTIME_BYTES if intentional: "
-        f"{ {k: (EXPECTED_RUNTIME_BYTES[k], deployed_runtime_bytes[k]) for k in deployed_runtime_bytes if EXPECTED_RUNTIME_BYTES.get(k) != deployed_runtime_bytes[k]} }"
+        f"{runtime_diff}"
     )

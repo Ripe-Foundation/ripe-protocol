@@ -205,94 +205,344 @@ def _replace_registered_mission_control(ripe_hq, governance, replacement):
     assert ripe_hq.getAddr(5) == replacement.address
 
 
-def _assert_failed_execution_preserves_pending(
+BINDING_ACTIONS = ("add", "deposit", "liquidation", "debt", "whitelist")
+BINDING_DEBT_TERMS = (31_00, 51_00, 81_00, 10_00, 11_00, 2_00)
+
+
+def _seed_binding_asset(mission_control, switchboard_bravo, asset):
+    mission_control.setAssetConfig(
+        asset,
+        _asset_config_with_debt_terms(),
+        sender=switchboard_bravo.address,
+    )
+
+
+def _queue_binding_action(
+    action_kind,
     switchboard_bravo,
     governance,
-    action_id,
-    expected_asset,
+    asset,
+    mock_whitelist,
+    mission_control=ZERO_ADDRESS,
 ):
-    pending_before = switchboard_bravo.pendingAssetConfig(action_id)
-    action_type_before = switchboard_bravo.actionType(action_id)
-    with boa.reverts("invalid asset config"):
-        switchboard_bravo.executePendingAction(action_id, sender=governance.address)
-    assert switchboard_bravo.hasPendingAction(action_id)
-    assert switchboard_bravo.actionType(action_id) == action_type_before
-    pending_after = switchboard_bravo.pendingAssetConfig(action_id)
-    assert pending_after.asset == pending_before.asset == expected_asset
-    assert pending_after.config == pending_before.config
+    if action_kind == "add":
+        return _add_asset(
+            switchboard_bravo,
+            governance,
+            asset,
+            [1],
+            0,
+            mission_control,
+        )
+    if action_kind == "deposit":
+        return switchboard_bravo.setAssetDepositParams(
+            asset,
+            [2],
+            0,
+            0,
+            2_000,
+            20_000,
+            0,
+            mission_control,
+            sender=governance.address,
+        )
+    if action_kind == "liquidation":
+        return switchboard_bravo.setAssetLiqConfig(
+            asset,
+            False,
+            False,
+            False,
+            False,
+            0,
+            (False, 0, 0, 0, 0),
+            mission_control,
+            sender=governance.address,
+        )
+    if action_kind == "debt":
+        return switchboard_bravo.setAssetDebtTerms(
+            asset,
+            *BINDING_DEBT_TERMS,
+            mission_control,
+            sender=governance.address,
+        )
+    return switchboard_bravo.setWhitelistForAsset(
+        asset,
+        mock_whitelist,
+        mission_control,
+        sender=governance.address,
+    )
 
 
-def test_execute_liq_config_revalidates_current_mission_control_target(
+def _assert_binding_action_effect(
+    action_kind,
+    mission_control,
+    asset,
+    mock_whitelist,
+):
+    assert mission_control.isSupportedAsset(asset)
+    config = mission_control.assetConfig(asset)
+    if action_kind == "deposit":
+        assert list(config.vaultIds) == [2]
+        assert config.perUserDepositLimit == 2_000
+        assert config.globalDepositLimit == 20_000
+    elif action_kind == "liquidation":
+        assert not config.shouldAuctionInstantly
+    elif action_kind == "debt":
+        assert config.debtTerms == BINDING_DEBT_TERMS
+    elif action_kind == "whitelist":
+        assert config.whitelist == mock_whitelist.address
+
+
+@pytest.mark.parametrize("action_kind", BINDING_ACTIONS)
+def test_default_target_action_is_bound_across_mission_control_rotation(
+    action_kind,
     switchboard_bravo,
     governance,
     ripe_hq,
     mission_control,
     zero_pointer_mission_control,
     alpha_token,
-    setAssetConfig,
+    mock_whitelist,
 ):
-    setAssetConfig(alpha_token)
-    original = mission_control.assetConfig(alpha_token)
+    if action_kind != "add":
+        _seed_binding_asset(mission_control, switchboard_bravo, alpha_token)
+
+    action_id = _queue_binding_action(
+        action_kind,
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        mock_whitelist,
+    )
+    assert (
+        switchboard_bravo.pendingMissionControl(action_id)
+        == mission_control.address
+    )
+
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    assert switchboard_bravo.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+
+    _assert_binding_action_effect(
+        action_kind,
+        mission_control,
+        alpha_token,
+        mock_whitelist,
+    )
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+    assert switchboard_bravo.pendingMissionControl(action_id) == ZERO_ADDRESS
+    assert not switchboard_bravo.hasPendingAction(action_id)
+
+
+@pytest.mark.parametrize("action_kind", BINDING_ACTIONS)
+def test_explicit_target_is_stored_and_used_for_every_asset_action(
+    action_kind,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    new_mission_control,
+    alpha_token,
+    mock_whitelist,
+):
+    if action_kind != "add":
+        _seed_binding_asset(new_mission_control, switchboard_bravo, alpha_token)
+
+    action_id = _queue_binding_action(
+        action_kind,
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        mock_whitelist,
+        new_mission_control.address,
+    )
+    assert (
+        switchboard_bravo.pendingMissionControl(action_id)
+        == new_mission_control.address
+    )
+
+    _execute_after_timelock(switchboard_bravo, governance, action_id)
+    _assert_binding_action_effect(
+        action_kind,
+        new_mission_control,
+        alpha_token,
+        mock_whitelist,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
+def test_legacy_zero_target_falls_back_to_execution_time_mission_control(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    mock_whitelist,
+):
+    action_id = _queue_binding_action(
+        "add",
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        mock_whitelist,
+    )
+    assert switchboard_bravo.pendingMissionControl(action_id) == mission_control.address
+
+    switchboard_bravo.eval(
+        f"self.pendingMissionControl[{action_id}] = {ZERO_ADDRESS}"
+    )
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, action_id)
+
+    assert zero_pointer_mission_control.isSupportedAsset(alpha_token)
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
+def test_bound_target_is_cleared_on_cancellation_and_cannot_execute(
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    mock_whitelist,
+):
+    action_id = _queue_binding_action(
+        "add",
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        mock_whitelist,
+    )
+    assert switchboard_bravo.pendingMissionControl(action_id) == mission_control.address
+
+    assert switchboard_bravo.cancelPendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    assert switchboard_bravo.pendingMissionControl(action_id) == ZERO_ADDRESS
+    assert not switchboard_bravo.hasPendingAction(action_id)
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    assert not switchboard_bravo.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
+def test_failed_bound_execution_is_atomic_and_preserves_target_for_retry(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    mock_whitelist,
+):
+    action_id = _queue_binding_action(
+        "add",
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        mock_whitelist,
+    )
+    pending_before = switchboard_bravo.pendingAssetConfig(action_id)
+    _seed_binding_asset(mission_control, switchboard_bravo, alpha_token)
+    live_before = mission_control.assetConfig(alpha_token)
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+
+    with boa.reverts("must be new asset"):
+        switchboard_bravo.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert mission_control.assetConfig(alpha_token) == live_before
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert switchboard_bravo.pendingAssetConfig(action_id) == pending_before
+    assert (
+        switchboard_bravo.pendingMissionControl(action_id)
+        == mission_control.address
+    )
+
+
+def test_liquidation_validation_uses_target_specific_training_wheels(
+    switchboard_bravo,
+    governance,
+    mission_control,
+    new_mission_control,
+    alpha_token,
+    mock_whitelist,
+):
+    assert mission_control.trainingWheels() != mock_whitelist.address
+    new_mission_control.setTrainingWheels(
+        mock_whitelist,
+        sender=switchboard_bravo.address,
+    )
+    config = list(_asset_config_with_debt_terms())
+    config[9] = True  # shouldSwapInStabPools
+    config[19] = mock_whitelist.address
+    new_mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+
     action_id = switchboard_bravo.setAssetLiqConfig(
         alpha_token,
         False,
         False,
-        False,
-        False,
+        True,
+        True,
+        0,
+        (False, 0, 0, 0, 0),
+        new_mission_control.address,
         sender=governance.address,
     )
-    _replace_registered_mission_control(
-        ripe_hq,
-        governance,
-        zero_pointer_mission_control,
+    assert (
+        switchboard_bravo.pendingMissionControl(action_id)
+        == new_mission_control.address
+    )
+
+    new_mission_control.setTrainingWheels(
+        mission_control.trainingWheels(),
+        sender=switchboard_bravo.address,
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    _assert_failed_execution_preserves_pending(
-        switchboard_bravo,
-        governance,
-        action_id,
-        alpha_token.address,
+    with boa.reverts("invalid asset config"):
+        switchboard_bravo.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert (
+        switchboard_bravo.pendingMissionControl(action_id)
+        == new_mission_control.address
     )
-    assert mission_control.assetConfig(alpha_token) == original
-    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
 
-
-def test_execute_debt_terms_revalidates_current_mission_control_target(
-    switchboard_bravo,
-    governance,
-    ripe_hq,
-    mission_control,
-    zero_pointer_mission_control,
-    alpha_token,
-    setAssetConfig,
-):
-    setAssetConfig(alpha_token)
-    original = mission_control.assetConfig(alpha_token)
-    terms = original.debtTerms
-    action_id = switchboard_bravo.setAssetDebtTerms(
-        alpha_token,
-        terms.ltv,
-        terms.redemptionThreshold,
-        terms.liqThreshold,
-        terms.liqFee,
-        terms.borrowRate,
-        terms.daowry,
+    new_mission_control.setTrainingWheels(
+        mock_whitelist,
+        sender=switchboard_bravo.address,
+    )
+    assert switchboard_bravo.executePendingAction(
+        action_id,
         sender=governance.address,
     )
-    _replace_registered_mission_control(
-        ripe_hq,
-        governance,
-        zero_pointer_mission_control,
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    _assert_failed_execution_preserves_pending(
-        switchboard_bravo,
-        governance,
-        action_id,
-        alpha_token.address,
-    )
-    assert mission_control.assetConfig(alpha_token) == original
-    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
 
 
 def test_stale_add_asset_revalidates_asset_is_still_new_at_execution(
@@ -369,38 +619,6 @@ def test_stale_add_asset_revalidates_asset_is_still_new_at_execution(
     assert switchboard_bravo.hasPendingAction(stale_action)
     assert switchboard_bravo.actionType(stale_action) == action_type_before
     assert switchboard_bravo.pendingAssetConfig(stale_action) == pending_before
-
-
-def test_execute_whitelist_revalidates_current_mission_control_target(
-    switchboard_bravo,
-    governance,
-    ripe_hq,
-    mission_control,
-    zero_pointer_mission_control,
-    alpha_token,
-    setAssetConfig,
-):
-    setAssetConfig(alpha_token)
-    original = mission_control.assetConfig(alpha_token)
-    action_id = switchboard_bravo.setWhitelistForAsset(
-        alpha_token,
-        ZERO_ADDRESS,
-        sender=governance.address,
-    )
-    _replace_registered_mission_control(
-        ripe_hq,
-        governance,
-        zero_pointer_mission_control,
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    _assert_failed_execution_preserves_pending(
-        switchboard_bravo,
-        governance,
-        action_id,
-        alpha_token.address,
-    )
-    assert mission_control.assetConfig(alpha_token) == original
-    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
 
 
 ###############

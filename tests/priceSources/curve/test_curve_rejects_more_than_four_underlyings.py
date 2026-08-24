@@ -597,15 +597,26 @@ def test_update_same_pool_nested_alt_rejected(
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
     assert curve.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
+    # Admit BRAVO through an acyclic route first. The strict dependency-graph
+    # check now rejects the former test setup (BRAVO -> ALPHA while the active
+    # ALPHA route already depends on BRAVO) at proposal time.
     pool_b = boa.loads(CURVE_POOL)
-    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mr.setCoins(
+        [bravo_token.address, charlie_token.address] + [ZERO_ADDRESS] * 6
+    )
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
     assert curve.addNewPriceFeed(bravo_token, pool_b, sender=governance.address)
     boa.env.time_travel(blocks=curve.actionTimeLock() + 1)
-    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
     assert curve.confirmNewPriceFeed(bravo_token, sender=governance.address)
 
+    # Reconstruct pool A as ALPHA/BRAVO. Updating BRAVO to it would make the
+    # active ALPHA -> BRAVO edge recursive and must be rejected.
+    mr.setCoins(
+        [alpha_token.address, bravo_token.address] + [ZERO_ADDRESS] * 6
+    )
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
     assert not curve.isValidUpdateFeed(bravo_token, pool_a)

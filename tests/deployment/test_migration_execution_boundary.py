@@ -478,6 +478,35 @@ def test_direct_construction_cannot_bypass_the_runner_boundary(tmp_path):
         runner.run(_args(), None, "0", True)
 
 
+def test_accepted_start_constructs_and_runs_migration(tmp_path):
+    """The accepted runner path must construct the current Migration API.
+
+    The deployed-history boundary is owned by MigrationRunner. After that
+    boundary accepted an explicit start, run() still passed the removed
+    ``allow_deployed_history`` keyword to Migration and failed before invoking
+    the selected migration. Exercise a complete no-deployment step so this
+    constructor call cannot drift out of sync again.
+    """
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    (migrations / "0002_Accepted.py").write_text(
+        "def migrate(migration):\n"
+        "    assert migration.timestamp() == '0002'\n"
+    )
+
+    history = tmp_path / "history"
+    history.mkdir()
+    manifest = {"contracts": {}}
+    (history / CURRENT_MANIFEST).write_text(json.dumps(manifest))
+    (history / "0001-manifest.json").write_text(json.dumps(manifest))
+
+    runner = MigrationRunner(str(migrations), str(history), {})
+    assert runner.run(_args(), "0002", "0002", False) == 0
+
+    assert json.loads((history / CURRENT_MANIFEST).read_text()) == manifest
+    assert json.loads((history / "0002-manifest.json").read_text()) == manifest
+
+
 # --- the start point has to name something, and be after the frontier -------
 
 

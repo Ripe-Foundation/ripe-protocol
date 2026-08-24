@@ -124,9 +124,11 @@ class MigrationRunner:
             log.h1(f"Running migration with timestamp {timestamp}...")
             try:
                 migration = Migration(
-                    deploy_args, self.files, timestamp, prev_timestamp, self.history_dir,
-                    # _require_start_point has established a deliberate start.
-                    allow_deployed_history=True,
+                    deploy_args,
+                    self.files,
+                    timestamp,
+                    prev_timestamp,
+                    self.history_dir,
                 )
                 migrate(migration)
                 self.gas += migration.end()

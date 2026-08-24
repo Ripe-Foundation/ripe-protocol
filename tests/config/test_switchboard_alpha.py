@@ -102,6 +102,56 @@ def isPaused() -> bool:
     )
 
 
+def _mutable_full_stability_pool(asset, name):
+    return boa.loads(
+        """
+asset: immutable(address)
+shouldRevert: public(bool)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+def setShouldRevert(_shouldRevert: bool):
+    self.shouldRevert = _shouldRevert
+
+@external
+@view
+def doesVaultHaveAnyFunds() -> bool:
+    return False
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256:
+    return 0
+
+@external
+@view
+def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool:
+    assert not self.shouldRevert
+    return False
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        asset,
+        name=name,
+    )
+
+
 @pytest.fixture(scope="function")
 def new_mission_control(ripe_hq, defaults):
     """Deploy a new MissionControl that is NOT registered in RipeHq.
@@ -954,13 +1004,13 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
         [(1, savings_green.address)],
         sender=governance.address,
     )
-    legacy_pool = _legacy_partial_stability_pool(
+    replacement_pool = _mutable_full_stability_pool(
         savings_green,
-        "replacement_partial_priority_stability_pool",
+        "mutable_full_priority_stability_pool",
     )
     assert vault_book.startAddressUpdateToRegistry(
         1,
-        legacy_pool.address,
+        replacement_pool.address,
         sender=governance.address,
     )
     boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
@@ -968,6 +1018,7 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
         1,
         sender=governance.address,
     )
+    replacement_pool.setShouldRevert(True)
 
     confirmation_block = switchboard_alpha.getActionConfirmationBlock(action_id)
     current_block = boa.env.evm.patch.block_number
@@ -979,8 +1030,8 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
             sender=governance.address,
         )
     assert switchboard_alpha.hasPendingAction(action_id)
-    assert vault_book.getAddr(1) == legacy_pool.address
-    assert stability_pool.address != legacy_pool.address
+    assert vault_book.getAddr(1) == replacement_pool.address
+    assert stability_pool.address != replacement_pool.address
 
 
 def test_invalid_priority_vaults(switchboard_alpha, governance):
