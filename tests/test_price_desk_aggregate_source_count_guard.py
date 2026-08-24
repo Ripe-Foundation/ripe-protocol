@@ -46,6 +46,15 @@ def _selected_price_sources():
     )
 
 
+def _robinhood_live_defaults(name):
+    contributor = boa.env.generate_address(f"{name}-contributor")
+    return boa.load(
+        "contracts/config/DefaultsRobinhoodLive.vy",
+        contributor,
+        name=name,
+    )
+
+
 def test_robinhood_price_desk_source_count_requires_gas_requalification_on_growth():
     selected_sources = _selected_price_sources()
     assert len(selected_sources) <= QUALIFIED_PRICE_DESK_SOURCE_COUNT, (
@@ -75,9 +84,8 @@ def test_robinhood_stale_time_policy_is_the_independently_qualified_gas_profile(
 
 
 def test_robinhood_enumerable_position_count_requires_gas_requalification_on_growth():
-    defaults = boa.load(
-        "contracts/config/DefaultsRobinhoodLive.vy",
-        name="aggregate_gas_robinhood_live_defaults",
+    defaults = _robinhood_live_defaults(
+        "aggregate_gas_robinhood_live_defaults"
     )
     enumerable_non_stability_positions = tuple(
         (entry.asset, vault_id)
@@ -92,10 +100,8 @@ def test_robinhood_enumerable_position_count_requires_gas_requalification_on_gro
 
 
 def test_ltv_bearing_assets_remain_within_direct_price_allowlist():
-    defaults_path = "contracts/config/DefaultsRobinhoodLive.vy"
-    defaults = boa.load(
-        defaults_path,
-        name="aggregate_gas_robinhood_live_ltv_allowlist_defaults",
+    defaults = _robinhood_live_defaults(
+        "aggregate_gas_robinhood_live_ltv_allowlist_defaults"
     )
     configs_by_asset = {
         str(entry.asset).lower(): entry.config
