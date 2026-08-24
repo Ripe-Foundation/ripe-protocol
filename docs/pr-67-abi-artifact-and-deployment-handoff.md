@@ -131,23 +131,16 @@ The corrected Robinhood forward sequence is deliberately multi-stage:
    complete 0009 records, deploys four interlocked replacements under
    `*Candidate0010`, and emits their Safe calldata. Those four confirmations
    must execute atomically.
-4. `2026082400_CcipWirePlan.py` performs the gated deployer-owned lane work and
-   emits the remaining Safe packet. Its marker means only that preparation ran.
-5. `2026082401_CcipActivationFinalized.py` is read-only and can complete only
-   after exact admin, ownership, routing, lane-policy, RipeHq, and pending-state
-   readback proves both token packages fully activated.
-6. `2026082402_VaultMigratorCandidate.py` requires RipeHq's next id to be exactly
-   25, deploys an unpaused Robinhood candidate with a zero Base-legacy-vault
-   binding, and emits the Safe calls that append it. It neither reserves nor
-   changes the CCIP rows at ids 23 and 24.
-7. `2026082403_PromoteVaultMigrator.py` creates the first canonical VaultMigrator
-   manifest record only after RipeHq id 25 equals the candidate.
-8. `2026082404_BlueChipTopologyDecision.py` is a read-only live-history
-   checkpoint. It requires BlueChip's chain-local ID to remain disabled at `0`,
-   PriceDesk's next id to be `4`, and both forward and reverse registry reads to
-   bind slot `3` to the canonical `UniswapV2Prices` record promoted by
-   `2026082101`. It also reads the live monitoring marker and inert RIPE pricing
-   surface. It emits no deployment, registry write, or activation calldata.
+4. Robinhood's CCIP lanes and RipeHq rows at ids 23 and 24 are already active,
+   so this deployment does not rewire or redeploy either token pool.
+   VaultMigrator registration and the BlueChip topology decision are deferred;
+   no id 25 registry row is added by this release.
+5. `2026082405_RedeployPr208.py` is the next Robinhood migration. It redeploys
+   the PR #208 Switchboards, price infrastructure, vault infrastructure, and
+   affected departments while retaining RipeHq, tokens, CCIP pools, Ledger,
+   MissionControl, and the existing PriceDesk slot 3 monitor.
+6. `2026082406_PromotePr208.py` promotes the authenticated candidates only after
+   the Safe registry confirmations and required post-activation readbacks pass.
 
 The promotion helper copies the candidate's complete record, including file,
 ABI, compiler JSON, and canonical ABI-encoded constructor arguments. Every

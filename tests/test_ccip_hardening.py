@@ -21,9 +21,11 @@ from scripts.utils import ccip
 ROOT = Path(__file__).resolve().parents[1]
 WIRE_MIGRATIONS = (
     "migrations/base-mainnet/2026082400_CcipWirePlan.py",
-    "migrations/robinhood-mainnet/2026082400_CcipWirePlan.py",
     "migrations/base-sepolia/0002_CcipWire.py",
     "migrations/robinhood-testnet/0002_CcipWire.py",
+)
+MAINNET_SAFE_PLAN_MIGRATIONS = (
+    "migrations/base-mainnet/2026082400_CcipWirePlan.py",
 )
 POOL_MIGRATIONS = (
     "migrations/base-mainnet/2026080700_CcipPools.py",
@@ -495,7 +497,7 @@ def test_selected_policy_values_drive_wiring_and_revalidation(relative_path):
     assert "CURRENT_RATE_LIMIT_ADMIN" not in source
 
 
-@pytest.mark.parametrize("relative_path", WIRE_MIGRATIONS[:2])
+@pytest.mark.parametrize("relative_path", MAINNET_SAFE_PLAN_MIGRATIONS)
 def test_mainnet_safe_plan_binds_live_ccip_append_order(relative_path):
     source = (ROOT / relative_path).read_text()
     assert 'POOLS = (\n    ("RIPE"' in source

@@ -21,7 +21,13 @@ from scripts.utils.migration_runner import MigrationRunner
 
 
 def _args(*, ignore_logs: bool = False):
-    return SimpleNamespace(ignore_logs=ignore_logs, rpc="redacted")
+    return SimpleNamespace(
+        ignore_logs=ignore_logs,
+        rpc="redacted",
+        sender=SimpleNamespace(address="0x" + "1" * 40),
+        chain="robinhood-mainnet",
+        blueprint=None,
+    )
 
 
 def _write_json(path: Path, value) -> None:
@@ -284,6 +290,80 @@ def test_raised_zero_output_function_remains_fail_closed():
     assert transaction.calls == 1
 
 
+class _ReconciledCall:
+    def __init__(self, callback):
+        self.contract = SimpleNamespace(address="0x" + "2" * 40)
+        self._callback = callback
+
+    def prepare_calldata(self):
+        return b"\x12\x34"
+
+    def __call__(self, **_kwargs):
+        return self._callback()
+
+
+def test_execute_reconciled_records_only_a_proven_frontier_call(tmp_path):
+    _write_json(tmp_path / "current-manifest.json", {"contracts": {}})
+    migration = Migration(_args(), {}, "2", "1", str(tmp_path))
+    calls = []
+    transaction = _ReconciledCall(lambda: calls.append("broadcast"))
+
+    result = migration.execute_reconciled(
+        transaction,
+        lambda: True,
+    )
+
+    assert result is True
+    assert calls == []
+    assert migration._count == 1
+    expected = {
+        **migration._transaction_intent(transaction, (), {}),
+        "receipt": True,
+    }
+    assert migration._transactions == [expected]
+    saved = json.loads((tmp_path / "2-log.json").read_text())
+    assert saved == {"transactions": [expected]}
+
+
+def test_execute_reconciled_recovers_mined_success_from_driver_error(tmp_path):
+    _write_json(tmp_path / "current-manifest.json", {"contracts": {}})
+    migration = Migration(_args(), {}, "2", "1", str(tmp_path))
+    state = {"complete": False}
+
+    def mined_then_driver_failed(**_kwargs):
+        state["complete"] = True
+        raise RuntimeError("synthetic post-receipt failure")
+
+    transaction = _ReconciledCall(mined_then_driver_failed)
+    assert migration.execute_reconciled(
+        transaction,
+        lambda: state["complete"],
+    )
+    assert migration._count == 1
+    assert migration._transactions == [
+        {
+            **migration._transaction_intent(transaction, (), {}),
+            "receipt": True,
+        }
+    ]
+
+
+def test_execute_reconciled_keeps_real_failure_closed(tmp_path):
+    _write_json(tmp_path / "current-manifest.json", {"contracts": {}})
+    migration = Migration(_args(), {}, "2", "1", str(tmp_path))
+    transaction = _ReconciledCall(
+        lambda: (_ for _ in ()).throw(RuntimeError("real failure"))
+    )
+
+    with pytest.raises(TransactionExecutionError):
+        migration.execute_reconciled(
+            transaction,
+            lambda: False,
+        )
+
+    assert migration._transactions == []
+
+
 @pytest.mark.parametrize("deployment_kind", ("standard", "blueprint"))
 def test_deployment_resume_preserves_recorded_manifest_metadata_byte_for_byte(
     tmp_path,
@@ -472,6 +552,76 @@ def test_deployment_resume_rejects_log_manifest_address_mismatch(
         match="MIGRATION_RESUMED_CONTRACT_LOG_ADDRESS_MISMATCH",
     ):
         migration.deploy("Service", owner, label="ServiceCandidate")
+
+
+def test_deployment_resume_accepts_legacy_vyper_contract_log(
+    tmp_path,
+    monkeypatch,
+):
+    address = "0x" + "2" * 40
+    source_path = "contracts/Service.vy"
+    record = _promotable_record(tmp_path, source_path, address)
+    _write_json(tmp_path / "current-manifest.json", {"contracts": {}})
+    _write_json(
+        tmp_path / "2-pending-manifest.json",
+        {"contracts": {"ServiceCandidate": record}},
+    )
+    legacy = f"<contracts/Service.vy at {address}, compiled with vyper-0.4.3>"
+    _write_json(tmp_path / "2-log.json", {"transactions": [legacy]})
+    migration = Migration(
+        _args(),
+        {"Service": source_path},
+        "2",
+        "1",
+        str(tmp_path),
+    )
+    attached = SimpleNamespace(address=address)
+    monkeypatch.setattr(migration, "get_contract", lambda _label: attached)
+    monkeypatch.setattr(
+        migration,
+        "_get_deployed_code",
+        lambda _address: _DEPLOYED_CODE[address.lower()],
+    )
+
+    assert migration.deploy("Service", label="ServiceCandidate") is attached
+
+
+def test_blueprint_resume_accepts_legacy_object_log_after_code_validation(
+    tmp_path,
+    monkeypatch,
+):
+    address = "0x" + "2" * 40
+    name = "Contributor"
+    source_path = "contracts/modules/Contributor.vy"
+    record = _promotable_record(tmp_path, source_path, address)
+    record["args"] = ""
+    _write_json(tmp_path / "current-manifest.json", {"contracts": {}})
+    _write_json(
+        tmp_path / "2-pending-manifest.json",
+        {"contracts": {name: record}},
+    )
+    legacy = (
+        "<boa.contracts.vyper.vyper_contract.VyperBlueprint object at 0x125af33e0>"
+    )
+    _write_json(tmp_path / "2-log.json", {"transactions": [legacy]})
+    migration = Migration(
+        _args(),
+        {name: source_path},
+        "2",
+        "1",
+        str(tmp_path),
+    )
+    attached = SimpleNamespace(address=address)
+    monkeypatch.setattr(migration, "get_contract", lambda _label: attached)
+    compiled = migration_module._compile_authenticated_record(
+        record,
+        expected_source_path=source_path,
+    )
+    creation_hex = compiled["evm"]["bytecode"]["object"]
+    expected_code = b"\xfe\x71\x00" + bytes.fromhex(creation_hex.removeprefix("0x"))
+    monkeypatch.setattr(migration, "_get_deployed_code", lambda _address: expected_code)
+
+    assert migration.deploy_bp(name) is attached
 
 
 @pytest.mark.parametrize("drift", ("constructor", "source"))
@@ -1050,6 +1200,14 @@ def test_candidate_promotion_uses_exact_utf8_source_bytes(tmp_path):
         match="MIGRATION_CANDIDATE_RECORD_SOURCE_MISMATCH",
     ):
         migration.promote_candidates([spec])
+
+
+def test_candidate_source_match_ignores_spaces_on_blank_lines_only():
+    normalize = migration_module._normalized_vyper_source
+
+    assert normalize(b"first\n   \nsecond\n") == normalize(b"first\n\nsecond\n")
+    assert normalize(b"first  \n\n") != normalize(b"first\n\n")
+    assert normalize(b"first\r\n\r\n") != normalize(b"first\n\n")
 
 
 def test_candidate_promotion_accepts_real_manifest_source_hash_fields(

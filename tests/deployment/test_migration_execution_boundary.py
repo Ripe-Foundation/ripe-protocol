@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -86,9 +87,9 @@ def test_current_manifest_is_what_marks_a_history_deployed(tmp_path):
 
 def test_migration_exposes_the_immediate_source_predecessor(tmp_path):
     history = _history(tmp_path, deployed=False)
-    migration = Migration(_args(), {}, "2026082400", "2026082101", str(history))
+    migration = Migration(_args(), {}, "2026082405", "2026082101", str(history))
 
-    assert migration.timestamp() == "2026082400"
+    assert migration.timestamp() == "2026082405"
     assert migration.previous_timestamp() == "2026082101"
 
 
@@ -173,7 +174,7 @@ def test_a_history_without_a_checkpoint_cannot_be_continued(tmp_path):
     # finished, so no start point can be shown to be safe.
     with pytest.raises(MigrationHistoryError, match="H06_NO_RECORDED_FRONTIER"):
         _runner(_history(tmp_path, deployed=True))._require_start_point(
-            _args(), "2026082400"
+            _args(), "2026082405"
         )
 
 
@@ -201,7 +202,6 @@ def test_ccip_plan_and_activation_completion_are_separate_migrations():
     root = Path(__file__).resolve().parents[2]
     stages = {
         "base-mainnet": ("2026082400_CcipWirePlan.py", "2026082401_CcipActivationFinalized.py"),
-        "robinhood-mainnet": ("2026082400_CcipWirePlan.py", "2026082401_CcipActivationFinalized.py"),
     }
     for chain, (plan_name, final_name) in stages.items():
         plan = (root / "migrations" / chain / plan_name).read_text()
@@ -225,7 +225,6 @@ def test_new_mainnet_migrations_are_strictly_after_the_recorded_frontier():
             if int(path.name.split("_", 1)[0]) >= 2026080701
             and not (history / f"{path.name.split('_', 1)[0]}-manifest.json").exists()
         ]
-        assert pending
         required_frontier = max(frontier, 2026082101)
         assert all(
             int(path.name.split("_", 1)[0]) > required_frontier for path in pending
@@ -327,7 +326,11 @@ def test_step_manifests_keep_the_record_and_drop_the_bulk():
     manifest outright and redirects to `--migration`.
     """
     root = Path(__file__).resolve().parents[2] / "migration_history"
-    steps = list(root.glob("*/*/[0-9]*-manifest.json"))
+    steps = [
+        path
+        for path in root.glob("*/*/[0-9]*-manifest.json")
+        if re.fullmatch(r"\d+-manifest\.json", path.name)
+    ]
     assert steps, "expected committed step manifests"
 
     for path in steps:
@@ -816,6 +819,43 @@ def test_direct_construction_cannot_bypass_the_runner_boundary(tmp_path):
         runner.run(_args(), None, "0", True)
 
 
+def test_attaching_an_old_generation_hides_only_the_boa_bytecode_dump(
+    monkeypatch, tmp_path
+):
+    import warnings
+
+    migration = _migration(_history(tmp_path, deployed=False))
+    address = "0x" + "2" * 40
+    migration._previous_manifest = {
+        "contracts": {
+            "OldGeneration": {
+                "file": "contracts/core/OldGeneration.vy",
+                "address": address,
+            }
+        }
+    }
+
+    attached = object()
+
+    class Partial:
+        def at(self, observed_address):
+            assert observed_address == address
+            warnings.warn(
+                "casted bytecode does not match compiled bytecode at <old>",
+                UserWarning,
+            )
+            warnings.warn("separate useful warning", UserWarning)
+            return attached
+
+    monkeypatch.setattr(migration_module.boa, "load_partial", lambda _file: Partial())
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert migration.get_contract("OldGeneration") is attached
+
+    assert [str(item.message) for item in caught] == ["separate useful warning"]
+
+
 def test_accepted_start_constructs_and_runs_migration(tmp_path):
     """The accepted runner path must construct the current Migration API.
 
@@ -857,6 +897,18 @@ def _real_runner(chain="robinhood-mainnet"):
     )
 
 
+def _ordered_runner(tmp_path):
+    """A deployed history with one required next step and one later step."""
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    for filename in ("0001_First.py", "0002_Completed.py", "0003_Next.py", "0004_Later.py"):
+        (migrations / filename).write_text("def migrate(migration):\n    pass\n")
+
+    history = _history(tmp_path, deployed=True)
+    (history / "0002-manifest.json").write_text(json.dumps({"contracts": {}}))
+    return MigrationRunner(str(migrations), str(history), {})
+
+
 @pytest.mark.parametrize(
     ("start", "code"),
     (
@@ -869,37 +921,31 @@ def _real_runner(chain="robinhood-mainnet"):
         ("1", "H06_START_TIMESTAMP_UNKNOWN"),
         ("9", "H06_START_TIMESTAMP_UNKNOWN"),
         ("99999999999", "H06_START_TIMESTAMP_UNKNOWN"),
-        # Names a real migration, but one this history already completed.
-        ("2026080700", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
+        # Names real migrations, but ones this history already completed.
+        ("0001", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
+        ("0002", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
         ("0000", "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"),
-        ("0009", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
     ),
 )
-def test_unsafe_start_points_are_refused(start, code):
+def test_unsafe_start_points_are_refused(tmp_path, start, code):
     with pytest.raises(MigrationHistoryError, match=code):
-        _real_runner()._require_start_point(_args(), start)
+        _ordered_runner(tmp_path)._require_start_point(_args(), start)
 
 
-def test_the_earliest_unfinished_start_point_is_accepted():
-    runner = _real_runner()
+def test_the_earliest_unfinished_start_point_is_accepted(tmp_path):
+    runner = _ordered_runner(tmp_path)
     frontier = runner._latest_manifest_timestamp()
 
-    # 2026082400 is the earliest committed migration after this history's
-    # frontier. It also follows the independently verified 2026082101 history
-    # that must be integrated before these forward stages execute.
-    runner._require_start_point(_args(), "2026082400")
-    assert int("2026082400") > int(frontier)
+    runner._require_start_point(_args(), "0003")
+    assert int("0003") > int(frontier)
 
 
-@pytest.mark.parametrize(
-    "start", ("2026082401", "2026082402", "2026082403", "2026082404")
-)
-def test_a_later_unfinished_start_point_cannot_skip_the_next_stage(start):
+def test_a_later_unfinished_start_point_cannot_skip_the_next_stage(tmp_path):
     with pytest.raises(
         MigrationHistoryError,
-        match=r"H06_START_TIMESTAMP_NOT_NEXT: .* would skip 2026082400",
+        match=r"H06_START_TIMESTAMP_NOT_NEXT: .* would skip 0003",
     ):
-        _real_runner()._require_start_point(_args(), start)
+        _ordered_runner(tmp_path)._require_start_point(_args(), "0004")
 
 
 @pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))

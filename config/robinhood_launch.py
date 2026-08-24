@@ -97,11 +97,11 @@ STALE_WINDOW_EQUITY = 345_600  # 4 days, fixed feed-level override
 STALE_WINDOW_DEFAULT = 86_400
 STALE_WINDOW_USDG = 86_400
 
-# Post-PR206/PR208 target policy only: no current migration consumes this table or
-# classifier. These are normalized addresses, not symbolic route names.
-# Keeping the policy table independent from BluePrint bindings is deliberate:
-# rebinding a symbol cannot silently reclassify an asset's future oracle
-# policy.
+# Post-PR206/PR208 target policy consumed by the 2026082405 replacement and its
+# 2026082406 promotion check. These are normalized addresses, not symbolic
+# route names. Keeping the table independent from BluePrint bindings is
+# deliberate: rebinding a symbol cannot silently reclassify an asset's future
+# oracle policy.
 ROBINHOOD_STALE_TIME_INHERIT_ASSETS = frozenset(
     (
         "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",  # native ETH

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import warnings
 from typing import Any, Mapping
 
 import boa.contracts
@@ -19,6 +20,7 @@ from scripts.utils import json_file
 from scripts.utils import solidity
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import (
+    TransactionExecutionError,
     deployed_contracts_manifest,
     execute_transaction,
 )
@@ -32,6 +34,14 @@ _PROMOTABLE_SOLC_FIELDS = frozenset(
 _CANONICAL_HEX_RE = re.compile(r"(?:[0-9a-f]{2})*")
 _INTEGRITY_RE = re.compile(r"[0-9a-f]{64}")
 _COMPILER_VERSION_RE = re.compile(r"v?\d+\.\d+\.\d+(?:\+commit\.[0-9a-f]+)?")
+_ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
+_LEGACY_VYPER_DEPLOYMENT_RE = re.compile(
+    r"^<[^>]+ at (0x[0-9a-fA-F]{40})(?:, compiled with [^>]+)?>"
+)
+_LEGACY_BLUEPRINT_LOG_RE = re.compile(
+    r"^<boa\.contracts\.vyper\.vyper_contract\.VyperBlueprint "
+    r"object at 0x[0-9a-fA-F]+>$"
+)
 _ABI_ENTRY_TYPES = frozenset({"constructor", "event", "fallback", "function"})
 _TRANSACTION_LOG_VERSION = 2
 _TRANSACTION_LOG_FIELDS = frozenset(
@@ -71,7 +81,15 @@ _DISTINCT_ACTIVATION_POLICIES = frozenset(
             "RipeHq",
             5,
             1,
-        )
+        ),
+        (
+            "BondBooster",
+            "contracts/config/BondBooster.vy",
+            "contracts/core/BondRoom.vy",
+            "RipeHq",
+            12,
+            1,
+        ),
     }
 )
 
@@ -268,7 +286,9 @@ def _compile_authenticated_record(
             or hashlib.sha256(recorded_source).hexdigest() != recorded_sha256
         ):
             raise RuntimeError(f"MIGRATION_{kind}_RECORD_SOURCE_MISMATCH")
-        if not local_source.is_file() or local_source.read_bytes() != recorded_source:
+        if not local_source.is_file() or _normalized_vyper_source(
+            local_source.read_bytes()
+        ) != _normalized_vyper_source(recorded_source):
             raise RuntimeError(f"MIGRATION_{kind}_RECORD_SOURCE_MISMATCH")
 
     expected_compiler = f"v{vyper.__long_version__}"
@@ -433,6 +453,21 @@ class MigrationHistoryError(Exception):
     """Raised when a migration would execute against a deployed history."""
 
 
+def _deployment_address_from_log(value):
+    """Read a chain address from current or legacy deployment journal data."""
+    if not isinstance(value, str):
+        return None
+    if _ADDRESS_RE.fullmatch(value):
+        return value
+    match = _LEGACY_VYPER_DEPLOYMENT_RE.match(value)
+    return match.group(1) if match else None
+
+
+def _normalized_vyper_source(source):
+    """Match Vyper's compiler JSON normalization of whitespace-only lines."""
+    return re.sub(rb"(?m)^[ \t]+(?=\r?$)", b"", source)
+
+
 def history_has_deployment(history_path):
     """True if `history_path` already holds a deployed current manifest."""
     return os.path.exists(os.path.join(str(history_path), CURRENT_MANIFEST))
@@ -490,6 +525,7 @@ class Migration:
         self._args = {}
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
+        self._last_resumed_transaction_raw = None
         self.gas = 0
 
         try:
@@ -555,6 +591,37 @@ class Migration:
         self._save_log_file()
 
         return tx
+
+    def execute_reconciled(self, transaction, postcondition, *args, **kwargs):
+        """Record a call already proven complete after a receipt-side failure."""
+        if self._curr_transaction() is not None:
+            return self.execute(transaction, *args, **kwargs)
+        if postcondition():
+            return self._record_reconciled_transaction(
+                transaction,
+                args,
+                kwargs,
+            )
+        try:
+            return self.execute(transaction, *args, **kwargs)
+        except TransactionExecutionError:
+            if not postcondition():
+                raise
+            return self._record_reconciled_transaction(
+                transaction,
+                args,
+                kwargs,
+            )
+
+    def _record_reconciled_transaction(self, transaction, args, kwargs):
+        assert self._curr_transaction() is None
+        next_transaction = self._count + 1
+        log.h2(f"Transaction {next_transaction} — reconciled on-chain state")
+        intent = self._transaction_intent(transaction, args, kwargs)
+        self._transactions.append(self._transaction_record(intent, True))
+        self._count += 1
+        self._save_log_file()
+        return True
 
     def _expected_source_path(
         self,
@@ -649,11 +716,19 @@ class Migration:
             if not isinstance(record, dict):
                 raise RuntimeError("MIGRATION_RESUMED_CONTRACT_RECORD_MISSING")
             logged_address = self._last_resumed_transaction
+            raw_log_entry = self._last_resumed_transaction_raw
             recorded_address = record.get("address")
-            if (
-                not isinstance(logged_address, str)
-                or not isinstance(recorded_address, str)
-                or logged_address.lower() != recorded_address.lower()
+            legacy_blueprint = (
+                blueprint
+                and isinstance(raw_log_entry, str)
+                and _LEGACY_BLUEPRINT_LOG_RE.fullmatch(raw_log_entry) is not None
+            )
+            if not isinstance(recorded_address, str) or (
+                not legacy_blueprint
+                and (
+                    not isinstance(logged_address, str)
+                    or logged_address.lower() != recorded_address.lower()
+                )
             ):
                 raise RuntimeError("MIGRATION_RESUMED_CONTRACT_LOG_ADDRESS_MISMATCH")
             if str(contract.address).lower() != recorded_address.lower():
@@ -735,7 +810,7 @@ class Migration:
 
         next_transaction = self._count + 1
         log.h2(
-            f"Transaction {next_transaction} for migration with timestamp {self._timestamp} - Deploying {name}"
+            f"Transaction {next_transaction} — Deploying {name}"
         )
 
         recorded = self._curr_transaction()
@@ -826,7 +901,18 @@ class Migration:
     def get_contract(self, name, address=None):
         file = self._previous_manifest["contracts"][name]["file"]
         address = address or self.get_address(name)
-        return boa.load_partial(file).at(address)
+        # Attaching current source to an older deployed generation is expected
+        # during replacement migrations. Boa's warning includes a full storage
+        # dump (potentially thousands of lines), obscuring the actual operator
+        # plan. Keep every other warning visible and suppress only this known
+        # attachment warning in this narrow scope.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"casted bytecode does not match compiled bytecode at ",
+                category=UserWarning,
+            )
+            return boa.load_partial(file).at(address)
 
     def end(self):
         """
@@ -1207,6 +1293,7 @@ class Migration:
         """
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
+        self._last_resumed_transaction_raw = None
         next_transaction = self._count + 1
         message = self._clean_message(str(transaction), contract_name, *args)
         intent = None
@@ -1214,7 +1301,7 @@ class Migration:
             intent = self._transaction_intent(transaction, args, kwargs)
 
         log.h2(
-            f"Transaction {next_transaction} for migration with timestamp {self._timestamp} - {message}"
+            f"Transaction {next_transaction} — {message}"
         )
 
         recorded = self._curr_transaction()
@@ -1230,7 +1317,11 @@ class Migration:
             self._transactions.append(
                 self._transaction_record(intent, tx)
                 if contract_name == ""
-                else tx
+                # Deployment objects stringify to verbose representations,
+                # and a VyperBlueprint string contains only a Python memory
+                # address. Persist the actual chain address so a restart can
+                # authenticate the journal against the pending manifest.
+                else str(tx.address)
             )
             gas = 0
             if contract_name != "":
@@ -1250,12 +1341,15 @@ class Migration:
         else:
             log.h3(f"Skipping transaction {next_transaction}")
             self._last_run_was_resume = True
-            tx = (
-                self._resume_transaction(recorded, intent)
-                if contract_name == ""
-                else recorded
-            )
-            self._last_resumed_transaction = str(tx)
+            if contract_name == "":
+                tx = self._resume_transaction(recorded, intent)
+                self._last_resumed_transaction = str(tx)
+            else:
+                self._last_resumed_transaction_raw = str(recorded)
+                self._last_resumed_transaction = _deployment_address_from_log(
+                    str(recorded)
+                )
+                tx = recorded
             if contract_name != "":
                 self._count += 1
                 return self.get_contract(kwargs["name"])
@@ -1286,7 +1380,7 @@ class Migration:
 
         json_file.save(self._pending_manifest_filename(), merged_manifest)
 
-        log.h3(f"{contract_name} added to pending manifest")
+        log.detail(f"{contract_name} added to pending manifest")
         return merged_manifest
 
     def _load_log_file(self):

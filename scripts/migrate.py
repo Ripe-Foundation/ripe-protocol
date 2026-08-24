@@ -1,4 +1,6 @@
 from pathlib import Path
+import shutil
+import tempfile
 
 import boa
 import boa.deployments
@@ -25,6 +27,21 @@ import os
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _isolate_fork_history(history_dir: Path, profile_id: str) -> Path:
+    """Copy deployment history to a disposable namespace for a fork run.
+
+    Fork deployments produce real-looking addresses and complete manifests,
+    but none of those addresses exist on the live chain.  Keeping their journal
+    out of the profile-owned history prevents a successful preview from
+    becoming the next live run's apparent resume point.
+    """
+    source = Path(history_dir)
+    root = Path(tempfile.mkdtemp(prefix=f"ripe-{profile_id}-fork-history-"))
+    destination = root / "history"
+    shutil.copytree(source, destination)
+    return destination
 
 
 def _load_dotenv() -> None:
@@ -160,6 +177,22 @@ def _etherscan_api_key(chain):
     if chain not in _BASESCAN_CHAINS:
         return None
     return os.environ.get("BASESCAN_API_KEY")
+
+
+def _requires_robinhood_launch_facts(start_timestamp) -> bool:
+    """Only a launch/full replay consumes the complete external-fact set.
+
+    A deployed-history continuation names a positive migration timestamp and
+    each forward migration validates only the external facts it actually
+    consumes.  Requiring today's complete launch inventory for a replacement
+    that derives its immutable inputs from authenticated live contracts would
+    make every post-launch migration impossible after any unrelated launch
+    fact becomes stale or is deliberately marked unverified.
+    """
+    text = "" if start_timestamp is None else str(start_timestamp).strip()
+    return not text.isdigit() or int(text) == 0
+
+
 ETHERSCAN_URLS = {
     "eth-mainnet": "https://api.etherscan.io/api",
     "eth-goerli": "https://api-goerli.etherscan.io/api",
@@ -340,7 +373,10 @@ def cli(
     )
     try:
         profile = get_profile(profile_id)
-        if profile.identity.profile_id.startswith("robinhood-"):
+        if (
+            profile.identity.profile_id.startswith("robinhood-")
+            and _requires_robinhood_launch_facts(start_timestamp)
+        ):
             from config.robinhood_launch import (
                 validate_deployment_external_facts,
             )
@@ -442,6 +478,13 @@ def cli(
         local_preview=fork,
     )
 
+    history_dir = paths.history_dir
+    if fork:
+        history_dir = _isolate_fork_history(
+            paths.history_dir,
+            profile.identity.profile_id,
+        )
+
     log.h1("Contract Migration")
     # The RPC value is never logged, not even redacted: the reference is what
     # an operator needs, and a URL in scrollback or CI output is a key in
@@ -451,10 +494,16 @@ def cli(
         f"`{profile.identity.profile_id}` from `{redacted_rpc.reference}`."
     )
     log.info(f"Deployer account `{sender.address}`.")
-    log.info(
-        "Manifests are stored in the profile-owned history namespace "
-        f"`{paths.history_dir.relative_to(ROOT)}`."
-    )
+    if fork:
+        log.info(
+            "Fork manifests are isolated from live history at "
+            f"`{history_dir}`."
+        )
+    else:
+        log.info(
+            "Manifests are stored in the profile-owned history namespace "
+            f"`{paths.history_dir.relative_to(ROOT)}`."
+        )
     log.info(f"Deployment arguments: {deploy_args}")
     log.info(
         "Migration start: "
@@ -471,7 +520,7 @@ def cli(
 
     migrations = MigrationRunner(
         str(paths.migration_dir),
-        str(paths.history_dir),
+        str(history_dir),
         vyper_files
     )
 

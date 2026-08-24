@@ -68,7 +68,7 @@ def test_every_post_pr206_target_override_is_zero_or_within_source_bounds():
         )
 
 
-def test_post_pr206_policy_has_no_current_migration_consumer():
+def test_post_pr206_policy_is_consumed_only_by_the_reviewed_replacement_pair():
     migration_dir = (
         Path(__file__).resolve().parents[2]
         / "migrations"
@@ -131,7 +131,16 @@ def test_post_pr206_policy_has_no_current_migration_consumer():
         if used_targets:
             consumers.append((path.name, tuple(sorted(used_targets))))
 
-    assert consumers == []
+    assert consumers == [
+        (
+            "2026082405_RedeployPr208.py",
+            ("STALE_WINDOW_INHERIT", "stale_time_override_for_asset"),
+        ),
+        (
+            "2026082406_PromotePr208.py",
+            ("STALE_WINDOW_INHERIT", "stale_time_override_for_asset"),
+        ),
+    ]
 
 
 def test_stale_time_policy_asset_sets_are_exact_and_disjoint():
