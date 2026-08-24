@@ -23,16 +23,17 @@ import contracts.modules.TimeLock as timeLock
 
 interface InstantBondLane:
     def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
-    def isValidRateOverride(_targetRate: uint256) -> bool: view
+    def isValidRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> bool: view
     def isValidConfig(_config: InstantBondConfig) -> bool: view
     def isValidEpochLength(_epochLength: uint256) -> bool: view
     def setConfig(_newConfig: InstantBondConfig): nonpayable
     def isValidPaymentToken(_token: address) -> bool: view
-    def setRateOverride(_targetRate: uint256): nonpayable
+    def setRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
     def setPaymentToken(_token: address): nonpayable
     def setCanBuyNow(_canBuyNow: bool): nonpayable
     def bondConfig() -> InstantBondConfig: view
-    def canCancelRateOverride() -> bool: view
+    def rateOverride() -> uint256: view
+    def rateOverrideEpoch() -> uint256: view
     def cancelRateOverride(): nonpayable
     def isRunning() -> bool: view
     def stop(): nonpayable
@@ -45,8 +46,6 @@ interface RipeHq:
 
 flag ActionType:
     INSTANT_BOND_CONFIG
-    RATE_OVERRIDE_SET
-    RATE_OVERRIDE_CANCEL
     REMAINING_ALLOCATION_BUDGET_SET
 
 struct InstantBondConfig:
@@ -100,20 +99,13 @@ event PendingInstantBondRemainingAllocationBudgetSet:
 event InstantBondRemainingAllocationBudgetExecuted:
     actionId: uint256
 
-event PendingRateOverrideSet:
-    actionId: uint256
-    confirmationBlock: uint256
+event InstantBondRateOverrideSet:
+    targetEpoch: indexed(uint256)
     targetRate: uint256
 
-event PendingRateOverrideCancellationSet:
-    actionId: uint256
-    confirmationBlock: uint256
-
-event RateOverrideExecuted:
-    actionId: uint256
-
-event RateOverrideCancellationExecuted:
-    actionId: uint256
+event InstantBondRateOverrideCancelled:
+    targetEpoch: indexed(uint256)
+    targetRate: uint256
 
 event InstantBondStarted:
     genesisBlock: uint256
@@ -129,7 +121,6 @@ event InstantBondCanBuyNowSet:
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingConfig: public(HashMap[uint256, InstantBondConfig]) # aid -> config
 pendingRemainingAllocationBudget: public(HashMap[uint256, uint256]) # aid -> amount
-pendingRateOverride: public(HashMap[uint256, uint256]) # aid -> target rate
 
 INSTANT_BOND_LANE_ID: constant(uint256) = 26
 INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
@@ -226,41 +217,29 @@ def setCanBuyNow(_canBuyNow: bool):
 
 
 @external
-def setInstantBondRateOverride(_targetRate: uint256) -> uint256:
+def setInstantBondRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isValidRateOverride(_targetRate) # dev: invalid rate override
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.RATE_OVERRIDE_SET
-    self.pendingRateOverride[aid] = _targetRate
-
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingRateOverrideSet(
-        actionId=aid,
-        confirmationBlock=confirmationBlock,
+    assert staticcall InstantBondLane(lane).isValidRateOverride(_targetRate, _targetEpoch) # dev: invalid rate override
+    resolvedEpoch: uint256 = extcall InstantBondLane(lane).setRateOverride(_targetRate, _targetEpoch)
+    log InstantBondRateOverrideSet(
+        targetEpoch=resolvedEpoch,
         targetRate=_targetRate,
     )
-    return aid
+    return resolvedEpoch
 
 
 @external
-def cancelInstantBondRateOverride() -> uint256:
+def cancelInstantBondRateOverride():
     assert gov._canGovern(msg.sender) # dev: no perms
 
     lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).canCancelRateOverride() # dev: no rate override
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.RATE_OVERRIDE_CANCEL
-
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingRateOverrideCancellationSet(
-        actionId=aid,
-        confirmationBlock=confirmationBlock,
-    )
-    return aid
+    targetRate: uint256 = staticcall InstantBondLane(lane).rateOverride()
+    assert targetRate != 0 # dev: no rate override
+    targetEpoch: uint256 = staticcall InstantBondLane(lane).rateOverrideEpoch()
+    extcall InstantBondLane(lane).cancelRateOverride()
+    log InstantBondRateOverrideCancelled(targetEpoch=targetEpoch, targetRate=targetRate)
 
 
 #########
@@ -351,14 +330,6 @@ def executePendingAction(_aid: uint256) -> bool:
         assert staticcall InstantBondLane(lane).isValidConfig(self.pendingConfig[_aid]) # dev: invalid config
         extcall InstantBondLane(lane).setConfig(self.pendingConfig[_aid])
         log InstantBondConfigExecuted(actionId=_aid)
-    elif actionType == ActionType.RATE_OVERRIDE_SET:
-        assert staticcall InstantBondLane(lane).isValidRateOverride(self.pendingRateOverride[_aid]) # dev: invalid rate override
-        extcall InstantBondLane(lane).setRateOverride(self.pendingRateOverride[_aid])
-        log RateOverrideExecuted(actionId=_aid)
-    elif actionType == ActionType.RATE_OVERRIDE_CANCEL:
-        assert staticcall InstantBondLane(lane).canCancelRateOverride() # dev: no rate override
-        extcall InstantBondLane(lane).cancelRateOverride()
-        log RateOverrideCancellationExecuted(actionId=_aid)
     else:
         claims: address = self._getInstantBondClaimsAddr()
         extcall InstantBondClaims(claims).setRemainingAllocationBudget(self.pendingRemainingAllocationBudget[_aid])

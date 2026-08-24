@@ -20,7 +20,10 @@
 implements: Department
 
 exports: addys.__interface__
-exports: deptBasics.__interface__
+exports: (
+    deptBasics.canMintGreen,
+    deptBasics.canMintRipe,
+)
 
 initializes: addys
 initializes: deptBasics[addys := addys]
@@ -192,6 +195,7 @@ event PaymentTokenSet:
     scale: uint256
 
 event RateOverrideInstalled:
+    targetEpoch: indexed(uint256)
     targetRate: uint256
 
 event RateOverrideApplied:
@@ -200,15 +204,24 @@ event RateOverrideApplied:
     targetRate: uint256
     controllerRate: uint256
 
+event RateOverrideMissed:
+    targetEpoch: indexed(uint256)
+    committedEpoch: indexed(uint256)
+    targetRate: uint256
+    controllerRate: uint256
+
 event RateOverrideCancelled:
+    targetEpoch: indexed(uint256)
     targetRate: uint256
 
 event RateOverrideInvalidated:
+    targetEpoch: indexed(uint256)
     targetRate: uint256
 
 # config
 bondConfig: public(InstantBondConfig)
 rateOverride: public(uint256)
+rateOverrideEpoch: public(uint256)
 
 # state
 isRunning: public(bool)
@@ -242,6 +255,43 @@ def __init__(
     self._storePaymentToken(_paymentToken)
     assert self._isValidConfig(_config) # dev: invalid config
     self.bondConfig = _config
+
+
+#######################
+# Department Controls #
+#######################
+
+
+@nonreentrant
+@external
+def pause(_shouldPause: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _shouldPause != deptBasics.isPaused # dev: no change
+    deptBasics.isPaused = _shouldPause
+    if _shouldPause:
+        self._invalidateInstalledOverride()
+    log deptBasics.DepartmentPauseModified(isPaused=_shouldPause)
+
+
+@nonreentrant
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    deptBasics._recoverFunds(_recipient, _asset)
+
+
+@nonreentrant
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    for asset: address in _assets:
+        deptBasics._recoverFunds(_recipient, asset)
+
+
+@view
+@external
+def isPaused() -> bool:
+    return deptBasics.isPaused
 
 
 #################
@@ -547,14 +597,18 @@ def _getEpochSnapshot(_prev: EpochSnapshot, _config: InstantBondConfig) -> (Epoc
     # first buy after start
     if _prev.rate == 0:
         onBoundary: bool = (block.number - self.genesisBlock) % _config.epochLength == 0
-        return self._openEpoch(epoch, _config.seedRate, _config, onBoundary), empty(RateTransition)
+        firstTransition: RateTransition = empty(RateTransition)
+        firstTransition.controllerRate = _config.seedRate
+        firstRate: uint256 = _config.seedRate
+        if self.rateOverride != 0 and self.rateOverrideEpoch == epoch:
+            firstRate = self.rateOverride
+        return self._openEpoch(epoch, firstRate, _config, onBoundary), firstTransition
 
-    # later epoch: roll the controller, then optional override
+    # later epoch: roll the controller, then apply only an exact-epoch override
     transition: RateTransition = self._nextRate(_prev, epoch - _prev.epoch, _config)
     rate: uint256 = transition.controllerRate
-    overrideRate: uint256 = self.rateOverride
-    if overrideRate != 0:
-        rate = overrideRate
+    if self.rateOverride != 0 and self.rateOverrideEpoch == epoch:
+        rate = self.rateOverride
 
     return self._openEpoch(epoch, rate, _config, True), transition
 
@@ -597,6 +651,28 @@ def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: Ra
     # store the new epoch
     self.epochState = _snap
 
+    # consume only an exact target, or clear an override whose target was missed
+    overrideRate: uint256 = self.rateOverride
+    if overrideRate != 0:
+        targetEpoch: uint256 = self.rateOverrideEpoch
+        if targetEpoch <= _snap.epoch:
+            self.rateOverride = 0
+            self.rateOverrideEpoch = 0
+            if targetEpoch == _snap.epoch:
+                log RateOverrideApplied(
+                    fromEpoch=_prev.epoch,
+                    toEpoch=_snap.epoch,
+                    targetRate=overrideRate,
+                    controllerRate=_transition.controllerRate,
+                )
+            else:
+                log RateOverrideMissed(
+                    targetEpoch=targetEpoch,
+                    committedEpoch=_snap.epoch,
+                    targetRate=overrideRate,
+                    controllerRate=_transition.controllerRate,
+                )
+
     # starting over
     if _prev.rate == 0:
         log EpochInitialized(
@@ -612,16 +688,6 @@ def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: Ra
         return
 
     # rolling to a new epoch
-    overrideRate: uint256 = self.rateOverride
-    if overrideRate != 0:
-        self.rateOverride = 0
-        log RateOverrideApplied(
-            fromEpoch=_prev.epoch,
-            toEpoch=_snap.epoch,
-            targetRate=overrideRate,
-            controllerRate=_transition.controllerRate,
-        )
-
     log EpochRolled(
         fromEpoch=_prev.epoch,
         toEpoch=_snap.epoch,
@@ -759,6 +825,8 @@ def setCanBuyNow(_canBuyNow: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert self.bondConfig.canBuyNow != _canBuyNow # dev: no change
     self.bondConfig.canBuyNow = _canBuyNow
+    if not _canBuyNow:
+        self._invalidateInstalledOverride()
     log CanBuyNowSet(canBuyNow=_canBuyNow)
 
 
@@ -775,8 +843,10 @@ def _resetEpoch():
 def _invalidateInstalledOverride():
     overrideRate: uint256 = self.rateOverride
     if overrideRate != 0:
+        targetEpoch: uint256 = self.rateOverrideEpoch
         self.rateOverride = 0
-        log RateOverrideInvalidated(targetRate=overrideRate)
+        self.rateOverrideEpoch = 0
+        log RateOverrideInvalidated(targetEpoch=targetEpoch, targetRate=overrideRate)
 
 
 #################
@@ -789,11 +859,16 @@ def _invalidateInstalledOverride():
 
 @nonreentrant
 @external
-def setRateOverride(_targetRate: uint256):
+def setRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert self._isValidRateOverride(_targetRate) # dev: invalid rate override
+    isValid: bool = False
+    resolvedEpoch: uint256 = 0
+    isValid, resolvedEpoch = self._isValidRateOverride(_targetRate, _targetEpoch)
+    assert isValid # dev: invalid rate override
     self.rateOverride = _targetRate
-    log RateOverrideInstalled(targetRate=_targetRate)
+    self.rateOverrideEpoch = resolvedEpoch
+    log RateOverrideInstalled(targetEpoch=resolvedEpoch, targetRate=_targetRate)
+    return resolvedEpoch
 
 
 # cancel rate override
@@ -811,8 +886,10 @@ def cancelRateOverride():
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     targetRate: uint256 = self.rateOverride
     assert targetRate != 0 # dev: no override
+    targetEpoch: uint256 = self.rateOverrideEpoch
     self.rateOverride = 0
-    log RateOverrideCancelled(targetRate=targetRate)
+    self.rateOverrideEpoch = 0
+    log RateOverrideCancelled(targetEpoch=targetEpoch, targetRate=targetRate)
 
 
 # validate rate override
@@ -820,18 +897,51 @@ def cancelRateOverride():
 
 @view
 @external
-def isValidRateOverride(_targetRate: uint256) -> bool:
-    return self._isValidRateOverride(_targetRate)
+def isValidRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> bool:
+    isValid: bool = False
+    resolvedEpoch: uint256 = 0
+    isValid, resolvedEpoch = self._isValidRateOverride(_targetRate, _targetEpoch)
+    return isValid
 
 
 @view
 @internal
-def _isValidRateOverride(_targetRate: uint256) -> bool:
-    if not self.isRunning or self.epochState.rate == 0:
-        return False
+def _isValidRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> (bool, uint256):
+    if not self.isRunning or self.rateOverride != 0:
+        return False, 0
+
     config: InstantBondConfig = self.bondConfig
     ceiling: uint256 = self._baseRateCeiling(config.maxEffectiveRate, config.maxVestingBonus)
-    return _targetRate >= MIN_BASE_RATE and _targetRate <= ceiling
+    if _targetRate < MIN_BASE_RATE or _targetRate > ceiling:
+        return False, 0
+
+    return self._resolveRateOverrideEpoch(_targetEpoch)
+
+
+@view
+@internal
+def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
+    epochLength: uint256 = self.bondConfig.epochLength
+    if epochLength == 0:
+        return False, 0
+
+    currentEpoch: uint256 = 0
+    if block.number >= self.genesisBlock:
+        currentEpoch = (block.number - self.genesisBlock) // epochLength
+
+    prev: EpochSnapshot = self.epochState
+    if _targetEpoch == 0:
+        if prev.rate != 0 and prev.epoch == currentEpoch:
+            if currentEpoch == max_value(uint256): # pragma: no branch
+                return False, 0
+            return True, currentEpoch + 1
+        return True, currentEpoch
+
+    if _targetEpoch < currentEpoch:
+        return False, 0
+    if prev.rate != 0 and _targetEpoch <= prev.epoch:
+        return False, 0
+    return True, _targetEpoch
 
 
 #################
