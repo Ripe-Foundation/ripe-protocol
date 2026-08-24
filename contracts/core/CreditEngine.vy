@@ -185,14 +185,16 @@ ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 DANGER_BLOCKS_DENOMINATOR: constant(uint256) = 100_0000 # 100.0000%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
-CURVE_PRICES_ID: constant(uint256) = 2
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
+
+CURVE_PRICES_ID: immutable(uint256)
 
 
 @deploy
-def __init__(_ripeHq: address):
+def __init__(_ripeHq: address, _curvePricesId: uint256):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, True, False) # can mint green only
+    CURVE_PRICES_ID = _curvePricesId
 
     # default discount for underscore vaults
     self.undyVaulDiscount = 50_00 # 50.00%

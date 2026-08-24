@@ -705,9 +705,12 @@ def test_bluechip_morpho_compatibility_is_resolved_but_readiness_is_not():
     assert blueprint_source.ROBINHOOD_COMPONENTS["price_desk_registry"] == {
         1: "Chainlink",
         2: "Curve",
-        3: "BlueChipYield",
-        4: None,
-        5: None,
+    }
+    assert blueprint_source.ROBINHOOD_COMPONENTS["blue_chip_yield"] == {
+        "protocol": "MorphoV2",
+        "compatibility": "resolved_by_33ad0f3c08bf6dc88f6569c622886d264d6e2868",
+        "deployment_disposition": "deferred",
+        "price_source_id": 0,
     }
     ready, blockers = sync.deployment_readiness()
     assert ready is False

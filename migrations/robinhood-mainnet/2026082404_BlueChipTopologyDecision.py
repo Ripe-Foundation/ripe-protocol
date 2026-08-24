@@ -1,25 +1,22 @@
-"""Block BlueChip activation until the live PriceDesk topology is resolved.
+"""Record the owner-approved Robinhood BlueChip deferral without writes.
 
-Live Robinhood already uses PriceDesk slot 3 for UniswapV2Prices, while
-SwitchboardAlpha treats slot 4 as Pyth. Appending BlueChip at either position
-would silently bind the wrong ABI to a hard-coded source ID. Governance must
-first choose and implement a coherent registry/consumer topology; this stage
-must not deploy or emit activation calldata before that owner decision lands.
+PriceDesk source IDs are chain-local. BlueChipYield is not part of the current
+Robinhood launch, so it has no registry assignment and uses ID ``0`` as the
+configuration sentinel. A future activation must choose its ID from the live
+topology in a separately reviewed migration.
 """
 
+from config.robinhood_launch import BLUECHIP_PRICES_ID
+from scripts.utils import log
 from scripts.utils.migration import Migration
 
 
-BLOCKER = "BLUECHIP_PRICE_DESK_TOPOLOGY_OWNER_DECISION_REQUIRED"
+INVALID_CONFIG = "BLUECHIP_PRICE_DESK_ID_MUST_REMAIN_UNASSIGNED"
 
 
 def migrate(migration: Migration):
-    price_desk = migration.get_contract("PriceDesk")
-    next_id = int(price_desk.numAddrs())
-    slot_3 = str(price_desk.getAddr(3))
-    slot_4 = str(price_desk.getAddr(4))
-    raise RuntimeError(
-        f"{BLOCKER}: next id {next_id}; slot 3 {slot_3} is selected for "
-        f"BlueChip by the blueprint but is occupied live; slot 4 {slot_4} is "
-        "hard-coded as Pyth by SwitchboardAlpha"
-    )
+    _ = migration
+    if BLUECHIP_PRICES_ID != 0:
+        raise RuntimeError(INVALID_CONFIG)
+    log.h1("BlueChipYield remains deferred and unassigned on Robinhood")
+    log.info("\tNo deployment, PriceDesk registration, or activation calldata emitted")

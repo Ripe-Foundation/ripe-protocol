@@ -775,17 +775,12 @@ def test_0010_defaults_dependency_mismatch_fails_before_any_write():
     assert migration.deployments == []
 
 
-def test_2026082404_blocks_bluechip_before_deployment_pending_topology_decision():
-    price_desk = _Registry(_addr(30), {3: _addr(33)}, count=4)
-    migration = _FakeMigration(
-        contracts={"PriceDesk": price_desk},
-    )
+def test_2026082404_records_bluechip_deferral_without_writes():
+    migration = _FakeMigration()
 
-    with pytest.raises(RuntimeError, match=BLUECHIP.BLOCKER) as exc_info:
-        BLUECHIP.migrate(migration)
+    assert BLUECHIP.BLUECHIP_PRICES_ID == 0
+    assert BLUECHIP.migrate(migration) is None
 
-    assert "slot 3" in str(exc_info.value)
-    assert "slot 4" in str(exc_info.value)
     assert migration.promotions == []
     assert migration.deployments == []
     assert migration.executions == []

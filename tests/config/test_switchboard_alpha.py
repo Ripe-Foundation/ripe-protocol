@@ -178,6 +178,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
             100,  # max (less than min)
             50,   # min timelock
             500,  # max timelock
+            0,    # Pyth disabled
         )
     
     # Test equal values
@@ -190,6 +191,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
             100,  # max (equal to min)
             50,   # min timelock
             500,  # max timelock
+            0,    # Pyth disabled
         )
 
 

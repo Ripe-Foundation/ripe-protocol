@@ -405,10 +405,11 @@ def bond_room(ripe_hq_deploy, bond_booster):
 
 
 @pytest.fixture(scope="session")
-def credit_engine(ripe_hq_deploy):
+def credit_engine(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/CreditEngine.vy",
         ripe_hq_deploy,
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="credit_engine",
     )
 
@@ -423,6 +424,7 @@ def endaoment(ripe_hq_deploy, fork):
         ripe_hq_deploy,
         ADDYS[fork]["WETH"],
         ADDYS[fork]["ETH"],
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="endaoment",
     )
 
@@ -496,11 +498,12 @@ def lootbox(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def teller(ripe_hq_deploy):
+def teller(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/Teller.vy",
         ripe_hq_deploy,
         False,
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="teller",
     )
 
@@ -631,6 +634,7 @@ def switchboard_alpha(ripe_hq_deploy, fork):
         PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["PYTH_PRICES_ID"],
         name="switchboard_alpha",
     )
 

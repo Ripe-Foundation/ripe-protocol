@@ -17,6 +17,7 @@ def _deploy_registered_robinhood_alpha(
         switchboard_alpha.MAX_STALE_TIME(),
         600,
         50_400,
+        0,  # Pyth is disabled in the Robinhood launch profile
         name="robinhood_reward_containment_alpha",
     )
     assert switchboard.startAddNewAddressToRegistry(

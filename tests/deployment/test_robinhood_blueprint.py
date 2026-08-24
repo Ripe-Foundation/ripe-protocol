@@ -414,9 +414,9 @@ def test_complete_inventory_and_cardinality_reconciliation():
         f"CM-{value:03d}" for value in range(1, 61)
     )
     assert Counter(component.deployment for component in components) == {
-        Disposition.REQUIRED: 44,
+        Disposition.REQUIRED: 43,
         Disposition.OMITTED: 14,
-        Disposition.DEFERRED: 1,
+        Disposition.DEFERRED: 2,
         Disposition.BLOCKED: 1,
     }
     assert len(surfaces) == 100
@@ -433,14 +433,14 @@ def test_complete_inventory_and_cardinality_reconciliation():
         Disposition.REQUIRED: 19,
         Disposition.OMITTED: 20,
         Disposition.DISABLED: 22,
-        Disposition.DEFERRED: 1,
-        Disposition.BLOCKED: 38,
+        Disposition.DEFERRED: 3,
+        Disposition.BLOCKED: 36,
     }
     assert Counter(surface.lifecycle_phase for surface in surfaces) == {
         LifecyclePhase.DEPLOYED_INITIAL_VALUE: 32,
-        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 22,
+        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 20,
         LifecyclePhase.ATOMIC_STOCK_ACTIVATION: 4,
-        LifecyclePhase.POST_LAUNCH_RELEASE: 4,
+        LifecyclePhase.POST_LAUNCH_RELEASE: 6,
         LifecyclePhase.OMITTED: 20,
         LifecyclePhase.BLOCKED: 18,
     }
@@ -449,15 +449,15 @@ def test_complete_inventory_and_cardinality_reconciliation():
         RelationPhase.CONSTRUCTOR: 40,
         RelationPhase.BOOTSTRAP: 3,
         RelationPhase.POST_DEPLOYMENT_SETUP: 3,
-        RelationPhase.REGISTRATION_ORDER: 31,
-        RelationPhase.RUNTIME_SECURITY: 219,
+        RelationPhase.REGISTRATION_ORDER: 32,
+        RelationPhase.RUNTIME_SECURITY: 218,
     }
     assert Counter(relation.kind for _, relation in relations) == {
         RelationKind.CONSTRUCTION_DEPENDENCY: 40,
         RelationKind.BOOTSTRAP_DEPENDENCY: 3,
         RelationKind.SETUP_DEPENDENCY: 3,
-        RelationKind.REGISTRATION_ORDER_DEPENDENCY: 31,
-        RelationKind.DIRECT_EXECUTION: 168,
+        RelationKind.REGISTRATION_ORDER_DEPENDENCY: 32,
+        RelationKind.DIRECT_EXECUTION: 167,
         RelationKind.AUTHORITY_DEPENDENCY: 40,
         RelationKind.INDIRECT_SECURITY_DEPENDENCY: 11,
     }
@@ -493,11 +493,11 @@ def test_complete_inventory_and_cardinality_reconciliation():
     # identity and nothing else.
     assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 49
     assert len(ROBINHOOD_BLUEPRINT.blockers) == 28
-    assert len(registries) == 38
+    assert len(registries) == 35
     assert Counter(item.domain for item in registries) == {
         RegistryDomain.RIPE_HQ: 24,
         RegistryDomain.VAULT_BOOK: 4,
-        RegistryDomain.PRICE_DESK: 5,
+        RegistryDomain.PRICE_DESK: 2,
         RegistryDomain.SWITCHBOARD: 5,
     }
     assert len(ROBINHOOD_BLUEPRINT.promotions) == 1
@@ -899,13 +899,10 @@ def test_exact_registry_topology_and_authority_classes():
     }
     assert {
         value: topology[(RegistryDomain.PRICE_DESK, value)].semantic_name
-        for value in range(1, 6)
+        for value in range(1, 3)
     } == {
         1: "Chainlink",
         2: "Curve",
-        3: "BlueChipYield",
-        4: "Pyth",
-        5: "Stork",
     }
     assert {
         value: topology[(RegistryDomain.SWITCHBOARD, value)].semantic_name
@@ -931,15 +928,15 @@ def test_blueprint_owns_complete_component_and_registry_censuses():
     ) == tuple(f"CM-{value:03d}" for value in range(1, 61))
 
     rows = blueprint_source.ROBINHOOD_REGISTRY_TOPOLOGY
-    assert len(rows) == 38
+    assert len(rows) == 35
     assert Counter(row.domain for row in rows) == {
         "ripe_hq": 24,
         "vault_book": 4,
-        "price_desk": 5,
+        "price_desk": 2,
         "switchboard": 5,
     }
     price_rows = tuple(row for row in rows if row.domain == "price_desk")
-    assert [row.registry_id for row in price_rows if row.selection_state == "selected"] == [1, 2, 3]
+    assert [row.registry_id for row in price_rows if row.selection_state == "selected"] == [1, 2]
     assert next(row for row in price_rows if row.registry_id == 2).component_id == "CM-017"
 
 
@@ -985,19 +982,14 @@ def test_curve_component_cannot_be_omitted(monkeypatch):
     assert error.value.code == "H03_COMPONENT_SOURCE_DRIFT"
 
 
-def test_curve_registration_source_order_cannot_move_bluechip_into_id_two(monkeypatch):
+def test_curve_registration_source_id_cannot_move_from_two(monkeypatch):
     rows = list(blueprint_source.ROBINHOOD_REGISTRY_TOPOLOGY)
     curve_index = next(
         index
         for index, row in enumerate(rows)
         if (row.domain, row.registry_id) == ("price_desk", 2)
     )
-    bluechip_index = next(
-        index
-        for index, row in enumerate(rows)
-        if (row.domain, row.registry_id) == ("price_desk", 3)
-    )
-    rows[curve_index], rows[bluechip_index] = rows[bluechip_index], rows[curve_index]
+    rows[curve_index] = replace(rows[curve_index], registry_id=3)
     monkeypatch.setattr(blueprint_source, "ROBINHOOD_REGISTRY_TOPOLOGY", tuple(rows))
     with pytest.raises(RobinhoodBlueprintError) as error:
         validate_blueprint()
@@ -1160,9 +1152,14 @@ def test_blueprint_registry_source_census_fails_closed(monkeypatch, mutation):
 
 def test_registry_shift_and_semantic_reuse_fail_closed():
     component = get_component("CM-018")
-    changed = replace(
-        component.registry_expectations[0],
-        registry_id=5,
+    assert component.registry_expectations == ()
+    changed = RegistryExpectation(
+        domain=RegistryDomain.PRICE_DESK,
+        registry_id=3,
+        semantic_name="BlueChipYield",
+        authority=RegistryIdAuthority.REGISTRATION_ORDER,
+        component_id="CM-018",
+        disposition=Disposition.DEFERRED,
     )
     assert_code(
         "H03_REGISTRY_TOPOLOGY",

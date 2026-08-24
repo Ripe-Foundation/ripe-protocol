@@ -3898,6 +3898,10 @@
       {
         "name": "_shouldPause",
         "type": "bool"
+      },
+      {
+        "name": "_curvePricesId",
+        "type": "uint256"
       }
     ],
     "outputs": []

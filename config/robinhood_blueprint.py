@@ -839,9 +839,9 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('CM-018',),
   'OWN-H04',
   ('OWN-ORACLE', 'OWN-H09'),
- 'before BlueChipYield deployment and registration',
- 'required',
-  ('B-P1-EXTERNAL-VERIFY',)),
+  'before any future BlueChipYield deployment and registration',
+  'deferred',
+  ()),
  ('I-CONTRIB-TEMPLATE',
   'deployment-produced contributor-template identity consumed by Defaults HR config',
   ('CM-032', 'CM-049'),
@@ -1059,8 +1059,8 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-015-RESERVED-SLOTS',
   'CM-015',
   'registration',
-  'Sequential PriceDesk registration is Chainlink ID 1, Curve ID 2, then BlueChipYield ID 3; '
-  'IDs 4 and 5 stay empty',
+  'Assigned launch PriceDesk topology is Chainlink ID 1 and Curve ID 2; deferred or omitted '
+  'sources have no Robinhood registry ID',
   'required',
   'deployed_initial_value',
   (),
@@ -1124,19 +1124,20 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-018-SELECTED-SLOT',
  'CM-018',
  'registration',
-  'BlueChipYield is selected for PriceDesk slot 3; registration still requires external-fact '
-  'closure',
-  'blocked',
-  'pre_activation_configuration',
-  ('B-P1-EXTERNAL-VERIFY',),
+  'BlueChipYield is deferred and unassigned at PriceDesk ID 0; any future activation must '
+  'select a chain-local ID in a separately reviewed change',
+  'deferred',
+  'post_launch_release',
+  (),
   ('NEG-024', 'NEG-037')),
  ('S-018-MORPHO-V2',
  'CM-018',
  'configuration',
-  'Integrated BlueChipYield supports the selected Morpho Vaults V2 factory and vault path',
-  'blocked',
-  'pre_activation_configuration',
-  ('B-P1-EXTERNAL-VERIFY',),
+  'Integrated BlueChipYield supports Morpho Vaults V2, but Robinhood deployment and '
+  'configuration are deferred',
+  'deferred',
+  'post_launch_release',
+  (),
   ('NEG-017', 'NEG-024', 'NEG-037')),
  ('S-021-HQ-RIPE-CAP',
   'CM-021',
@@ -4346,13 +4347,14 @@ _RELATION_ROWS = (('R-001',
   'PriceDesk directly calls the selected Curve source at ID 2 for GREEN valuation and retained snapshot housekeeping.',
   ('E-SRC-PD', 'E-CM')),
  ('R-290',
-  'CM-015',
-  'direct_execution',
-  'runtime_security',
   'CM-018',
+  'registration_order_dependency',
+  'registration_order',
+  'CM-015',
   ('contracts/registries/PriceDesk.vy:178-230',
    'contracts/priceSources/BlueChipYieldPrices.vy'),
-  'PriceDesk directly calls the selected BlueChipYield source at ID 3.',
+  'Any future BlueChipYield activation must bind a separately approved chain-local PriceDesk ID; '
+  'Robinhood currently leaves it unassigned.',
   ('E-SRC-PD', 'E-H04')),
  ('R-291',
   'CM-017',
@@ -5109,10 +5111,10 @@ def _source_registry_rows() -> tuple[tuple[Any, ...], ...]:
     expected_keys = (
         *(("ripe_hq", value) for value in range(1, 25)),
         *(("vault_book", value) for value in range(1, 5)),
-        *(("price_desk", value) for value in range(1, 6)),
+        *(("price_desk", value) for value in range(1, 3)),
         *(("switchboard", value) for value in range(1, 6)),
     )
-    if len(rows) != 38 or keys != expected_keys or len(set(keys)) != 38:
+    if len(rows) != 35 or keys != expected_keys or len(set(keys)) != 35:
         raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_CENSUS")
     components = _source_component_selection_map()
     selected_price_ids: set[int] = set()
@@ -5145,7 +5147,7 @@ def _source_registry_rows() -> tuple[tuple[Any, ...], ...]:
                 row.disposition,
             )
         )
-    if selected_price_ids != {1, 2, 3}:
+    if selected_price_ids != {1, 2}:
         raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_DRIFT")
     return tuple(normalized)
 
@@ -5282,7 +5284,6 @@ def validate_curve_launch_authority() -> None:
     expected_registration = (
         (1, "ChainlinkPrices"),
         (2, "CurvePrices"),
-        (3, "BlueChipYieldPrices"),
     )
     if (
         values["launch.chain_id"] != 4663
@@ -5605,7 +5606,6 @@ _PROFILE1_SELECTION = Profile1LaunchSelection(
         "I-CHAINLINK-CORE",
         "I-GOV-HANDOFF",
         "I-LEDGER-BLOCK-SOURCE",
-        "I-MORPHO-V2-FACTORY",
         "I-USDG",
         "I-USDG-FEED",
         "I-WETH",
@@ -6061,7 +6061,7 @@ def validate_blueprint(
             _fail("H03_SOURCE_AUTHORITY")
 
     registry_values = _all_registries(blueprint)
-    if len(registry_values) != 38 or registry_values != _CANONICAL_REGISTRIES:
+    if len(registry_values) != 35 or registry_values != _CANONICAL_REGISTRIES:
         _fail("H03_REGISTRY_TOPOLOGY")
     source_registry_values = {
         (RegistryDomain(domain), registry_id): RegistryExpectation(

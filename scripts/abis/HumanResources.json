@@ -1163,22 +1163,6 @@
     ]
   },
   {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "setLegacyContributorRipeGovVaultId",
-    "inputs": [
-      {
-        "name": "_contributor",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      }
-    ],
-    "outputs": []
-  },
-  {
     "stateMutability": "view",
     "type": "function",
     "name": "canModifyHrContributor",
@@ -1388,6 +1372,22 @@
         "type": "uint256"
       }
     ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setLegacyContributorRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "_contributor",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
   },
   {
     "stateMutability": "view",
