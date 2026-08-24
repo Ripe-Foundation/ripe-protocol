@@ -60,11 +60,10 @@ interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
 
 struct InstantBondConfig:
-    canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    maxEffectiveRate: uint256
-    seedRate: uint256
+    maxAllInPayoutRate: uint256
+    seedBasePayoutRate: uint256
     uHighBps: uint256
     uLowBps: uint256
     minUpBps: uint256
@@ -81,7 +80,9 @@ struct InstantBondConfig:
 struct InstantBondQuote:
     available: bool
     epoch: uint256
-    rate: uint256
+    controllerBasePayoutRate: uint256
+    basePayoutRate: uint256
+    rateSource: uint256
     remainingPayment: uint256
     minPaymentAmount: uint256
     budgetRemaining: uint256
@@ -94,14 +95,16 @@ struct InstantBondQuote:
     totalRipe: uint256
 
 struct RateTransition:
-    controllerRate: uint256
+    controllerBasePayoutRate: uint256
     utilizationBps: uint256
     effectiveAdjustmentBps: uint256
     decaySteps: uint256
 
 struct EpochSnapshot:
     epoch: uint256
-    rate: uint256
+    controllerBasePayoutRate: uint256
+    basePayoutRate: uint256
+    rateSource: uint256
     paymentCap: uint256
     minPaymentAmount: uint256
     maxVestingBonus: uint256
@@ -120,7 +123,9 @@ struct PayoutData:
 
 event EpochInitialized:
     epoch: indexed(uint256)
-    rate: uint256
+    controllerBasePayoutRate: uint256
+    basePayoutRate: uint256
+    rateSource: uint256
     paymentCap: uint256
     minPaymentAmount: uint256
     maxVestingBonus: uint256
@@ -131,8 +136,10 @@ event EpochInitialized:
 event EpochRolled:
     fromEpoch: indexed(uint256)
     toEpoch: indexed(uint256)
-    oldRate: uint256
-    newRate: uint256
+    oldBasePayoutRate: uint256
+    controllerBasePayoutRate: uint256
+    newBasePayoutRate: uint256
+    rateSource: uint256
     newPaymentCap: uint256
     newMinPaymentAmount: uint256
     newMaxVestingBonus: uint256
@@ -145,7 +152,6 @@ event EpochRolled:
     utilizationBps: uint256
     effectiveAdjustmentBps: uint256
     decaySteps: uint256
-    controllerRate: uint256
 
 event InstantBondPurchased:
     buyer: indexed(address)
@@ -158,15 +164,16 @@ event InstantBondPurchased:
     creationBlock: uint256
     maturityBlock: uint256
     totalRipe: uint256
-    epochRate: uint256
+    controllerBasePayoutRate: uint256
+    basePayoutRate: uint256
+    rateSource: uint256
     epoch: indexed(uint256)
 
 event InstantBondConfigSet:
-    canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    maxEffectiveRate: uint256
-    seedRate: uint256
+    maxAllInPayoutRate: uint256
+    seedBasePayoutRate: uint256
     uHighBps: uint256
     uLowBps: uint256
     minUpBps: uint256
@@ -197,32 +204,33 @@ event PaymentTokenSet:
 
 event RateOverrideInstalled:
     targetEpoch: indexed(uint256)
-    targetRate: uint256
+    targetBasePayoutRate: uint256
 
 event RateOverrideApplied:
     fromEpoch: indexed(uint256)
     toEpoch: indexed(uint256)
-    targetRate: uint256
-    controllerRate: uint256
+    targetBasePayoutRate: uint256
+    controllerBasePayoutRate: uint256
 
 event RateOverrideMissed:
     targetEpoch: indexed(uint256)
     committedEpoch: indexed(uint256)
-    targetRate: uint256
-    controllerRate: uint256
+    targetBasePayoutRate: uint256
+    controllerBasePayoutRate: uint256
 
 event RateOverrideCancelled:
     targetEpoch: indexed(uint256)
-    targetRate: uint256
+    targetBasePayoutRate: uint256
 
 event RateOverrideInvalidated:
     targetEpoch: indexed(uint256)
-    targetRate: uint256
+    targetBasePayoutRate: uint256
 
 # config
 bondConfig: public(InstantBondConfig)
-rateOverride: public(uint256)
-rateOverrideEpoch: public(uint256)
+overrideTargetBasePayoutRate: public(uint256)
+overrideTargetEpoch: public(uint256)
+canBuyNow: public(bool)
 
 # state
 isRunning: public(bool)
@@ -239,7 +247,10 @@ MAX_VESTING_LENGTH: public(constant(uint256)) = 7_884_000
 MAX_PRICE_STEP_BPS: constant(uint256) = 100_00 # 100.00%
 MAX_DECAY_EPOCHS: constant(uint256) = 32
 MAX_PAYMENT_DECIMALS: constant(uint8) = 73
-MIN_BASE_RATE: constant(uint256) = 10_000
+MIN_BASE_PAYOUT_RATE: constant(uint256) = 10_000
+RATE_SOURCE_SEED: public(constant(uint256)) = 1
+RATE_SOURCE_CONTROLLER: public(constant(uint256)) = 2
+RATE_SOURCE_OVERRIDE: public(constant(uint256)) = 3
 RIPE_TOKEN_ID: constant(uint256) = 3
 INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
 
@@ -316,7 +327,7 @@ def buyNow(
 
     config: InstantBondConfig = self.bondConfig
     assert self._isValidConfig(config) # dev: not configured
-    assert config.canBuyNow # dev: disabled
+    assert self.canBuyNow # dev: disabled
     assert block.number <= _deadlineBlock # dev: expired
     assert self._isPurchaseReady() # dev: mint not ready
 
@@ -336,14 +347,14 @@ def buyNow(
     # calculate payout and enforce allocation budget
     payout: PayoutData = self._calculatePayout(
         _paymentAmount,
-        snap.rate,
+        snap.basePayoutRate,
         snap.maxVestingBonus,
         _requestedVestingLength,
         snap.minVestingLength,
         snap.maxVestingLength,
     )
     assert payout.vestingLength == _expectedVestingLength # dev: vesting length moved
-    assert self._isWithinMaxEffectiveRate(_paymentAmount, payout.totalRipe, config.maxEffectiveRate) # dev: effective rate ceiling
+    assert self._isWithinMaxAllInPayoutRate(_paymentAmount, payout.totalRipe, config.maxAllInPayoutRate) # dev: all-in payout rate ceiling
 
     assert payout.totalRipe >= _minRipeOut # dev: slippage
     claims: address = self._getClaimsAddr()
@@ -378,7 +389,9 @@ def buyNow(
         creationBlock=block.number,
         maturityBlock=block.number + payout.vestingLength,
         totalRipe=payout.totalRipe,
-        epochRate=snap.rate,
+        controllerBasePayoutRate=snap.controllerBasePayoutRate,
+        basePayoutRate=snap.basePayoutRate,
+        rateSource=snap.rateSource,
         epoch=snap.epoch,
     )
     return payout.totalRipe
@@ -391,13 +404,13 @@ def buyNow(
 @internal
 def _calculatePayout(
     _paymentAmount: uint256,
-    _rate: uint256,
+    _basePayoutRate: uint256,
     _maxVestingBonus: uint256,
     _requestedVestingLength: uint256,
     _minVestingLength: uint256,
     _maxVestingLength: uint256,
 ) -> PayoutData:
-    baseRipe: uint256 = _paymentAmount * _rate // self.paymentScale
+    baseRipe: uint256 = _paymentAmount * _basePayoutRate // self.paymentScale
     vestingLength: uint256 = _minVestingLength
     if _requestedVestingLength != 0:
         vestingLength = min(max(_requestedVestingLength, _minVestingLength), _maxVestingLength)
@@ -418,8 +431,8 @@ def _calculatePayout(
 
 @view
 @internal
-def _isWithinMaxEffectiveRate(_paymentAmount: uint256, _totalRipe: uint256, _maxEffectiveRate: uint256) -> bool:
-    return _totalRipe <= _paymentAmount * _maxEffectiveRate // self.paymentScale
+def _isWithinMaxAllInPayoutRate(_paymentAmount: uint256, _totalRipe: uint256, _maxAllInPayoutRate: uint256) -> bool:
+    return _totalRipe <= _paymentAmount * _maxAllInPayoutRate // self.paymentScale
 
 
 ####################
@@ -435,8 +448,7 @@ def settleVestedRipe(
     _autoDeposit: bool,
     _lockDuration: uint256,
 ) -> bool:
-    assert msg.sender == self._getClaimsAddr() # dev: invalid claims
-    assert addys._getInstantBondLaneAddr() == self # dev: retired lane
+    assert self._isClaimsSettlementCompatible(msg.sender) # dev: invalid claims
     assert _beneficiary != empty(address) and _amount != 0 # dev: invalid settlement
 
     if _autoDeposit:
@@ -445,7 +457,6 @@ def settleVestedRipe(
         assert _lockDuration == 0 # dev: invalid lock duration
 
     ripeHq: address = addys._getRipeHq()
-    assert staticcall RipeHq(ripeHq).canMintRipe(self) # dev: cannot mint ripe
     ripeToken: address = self._getRipeTokenAddr()
     assert ripeToken != empty(address) and ripeToken.is_contract # dev: invalid ripe token
     assert staticcall RipeToken(ripeToken).ripeHq() == ripeHq # dev: invalid token hq
@@ -488,9 +499,6 @@ def settleVestedRipe(
 @view
 @internal
 def _isPurchaseReady() -> bool:
-    if addys._getInstantBondLaneAddr() != self:
-        return False
-
     endaoFunds: address = addys._getEndaomentFundsAddr()
     if endaoFunds == empty(address) or not endaoFunds.is_contract:
         return False
@@ -500,17 +508,44 @@ def _isPurchaseReady() -> bool:
         return False
     if staticcall InstantBondClaims(claims).isPaused():
         return False
-
-    ripeHq: address = addys._getRipeHq()
-    if staticcall InstantBondClaims(claims).getRipeHq() != ripeHq:
+    if not self._isClaimsSettlementCompatible(claims):
         return False
 
+    ripeHq: address = addys._getRipeHq()
     ripeToken: address = self._getRipeTokenAddr()
     if ripeToken == empty(address) or not ripeToken.is_contract:
         return False
     if staticcall RipeToken(ripeToken).ripeHq() != ripeHq:
         return False
     if staticcall RipeToken(ripeToken).isPaused():
+        return False
+    return True
+
+
+@view
+@external
+def getInstantBondClaimsAddr() -> address:
+    return self._getClaimsAddr()
+
+
+@view
+@external
+def isClaimsSettlementCompatible(_claims: address) -> bool:
+    return self._isClaimsSettlementCompatible(_claims)
+
+
+@view
+@internal
+def _isClaimsSettlementCompatible(_claims: address) -> bool:
+    if addys._getInstantBondLaneAddr() != self:
+        return False
+    if _claims == empty(address) or not _claims.is_contract:
+        return False
+    if _claims != self._getClaimsAddr():
+        return False
+
+    ripeHq: address = addys._getRipeHq()
+    if staticcall InstantBondClaims(_claims).getRipeHq() != ripeHq:
         return False
     return staticcall RipeHq(ripeHq).canMintRipe(self)
 
@@ -537,8 +572,8 @@ def _nextRate(
     _elapsed: uint256,
     _config: InstantBondConfig,
 ) -> RateTransition:
-    ceiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxVestingBonus)
-    rate: uint256 = min(_prev.rate, ceiling)
+    ceiling: uint256 = self._basePayoutRateCeiling(_config.maxAllInPayoutRate, _config.maxVestingBonus)
+    basePayoutRate: uint256 = min(_prev.basePayoutRate, ceiling)
     utilizationBps: uint256 = 0
     adjustmentBps: uint256 = 0
     decaySteps: uint256 = 0
@@ -558,20 +593,20 @@ def _nextRate(
                 earlinessBps = HUNDRED_PERCENT - (_prev.weightedLateness // _prev.acceptedPayment)
             demandBps: uint256 = strengthBps * earlinessBps // HUNDRED_PERCENT
             adjustmentBps = _config.minUpBps + (_config.maxUpBps - _config.minUpBps) * demandBps // HUNDRED_PERCENT
-            rate = max(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT + adjustmentBps), MIN_BASE_RATE)
+            basePayoutRate = max(basePayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + adjustmentBps), MIN_BASE_PAYOUT_RATE)
 
         elif utilizationBps <= _config.uLowBps:
             weaknessBps: uint256 = (_config.uLowBps - utilizationBps) * HUNDRED_PERCENT // _config.uLowBps
             adjustmentBps = _config.minDownBps + (_config.maxDownBps - _config.minDownBps) * weaknessBps // HUNDRED_PERCENT
-            rate = min(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - adjustmentBps), ceiling)
+            basePayoutRate = min(basePayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT - adjustmentBps), ceiling)
 
         decaySteps = min(_elapsed - 1, _config.maxDecayEpochs)
 
     for i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS):
-        rate = min(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.decayBps), ceiling)
+        basePayoutRate = min(basePayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.decayBps), ceiling)
 
     return RateTransition(
-        controllerRate=rate,
+        controllerBasePayoutRate=basePayoutRate,
         utilizationBps=utilizationBps,
         effectiveAdjustmentBps=adjustmentBps,
         decaySteps=decaySteps,
@@ -606,26 +641,44 @@ def _getEpochSnapshot(_prev: EpochSnapshot, _config: InstantBondConfig) -> (Epoc
     epoch: uint256 = (block.number - self.genesisBlock) // _config.epochLength
 
     # already committed this epoch
-    if _prev.rate != 0 and epoch <= _prev.epoch:
+    if _prev.basePayoutRate != 0 and epoch <= _prev.epoch:
         return _prev, empty(RateTransition)
 
     # first buy after start
-    if _prev.rate == 0:
+    if _prev.basePayoutRate == 0:
         onBoundary: bool = (block.number - self.genesisBlock) % _config.epochLength == 0
         firstTransition: RateTransition = empty(RateTransition)
-        firstTransition.controllerRate = _config.seedRate
-        firstRate: uint256 = _config.seedRate
-        if self.rateOverride != 0 and self.rateOverrideEpoch == epoch:
-            firstRate = self.rateOverride
-        return self._openEpoch(epoch, firstRate, _config, onBoundary), firstTransition
+        firstTransition.controllerBasePayoutRate = _config.seedBasePayoutRate
+        firstBasePayoutRate: uint256 = _config.seedBasePayoutRate
+        rateSource: uint256 = RATE_SOURCE_SEED
+        if self.overrideTargetBasePayoutRate != 0 and self.overrideTargetEpoch == epoch:
+            firstBasePayoutRate = self.overrideTargetBasePayoutRate
+            rateSource = RATE_SOURCE_OVERRIDE
+        return self._openEpoch(
+            epoch,
+            firstTransition.controllerBasePayoutRate,
+            firstBasePayoutRate,
+            rateSource,
+            _config,
+            onBoundary,
+        ), firstTransition
 
     # later epoch: roll the controller, then apply only an exact-epoch override
     transition: RateTransition = self._nextRate(_prev, epoch - _prev.epoch, _config)
-    rate: uint256 = transition.controllerRate
-    if self.rateOverride != 0 and self.rateOverrideEpoch == epoch:
-        rate = self.rateOverride
+    basePayoutRate: uint256 = transition.controllerBasePayoutRate
+    rateSource: uint256 = RATE_SOURCE_CONTROLLER
+    if self.overrideTargetBasePayoutRate != 0 and self.overrideTargetEpoch == epoch:
+        basePayoutRate = self.overrideTargetBasePayoutRate
+        rateSource = RATE_SOURCE_OVERRIDE
 
-    return self._openEpoch(epoch, rate, _config, True), transition
+    return self._openEpoch(
+        epoch,
+        transition.controllerBasePayoutRate,
+        basePayoutRate,
+        rateSource,
+        _config,
+        True,
+    ), transition
 
 
 # open epoch
@@ -635,13 +688,17 @@ def _getEpochSnapshot(_prev: EpochSnapshot, _config: InstantBondConfig) -> (Epoc
 @internal
 def _openEpoch(
     _epoch: uint256,
-    _rate: uint256,
+    _controllerBasePayoutRate: uint256,
+    _basePayoutRate: uint256,
+    _rateSource: uint256,
     _config: InstantBondConfig,
     _timingEligible: bool,
 ) -> EpochSnapshot:
     return EpochSnapshot(
         epoch=_epoch,
-        rate=_rate,
+        controllerBasePayoutRate=_controllerBasePayoutRate,
+        basePayoutRate=_basePayoutRate,
+        rateSource=_rateSource,
         paymentCap=_config.paymentCapPerEpoch,
         minPaymentAmount=_config.minPaymentAmount,
         maxVestingBonus=_config.maxVestingBonus,
@@ -660,39 +717,41 @@ def _openEpoch(
 def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: RateTransition):
 
     # already committed this epoch
-    if _prev.rate != 0 and _snap.epoch <= _prev.epoch:
+    if _prev.basePayoutRate != 0 and _snap.epoch <= _prev.epoch:
         return
 
     # store the new epoch
     self.epochState = _snap
 
     # consume only an exact target, or clear an override whose target was missed
-    overrideRate: uint256 = self.rateOverride
-    if overrideRate != 0:
-        targetEpoch: uint256 = self.rateOverrideEpoch
+    overrideTargetBasePayoutRate: uint256 = self.overrideTargetBasePayoutRate
+    if overrideTargetBasePayoutRate != 0:
+        targetEpoch: uint256 = self.overrideTargetEpoch
         if targetEpoch <= _snap.epoch:
-            self.rateOverride = 0
-            self.rateOverrideEpoch = 0
+            self.overrideTargetBasePayoutRate = 0
+            self.overrideTargetEpoch = 0
             if targetEpoch == _snap.epoch:
                 log RateOverrideApplied(
                     fromEpoch=_prev.epoch,
                     toEpoch=_snap.epoch,
-                    targetRate=overrideRate,
-                    controllerRate=_transition.controllerRate,
+                    targetBasePayoutRate=overrideTargetBasePayoutRate,
+                    controllerBasePayoutRate=_snap.controllerBasePayoutRate,
                 )
             else:
                 log RateOverrideMissed(
                     targetEpoch=targetEpoch,
                     committedEpoch=_snap.epoch,
-                    targetRate=overrideRate,
-                    controllerRate=_transition.controllerRate,
+                    targetBasePayoutRate=overrideTargetBasePayoutRate,
+                    controllerBasePayoutRate=_snap.controllerBasePayoutRate,
                 )
 
     # starting over
-    if _prev.rate == 0:
+    if _prev.basePayoutRate == 0:
         log EpochInitialized(
             epoch=_snap.epoch,
-            rate=_snap.rate,
+            controllerBasePayoutRate=_snap.controllerBasePayoutRate,
+            basePayoutRate=_snap.basePayoutRate,
+            rateSource=_snap.rateSource,
             paymentCap=_snap.paymentCap,
             minPaymentAmount=_snap.minPaymentAmount,
             maxVestingBonus=_snap.maxVestingBonus,
@@ -706,8 +765,10 @@ def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: Ra
     log EpochRolled(
         fromEpoch=_prev.epoch,
         toEpoch=_snap.epoch,
-        oldRate=_prev.rate,
-        newRate=_snap.rate,
+        oldBasePayoutRate=_prev.basePayoutRate,
+        controllerBasePayoutRate=_snap.controllerBasePayoutRate,
+        newBasePayoutRate=_snap.basePayoutRate,
+        rateSource=_snap.rateSource,
         newPaymentCap=_snap.paymentCap,
         newMinPaymentAmount=_snap.minPaymentAmount,
         newMaxVestingBonus=_snap.maxVestingBonus,
@@ -720,7 +781,6 @@ def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: Ra
         utilizationBps=_transition.utilizationBps,
         effectiveAdjustmentBps=_transition.effectiveAdjustmentBps,
         decaySteps=_transition.decaySteps,
-        controllerRate=_transition.controllerRate,
     )
 
 
@@ -811,11 +871,10 @@ def setConfig(_newConfig: InstantBondConfig):
     self._invalidateInstalledOverride()
 
     log InstantBondConfigSet(
-        canBuyNow=_newConfig.canBuyNow,
         paymentCapPerEpoch=_newConfig.paymentCapPerEpoch,
         minPaymentAmount=_newConfig.minPaymentAmount,
-        maxEffectiveRate=_newConfig.maxEffectiveRate,
-        seedRate=_newConfig.seedRate,
+        maxAllInPayoutRate=_newConfig.maxAllInPayoutRate,
+        seedBasePayoutRate=_newConfig.seedBasePayoutRate,
         uHighBps=_newConfig.uHighBps,
         uLowBps=_newConfig.uLowBps,
         minUpBps=_newConfig.minUpBps,
@@ -838,8 +897,8 @@ def setConfig(_newConfig: InstantBondConfig):
 @external
 def setCanBuyNow(_canBuyNow: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert self.bondConfig.canBuyNow != _canBuyNow # dev: no change
-    self.bondConfig.canBuyNow = _canBuyNow
+    assert self.canBuyNow != _canBuyNow # dev: no change
+    self.canBuyNow = _canBuyNow
     if not _canBuyNow:
         self._invalidateInstalledOverride()
     log CanBuyNowSet(canBuyNow=_canBuyNow)
@@ -856,12 +915,12 @@ def _resetEpoch():
 
 @internal
 def _invalidateInstalledOverride():
-    overrideRate: uint256 = self.rateOverride
-    if overrideRate != 0:
-        targetEpoch: uint256 = self.rateOverrideEpoch
-        self.rateOverride = 0
-        self.rateOverrideEpoch = 0
-        log RateOverrideInvalidated(targetEpoch=targetEpoch, targetRate=overrideRate)
+    targetBasePayoutRate: uint256 = self.overrideTargetBasePayoutRate
+    if targetBasePayoutRate != 0:
+        targetEpoch: uint256 = self.overrideTargetEpoch
+        self.overrideTargetBasePayoutRate = 0
+        self.overrideTargetEpoch = 0
+        log RateOverrideInvalidated(targetEpoch=targetEpoch, targetBasePayoutRate=targetBasePayoutRate)
 
 
 #################
@@ -874,15 +933,15 @@ def _invalidateInstalledOverride():
 
 @nonreentrant
 @external
-def setRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> uint256:
+def setRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     isValid: bool = False
     resolvedEpoch: uint256 = 0
-    isValid, resolvedEpoch = self._isValidRateOverride(_targetRate, _targetEpoch)
+    isValid, resolvedEpoch = self._isValidRateOverride(_targetBasePayoutRate, _targetEpoch)
     assert isValid # dev: invalid rate override
-    self.rateOverride = _targetRate
-    self.rateOverrideEpoch = resolvedEpoch
-    log RateOverrideInstalled(targetEpoch=resolvedEpoch, targetRate=_targetRate)
+    self.overrideTargetBasePayoutRate = _targetBasePayoutRate
+    self.overrideTargetEpoch = resolvedEpoch
+    log RateOverrideInstalled(targetEpoch=resolvedEpoch, targetBasePayoutRate=_targetBasePayoutRate)
     return resolvedEpoch
 
 
@@ -892,19 +951,19 @@ def setRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> uint256:
 @view
 @external
 def canCancelRateOverride() -> bool:
-    return self.rateOverride != 0
+    return self.overrideTargetBasePayoutRate != 0
 
 
 @nonreentrant
 @external
 def cancelRateOverride():
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    targetRate: uint256 = self.rateOverride
-    assert targetRate != 0 # dev: no override
-    targetEpoch: uint256 = self.rateOverrideEpoch
-    self.rateOverride = 0
-    self.rateOverrideEpoch = 0
-    log RateOverrideCancelled(targetEpoch=targetEpoch, targetRate=targetRate)
+    targetBasePayoutRate: uint256 = self.overrideTargetBasePayoutRate
+    assert targetBasePayoutRate != 0 # dev: no override
+    targetEpoch: uint256 = self.overrideTargetEpoch
+    self.overrideTargetBasePayoutRate = 0
+    self.overrideTargetEpoch = 0
+    log RateOverrideCancelled(targetEpoch=targetEpoch, targetBasePayoutRate=targetBasePayoutRate)
 
 
 # validate rate override
@@ -912,22 +971,22 @@ def cancelRateOverride():
 
 @view
 @external
-def isValidRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> bool:
+def isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> bool:
     isValid: bool = False
     resolvedEpoch: uint256 = 0
-    isValid, resolvedEpoch = self._isValidRateOverride(_targetRate, _targetEpoch)
+    isValid, resolvedEpoch = self._isValidRateOverride(_targetBasePayoutRate, _targetEpoch)
     return isValid
 
 
 @view
 @internal
-def _isValidRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> (bool, uint256):
-    if not self.isRunning or self.rateOverride != 0:
+def _isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> (bool, uint256):
+    if not self.isRunning or self.overrideTargetBasePayoutRate != 0:
         return False, 0
 
     config: InstantBondConfig = self.bondConfig
-    ceiling: uint256 = self._baseRateCeiling(config.maxEffectiveRate, config.maxVestingBonus)
-    if _targetRate < MIN_BASE_RATE or _targetRate > ceiling:
+    ceiling: uint256 = self._basePayoutRateCeiling(config.maxAllInPayoutRate, config.maxVestingBonus)
+    if _targetBasePayoutRate < MIN_BASE_PAYOUT_RATE or _targetBasePayoutRate > ceiling:
         return False, 0
 
     return self._resolveRateOverrideEpoch(_targetEpoch)
@@ -946,7 +1005,7 @@ def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
 
     prev: EpochSnapshot = self.epochState
     if _targetEpoch == 0:
-        if prev.rate != 0 and prev.epoch == currentEpoch:
+        if prev.basePayoutRate != 0 and prev.epoch == currentEpoch:
             if currentEpoch == max_value(uint256): # pragma: no branch
                 return False, 0
             return True, currentEpoch + 1
@@ -954,7 +1013,7 @@ def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
 
     if _targetEpoch < currentEpoch:
         return False, 0
-    if prev.rate != 0 and _targetEpoch <= prev.epoch:
+    if prev.basePayoutRate != 0 and _targetEpoch <= prev.epoch:
         return False, 0
     return True, _targetEpoch
 
@@ -1051,8 +1110,8 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
     if _config.maxDecayEpochs == 0 or _config.maxDecayEpochs > MAX_DECAY_EPOCHS:
         return False
 
-    # effective-rate ceiling must be real and safe to scale by 100%
-    if _config.maxEffectiveRate == 0 or _config.maxEffectiveRate > max_value(uint256) // HUNDRED_PERCENT:
+    # all-in payout-rate ceiling must be real and safe to scale by 100%
+    if _config.maxAllInPayoutRate == 0 or _config.maxAllInPayoutRate > max_value(uint256) // HUNDRED_PERCENT:
         return False
 
     # epoch cap is at least one token unit and safe to scale by 100%
@@ -1066,7 +1125,7 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
 
     # live ceiling must be safe against both the new cap and a committed epoch's cap
     effectivePaymentCap: uint256 = max(_config.paymentCapPerEpoch, self.epochState.paymentCap)
-    if _config.maxEffectiveRate > max_value(uint256) // effectivePaymentCap:
+    if _config.maxAllInPayoutRate > max_value(uint256) // effectivePaymentCap:
         return False
 
     # vesting bonus stays inside the hard cap
@@ -1080,17 +1139,17 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
         return False
 
     # implied max base rate must still be a legal rate
-    baseRateCeiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxVestingBonus)
-    if baseRateCeiling < MIN_BASE_RATE:
+    basePayoutRateCeiling: uint256 = self._basePayoutRateCeiling(_config.maxAllInPayoutRate, _config.maxVestingBonus)
+    if basePayoutRateCeiling < MIN_BASE_PAYOUT_RATE:
         return False
 
     # full-cap bonus ripe cannot overflow
-    maxBaseRipe: uint256 = _config.paymentCapPerEpoch * baseRateCeiling // paymentScale
+    maxBaseRipe: uint256 = _config.paymentCapPerEpoch * basePayoutRateCeiling // paymentScale
     if _config.maxVestingBonus != 0 and maxBaseRipe > max_value(uint256) // _config.maxVestingBonus:
         return False
 
     # seed must sit in [min base rate, implied ceiling]
-    if _config.seedRate < MIN_BASE_RATE or _config.seedRate > baseRateCeiling:
+    if _config.seedBasePayoutRate < MIN_BASE_PAYOUT_RATE or _config.seedBasePayoutRate > basePayoutRateCeiling:
         return False
 
     # epoch length must be a valid clock
@@ -1110,8 +1169,8 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
 
 @pure
 @internal
-def _baseRateCeiling(_maxEffectiveRate: uint256, _maxVestingBonus: uint256) -> uint256:
-    return _maxEffectiveRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _maxVestingBonus)
+def _basePayoutRateCeiling(_maxAllInPayoutRate: uint256, _maxVestingBonus: uint256) -> uint256:
+    return _maxAllInPayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _maxVestingBonus)
 
 
 ###########
@@ -1141,7 +1200,9 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
         budgetRemaining = staticcall InstantBondClaims(claims).remainingAllocationBudget()
 
     quote.epoch = snap.epoch
-    quote.rate = snap.rate
+    quote.controllerBasePayoutRate = snap.controllerBasePayoutRate
+    quote.basePayoutRate = snap.basePayoutRate
+    quote.rateSource = snap.rateSource
     quote.remainingPayment = remainingPayment
     quote.minPaymentAmount = snap.minPaymentAmount
     quote.budgetRemaining = budgetRemaining
@@ -1152,7 +1213,7 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
     # payout
     payout: PayoutData = self._calculatePayout(
         _paymentAmount,
-        snap.rate,
+        snap.basePayoutRate,
         snap.maxVestingBonus,
         _requestedVestingLength,
         snap.minVestingLength,
@@ -1168,9 +1229,9 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
     quote.totalRipe = payout.totalRipe
 
     # same gates as buyNow, minus deadline / expectedEpoch / slippage
-    if deptBasics.isPaused or not config.canBuyNow:
+    if deptBasics.isPaused or not self.canBuyNow:
         return quote
-    if not self._isWithinMaxEffectiveRate(_paymentAmount, payout.totalRipe, config.maxEffectiveRate):
+    if not self._isWithinMaxAllInPayoutRate(_paymentAmount, payout.totalRipe, config.maxAllInPayoutRate):
         return quote
     if payout.totalRipe > budgetRemaining:
         return quote

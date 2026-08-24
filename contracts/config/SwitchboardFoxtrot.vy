@@ -24,17 +24,18 @@ import contracts.modules.TimeLock as timeLock
 interface InstantBondLane:
     def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
     def genesisBlock() -> uint256: view
-    def isValidRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> bool: view
+    def isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> bool: view
     def isValidConfig(_config: InstantBondConfig) -> bool: view
     def isValidEpochLength(_epochLength: uint256) -> bool: view
     def setConfig(_newConfig: InstantBondConfig): nonpayable
     def isValidPaymentToken(_token: address) -> bool: view
-    def setRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
+    def setRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
     def setPaymentToken(_token: address): nonpayable
     def setCanBuyNow(_canBuyNow: bool): nonpayable
+    def canBuyNow() -> bool: view
     def bondConfig() -> InstantBondConfig: view
-    def rateOverride() -> uint256: view
-    def rateOverrideEpoch() -> uint256: view
+    def overrideTargetBasePayoutRate() -> uint256: view
+    def overrideTargetEpoch() -> uint256: view
     def cancelRateOverride(): nonpayable
     def isRunning() -> bool: view
     def stop(): nonpayable
@@ -50,11 +51,10 @@ flag ActionType:
     REMAINING_ALLOCATION_BUDGET_SET
 
 struct InstantBondConfig:
-    canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    maxEffectiveRate: uint256
-    seedRate: uint256
+    maxAllInPayoutRate: uint256
+    seedBasePayoutRate: uint256
     uHighBps: uint256
     uLowBps: uint256
     minUpBps: uint256
@@ -71,11 +71,10 @@ struct InstantBondConfig:
 event PendingInstantBondConfigSet:
     actionId: uint256
     confirmationBlock: uint256
-    canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
-    maxEffectiveRate: uint256
-    seedRate: uint256
+    maxAllInPayoutRate: uint256
+    seedBasePayoutRate: uint256
     uHighBps: uint256
     uLowBps: uint256
     minUpBps: uint256
@@ -102,11 +101,11 @@ event InstantBondRemainingAllocationBudgetExecuted:
 
 event InstantBondRateOverrideSet:
     targetEpoch: indexed(uint256)
-    targetRate: uint256
+    targetBasePayoutRate: uint256
 
 event InstantBondRateOverrideCancelled:
     targetEpoch: indexed(uint256)
-    targetRate: uint256
+    targetBasePayoutRate: uint256
 
 event InstantBondStarted:
     genesisBlock: uint256
@@ -177,11 +176,10 @@ def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
     log PendingInstantBondConfigSet(
         actionId=aid,
         confirmationBlock=confirmationBlock,
-        canBuyNow=_config.canBuyNow,
         paymentCapPerEpoch=_config.paymentCapPerEpoch,
         minPaymentAmount=_config.minPaymentAmount,
-        maxEffectiveRate=_config.maxEffectiveRate,
-        seedRate=_config.seedRate,
+        maxAllInPayoutRate=_config.maxAllInPayoutRate,
+        seedBasePayoutRate=_config.seedBasePayoutRate,
         uHighBps=_config.uHighBps,
         uLowBps=_config.uLowBps,
         minUpBps=_config.minUpBps,
@@ -206,8 +204,7 @@ def setCanBuyNow(_canBuyNow: bool):
     assert gov._canGovern(msg.sender) # dev: no perms
 
     lane: address = self._getInstantBondLaneAddr()
-    config: InstantBondConfig = staticcall InstantBondLane(lane).bondConfig()
-    assert config.canBuyNow != _canBuyNow # dev: no change
+    assert staticcall InstantBondLane(lane).canBuyNow() != _canBuyNow # dev: no change
     extcall InstantBondLane(lane).setCanBuyNow(_canBuyNow)
     log InstantBondCanBuyNowSet(canBuyNow=_canBuyNow)
 
@@ -218,15 +215,15 @@ def setCanBuyNow(_canBuyNow: bool):
 
 
 @external
-def setInstantBondRateOverride(_targetRate: uint256, _targetEpoch: uint256) -> uint256:
+def setInstantBondRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isValidRateOverride(_targetRate, _targetEpoch) # dev: invalid rate override
-    resolvedEpoch: uint256 = extcall InstantBondLane(lane).setRateOverride(_targetRate, _targetEpoch)
+    assert staticcall InstantBondLane(lane).isValidRateOverride(_targetBasePayoutRate, _targetEpoch) # dev: invalid rate override
+    resolvedEpoch: uint256 = extcall InstantBondLane(lane).setRateOverride(_targetBasePayoutRate, _targetEpoch)
     log InstantBondRateOverrideSet(
         targetEpoch=resolvedEpoch,
-        targetRate=_targetRate,
+        targetBasePayoutRate=_targetBasePayoutRate,
     )
     return resolvedEpoch
 
@@ -236,11 +233,11 @@ def cancelInstantBondRateOverride():
     assert gov._canGovern(msg.sender) # dev: no perms
 
     lane: address = self._getInstantBondLaneAddr()
-    targetRate: uint256 = staticcall InstantBondLane(lane).rateOverride()
-    assert targetRate != 0 # dev: no rate override
-    targetEpoch: uint256 = staticcall InstantBondLane(lane).rateOverrideEpoch()
+    targetBasePayoutRate: uint256 = staticcall InstantBondLane(lane).overrideTargetBasePayoutRate()
+    assert targetBasePayoutRate != 0 # dev: no rate override
+    targetEpoch: uint256 = staticcall InstantBondLane(lane).overrideTargetEpoch()
     extcall InstantBondLane(lane).cancelRateOverride()
-    log InstantBondRateOverrideCancelled(targetEpoch=targetEpoch, targetRate=targetRate)
+    log InstantBondRateOverrideCancelled(targetEpoch=targetEpoch, targetBasePayoutRate=targetBasePayoutRate)
 
 
 #########
