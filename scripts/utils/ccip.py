@@ -633,6 +633,22 @@ def require_mainnet_activation_finalized(migration, pools, source_file):
                 f"CCIP_FINALIZATION_POOL_CAPABILITY_MISMATCH: {label}"
             )
 
+        expected_selectors = tuple(
+            sorted(
+                int(CCIP[remote_chain]["CHAIN_SELECTOR"])
+                for remote_chain in config["REMOTE_CHAINS"]
+            )
+        )
+        actual_selectors = tuple(
+            sorted(int(selector) for selector in pool.getSupportedChains())
+        )
+        if actual_selectors != expected_selectors:
+            raise RuntimeError(
+                "CCIP_FINALIZATION_LANE_SET_MISMATCH: "
+                f"{label} has selectors {actual_selectors}, expected "
+                f"{expected_selectors}"
+            )
+
         for remote_chain in config["REMOTE_CHAINS"]:
             selector = CCIP[remote_chain]["CHAIN_SELECTOR"]
             if not pool.isSupportedChain(selector):

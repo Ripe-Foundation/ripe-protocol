@@ -31,6 +31,10 @@ UNISWAP = _load(
     "migrations/robinhood-mainnet/0008_UniswapV2Prices.py",
     "pr67_uniswap_deployment",
 )
+SWITCHBOARDS = _load(
+    "migrations/robinhood-mainnet/0002_Switchboards.py",
+    "pr67_switchboard_deployment",
+)
 REDEPLOY = _load(
     "migrations/robinhood-mainnet/0009_RedeployStaleContracts.py",
     "pr67_redeploy_candidates",
@@ -68,6 +72,17 @@ class _Registry(_Contract):
         return self.slots.get(reg_id, ZERO_ADDRESS)
 
     def numAddrs(self):
+        return self.count
+
+    def startAddNewAddressToRegistry(self, address, _description):
+        self._pending = address
+        return True
+
+    def confirmNewAddressToRegistry(self, address):
+        assert self._pending.address == address.address
+        self.count += 1
+        self.slots[self.count] = address.address
+        self._pending = None
         return self.count
 
 
@@ -188,7 +203,9 @@ class _FakeMigration:
         label = kwargs.get("label", name)
         address = _addr(self._next_address)
         self._next_address += 1
-        if name == "VaultMigrator":
+        if name == "Switchboard":
+            contract = _Registry(address)
+        elif name == "VaultMigrator":
             contract = _VaultMigratorCandidate(address, args[1])
         elif name == "UniswapV2Prices":
             contract = _UniswapMonitorCandidate(address, *args)
@@ -305,6 +322,32 @@ def test_base_bluechip_replay_calls_match_final_constructor_shape():
     old_call = _bluechip_deploy_call(ROOT / "migrations/base-mainnet/1007_PriceDesk.py")
     assert isinstance(old_call.args[2], ast.Name)
     assert old_call.args[2].id == "ZERO_ADDRESS"
+
+
+def test_0002_passes_chain_local_pyth_id_to_switchboard_alpha():
+    hq = _Registry(_addr(1), count=5)
+    migration = _FakeMigration(contracts={"RipeHq": hq})
+
+    SWITCHBOARDS.migrate(migration)
+
+    alpha = next(
+        row for row in migration.deployments if row[0] == "SwitchboardAlpha"
+    )
+    assert alpha[2] == (
+        hq,
+        ZERO_ADDRESS,
+        SWITCHBOARDS.STALE_WINDOW_MIN,
+        SWITCHBOARDS.STALE_WINDOW_MAX,
+        SWITCHBOARDS.SWITCHBOARD_MIN_TIMELOCK,
+        SWITCHBOARDS.SWITCHBOARD_MAX_TIMELOCK,
+        SWITCHBOARDS.PYTH_PRICES_ID,
+    )
+    assert SWITCHBOARDS.PYTH_PRICES_ID == 0
+    assert all(
+        len(args) == 4
+        for name, _label, args, _contract in migration.deployments
+        if name.startswith("Switchboard") and name != "SwitchboardAlpha"
+    )
 
 
 def test_safe_calldata_helpers_bind_the_expected_registry_calls():

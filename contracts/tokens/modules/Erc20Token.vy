@@ -560,6 +560,8 @@ def _isValidNewRipeHq(_newHq: address, _prevHq: address) -> bool:
     newRipeToken: address = staticcall RipeHq(_newHq).ripeToken()
     if empty(address) in [newGreenToken, newSavingsGreen, newRipeToken]:
         return False
+    if self not in [newGreenToken, newSavingsGreen, newRipeToken]:
+        return False
 
     # an hq migration must retain the complete token suite. In particular,
     # GREEN's backing guard must keep protecting the same SavingsGreen token.

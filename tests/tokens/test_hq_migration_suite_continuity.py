@@ -130,7 +130,7 @@ def test_confirmation_cancels_candidate_whose_suite_changes_during_timelock(
         assert not green_token.hasPendingHqChange()
 
 
-def test_token_missing_from_current_hq_suite_cannot_migrate(
+def test_initial_setup_rejects_hq_suite_that_omits_the_token(
     green_token,
     savings_green,
     ripe_token,
@@ -155,22 +155,38 @@ def test_token_missing_from_current_hq_suite_cannot_migrate(
             governance,
             fork,
         )
-        candidate = _deploy_hq(
+
+        assert not orphan.isValidNewRipeHq(current_hq)
+        with boa.reverts("invalid ripe hq"):
+            orphan.finishTokenSetup(current_hq, sender=deploy3r)
+        assert orphan.ripeHq() == ZERO_ADDRESS
+
+
+def test_constructor_rejects_hq_suite_that_omits_the_token(
+    green_token,
+    savings_green,
+    ripe_token,
+    deploy3r,
+    fork,
+):
+    with boa.env.anchor():
+        hq = _deploy_hq(
             green_token,
             savings_green,
             ripe_token,
-            governance,
+            deploy3r,
             fork,
         )
-
-        # Initial setup is intentionally a separate path because the token/HQ
-        # deployment graph is circular. Migration must nevertheless fail closed
-        # if a malformed legacy setup did not assign this token any suite role.
-        assert orphan.finishTokenSetup(current_hq, sender=deploy3r)
-        assert not orphan.isValidNewRipeHq(candidate)
-        with boa.reverts("invalid new hq"):
-            orphan.initiateHqChange(candidate, sender=governance.address)
-        assert not orphan.hasPendingHqChange()
+        with boa.reverts("invalid ripe hq"):
+            boa.load(
+                "contracts/tokens/GreenToken.vy",
+                hq,
+                ZERO_ADDRESS,
+                PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+                PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+                0,
+                ZERO_ADDRESS,
+            )
 
 
 def test_first_time_setup_still_accepts_the_newly_deployed_complete_suite(

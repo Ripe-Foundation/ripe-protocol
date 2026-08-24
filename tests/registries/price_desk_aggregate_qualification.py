@@ -57,9 +57,9 @@ QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE = 3
 # Raising either input without expanding the measured envelope fails loudly.
 
 # Snapshot of a read-only live registry check at the gas-limit observation
-# block. Repository slot 3 is BlueChipYieldPrices, while live slot 3 was still
-# Uniswap V2 Prices. Reconciliation is a manual pre-activation gate; this
-# source-only test package must not silently treat the two compositions as one.
+# block. The repository launch topology now leaves slot 3 unassigned, while
+# live slot 3 was Uniswap V2 Prices. Reconciliation is a manual pre-activation
+# gate; this source-only test package must not treat the two compositions as one.
 ROBINHOOD_LIVE_PRICE_DESK_SLOT_3 = "Uniswap V2 Prices"
 ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS = (
     "0xfB2d96242769fCE0a3Cf75204B0553cE0E516545"

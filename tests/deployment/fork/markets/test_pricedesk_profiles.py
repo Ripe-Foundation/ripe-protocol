@@ -23,16 +23,18 @@ def test_launch_pricedesk_topology_uses_real_robinhood_blueprint(
         accepted_preflight.envelope, ("h08_assertions",)
     )
     rows = _price_desk_rows()
+    assert set(rows) == {1, 2}
     assert rows[1].semantic_name == "Chainlink"
     assert rows[1].disposition is Disposition.REQUIRED
     assert rows[2].semantic_name == "Curve"
     assert rows[2].disposition is Disposition.REQUIRED
-    assert rows[3].semantic_name == "BlueChipYield"
-    assert rows[3].disposition is Disposition.REQUIRED
-    assert all(
-        rows[index].disposition is Disposition.OMITTED
-        for index in (4, 5)
+    bluechip = next(
+        component
+        for component in ROBINHOOD_BLUEPRINT.components
+        if component.component_id == "CM-018"
     )
+    assert bluechip.deployment is Disposition.DEFERRED
+    assert bluechip.registry_expectations == ()
 
 
 def test_curve_pool_identity_and_higher_powers_are_not_inferred_from_launch_selection(

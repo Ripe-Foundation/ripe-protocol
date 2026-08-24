@@ -63,11 +63,11 @@ class MigrationRunner:
         # migrations on robinhood-mainnet, the exact redeployment this guard
         # exists to prevent.
         #
-        # Three things are required, and none of them can be derived for the
-        # caller: the value names a migration that exists, and it is strictly
-        # after the latest migration this history has a completion marker for.
-        # There is deliberately no override; --force-replay is the more
-        # dangerous mode, not a bypass.
+        # The value must name the earliest known migration after the latest
+        # completion marker. Merely requiring a later timestamp would let an
+        # operator skip unfinished stages whose postconditions later stages
+        # depend on. There is deliberately no override; --force-replay is the
+        # more dangerous mode, not a bypass.
         if not history_has_deployment(self.history_dir):
             return
 
@@ -101,6 +101,22 @@ class MigrationRunner:
                 f"H06_START_TIMESTAMP_NOT_AFTER_FRONTIER: {text} is at or "
                 f"before {frontier}, the latest migration this history records "
                 "as complete. Re-running it would repeat work already done."
+            )
+
+        unfinished = sorted(
+            (timestamp for timestamp in known if int(timestamp) > int(frontier)),
+            key=int,
+        )
+        if not unfinished:
+            raise MigrationHistoryError(
+                "H06_NO_UNFINISHED_MIGRATION: no known migration follows "
+                f"the recorded frontier {frontier}."
+            )
+        expected = unfinished[0]
+        if text != expected:
+            raise MigrationHistoryError(
+                f"H06_START_TIMESTAMP_NOT_NEXT: {text} would skip {expected}, "
+                "the earliest migration not recorded complete."
             )
 
     def run(self, deploy_args: DeployArgs, start_timestamp=None, end_timestamp=None, continue_running=True):

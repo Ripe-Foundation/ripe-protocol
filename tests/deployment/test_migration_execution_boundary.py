@@ -872,13 +872,26 @@ def test_unsafe_start_points_are_refused(start, code):
         _real_runner()._require_start_point(_args(), start)
 
 
-def test_a_start_point_after_the_frontier_is_accepted():
+def test_the_earliest_unfinished_start_point_is_accepted():
     runner = _real_runner()
     frontier = runner._latest_manifest_timestamp()
 
-    # 2026082400 exists and is after the independently verified 2026082101 frontier.
+    # 2026082400 is the earliest committed migration after this history's
+    # frontier. It also follows the independently verified 2026082101 history
+    # that must be integrated before these forward stages execute.
     runner._require_start_point(_args(), "2026082400")
     assert int("2026082400") > int(frontier)
+
+
+@pytest.mark.parametrize(
+    "start", ("2026082401", "2026082402", "2026082403", "2026082404")
+)
+def test_a_later_unfinished_start_point_cannot_skip_the_next_stage(start):
+    with pytest.raises(
+        MigrationHistoryError,
+        match=r"H06_START_TIMESTAMP_NOT_NEXT: .* would skip 2026082400",
+    ):
+        _real_runner()._require_start_point(_args(), start)
 
 
 @pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))

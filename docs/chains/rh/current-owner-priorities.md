@@ -59,8 +59,8 @@ activation, or release posture below.
 - Use the protected shared `BasicVault` behavior through `SimpleErc20`; do not
   deploy or configure a separate `GuardedErc20` artifact.
 - Launch with Chainlink at PriceDesk slot 1 and unchanged CurvePrices at slot 2
-  for GREEN only. BlueChipYield at slot 3 remains blueprint-selected but is not
-  deployed or finalized by the current candidate. USDG has no Curve feed,
+  for GREEN only. BlueChipYield is deferred and unassigned, and PriceDesk slot
+  3 remains empty. USDG has no Curve feed,
   slots 4 and 5 remain empty, neither LP token is admitted, and priority source
   IDs remain `[1, 2]`.
 - Treat RIPE/WETH V2 only as an optional externally held liquidity canary.

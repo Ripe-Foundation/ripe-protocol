@@ -36,6 +36,7 @@ POOL_MIGRATIONS = (
 class _ConfiguredPool:
     def __init__(self, selector, remote_pool, remote_token, rate=(False, 0, 0)):
         self.selector = selector
+        self.supported_selectors = [selector]
         self.remote_pools = [ccip.encode_address(remote_pool)]
         self.remote_token = ccip.encode_address(remote_token)
         self.rate = rate
@@ -44,7 +45,11 @@ class _ConfiguredPool:
 
     def isSupportedChain(self, selector):
         self.calls.append("isSupportedChain")
-        return selector == self.selector
+        return selector in self.supported_selectors
+
+    def getSupportedChains(self):
+        self.calls.append("getSupportedChains")
+        return self.supported_selectors
 
     def getRemoteToken(self, selector):
         self.calls.append("getRemoteToken")
@@ -220,6 +225,13 @@ def test_mainnet_activation_finalizer_requires_complete_read_only_state(monkeypa
     ccip.require_mainnet_activation_finalized(
         Migration(), pools, "RipeCcipBurnMintTokenPools.sol"
     )
+
+    pool.supported_selectors.append(selector + 1)
+    with pytest.raises(RuntimeError, match="CCIP_FINALIZATION_LANE_SET_MISMATCH"):
+        ccip.require_mainnet_activation_finalized(
+            Migration(), pools, "RipeCcipBurnMintTokenPools.sol"
+        )
+    pool.supported_selectors = [selector]
 
     pool.token_decimals = 17
     with pytest.raises(AssertionError, match="wrong token decimals"):

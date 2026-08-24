@@ -472,11 +472,11 @@ work.
 every external-state phase remain blocked.
 
 Select unchanged `CurvePrices` at PriceDesk ID 2 for GREEN only, while keeping
-Chainlink at ID 1, IDs 4 and 5 empty, and priority IDs `[1, 2]`. BlueChipYield
-remains structurally selected at ID 3 in the blueprint but is deliberately not
-deployed or finalized by the current production-remediation candidate. The
-exact configured route is GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink
-USDG. USDG has no Curve feed, so the route cannot recurse.
+Chainlink at ID 1, IDs 3 through 5 empty, and priority IDs `[1, 2]`.
+BlueChipYield is deferred and unassigned; any future activation must select a
+chain-local PriceDesk ID in a separately reviewed change. The exact configured
+route is GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG. USDG has no
+Curve feed, so the route cannot recurse.
 
 This decision does not admit either LP token, add another Curve feed or
 consumer, enable dynamic rates, create Teller reference snapshots, enable

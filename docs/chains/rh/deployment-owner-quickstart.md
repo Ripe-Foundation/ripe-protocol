@@ -68,7 +68,7 @@ is not a current Defaults constructor binding or selected asset.
 | --- | --- |
 | 1 | Chainlink selected |
 | 2 | Unchanged CurvePrices selected for GREEN only |
-| 3 | BlueChipYield structurally selected in the blueprint, but not deployed or finalized by the current migration candidate |
+| 3 | Unassigned; BlueChipYield is deferred and has no Robinhood PriceDesk ID |
 | 4 | Empty Pyth |
 | 5 | Empty Stork |
 
@@ -389,11 +389,10 @@ the 86-key plan census, the shared 1,000-RIPE analysis, and priority IDs
 `[1, 3]` remain historical inputs. Do not rebase, merge, execute, or use them as
 current configuration or migration authority.
 
-The current candidate intentionally omits BlueChipYield deployment even though
-the structural blueprint retains ID 3. Do not infer deployed topology from the
-blueprint and do not invent an alternate registration merely to reconcile the
-two. Resolve that boundary through a separately reviewed production change if
-the owner later wants BlueChipYield deployed.
+The current candidate intentionally defers BlueChipYield and leaves PriceDesk
+slot 3 unassigned. Do not invent an alternate registration to fill that slot.
+If the owner later wants BlueChipYield deployed, select its chain-local ID in a
+separately reviewed production change.
 
 ## Stop conditions and prohibited substitutions
 

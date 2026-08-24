@@ -171,7 +171,6 @@ def test_green_route_uses_curve_and_chainlink_usdg_without_recursion(
     route = robinhood_curve_launch_route
     assert route.price_desk.getAddr(1) == route.chainlink.address
     assert route.price_desk.getAddr(2) == route.curve.address
-    assert route.price_desk.getAddr(3) != ZERO_ADDRESS
     assert tuple(mission_control.getPriceConfig().priorityPriceSourceIds) == (1, 2)
 
     config = route.curve.curveConfig(route.green)

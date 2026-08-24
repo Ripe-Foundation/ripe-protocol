@@ -52,14 +52,13 @@ def test_robinhood_price_desk_source_count_requires_gas_requalification_on_growt
         "Robinhood PriceDesk source growth requires aggregate protocol-gas "
         "requalification before activation"
     )
-    assert [row.registry_id for row in selected_sources] == [1, 2, 3], (
+    assert [row.registry_id for row in selected_sources] == [1, 2], (
         "Robinhood PriceDesk registry ordering changed; aggregate protocol-gas "
         "requalification is required before activation"
     )
     assert [row.semantic_name for row in selected_sources] == [
         "Chainlink",
         "Curve",
-        "BlueChipYield",
     ], (
         "Robinhood PriceDesk source composition changed; aggregate protocol-gas "
         "requalification is required before activation"
@@ -143,13 +142,7 @@ def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
 
 
 def test_observed_live_slot_three_divergence_is_documented_for_manual_recheck():
-    repository_slot_three = next(
-        row for row in _selected_price_sources() if row.registry_id == 3
-    )
-    assert repository_slot_three.semantic_name == "BlueChipYield"
+    assert all(row.registry_id != 3 for row in _selected_price_sources())
     assert len(ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS) == 42
     assert int(ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS, 16) != 0
-    assert repository_slot_three.semantic_name != ROBINHOOD_LIVE_PRICE_DESK_SLOT_3, (
-        "the documented slot-3 snapshot no longer differs from the repository; "
-        "manually reread live state and update aggregate-gas qualification"
-    )
+    assert ROBINHOOD_LIVE_PRICE_DESK_SLOT_3 == "Uniswap V2 Prices"

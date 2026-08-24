@@ -4,6 +4,7 @@ import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
 
+from config.BluePrint import PARAMS
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import assert_reverted_call, filter_logs, get_boa_dev_reasons
 
@@ -5159,6 +5160,7 @@ def test_purchase_ripe_bond_minimum_exact_boundary(
 def test_minimum_payout_assertion_mutant_is_unprotected(
     ripe_hq,
     teller,
+    fork,
     setupRipeBonds,
     bob,
     alpha_token_whale,
@@ -5179,6 +5181,7 @@ def test_minimum_payout_assertion_mutant_is_unprotected(
             _minimum_assertion_mutant_source(),
             ripe_hq,
             False,
+            PARAMS[fork]["CURVE_PRICES_ID"],
             name="teller_without_minimum_payout_assertion",
         )
         teller_code = boa.env.get_code(teller.address)
