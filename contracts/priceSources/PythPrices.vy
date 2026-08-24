@@ -313,6 +313,7 @@ def _getGlobalStaleTime() -> (uint256, bool):
 def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     assert self._isValidNewFeed(_asset, _feedId, _staleTime) # dev: invalid feed
@@ -420,6 +421,7 @@ def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
 
 @internal
 def _initiatePriceFeedUpdate(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
@@ -495,6 +497,13 @@ def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) ->
 
 
 @view
+@external
+def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    config: PythFeedConfig = self.feedConfig[_asset]
+    return self._isValidUpdateFeed(_asset, config.feedId, _staleTime)
+
+
+@view
 @internal
 def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
     oldConfig: PythFeedConfig = self.feedConfig[_asset]
@@ -535,6 +544,7 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
 def disablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId

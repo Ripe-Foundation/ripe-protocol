@@ -189,7 +189,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
         priceDesk: address = addys._getPriceDeskAddr()
         if msg.sender != priceDesk or _priceDesk != priceDesk:
             return 0
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime)
+    return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime)
 
 
 @view
@@ -203,12 +203,13 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
         priceDesk: address = addys._getPriceDeskAddr()
         if msg.sender != priceDesk or _priceDesk != priceDesk:
             return 0, True
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime), True
+    return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime), True
 
 
 @view
 @internal
 def _getPrice(
+    _asset: address,
     _feed: address, 
     _decimals: uint256,
     _needsEthToUsd: bool,
@@ -216,6 +217,9 @@ def _getPrice(
     _globalStaleTime: uint256,
     _feedStaleTime: uint256,
 ) -> uint256:
+    if not self._isSafeConversionRoute(_asset, _feed, _needsEthToUsd, _needsBtcToUsd):
+        return 0
+
     globalStaleTime: uint256 = _globalStaleTime
     hasGlobalStaleTime: bool = globalStaleTime != 0
     if _feedStaleTime == 0 and not hasGlobalStaleTime:
@@ -262,6 +266,28 @@ def _getPrice(
         price = price * btcUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
+
+
+@view
+@internal
+def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
+    if _needsEthToUsd and _needsBtcToUsd:
+        return False
+
+    if not _needsEthToUsd and not _needsBtcToUsd:
+        return True
+
+    anchorAsset: address = ETH
+    if _needsBtcToUsd:
+        anchorAsset = BTC
+    anchorConfig: ChainlinkConfig = self.feedConfig[anchorAsset]
+
+    # Conversion legs consume the anchor feed directly as USD.
+    if _asset == anchorAsset or _feed == anchorConfig.feed:
+        return False
+    if anchorConfig.needsEthToUsd or anchorConfig.needsBtcToUsd:
+        return False
+    return True
 
 
 # utilities
@@ -380,6 +406,7 @@ def addNewPriceFeed(
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     decimals: uint256 = 0
@@ -513,6 +540,7 @@ def _initiatePriceFeedUpdate(
     _needsBtcToUsd: bool,
     _staleTime: uint256,
 ) -> bool:
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
     oldFeed: address = self.feedConfig[_asset].feed
     assert self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
 
@@ -584,6 +612,13 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 
 @view
 @external
+def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    config: ChainlinkConfig = self.feedConfig[_asset]
+    return self._isValidUpdateFeed(_asset, config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime)
+
+
+@view
+@external
 def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
     if _newFeed == self.feedConfig[_asset].feed:
         return False
@@ -620,10 +655,8 @@ def _isValidFeedConfig(
 ) -> bool:
     if empty(address) in [_asset, _feed]:
         return False
-    if _needsEthToUsd and _needsBtcToUsd:
-        return False
 
-    return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, 0, _staleTime) != 0
+    return self._getPrice(_asset, _feed, _decimals, _needsEthToUsd, _needsBtcToUsd, 0, _staleTime) != 0
 
 
 ################
@@ -638,6 +671,7 @@ def _isValidFeedConfig(
 def disablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     oldFeed: address = self.feedConfig[_asset].feed

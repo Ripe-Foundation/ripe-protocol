@@ -148,7 +148,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
         priceDesk: address = addys._getPriceDeskAddr()
         if msg.sender != priceDesk or _priceDesk != priceDesk:
             return 0
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk)
+    return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk)
 
 
 @view
@@ -162,12 +162,13 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
         priceDesk: address = addys._getPriceDeskAddr()
         if msg.sender != priceDesk or _priceDesk != priceDesk:
             return 0, True
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk), True
+    return self._getPrice(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime, config.staleTime, _priceDesk), True
 
 
 @view
 @internal
 def _getPrice(
+    _asset: address,
     _feed: address, 
     _decimals: uint256,
     _needsEthToUsd: bool,
@@ -175,6 +176,9 @@ def _getPrice(
     _feedStaleTime: uint256,
     _priceDesk: address,
 ) -> uint256:
+    if not self._isSafeConversionRoute(_asset, _feed, _needsEthToUsd):
+        return 0
+
     globalStaleTime: uint256 = _globalStaleTime
     hasGlobalStaleTime: bool = globalStaleTime != 0
     if _feedStaleTime == 0 and not hasGlobalStaleTime:
@@ -201,6 +205,18 @@ def _getPrice(
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
+
+
+@view
+@internal
+def _isSafeConversionRoute(_asset: address, _feed: address, _needsEthToUsd: bool) -> bool:
+    if not _needsEthToUsd:
+        return True
+
+    ethConfig: RedStoneConfig = self.feedConfig[ETH]
+    if _asset == ETH or ethConfig.needsEthToUsd:
+        return False
+    return _feed != ethConfig.feed
 
 
 # utilities
@@ -317,6 +333,7 @@ def addNewPriceFeed(
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     decimals: uint256 = 0
@@ -447,6 +464,7 @@ def _initiatePriceFeedUpdate(
     _needsEthToUsd: bool,
     _staleTime: uint256,
 ) -> bool:
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
     oldFeed: address = self.feedConfig[_asset].feed
     assert self._isValidUpdateFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _staleTime) # dev: invalid feed
 
@@ -524,6 +542,13 @@ def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _n
 
 
 @view
+@external
+def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    config: RedStoneConfig = self.feedConfig[_asset]
+    return self._isValidUpdateFeed(_asset, config.feed, config.decimals, config.needsEthToUsd, _staleTime)
+
+
+@view
 @internal
 def _isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _staleTime: uint256) -> bool:
     currentConfig: RedStoneConfig = self.feedConfig[_asset]
@@ -552,7 +577,7 @@ def _isValidFeedConfig(
     if empty(address) in [_asset, _feed]:
         return False
 
-    return self._getPrice(_feed, _decimals, _needsEthToUsd, 0, _staleTime, addys._getPriceDeskAddr()) != 0
+    return self._getPrice(_asset, _feed, _decimals, _needsEthToUsd, 0, _staleTime, addys._getPriceDeskAddr()) != 0
 
 
 ################
@@ -567,6 +592,7 @@ def _isValidFeedConfig(
 def disablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     oldFeed: address = self.feedConfig[_asset].feed

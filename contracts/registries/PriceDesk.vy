@@ -149,12 +149,12 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 @view
 @external
 def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256:
-    # Preserve the legacy selector without silently ignoring a requested cap.
+    if _asset == empty(address):
+        return 0
+    # Preserve the selector while rejecting the retired caller cap for real assets.
     if _staleTime != 0:
         if _shouldRaise:
             raise "caller stale time unsupported"
-        return 0
-    if _asset == empty(address):
         return 0
     return self._getPrice(_asset, _shouldRaise)
 
