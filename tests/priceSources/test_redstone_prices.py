@@ -83,6 +83,29 @@ def _add_redstone_feed(
     assert redstone.confirmNewPriceFeed(asset, sender=governance.address)
 
 
+def _add_chainlink_eth_feed(
+    chainlink,
+    redstone,
+    feed,
+    governance,
+    stale_time=600,
+):
+    _set_redstone_feed(feed, 2_500 * CHAINLINK_DECIMALS)
+    assert chainlink.addNewPriceFeed(
+        redstone.ETH(),
+        feed,
+        stale_time,
+        False,
+        False,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+    _set_redstone_feed(feed, 2_500 * CHAINLINK_DECIMALS)
+    assert chainlink.confirmNewPriceFeed(
+        redstone.ETH(), sender=governance.address
+    )
+
+
 def _set_redstone_global_bound(
     switchboard_alpha,
     governance,
@@ -1521,6 +1544,70 @@ def test_redstone_failed_stale_confirmation_can_cancel_after_expiry(
         assert redstone.pendingUpdates(alpha_token).actionId == 0
 
 
+def test_redstone_converting_stale_confirmation_retries_after_eth_anchor_recovers(
+    redstone,
+    chainlink,
+    price_desk,
+    alpha_token,
+    mock_redstone_alpha,
+    mock_redstone_eth,
+    governance,
+):
+    with boa.env.anchor():
+        _add_chainlink_eth_feed(
+            chainlink,
+            redstone,
+            mock_redstone_eth,
+            governance,
+        )
+        _add_redstone_feed(
+            redstone,
+            alpha_token,
+            mock_redstone_alpha,
+            governance,
+            600,
+            needs_eth=True,
+            refresh_feeds=(
+                (mock_redstone_eth, 2_500 * CHAINLINK_DECIMALS),
+            ),
+        )
+        assert redstone.updateStaleTime(
+            alpha_token,
+            MIN_LOCAL_STALE_TIME,
+            sender=governance.address,
+        )
+        action_id = redstone.pendingUpdates(alpha_token).actionId
+        assert action_id != 0
+        pending_before = _redstone_pending_state(redstone, alpha_token)
+        active_before = _redstone_active_state(redstone, alpha_token)
+
+        _advance_timelock_blocks(redstone.actionTimeLock() + 1)
+        _set_redstone_feed(mock_redstone_alpha, 500 * CHAINLINK_DECIMALS)
+        _set_redstone_feed(
+            mock_redstone_eth,
+            2_500 * CHAINLINK_DECIMALS,
+            age=601,
+        )
+        assert price_desk.getPrice(redstone.ETH()) == 0
+
+        assert not redstone.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert _redstone_pending_state(
+            redstone, alpha_token
+        ) == pending_before
+        assert _redstone_active_state(redstone, alpha_token) == active_before
+        assert redstone.hasPendingAction(action_id)
+
+        _set_redstone_feed(mock_redstone_eth, 2_500 * CHAINLINK_DECIMALS)
+        assert redstone.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert redstone.feedConfig(alpha_token).staleTime == MIN_LOCAL_STALE_TIME
+        assert redstone.pendingUpdates(alpha_token).actionId == 0
+        assert not redstone.hasPendingAction(action_id)
+
+
 def test_redstone_failed_feed_replacement_confirmation_auto_cancels(
     redstone,
     alpha_token,
@@ -1558,3 +1645,66 @@ def test_redstone_failed_feed_replacement_confirmation_auto_cancels(
         assert not redstone.hasPendingAction(action_id)
         assert redstone.feedConfig(alpha_token).feed == active.feed
         assert redstone.feedConfig(alpha_token).staleTime == active.staleTime
+
+
+def test_redstone_converting_replacement_auto_cancels_when_eth_anchor_is_unhealthy(
+    redstone,
+    chainlink,
+    price_desk,
+    alpha_token,
+    mock_redstone_alpha,
+    mock_redstone_eth,
+    governance,
+):
+    with boa.env.anchor():
+        _add_chainlink_eth_feed(
+            chainlink,
+            redstone,
+            mock_redstone_eth,
+            governance,
+        )
+        _add_redstone_feed(
+            redstone,
+            alpha_token,
+            mock_redstone_alpha,
+            governance,
+            600,
+            needs_eth=True,
+            refresh_feeds=(
+                (mock_redstone_eth, 2_500 * CHAINLINK_DECIMALS),
+            ),
+        )
+        empty_pending = _redstone_pending_state(redstone, alpha_token)
+        active_before = _redstone_active_state(redstone, alpha_token)
+        replacement = boa.load(
+            "contracts/mock/MockChainlinkFeed.vy",
+            500 * EIGHTEEN_DECIMALS,
+        )
+        _set_redstone_feed(replacement, 1_000 * CHAINLINK_DECIMALS)
+        assert redstone.updatePriceFeed(
+            alpha_token,
+            replacement,
+            600,
+            True,
+            sender=governance.address,
+        )
+        action_id = redstone.pendingUpdates(alpha_token).actionId
+        assert action_id != 0
+
+        _advance_timelock_blocks(redstone.actionTimeLock() + 1)
+        _set_redstone_feed(replacement, 1_000 * CHAINLINK_DECIMALS)
+        _set_redstone_feed(
+            mock_redstone_eth,
+            2_500 * CHAINLINK_DECIMALS,
+            age=601,
+        )
+        assert price_desk.getPrice(redstone.ETH()) == 0
+
+        assert not redstone.confirmPriceFeedUpdate(
+            alpha_token, sender=governance.address
+        )
+        assert _redstone_pending_state(
+            redstone, alpha_token
+        ) == empty_pending
+        assert not redstone.hasPendingAction(action_id)
+        assert _redstone_active_state(redstone, alpha_token) == active_before

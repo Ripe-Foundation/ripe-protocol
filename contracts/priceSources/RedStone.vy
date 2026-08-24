@@ -191,7 +191,9 @@ def _getPrice(
         priceDesk: address = _priceDesk
         if _priceDesk == empty(address):
             priceDesk = addys._getPriceDeskAddr()
-        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, True)
+        # A missing ETH/USD anchor must fail closed without reverting so feed
+        # confirmation can follow its retry-or-cancel lifecycle.
+        ethUsdPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(ETH, False)
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price

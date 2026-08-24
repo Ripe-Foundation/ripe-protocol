@@ -246,17 +246,33 @@ logic. Then:
    `86400` seconds. Apply a
    nonzero equity override only to a feed whose address and acceptance evidence
    have been separately approved; the policy table is not feed evidence.
+   A nonzero local stale time is an absolute per-feed policy, not a cap on
+   MissionControl: a later global tightening does not tighten that route.
+   `updatePriceFeed(..., 0)` preserves the active local policy during a feed
+   rotation. Use `updateStaleTime(asset, 0)` to restore global inheritance, or
+   `updateStaleTime(asset, nonzero)` to change only the local policy.
 3. Bind the pure strict qualifiers to the staged candidate objects. Run the
-   RedStone local- and cross-source route census and abort on any collision,
-   unsafe conversion route, unmatched timelock action, or incomplete RPC
-   discovery. Run the same generation-independent conversion-graph census for
-   Chainlink. Before rotating either Chainlink ETH/USD or BTC/USD anchor,
+   RedStone semantic conversion-route census for every proposed add, update,
+   and confirmation across active and pending RedStone configs and every
+   active and pending address-valued ETH route in the other PriceDesk sources.
+   Compare actual asset, feed, and anchor semantics rather than trusting
+   registry or source labels, and abort on any collision, unsafe conversion
+   route, unmatched timelock action, or incomplete RPC discovery. Run the same
+   generation-independent conversion-graph census for Chainlink. Before
+   rotating either Chainlink ETH/USD or BTC/USD anchor,
    enumerate all active and pending dependents and abort if the proposed anchor
    makes any dependent unusable or any required read is incomplete.
 4. Confirm every source runtime identity, pending action, active feed, stored
    stale time, effective stale-time interpretation, and pause state. Source
    pause freezes administrative mutation; it is not a price circuit breaker,
    and the source must be unpaused before governance can remediate a feed.
+   Treat `updateStaleTime` as a timelocked policy change, not a kill switch. If
+   a tighter candidate cannot validate the unchanged feed at confirmation, the
+   active policy remains in force and the action remains pending for retry
+   after freshness recovers or explicit cancellation. If governance needs the
+   feed to fail closed instead of waiting, use the disable lifecycle and
+   confirm it as soon as its timelock permits; disable confirmation does not
+   depend on a fresh price.
 5. Flip RipeHq PriceDesk ID `7` last. Immediately read back ID `7`, source IDs,
    priority order, global and local stale times, representative direct and
    conversion prices, and the absence of pending actions.

@@ -46,7 +46,7 @@ EXPECTED_RUNTIME_BYTES = {
     "ChainlinkPrices": 16091,
     "CurvePrices": 23966,
     "PythPrices": 16055,
-    "RedStone": 14986,
+    "RedStone": 14985,
     "StorkPrices": 15067,
     "UndyVaultPrices": 17689,
     "wsuperOETHbPrices": 8336,
