@@ -190,6 +190,7 @@ def set_stored(new_value: uint256):
     deploy_args = SimpleNamespace(
         ignore_logs=False,
         rpc="redacted",
+        chain="robinhood-mainnet",
         sender=SimpleNamespace(address=boa.env.eoa),
     )
 
@@ -199,13 +200,22 @@ def set_stored(new_value: uint256):
     assert result == NO_OUTPUT_TRANSACTION_RESULT
     assert result
     assert contract.stored() == 41
-    assert json.loads((tmp_path / "2-log.json").read_text()) == {
-        "transactions": [NO_OUTPUT_TRANSACTION_RESULT]
+    record = json.loads((tmp_path / "2-log.json").read_text())["transactions"][0]
+    assert record == {
+        **migration._transaction_intent(contract.set_stored, (41,), {}),
+        "receipt": NO_OUTPUT_TRANSACTION_RESULT,
     }
 
     resumed = Migration(deploy_args, {}, "2", "1", str(tmp_path))
-    assert resumed.execute(contract.set_stored, 99) == NO_OUTPUT_TRANSACTION_RESULT
+    assert resumed.execute(contract.set_stored, 41) == NO_OUTPUT_TRANSACTION_RESULT
     assert contract.stored() == 41
+
+    changed = Migration(deploy_args, {}, "2", "1", str(tmp_path))
+    with pytest.raises(
+        RuntimeError,
+        match="MIGRATION_TRANSACTION_CALLDATA_MISMATCH",
+    ):
+        changed.execute(contract.set_stored, 99)
 
 
 @pytest.mark.parametrize("explicit_amount", (False, True))
@@ -225,6 +235,7 @@ def bump(amount: uint256 = 1):
     deploy_args = SimpleNamespace(
         ignore_logs=False,
         rpc="redacted",
+        chain="robinhood-mainnet",
         sender=SimpleNamespace(address=boa.env.eoa),
     )
     call_args = (7,) if explicit_amount else ()
@@ -235,8 +246,10 @@ def bump(amount: uint256 = 1):
 
     assert result == NO_OUTPUT_TRANSACTION_RESULT
     assert contract.count() == expected
-    assert json.loads((tmp_path / "2-log.json").read_text()) == {
-        "transactions": [NO_OUTPUT_TRANSACTION_RESULT]
+    record = json.loads((tmp_path / "2-log.json").read_text())["transactions"][0]
+    assert record == {
+        **migration._transaction_intent(contract.bump, call_args, {}),
+        "receipt": NO_OUTPUT_TRANSACTION_RESULT,
     }
 
     resumed = Migration(deploy_args, {}, "2", "1", str(tmp_path))

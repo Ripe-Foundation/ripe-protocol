@@ -77,9 +77,9 @@ class MigrationRunner:
             raise MigrationHistoryError(
                 "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
                 f"{self.history_dir} already holds a deployed "
-                "current-manifest.json, and the auto-resume checkpoint does not "
-                "record migrations that deploy nothing. Pass --start-timestamp "
-                "naming the first migration to run."
+                "current-manifest.json. Pass --start-timestamp naming the first "
+                "migration to run; the default would select deployed history "
+                "from the beginning."
             )
 
         known = self._known_migration_timestamps()
@@ -118,6 +118,12 @@ class MigrationRunner:
         named `current-manifest.json` will be also be saved in the history directory,
         duplicating the manifest of the latest migration.
         """
+        if not __debug__:
+            raise MigrationHistoryError(
+                "MIGRATION_OPTIMIZED_MODE_FORBIDDEN: migrations require Python "
+                "assertions because deployment validation must not be stripped"
+            )
+
         self._require_start_point(deploy_args, start_timestamp)
 
         for migrate, timestamp, prev_timestamp in self._migrations(start_timestamp, end_timestamp):

@@ -18,6 +18,10 @@ from scripts.utils import log
 MAX_ADDRESS = 2**160 - 1
 
 
+class LedgerDeploymentValidationError(RuntimeError):
+    """Raised when node-backed Ledger deployment validation fails."""
+
+
 def _load_web3():
     from web3 import Web3
 
@@ -55,7 +59,10 @@ def _normalize_expected_source(expected_source):
 def _read_word(w3, contract_address, signature):
     selector = w3.keccak(text=signature)[:4]
     result = w3.eth.call({"to": contract_address, "data": selector})
-    assert len(result) == 32, f"malformed {signature} readback"
+    if len(result) != 32:
+        raise LedgerDeploymentValidationError(
+            f"malformed {signature} readback"
+        )
     return int.from_bytes(result, "big")
 
 
@@ -81,15 +88,22 @@ def validate_ledger_action_block_source(
                 "has no real RPC."
             )
             return None
-        raise AssertionError("production Ledger requires a real RPC node")
+        raise LedgerDeploymentValidationError(
+            "production Ledger requires a real RPC node"
+        )
 
     Web3 = _load_web3()
     try:
         w3 = Web3(Web3.HTTPProvider(rpc))
         connected = w3.is_connected()
     except Exception as exc:
-        raise AssertionError("production Ledger RPC is unavailable") from exc
-    assert connected, "production Ledger RPC is unavailable"
+        raise LedgerDeploymentValidationError(
+            "production Ledger RPC is unavailable"
+        ) from exc
+    if not connected:
+        raise LedgerDeploymentValidationError(
+            "production Ledger RPC is unavailable"
+        )
 
     address = w3.to_checksum_address(ledger_address)
     code = w3.eth.get_code(address)
@@ -100,14 +114,22 @@ def validate_ledger_action_block_source(
                 "only in the local/fork EVM."
             )
             return None
-        raise AssertionError("Ledger is not deployed on the configured RPC")
+        raise LedgerDeploymentValidationError(
+            "Ledger is not deployed on the configured RPC"
+        )
 
     actual_source = _read_word(w3, address, "ACTION_BLOCK_SOURCE()")
-    assert actual_source == normalized_source, "Ledger action-block source mismatch"
+    if actual_source != normalized_source:
+        raise LedgerDeploymentValidationError(
+            "Ledger action-block source mismatch"
+        )
 
     if normalized_source == 0:
         return 0, None
 
     action_block = _read_word(w3, address, "getArbActionBlock()")
-    assert action_block != 0, "ArbSys action block reads zero"
+    if action_block == 0:
+        raise LedgerDeploymentValidationError(
+            "ArbSys action block reads zero"
+        )
     return actual_source, action_block

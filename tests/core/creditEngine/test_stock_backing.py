@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import re
 import statistics
 import sys
@@ -12,9 +13,18 @@ import pytest
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
-C2_MEASUREMENT_INTERPRETER = Path(
-    "/Users/wigglez/dev/ripe-protocol-validation-envs/"
-    "rh-wave2-py312/bin/python"
+_C2_INTERPRETER_PATH = os.environ.get("RIPE_C2_MEASUREMENT_INTERPRETER")
+C2_MEASUREMENT_INTERPRETER = (
+    Path(_C2_INTERPRETER_PATH).resolve()
+    if _C2_INTERPRETER_PATH
+    else (
+        Path.home()
+        / "dev"
+        / "ripe-protocol-validation-envs"
+        / "rh-wave2-py312"
+        / "bin"
+        / "python"
+    ).resolve()
 )
 
 
@@ -880,7 +890,9 @@ def test_c1_max_withdrawable_numeric_null_and_terms_failure_surface(
 
 @pytest.mark.skipif(
     Path(sys.executable).resolve() != C2_MEASUREMENT_INTERPRETER,
-    reason="sealed C2 gas protocol requires the attested RH validation venv",
+    reason=(
+        "sealed C2 gas protocol requires the attested RH validation interpreter"
+    ),
 )
 @pytest.mark.gas
 def test_c2_marginal_gas_protocol(

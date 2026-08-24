@@ -337,7 +337,7 @@ def migrate(migration: Migration):
         migration,
         ledger.address,
         LEDGER_ACTION_BLOCK_SOURCE,
-        allow_local_preview=True,
+        allow_local_preview=migration.is_local_preview(),
     )
     if validation is None:
         log.h2("Ledger node-backed validation skipped for local/fork preview")

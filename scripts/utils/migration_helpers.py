@@ -253,10 +253,13 @@ def execute_transaction(transaction, *args, **kwargs):
             # URLs, keys, or calldata, and what a driver puts in a message
             # cannot be enumerated in advance. Retrying twenty times on a
             # deterministic revert with only a code is painful to debug, so
-            # RIPE_MIGRATE_TRACE=1 opts in to the cause, with URLs stripped.
+            # RIPE_MIGRATE_TRACE=1 opts in to the cause, with complete URLs
+            # stripped. Preserving the authority is unsafe because an RPC URL
+            # may carry HTTP basic-auth credentials as userinfo.
             if os.environ.get("RIPE_MIGRATE_TRACE"):
                 detail = re.sub(
-                    r"(https?://[^/\s]+)[^\s]*", r"\1/<redacted>",
+                    r"(?i)\bhttps?://[^\s\"'<>]+",
+                    "<redacted-url>",
                     f"{type(exception).__name__}: {exception}",
                 )
                 log.error(f"\tH02_TRANSACTION_FAILED {detail}\n")

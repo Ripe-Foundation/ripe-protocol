@@ -1,4 +1,4 @@
-"""Wire the CCIP pools to the remote chain and hand them to the Safe.
+"""Prepare CCIP wiring and print the remaining Safe execution plan.
 
 Base note: the tokens here have no getCCIPAdmin(), owner() or any other hook
 RegistryModuleOwnerCustom knows how to read, so the CCIP admin role cannot be
@@ -19,7 +19,9 @@ replace the router, and a hostile router can nominate ramps that reach the
 pool's mint path -- so this ordering is what makes a deployer-run deployment
 safe without deploying from the Safe itself.
 
-Everything the Safe has to do is printed at the end as calldata.
+Everything the Safe has to do is printed at the end as calldata. Completion of
+this migration records only that the preparation stage ran; activation is not
+complete until ``2026082401_CcipActivationFinalized`` succeeds.
 """
 
 from config.Ccip import (
@@ -513,3 +515,8 @@ def migrate(migration: Migration):
         )
     if hq_append_plan_sha256 is not None:
         log.info(f"\tApproved HQ append plan SHA-256: {hq_append_plan_sha256}")
+
+    log.info(
+        "\tActivation completion is recorded only by "
+        "2026082401_CcipActivationFinalized."
+    )

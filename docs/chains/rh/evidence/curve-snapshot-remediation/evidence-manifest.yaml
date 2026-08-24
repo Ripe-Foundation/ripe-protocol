@@ -152,8 +152,8 @@ artifacts:
     deselected: 0
     duration_seconds: 47.73
   - file: fail-first-4a72a1f-junit.xml
-    sha256: 0dcc4e8eba5d9072d67ffff6e8d150df763fc142a340e66a2f3b1e6ee5f40a26
-    bytes: 14417
+    sha256: 72f446a9f173b7baa2cd2e29dde0335df164bcc10bb013f3281dd78a6edfea54
+    bytes: 14415
     tests: 4
     passed: 0
     failed: 4

@@ -43,9 +43,9 @@ evidence for the delivered tip.
 ## 2. Environment and machine
 
 ```text
-Interpreter : /Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+Interpreter : ${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
 Python      : 3.12.0    IPython 9.8.0    pytest 8.4.2    vyper 0.4.3
-Machine     : Wigglez-MacStudio-2025, macOS 26.5.2 (25F84), Darwin 25.5.0 arm64
+Machine     : <validation-host>, macOS 26.5.2 (25F84), Darwin 25.5.0 arm64
 ```
 
 Every run below set `ETHERSCAN_API_KEY=local-placeholder` and private mode-0700
@@ -579,7 +579,7 @@ Task-created checkouts, and their disposition:
 
 | Path | Kind | Disposition |
 | --- | --- | --- |
-| `/Users/wigglez/dev/ripe-protocol-rh-simplification` | worktree | **retained** — this is the deliverable |
+| `${HOME}/dev/ripe-protocol-rh-simplification` | worktree | **retained** — this is the deliverable |
 | `/private/tmp/rh-simplification-reference.1upxPJ/baseline` | worktree | destroyed by an external sweep mid-run; that run was discarded |
 | `/private/tmp/rh-simplification-reference.bsrpMD/baseline` | worktree | removed after use, verified clean |
 | `/private/tmp/rh-simplification-validation.QirtkD/candidate` | worktree | removed after use, verified clean |
@@ -709,8 +709,8 @@ checkout (`baseline-clone` at `6260726`, `candidate2-clone` at `6781cb2`), the
 same clone-not-worktree isolation Section 2 describes. Both checkouts were
 clean at run time and each `HEAD` was re-read after every lane. Interpreter and
 machine match Section 2 and were confirmed from the run artifacts themselves:
-`/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312` (Python
-3.12), host `Wigglez-MacStudio-2025.local`, run 2026-08-07.
+`${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312` (Python
+3.12), host `<validation-host>.local`, run 2026-08-07.
 
 ### Suite results
 

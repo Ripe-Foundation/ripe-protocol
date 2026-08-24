@@ -230,10 +230,10 @@ Do not deploy. Redeploy is a later RipeHq swap.
 
 Do **all** contract and test edits in a **new git worktree and a
 new branch**. Do not edit
-`/Users/wigglez/dev/ripe-protocol-user-flow-audit`
+`${HOME}/dev/ripe-protocol-user-flow-audit`
 (`docs/rh-user-flow-audit-priority` — dirty, other groups). Do not
-work in `/Users/wigglez/dev/ripe-protocol` or
-`/Users/wigglez/dev/ripe-protocol-rh`.
+work in `${HOME}/dev/ripe-protocol` or
+`${HOME}/dev/ripe-protocol-rh`.
 
 Start point is the contract baseline
 `3822a59273a3b1baaff5831d288954ac2c072fc6` (this guide’s size pin).
@@ -243,8 +243,8 @@ the combined report are **not** in that commit. Copy **only** those
 two files. Do not copy other dirty / untracked files.
 
 ```
-SRC=/Users/wigglez/dev/ripe-protocol-user-flow-audit
-WT=/Users/wigglez/dev/ripe-protocol-user-flow-audit-g10-impl
+SRC=${HOME}/dev/ripe-protocol-user-flow-audit
+WT=${HOME}/dev/ripe-protocol-user-flow-audit-g10-impl
 PIN=3822a59273a3b1baaff5831d288954ac2c072fc6
 
 test ! -e "$WT" || { echo "worktree path exists; stop"; exit 1; }
@@ -277,7 +277,7 @@ Do not recreate over a dirty tree. Do not edit `$SRC` after this.
 No `.venv` here. Interpreter and cache:
 
 ```
-RIPE_PYTHON=/Users/wigglez/dev/ripe-protocol/.venv/bin/python
+RIPE_PYTHON=${HOME}/dev/ripe-protocol/.venv/bin/python
 RIPE_BOA_CACHE_DIR="${TMPDIR:-/tmp}/ripe-boa-cache-g10"
 ```
 
@@ -877,7 +877,7 @@ All four nodes. Expected model changes (do this up front, not
 ## Commands
 
 ```
-RIPE_PYTHON=/Users/wigglez/dev/ripe-protocol/.venv/bin/python
+RIPE_PYTHON=${HOME}/dev/ripe-protocol/.venv/bin/python
 RIPE_BOA_CACHE_DIR="${TMPDIR:-/tmp}/ripe-boa-cache-g10"
 
 g10_pytest() {
@@ -986,7 +986,7 @@ sGREEN-as-claim (Group 12). Measuring AH 21st-receipt routing
 ## Done
 
 - Worked only in
-  `/Users/wigglez/dev/ripe-protocol-user-flow-audit-g10-impl` on
+  `${HOME}/dev/ripe-protocol-user-flow-audit-g10-impl` on
   `impl/g10-stab-claim-membership`. Dirty audit checkout untouched.
 - HEAD was exactly `3822a59273a3b1baaff5831d288954ac2c072fc6`.
 - #1, #2, #3, and row B landed as prescribed, **or** a hunk was

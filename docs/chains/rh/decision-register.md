@@ -1471,7 +1471,7 @@ Those close the 08-18 gas-ceiling findings; they are not production
 chain gas limits.
 
 Pyth `Bytes[2048]` is conditionally qualified for this head. Durable
-record: `/Users/wigglez/dev/ripe-pr193-pyth-evidence` and PR #193
+record: `${HOME}/dev/ripe-pr193-pyth-evidence` and PR #193
 comment
 https://github.com/Ripe-Foundation/ripe-protocol/pull/193#issuecomment-5351468833.
 Hermes samples measure 963 + 348·n bytes (at most 3 feeds per element,

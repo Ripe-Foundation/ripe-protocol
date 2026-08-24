@@ -529,6 +529,40 @@ def test_execute_transaction_failure_never_logs_exception_text(capsys):
         assert component not in rendered
 
 
+def test_execute_transaction_trace_redacts_complete_authenticated_rpc_url(
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setenv("RIPE_MIGRATE_TRACE", "1")
+    failure_text = (
+        "synthetic provider failure "
+        "https://synthetic-user:synthetic-password@rpc.invalid.example/"
+        "path-token?api=query-token#fragment-token"
+    )
+
+    def fail():
+        raise RuntimeError(failure_text)
+
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+    ):
+        migration_helpers.execute_transaction(fail)
+    rendered = capsys.readouterr().out
+
+    assert "RuntimeError: synthetic provider failure" in rendered
+    assert "<redacted-url>" in rendered
+    for component in (
+        "https://",
+        "synthetic-user",
+        "synthetic-password",
+        "rpc.invalid.example",
+        "path-token",
+        "query-token",
+        "fragment-token",
+    ):
+        assert component not in rendered
+
+
 def test_execute_transaction_none_result_fails_without_replay():
     calls = []
 

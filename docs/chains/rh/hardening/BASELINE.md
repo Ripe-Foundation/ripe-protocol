@@ -26,13 +26,13 @@ preserving the same fail-closed 35-path ceiling.
 | Authoritative source tree | `be5d2dc78842550fda2c8c1fd4cb72bb6fbefadb` |
 | Source branch | `rh` |
 | Candidate branch | `rh-hardening-post-h05-reconciliation` |
-| Candidate worktree | `/Users/wigglez/dev/ripe-protocol-rh-hardening-post-h05-reconciliation` |
+| Candidate worktree | `${HOME}/dev/ripe-protocol-rh-hardening-post-h05-reconciliation` |
 | Historical hardening tip | `2c7f09381888beb54322628fec44d284bcec5063` |
 | Historical hardening tree | `8d100da5cdf40181c411afb8c0d28f7cc4e867bf` |
 | Merge base | `a86650b187c523f27c92f05bfe959d06840025a6` |
 | Reconciliation scope | exactly 35 paths; no production contract, interface, ABI, dependency, or migration execution path |
 | Compiler settings | Source-governed optimization: Teller, CreditEngine, and Lootbox `codesize`; GuardedErc20 and Ledger Vyper-default `gas`; no `-O` override; `experimental_codegen=false` |
-| Interpreter | `/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python` |
+| Interpreter | `${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python` |
 | Python executable SHA-256 | `d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765` |
 | Exact requirement pins | `92` |
 | Requirement deviations | `0` |
@@ -55,7 +55,7 @@ history.
 | Baseline commit | `a86650b187c523f27c92f05bfe959d06840025a6` |
 | Reviewed implementation snapshot | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` |
 | Branch | `rh-hardening` |
-| Worktree | `/Users/wigglez/dev/ripe-protocol-rh-hardening` |
+| Worktree | `${HOME}/dev/ripe-protocol-rh-hardening` |
 | Source branch captured once | `rh` |
 | Compiler settings | Source-governed optimization: Teller, CreditEngine, and Lootbox `codesize`; GuardedErc20 and Ledger Vyper-default `gas`; no `-O` override; `experimental_codegen=false` |
 | Interpreter | `/private/tmp/ripe-rh-final-gate2.uZCfBL/venv/bin/python` |
