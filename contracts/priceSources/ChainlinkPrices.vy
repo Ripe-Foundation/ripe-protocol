@@ -155,8 +155,10 @@ def __init__(
 
 @internal
 def _setDefaultFeedOnDeploy(_asset: address, _newFeed: address, _staleTime: uint256) -> bool:
-    decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
-    if not self._isValidNewFeed(_asset, _newFeed, decimals, False, False, _staleTime):
+    hasDecimals: bool = False
+    decimals: uint256 = 0
+    hasDecimals, decimals = self._readFeedDecimals(_newFeed)
+    if not hasDecimals or not self._isValidNewFeed(_asset, _newFeed, decimals, False, False, _staleTime):
         return False
     self.feedConfig[_asset] = ChainlinkConfig(
         feed=_newFeed,
@@ -257,6 +259,30 @@ def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
     return min(_callerBound, _feedBound)
 
 
+@view
+@internal
+def _readFeedDecimals(_feed: address) -> (bool, uint256):
+    if _feed == empty(address):
+        return False, 0
+
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _feed,
+        method_id("decimals()", output_type=Bytes[4]),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, 0
+
+    decimals: uint256 = abi_decode(response, uint256)
+    if decimals > 255:
+        return False, 0
+    return True, decimals
+
+
 ##################
 # Chainlink Data #
 ##################
@@ -271,17 +297,19 @@ def getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256 = 0
 @view
 @internal
 def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -> uint256:
-    if _feed == empty(address):
+    if _feed == empty(address) or _decimals > NORMALIZED_DECIMALS:
+        return 0
+
+    hasDecimals: bool = False
+    liveDecimals: uint256 = 0
+    hasDecimals, liveDecimals = self._readFeedDecimals(_feed)
+    if not hasDecimals or liveDecimals != _decimals:
         return 0
 
     oracle: ChainlinkRound = staticcall ChainlinkFeed(_feed).latestRoundData()
 
     # oracle has no price
     if oracle.answer <= 0:
-        return 0
-
-    # bad decimals
-    if _decimals > NORMALIZED_DECIMALS:
         return 0
 
     # cannot have future timestamp
@@ -328,10 +356,10 @@ def addNewPriceFeed(
     assert not priceData.isPaused # dev: contract paused
 
     # validation
+    hasDecimals: bool = False
     decimals: uint256 = 0
-    if _newFeed != empty(address):
-        decimals = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
-    assert self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
+    hasDecimals, decimals = self._readFeedDecimals(_newFeed)
+    assert hasDecimals and self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -434,11 +462,11 @@ def updatePriceFeed(
     assert not priceData.isPaused # dev: contract paused
 
     # validation
+    hasDecimals: bool = False
     decimals: uint256 = 0
-    if _newFeed != empty(address):
-        decimals = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
+    hasDecimals, decimals = self._readFeedDecimals(_newFeed)
     oldFeed: address = self.feedConfig[_asset].feed
-    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
+    assert hasDecimals and self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
