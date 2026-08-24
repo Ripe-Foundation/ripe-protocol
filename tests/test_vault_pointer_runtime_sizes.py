@@ -19,8 +19,11 @@ EIP170_LIMIT = 24_576
 # exact-payment, and Stability-local claimable-aware retirement remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
-# SwitchboardBravo and CurvePrices retain only 26 and 124 bytes of headroom,
-# respectively. Any edit to either contract must recompile and remeasure.
+# SwitchboardBravo retains only 26 bytes of headroom. CurvePrices retains 1,170
+# bytes after switching to codesize optimization for confirmation-time registry
+# snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
+# metadata binding and checked runtime arithmetic. Any edit to these contracts
+# must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
     "SwitchboardAlpha": 24557,
@@ -49,11 +52,11 @@ EXPECTED_RUNTIME_BYTES = {
     "StabilityPool": 24276,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 14597,
-    "CurvePrices": 24452,
+    "CurvePrices": 23406,
     "PythPrices": 14811,
     "RedStone": 13982,
     "StorkPrices": 13832,
-    "UndyVaultPrices": 17689,
+    "UndyVaultPrices": 18306,
     "wsuperOETHbPrices": 8336,
 }
 

@@ -2,6 +2,7 @@
 # Ripe Foundation (C) 2026
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: PriceSource
 
@@ -599,10 +600,10 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate the pending admission-time config; do not reconstruct MetaRegistry
+    # bind confirmation to the reviewed MetaRegistry snapshot
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending new feed
-    if not self._isValidNewFeedStructure(_asset, d.config):
+    if not self._isCurrentCurvePoolConfig(d.config) or not self._isValidNewFeedStructure(_asset, d.config):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -710,11 +711,11 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate the pending admission-time config; do not reconstruct MetaRegistry
+    # bind confirmation to the reviewed MetaRegistry snapshot
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending update feed
     prevPool: address = self.curveConfig[_asset].pool
-    if not self._isValidUpdateFeedStructure(_asset, d.config, prevPool):
+    if not self._isCurrentCurvePoolConfig(d.config) or not self._isValidUpdateFeedStructure(_asset, d.config, prevPool):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -956,6 +957,13 @@ def _getCurvePoolConfig(_pool: address) -> CurvePriceConfig:
 
 @view
 @internal
+def _isCurrentCurvePoolConfig(_expected: CurvePriceConfig) -> bool:
+    current: CurvePriceConfig = self._getCurvePoolConfig(_expected.pool)
+    return keccak256(abi_encode(current)) == keccak256(abi_encode(_expected))
+
+
+@view
+@internal
 def _getPoolType(_pool: address, _mr: address) -> PoolType:
     # check what type of pool this is based on where it's registered on Curve
     registryHandlers: address[10] = staticcall CurveMetaRegistry(_mr).get_registry_handlers_from_pool(_pool)
@@ -1035,10 +1043,17 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate pending parameter bounds and current pool-observation usability
+    # bind confirmation to the reviewed MetaRegistry/token-metadata snapshot
     d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
     assert d.pool != empty(address) # dev: no pending update
     assert self._isValidPendingGreenRefPoolConfig(d) # dev: invalid ref pool config
+    currentPoolConfig: CurvePriceConfig = self._getCurvePoolConfig(d.pool)
+    if (
+        not self._isValidGreenRefPoolIdentity(currentPoolConfig, d, GREEN)
+        or convert(staticcall IERC20Detailed(d.altAsset).decimals(), uint256) != d.altAssetDecimals
+    ):
+        self._cancelGreenRefPoolConfig(_aid)
+        return False
 
     # check time lock
     assert timeLock._confirmAction(_aid) # dev: time lock not reached
@@ -1109,11 +1124,16 @@ def cancelGreenRefPoolConfig(_aid: uint256) -> bool:
     d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
     assert d.pool != empty(address) # dev: no pending update
     
-    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
-    self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
+    self._cancelGreenRefPoolConfig(_aid)
 
     log GreenRefPoolConfigUpdateCancelled(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks, stabilizerAdjustWeight=d.stabilizerAdjustWeight, stabilizerMaxPoolDebt=d.stabilizerMaxPoolDebt)
     return True
+
+
+@internal
+def _cancelGreenRefPoolConfig(_aid: uint256):
+    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
 
 
 # validation
@@ -1186,6 +1206,26 @@ def _isValidGreenRefPoolConfig(
     _stabilizerMaxPoolDebt: uint256,
     _greenToken: address,
 ) -> bool:
+    if not self._isValidGreenRefPoolIdentity(_poolConfig, _refConfig, _greenToken):
+        return False
+
+    return self._isValidGreenRefPoolParams(
+        _refConfig,
+        _maxNumSnapshots,
+        _dangerTrigger,
+        _staleBlocks,
+        _stabilizerAdjustWeight,
+        _stabilizerMaxPoolDebt,
+    )
+
+
+@view
+@internal
+def _isValidGreenRefPoolIdentity(
+    _poolConfig: CurvePriceConfig,
+    _refConfig: GreenRefPoolConfig,
+    _greenToken: address,
+) -> bool:
     if _poolConfig.pool != _refConfig.pool or _poolConfig.lpToken != _refConfig.lpToken:
         return False
 
@@ -1203,15 +1243,7 @@ def _isValidGreenRefPoolConfig(
 
     if _poolConfig.underlying[1 - _refConfig.greenIndex] != _refConfig.altAsset:
         return False
-
-    return self._isValidGreenRefPoolParams(
-        _refConfig,
-        _maxNumSnapshots,
-        _dangerTrigger,
-        _staleBlocks,
-        _stabilizerAdjustWeight,
-        _stabilizerMaxPoolDebt,
-    )
+    return True
 
 
 ########################
