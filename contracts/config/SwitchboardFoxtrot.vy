@@ -144,7 +144,7 @@ def __init__(
 @internal
 def _getRipeReserveEngineAddr() -> address:
     engine: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_RESERVE_ENGINE_ID)
-    assert engine != empty(address) # dev: invalid engine
+    assert engine != empty(address) and engine.is_contract # dev: invalid engine
     return engine
 
 

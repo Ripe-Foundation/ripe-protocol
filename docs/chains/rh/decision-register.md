@@ -472,11 +472,14 @@ work.
 every external-state phase remain blocked.
 
 Select unchanged `CurvePrices` at PriceDesk ID 2 for GREEN only, while keeping
-Chainlink at ID 1, IDs 4 and 5 empty, and priority IDs `[1, 2]`. BlueChipYield
-remains structurally selected at ID 3 in the blueprint but is deliberately not
-deployed or finalized by the current production-remediation candidate. The
-exact configured route is GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink
-USDG. USDG has no Curve feed, so the route cannot recurse.
+Chainlink at ID 1 and priority IDs `[1, 2]`. Before PR #206, live ID 3 remains
+the legacy functional UniswapV2Prices fallback; priority ordering does not
+disable it. The required PR #206 fresh-generation history must replace it with
+the authenticated inert monitor before this launch disposition can be
+realized. BlueChipYield, Pyth, and Stork remain unassigned on Robinhood. Any
+future activation must select a chain-local PriceDesk ID in a separately
+reviewed change. The exact configured route is GREEN -> Curve GREEN/USDG ->
+PriceDesk -> Chainlink USDG. USDG has no Curve feed, so the route cannot recurse.
 
 This decision does not admit either LP token, add another Curve feed or
 consumer, enable dynamic rates, create Teller reference snapshots, enable
@@ -1437,32 +1440,77 @@ and the pending action survives until cancel or expiry. Other registered
 switchboards may write raw or empty lists directly. The execution event
 reports the sanitized count only; it does not emit the id list.
 
+**24 August 2026 — F31 proposal-time validation disposition.** The relevant
+SwitchboardAlpha and SwitchboardDelta actions store the already-resolved
+MissionControl address when proposed. A later RipeHq MissionControl rotation
+therefore does not retarget either pending action. The following are separate
+proposal-to-confirmation policies, not MissionControl-retargeting defects:
+
+- **Alpha `RIPE_VAULT_CONFIG`: proposal-time validation ratified.** Proposal validates
+  the asset against the target MissionControl's
+  then-current core RipeGov vault id and supported-asset topology, as well as
+  the bounded weight and lock terms. Confirmation writes the reviewed values to
+  that same pinned MissionControl without re-reading its live core-vault id or
+  asset classification. The governance risk is that another action can change
+  that target topology during the timelock and leave the queued config stale but
+  executable. The owner accepted proposal-time validation: governance must
+  serialize core RipeGov vault/asset topology changes against pending
+  `RIPE_VAULT_CONFIG` actions, cancel any stale proposal before changing that
+  topology, and repropose against the new state. This ratification does not
+  authorize deployment or execution.
+- **Delta Underscore registry: deferred and not ratified for nonzero
+  activation.** Proposal checks the candidate root, Ledger, optional vault
+  registry, and optional LegoBook interfaces; confirmation writes the candidate
+  to the pinned MissionControl without repeating those calls. A mutable
+  registry can therefore drift during the timelock and activate an invalid or
+  unsafe trust graph. Robinhood's zero-registry default remains controlling,
+  and issue #161 plus a fresh activation package must either add confirmation
+  revalidation or bind and re-check an accepted immutable topology before any
+  nonzero registry is configured.
+
 PriceDesk must precede the new RedStone selector during deployment.
 
-Metadata captured through typed calls at governance admission is
-authoritative until governance updates or disables the configuration.
-Chainlink and RedStone cache feed decimals at proposal (and Chainlink
-constructor capture on deploy). Price scaling uses that cached value.
-They do not re-read live decimals on confirm or price. Decimal drift
-during the pending timelock is inside the accepted risk: confirmation
-admits the cached decimals and can mis-scale immediately. After
-admission, a later feed-decimal change can mis-scale prices by
-`10 ** abs(oldDecimals - newDecimals)` until governance acts. Curve
-ordinary and GREEN-reference feeds keep proposal-time MetaRegistry
-metadata and alternative-token decimals; confirmation still validates
-pending parameter bounds, live prices, timestamps, rounds, pool
-observations, snapshots, recursion, permissions, and timelocks, but
-does not reconstruct MetaRegistry metadata. Governance must update or
-disable a configuration if identity or decimals change.
+Metadata captured through typed calls and admitted by governance remains the
+runtime authority until governance updates or disables the configuration.
+Chainlink and RedStone snapshot feed decimals at proposal (with Chainlink also
+capturing constructor-configured feed decimals at deployment). Confirmation
+re-reads the live feed decimals and requires an exact match to the pending
+snapshot; mismatch, failure, or malformed metadata cancels the pending action
+without adopting the live value. Runtime pricing then trusts the confirmed
+cached decimals and does not call `decimals()`. A post-confirmation decimal
+change can therefore still mis-scale prices by
+`10 ** abs(oldDecimals - newDecimals)` until governance acts.
 
-Registered Underscore Earn Vaults and their underlyings are trusted not
-to change asset() or decimals. If an upgrade changes either, governance
-must disable and re-register the feed. This reverses PR #193's
-live-identity checks; a changed identity serves mis-scaled prices until
-disabled. When `maxUpsideDeviation` is nonzero, newly snapshotted upside
-is throttled; when it is zero, upside passes through unthrottled.
-Downside is accepted immediately. Undy ignores the PriceDesk-forwarded
-stale bound and uses only the per-feed config stale time.
+Curve ordinary-feed confirmation re-derives the live MetaRegistry pool config
+and exact-matches the complete pending topology; it never adopts newly observed
+metadata. GREEN-reference confirmation likewise re-derives and exact-matches
+the pool, LP token, coins, GREEN index, alternative asset, and the alternative
+asset's live decimals. Drift cancels the pending action. Runtime pricing trusts
+the confirmed snapshots, so later registry or decimal drift still requires a
+governance update or disable.
+
+Undy new-feed proposals snapshot the vault's `asset()`, underlying decimals,
+and vault-token decimals. Update proposals carry forward that already-confirmed
+metadata while changing policy fields. Both confirmation paths re-read the
+three live values and require exact equality with the pending snapshot; drift
+cancels without adopting the changed metadata. Runtime pricing trusts the
+confirmed snapshot, so a post-confirmation identity or decimal change remains
+a governed disable-and-re-register risk. When `maxUpsideDeviation` is nonzero,
+newly snapshotted upside is throttled; when it is zero, upside passes through
+unthrottled. Downside is accepted immediately. Undy ignores the
+PriceDesk-forwarded stale bound and uses only the per-feed config stale time.
+
+**24 August 2026 — F16 partial-reservation liquidation admission.**
+AuctionHouse sizes a Stability Pool payment from the receiver's raw token
+custody, while StabilityPool settlement can transfer only custody not reserved
+for claims. `canAcceptLiquidationAsset` therefore rejects a receiver cohort
+whenever `totalClaimableBalances[stabAsset]` is nonzero, including a partial
+reservation, before collateral moves. AuctionHouse may try a later priority
+pool and otherwise uses its configured ordinary-auction fallback. This is a
+deliberately conservative receiver rule: the cohort is unavailable even when
+some custody is unreserved, and the claimable-GREEN optimization is skipped,
+until the aggregate reservation clears. The user's own StabilityPool position
+remains visible to liquidation enumeration; only receiver admission changes.
 
 StabVault local-EVM claim ceilings after PriceDesk streamlining:
 `claim_many` measured 7,210,169 against 7,250,000 (0.55% headroom);
@@ -1471,7 +1519,7 @@ Those close the 08-18 gas-ceiling findings; they are not production
 chain gas limits.
 
 Pyth `Bytes[2048]` is conditionally qualified for this head. Durable
-record: `/Users/wigglez/dev/ripe-pr193-pyth-evidence` and PR #193
+record: `${HOME}/dev/ripe-pr193-pyth-evidence` and PR #193
 comment
 https://github.com/Ripe-Foundation/ripe-protocol/pull/193#issuecomment-5351468833.
 Hermes samples measure 963 + 348·n bytes (at most 3 feeds per element,

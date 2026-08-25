@@ -23,6 +23,7 @@ from config.network_profiles import (
 )
 from scripts import console, migrate, verify
 from scripts.utils import migration_helpers
+from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import TransactionExecutionError
 from scripts.utils.migration_runner import MigrationError
 
@@ -49,6 +50,22 @@ _SENSITIVE_RPC = (
     "https://synthetic-user:synthetic-password@rpc.invalid.example/"
     "path-token?api_key=query-token#fragment-token"
 )
+
+
+def test_deploy_args_log_representation_is_readable_and_redacts_rpc():
+    args = DeployArgs(
+        SimpleNamespace(address="0x" + "1" * 40),
+        "robinhood-mainnet",
+        False,
+        "robinhood",
+        _SENSITIVE_RPC,
+    )
+
+    rendered = repr(args)
+    assert "robinhood-mainnet" in rendered
+    assert "force_replay=False" in rendered
+    assert "rpc=<redacted>" in rendered
+    assert _SENSITIVE_RPC not in rendered
 
 
 @pytest.fixture(scope="session")
@@ -522,6 +539,42 @@ def test_execute_transaction_failure_never_logs_exception_text(capsys):
         _SENSITIVE_RPC,
         "synthetic-user",
         "synthetic-password",
+        "path-token",
+        "query-token",
+        "fragment-token",
+    ):
+        assert component not in rendered
+
+
+@pytest.mark.parametrize("scheme", ("http", "https", "ws", "wss"))
+def test_execute_transaction_trace_redacts_complete_authenticated_rpc_url(
+    scheme,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setenv("RIPE_MIGRATE_TRACE", "1")
+    failure_text = (
+        "synthetic provider failure "
+        f"{scheme}://synthetic-user:synthetic-password@rpc.invalid.example/"
+        "path-token?api=query-token#fragment-token"
+    )
+
+    def fail():
+        raise RuntimeError(failure_text)
+
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+    ):
+        migration_helpers.execute_transaction(fail)
+    rendered = capsys.readouterr().out
+
+    assert "RuntimeError: synthetic provider failure" in rendered
+    assert "<redacted-url>" in rendered
+    for component in (
+        f"{scheme}://",
+        "synthetic-user",
+        "synthetic-password",
+        "rpc.invalid.example",
         "path-token",
         "query-token",
         "fragment-token",

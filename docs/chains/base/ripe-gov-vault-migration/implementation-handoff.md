@@ -2,7 +2,7 @@
 
 **Purpose:** self-contained handoff for a fresh agent in a fresh session
 **Controlling architecture:** `docs/chains/base/ripe-gov-vault-migration/decision-plan.md`
-**Repository:** `/Users/wigglez/dev/ripe-protocol`
+**Repository:** `${HOME}/dev/ripe-protocol`
 **Historical planning baseline (not an execution lock):** `master` commit
 `91eda49ccd34a25090582aff0695075c4c806011`, tree
 `fbd958bec234081f70769045abd8f9bb638f6dd7`
@@ -32,7 +32,7 @@ fresh agent must use the user's dispatch message to determine which phase is act
 
 The owner can hand off the work with this instruction:
 
-> Work from `/Users/wigglez/dev/ripe-protocol`. Read
+> Work from `${HOME}/dev/ripe-protocol`. Read
 > `docs/chains/base/ripe-gov-vault-migration/implementation-handoff.md` and its controlling
 > `decision-plan.md` completely before acting. Rebind only the source inputs authorized for the
 > active phase; Phase 1 must defer live-chain facts and all validation to Phase 2.
@@ -233,7 +233,7 @@ the table above.
 For provenance, the former external worktree was clean at implementation commit
 `f7f42db1aa1a3a4ec3e65550a0098044b66381c2`, tree
 `863d68ef61cf194e58bae76fc27f7b703a63b2e4`, and that implementation was included in the reviewed
-RH anchor. The local `/Users/wigglez/dev/ripe-protocol-rh` worktree was stale at
+RH anchor. The local `${HOME}/dev/ripe-protocol-rh` worktree was stale at
 `be6e4e9805e9b499b10f61cd219c555e62b43857`; do not treat that worktree name as proof of current
 content. Read the relevant contract files from the current RH ref or a clean detached view, record
 their blobs/content hashes, and proceed. Do not modify either RH worktree for this Base task.

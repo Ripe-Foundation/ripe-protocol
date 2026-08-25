@@ -20,8 +20,8 @@
 
 ### Feature documentation
 
-- **[Instant Bond Lane — start-here guide](docs/instant-bond-lane/README.md)** —
-  architecture, purchase settlement, epoch pricing, governance overrides, security
+- **[Ripe Reserve Engine — start-here guide](docs/ripe-reserve-engine/README.md)** —
+  architecture, acquisition settlement, epoch pricing, governance overrides, security
   boundaries, validation, and the remaining activation gates for the draft feature.
 
 ---

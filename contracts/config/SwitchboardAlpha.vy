@@ -415,11 +415,11 @@ MAX_AUCTION_DELAY: constant(uint256) = 2**32 - 1 # protect overflow
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
-PYTH_PRICES_ID: constant(uint256) = 4
 CREDIT_ENGINE_ID: constant(uint256) = 13
 
 MIN_STALE_TIME: public(immutable(uint256))
 MAX_STALE_TIME: public(immutable(uint256))
+PYTH_PRICES_ID: immutable(uint256)
 
 
 @deploy
@@ -430,6 +430,7 @@ def __init__(
     _maxStaleTime: uint256,
     _minConfigTimeLock: uint256,
     _maxConfigTimeLock: uint256,
+    _pythPricesId: uint256,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
@@ -437,6 +438,7 @@ def __init__(
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
     MIN_STALE_TIME = _minStaleTime
     MAX_STALE_TIME = _maxStaleTime
+    PYTH_PRICES_ID = _pythPricesId
 
 
 # access control
@@ -477,12 +479,6 @@ def _resolveMissionControl(_missionControl: address) -> address:
     return _missionControl
 
 
-@view
-@internal
-def _getPythPricesAddr() -> address:
-    return staticcall PriceDesk(self._hqAddr(PRICE_DESK_ID)).getAddr(PYTH_PRICES_ID)
-
-
 ##################
 # General Config #
 ##################
@@ -515,15 +511,9 @@ def _areValidVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: 
 @external
 def setStaleTime(_staleTime: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
+    assert _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME # dev: invalid stale time
     mc: address = self._resolveMissionControl(_missionControl)
     return self._setPendingGenConfig(ActionType.GEN_CONFIG_STALE_TIME, mc, 0, 0, _staleTime)
-
-
-@view
-@internal
-def _isValidStaleTime(_staleTime: uint256) -> bool:
-    return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
 
 
 # set pending general config
@@ -927,6 +917,7 @@ def setBuybackRatio(_ratio: uint256) -> uint256:
 def setPythMaxConfidenceRatio(_ratio: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _ratio < HUNDRED_PERCENT # dev: ratio must be < 100%
+    assert PYTH_PRICES_ID != 0 # dev: pyth disabled
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.PYTH_MAX_CONFIDENCE_RATIO
@@ -1576,7 +1567,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.PYTH_MAX_CONFIDENCE_RATIO:
         ratio: uint256 = self.pendingPythMaxConfidenceRatio[_aid]
-        extcall PythPrices(self._getPythPricesAddr()).setMaxConfidenceRatio(ratio)
+        extcall PythPrices(staticcall PriceDesk(self._hqAddr(PRICE_DESK_ID)).getAddr(PYTH_PRICES_ID)).setMaxConfidenceRatio(ratio)
         log PythMaxConfidenceRatioSet(ratio=ratio)
 
     elif actionType == ActionType.RIPE_REWARDS_BLOCK:

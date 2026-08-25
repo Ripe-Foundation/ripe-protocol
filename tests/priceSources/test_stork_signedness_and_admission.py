@@ -1,7 +1,8 @@
 import boa
 import pytest
 
-from constants import EIGHTEEN_DECIMALS
+from conf_utils import advance_timelock_blocks
+from constants import EIGHTEEN_DECIMALS, ONE_DAY_IN_SECS
 
 
 NOT_FOUND_REVERT = "Revert(b'\\xc5r;Q')"
@@ -13,11 +14,14 @@ CONSTRUCTOR_FEED_PRICE = 999879984000000000
 
 @pytest.fixture(scope="module")
 def addStorkFeed(stork_prices, governance):
-    def addStorkFeed(_asset, _feed_id, _stale_time=0):
+    def addStorkFeed(_asset, _feed_id, _stale_time=ONE_DAY_IN_SECS):
+        # These signedness tests run before the shared MissionControl policy is
+        # configured, so use an explicit feed policy unless a test is
+        # intentionally exercising inheritance.
         if stork_prices.hasPriceFeed(_asset):
             return
         assert stork_prices.addNewPriceFeed(_asset, _feed_id, _stale_time, sender=governance.address)
-        boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+        advance_timelock_blocks(stork_prices.actionTimeLock() + 1)
         assert stork_prices.confirmNewPriceFeed(_asset, sender=governance.address)
     yield addStorkFeed
 
@@ -101,7 +105,7 @@ def test_stork_failed_revalidation_cancels_pending(
     assert not stork_prices.hasPendingPriceFeedUpdate(alpha_token)
 
 
-def test_stork_admission_resolves_global_and_feed_stale_bounds(
+def test_stork_admission_uses_exact_feed_override_over_global_default(
     stork_prices,
     mock_stork,
     alpha_token,
@@ -118,13 +122,21 @@ def test_stork_admission_resolves_global_and_feed_stale_bounds(
 
         _write_feed(mock_stork, global_tight, EIGHTEEN_DECIMALS, now - 50)
         setGeneralConfig(_priceStaleTime=10)
-        with boa.reverts("invalid feed"):
-            stork_prices.addNewPriceFeed(alpha_token, global_tight, 1000, sender=governance.address)
+        assert stork_prices.addNewPriceFeed(
+            alpha_token,
+            global_tight,
+            1000,
+            sender=governance.address,
+        )
+        assert stork_prices.cancelNewPendingPriceFeed(
+            alpha_token,
+            sender=governance.address,
+        )
 
-        _write_feed(mock_stork, feed_tight, EIGHTEEN_DECIMALS, now - 50)
+        _write_feed(mock_stork, feed_tight, EIGHTEEN_DECIMALS, now - 350)
         setGeneralConfig(_priceStaleTime=1000)
         with boa.reverts("invalid feed"):
-            stork_prices.addNewPriceFeed(bravo_token, feed_tight, 10, sender=governance.address)
+            stork_prices.addNewPriceFeed(bravo_token, feed_tight, 300, sender=governance.address)
 
         _write_feed(mock_stork, both_ok, EIGHTEEN_DECIMALS, now - 50)
         setGeneralConfig(_priceStaleTime=1000)
@@ -161,7 +173,7 @@ def test_stork_update_confirm_cancels_when_revalidation_fails(
         assert not stork_prices.hasPendingPriceFeedUpdate(alpha_token)
 
 
-def test_stork_update_confirm_cancels_when_globally_stale(
+def test_stork_update_confirm_keeps_exact_override_despite_tighter_global(
     stork_prices,
     mock_stork,
     alpha_token,
@@ -183,8 +195,10 @@ def test_stork_update_confirm_cancels_when_globally_stale(
         boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
         setGeneralConfig(_priceStaleTime=10)
         _write_feed(mock_stork, new_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp - 50)
-        assert not stork_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
-        assert stork_prices.feedConfig(alpha_token).feedId == old_id
+        assert stork_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
+        assert stork_prices.feedConfig(alpha_token).feedId == new_id
+        assert stork_prices.feedConfig(alpha_token).staleTime == 1000
+        assert not stork_prices.hasPendingPriceFeedUpdate(alpha_token)
 
 
 def test_mock_stork_unset_feed_reverts_not_found(mock_stork):
@@ -235,13 +249,23 @@ def test_stork_unknown_update_admission_bubbles_not_found(
         old_id = _feed_id(42)
         unset_id = _feed_id(43)
         _write_feed(mock_stork, old_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
-        assert stork_prices.addNewPriceFeed(delta_token, old_id, 0, sender=governance.address)
+        assert stork_prices.addNewPriceFeed(
+            delta_token,
+            old_id,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
         boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
         _write_feed(mock_stork, old_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
         assert stork_prices.confirmNewPriceFeed(delta_token, sender=governance.address)
 
         with boa.reverts(NOT_FOUND_REVERT):
-            stork_prices.updatePriceFeed(delta_token, unset_id, 0, sender=governance.address)
+            stork_prices.updatePriceFeed(
+                delta_token,
+                unset_id,
+                ONE_DAY_IN_SECS,
+                sender=governance.address,
+            )
         assert stork_prices.feedConfig(delta_token).feedId == old_id
         assert not stork_prices.hasPendingPriceFeedUpdate(delta_token)
 
@@ -255,7 +279,12 @@ def test_stork_confirm_new_feed_not_found_leaves_pending(
     with boa.env.anchor():
         feed_id = _feed_id(44)
         _write_feed(mock_stork, feed_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
-        assert stork_prices.addNewPriceFeed(delta_token, feed_id, 0, sender=governance.address)
+        assert stork_prices.addNewPriceFeed(
+            delta_token,
+            feed_id,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
         pending = stork_prices.pendingUpdates(delta_token)
         boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
 
@@ -284,13 +313,23 @@ def test_stork_confirm_update_not_found_leaves_pending(
         old_id = _feed_id(45)
         new_id = _feed_id(46)
         _write_feed(mock_stork, old_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
-        assert stork_prices.addNewPriceFeed(delta_token, old_id, 0, sender=governance.address)
+        assert stork_prices.addNewPriceFeed(
+            delta_token,
+            old_id,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
         boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
         _write_feed(mock_stork, old_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
         assert stork_prices.confirmNewPriceFeed(delta_token, sender=governance.address)
 
         _write_feed(mock_stork, new_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
-        assert stork_prices.updatePriceFeed(delta_token, new_id, 0, sender=governance.address)
+        assert stork_prices.updatePriceFeed(
+            delta_token,
+            new_id,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
         pending = stork_prices.pendingUpdates(delta_token)
         boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
 
@@ -322,7 +361,12 @@ def test_stork_pricedesk_contains_not_found_and_fails_closed(
     with boa.env.anchor():
         feed_id = _feed_id(47)
         _write_feed(mock_stork, feed_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
-        assert stork_prices.addNewPriceFeed(delta_token, feed_id, 0, sender=governance.address)
+        assert stork_prices.addNewPriceFeed(
+            delta_token,
+            feed_id,
+            ONE_DAY_IN_SECS,
+            sender=governance.address,
+        )
         boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
         _write_feed(mock_stork, feed_id, EIGHTEEN_DECIMALS, boa.env.evm.patch.timestamp)
         assert stork_prices.confirmNewPriceFeed(delta_token, sender=governance.address)

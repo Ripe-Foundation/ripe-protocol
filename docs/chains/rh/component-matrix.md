@@ -62,7 +62,7 @@ Underscore, no Stage B/C, and mandatory reopening before Underscore inclusion
 or any nonzero cooldown proposal or queued action. Evidence:
 [`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
 
-**Controlling architecture:** `/Users/wigglez/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
+**Controlling architecture:** `${HOME}/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
 
 This matrix specifies the clean Robinhood deployment surface. It does not approve
 owner decisions, prove current external addresses, or authorize deployment.

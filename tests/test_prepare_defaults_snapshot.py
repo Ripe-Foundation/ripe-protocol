@@ -286,7 +286,12 @@ def test_every_live_read_is_pinned_and_provenance_is_embedded():
     assert eth.contract_reads and all(
         read[-1] == BLOCK_NUMBER for read in eth.contract_reads
     )
-    assert not eth.raw_reads
+    assert eth.raw_reads == [
+        (
+            {"to": ASSET, "data": prepare_defaults.SYMBOL_SELECTOR},
+            BLOCK_NUMBER,
+        )
+    ]
     assert snapshot.block_hash == "0x" + BLOCK_HASH.hex()
     assert f"#   chain id: {prepare_defaults.EXPECTED_CHAIN_ID}" in source
     assert f"#   snapshot block: {BLOCK_NUMBER}" in source
@@ -332,6 +337,10 @@ def test_every_live_read_is_pinned_and_provenance_is_embedded():
         f"#   Ledger code sha256: {hashlib.sha256(b'ledger-code').hexdigest()}"
         in source
     )
+    assert "CONTRIB_TEMPLATE: immutable(address)" in source
+    assert "def __init__(_contribTemplate: address):" in source
+    assert "CONTRIB_TEMPLATE = _contribTemplate" in source
+    assert f"CONTRIB_TEMPLATE: constant(address) = {CONTRIBUTOR}" not in source
 
 
 def test_same_block_is_byte_identical_as_finalized_head_advances():
@@ -519,19 +528,37 @@ def test_build_rejects_inputs_that_do_not_match_provenance(
     assert not eth.raw_reads
 
 
-def test_symbol_availability_cannot_change_generated_bytes():
-    available = FakeEth(symbol_available=True)
-    unavailable = FakeEth(symbol_available=False)
+def test_unnamed_asset_symbol_is_read_at_the_pinned_snapshot_block():
+    eth = FakeEth(symbol_available=True)
 
-    _, available_source = _snapshot_and_source(available)
-    _, unavailable_source = _snapshot_and_source(unavailable)
+    _, source = _snapshot_and_source(eth)
 
-    assert available_source.encode() == unavailable_source.encode()
-    assert not available.raw_reads
-    assert not unavailable.raw_reads
-    deterministic_label = f"ADDRESS_{ASSET.removeprefix('0x').lower()}"
-    assert f"{deterministic_label}: constant(address)" in available_source
-    assert f"# {deterministic_label}" in available_source
+    assert eth.raw_reads == [
+        (
+            {"to": ASSET, "data": prepare_defaults.SYMBOL_SELECTOR},
+            BLOCK_NUMBER,
+        )
+    ]
+    assert "FAKE: constant(address)" in source
+    assert "# FAKE" in source
+
+
+def test_missing_unnamed_asset_symbol_fails_closed():
+    eth = FakeEth(symbol_available=False)
+
+    with pytest.raises(
+        prepare_defaults.SnapshotError,
+        match="token symbol unavailable at snapshot block",
+    ):
+        _snapshot_and_source(eth)
+
+    assert eth.raw_reads
+
+
+def test_token_symbol_decoder_accepts_legacy_bytes32():
+    assert prepare_defaults._decode_token_symbol(
+        b"SPCX".ljust(32, b"\x00"), ASSET
+    ) == "SPCX"
 
 
 @pytest.mark.parametrize(
@@ -850,7 +877,9 @@ def test_coverage_report_names_what_defaults_cannot_carry():
     }
     report = result.coverage_report(ROBINHOOD)
     assert "userConfig" in report and "userDelegation" in report
-    assert "preferredStabVaultId = 1, coreRipeGovVaultId = 2" in report
+    assert "coreRipeGovVaultId and preferredStabVaultId" in report
+    assert "historical isStabVaultId and isRipeGovVaultId" in report
+    assert "otherwise replacement is blocked" in report
     assert "assetConfigs: 1" in report
 
 

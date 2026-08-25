@@ -26,6 +26,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -82,12 +85,54 @@ def test_current_manifest_is_what_marks_a_history_deployed(tmp_path):
     assert history_has_deployment(deployed) is True
 
 
+def test_migration_exposes_the_immediate_source_predecessor(tmp_path):
+    history = _history(tmp_path, deployed=False)
+    migration = Migration(_args(), {}, "2026082405", "2026082101", str(history))
+
+    assert migration.timestamp() == "2026082405"
+    assert migration.previous_timestamp() == "2026082101"
+
+
 def test_every_committed_history_is_recognised_as_deployed():
     root = Path(__file__).resolve().parents[2] / "migration_history"
     histories = [p for p in root.glob("*/*") if p.is_dir()]
     assert histories, "expected committed histories"
     for history in histories:
         assert history_has_deployment(history), history
+
+
+def test_optimized_python_cannot_import_or_execute_a_migration(tmp_path):
+    migrations = tmp_path / "migrations"
+    history = tmp_path / "history"
+    sentinel = tmp_path / "migration-imported"
+    migrations.mkdir()
+    history.mkdir()
+    (migrations / "0001_probe.py").write_text(
+        f"from pathlib import Path\nPath({str(sentinel)!r}).write_text('reached')\n"
+        "def migrate(_migration):\n    raise AssertionError('must not run')\n"
+    )
+    code = """
+import sys
+from scripts.utils.migration_runner import MigrationRunner
+try:
+    MigrationRunner(sys.argv[1], sys.argv[2], {}).run(None, "0001")
+except Exception as exc:
+    if "MIGRATION_OPTIMIZED_MODE_FORBIDDEN" in str(exc):
+        raise SystemExit(0)
+    print(repr(exc), file=sys.stderr)
+    raise SystemExit(2)
+raise SystemExit(3)
+"""
+    result = subprocess.run(
+        [sys.executable, "-O", "-c", code, str(migrations), str(history)],
+        cwd=Path(__file__).resolve().parents[2],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not sentinel.exists()
 
 
 def test_mainnet_step_manifests_are_retained():
@@ -129,7 +174,7 @@ def test_a_history_without_a_checkpoint_cannot_be_continued(tmp_path):
     # finished, so no start point can be shown to be safe.
     with pytest.raises(MigrationHistoryError, match="H06_NO_RECORDED_FRONTIER"):
         _runner(_history(tmp_path, deployed=True))._require_start_point(
-            _args(), "2026080701"
+            _args(), "2026082405"
         )
 
 
@@ -152,25 +197,38 @@ def test_replay_does_not_bypass_the_start_point(tmp_path, start):
         )
 
 
-def test_ccip_wire_is_invisible_to_the_resume_checkpoint():
-    """A migration that deploys nothing leaves no numbered manifest.
+def test_ccip_plan_and_activation_completion_are_separate_migrations():
+    """Safe-pending preparation cannot stand in for activation completion."""
+    root = Path(__file__).resolve().parents[2]
+    stages = {
+        "base-mainnet": ("2026082400_CcipWirePlan.py", "2026082401_CcipActivationFinalized.py"),
+    }
+    for chain, (plan_name, final_name) in stages.items():
+        plan = (root / "migrations" / chain / plan_name).read_text()
+        final = (root / "migrations" / chain / final_name).read_text()
+        assert "records only that the preparation stage ran" in plan
+        assert "require_mainnet_activation_finalized" in final
 
-    2026080701_CcipWire only calls execute() -- it wires the CCIP pools and
-    hands them to the Safe -- so _append_manifest never runs. The resume
-    checkpoint is derived from numbered manifests, so it cannot see that this
-    migration completed, and it has completed: CCIP is live on both mainnets.
 
-    Asserted as the durable fact rather than as "auto-resume selects X", which
-    is a function of whatever has been deployed since. Adding a later migration
-    that does record a manifest moves the checkpoint past this one and changes
-    that answer without changing the hazard.
-    """
+def test_new_mainnet_migrations_are_strictly_after_the_recorded_frontier():
     root = Path(__file__).resolve().parents[2]
     for chain in ("base-mainnet", "robinhood-mainnet"):
-        assert (root / f"migrations/{chain}/2026080701_CcipWire.py").exists()
-        assert not (
-            root / f"migration_history/{chain}/v1/2026080701-manifest.json"
-        ).exists()
+        history = root / "migration_history" / chain / "v1"
+        frontier = max(
+            int(path.name.removesuffix("-manifest.json"))
+            for path in history.glob("*-manifest.json")
+            if path.name != "current-manifest.json"
+        )
+        pending = [
+            path
+            for path in (root / "migrations" / chain).glob("*.py")
+            if int(path.name.split("_", 1)[0]) >= 2026080701
+            and not (history / f"{path.name.split('_', 1)[0]}-manifest.json").exists()
+        ]
+        required_frontier = max(frontier, 2026082101)
+        assert all(
+            int(path.name.split("_", 1)[0]) > required_frontier for path in pending
+        )
 
 
 @pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))
@@ -268,7 +326,11 @@ def test_step_manifests_keep_the_record_and_drop_the_bulk():
     manifest outright and redirects to `--migration`.
     """
     root = Path(__file__).resolve().parents[2] / "migration_history"
-    steps = list(root.glob("*/*/[0-9]*-manifest.json"))
+    steps = [
+        path
+        for path in root.glob("*/*/[0-9]*-manifest.json")
+        if re.fullmatch(r"\d+-manifest\.json", path.name)
+    ]
     assert steps, "expected committed step manifests"
 
     for path in steps:
@@ -368,9 +430,9 @@ def test_current_manifests_keep_everything():
         for name, record in json.loads(path.read_text())["contracts"].items():
             where = f"{path.parent.parent.name}/{path.parent.name}:{name}"
             assert "address" in record, where
-            # Solidity deploys are recorded by address alone -- Foundry
-            # artifacts have no Vyper compiler-output equivalent
-            # (see Migration.deploy_solidity). Everything else keeps the lot.
+            # Solidity deploys keep their authenticated artifact/runtime intent
+            # in the transaction journal. The manifest remains the address
+            # index and has no Vyper compiler-output equivalent.
             if vyper_fields & set(record):
                 assert vyper_fields <= set(record), where
                 kept += 1
@@ -395,13 +457,41 @@ def _with_log(tmp_path: Path, recorded, *, force_replay: bool):
     )
 
 
+class _JournalCall:
+    def __init__(self, target: str, calldata: bytes, result, broadcasts):
+        self.contract = SimpleNamespace(address=target)
+        self._calldata = calldata
+        self._result = result
+        self._broadcasts = broadcasts
+
+    def prepare_calldata(self):
+        return self._calldata
+
+    def __call__(self, **_kwargs):
+        self._broadcasts.append(self._calldata)
+        return self._result
+
+
+def _record(migration: Migration, call: _JournalCall, receipt, **kwargs):
+    return {
+        **migration._transaction_intent(call, (), kwargs),
+        "receipt": receipt,
+    }
+
+
 def test_default_resume_consumes_recorded_receipts(tmp_path):
     # Default mode (no --force-replay) reads the journal and skips what it
     # records. This is the production default, so a re-run resumes.
     broadcast = []
-    migration = _with_log(tmp_path, ["0xRECORDED"], force_replay=False)
+    call = _JournalCall("0x" + "2" * 40, b"\x01", "0xNEW", broadcast)
+    migration = _with_log(
+        tmp_path,
+        [],
+        force_replay=False,
+    )
+    migration._transactions = [_record(migration, call, "0xRECORDED")]
 
-    result = migration.execute(lambda **_: broadcast.append("sent") or "0xNEW")
+    result = migration.execute(call)
 
     # The recorded receipt is returned and nothing is re-broadcast.
     assert result == "0xRECORDED"
@@ -411,24 +501,275 @@ def test_default_resume_consumes_recorded_receipts(tmp_path):
 def test_force_replay_ignores_the_journal_and_rebroadcasts(tmp_path):
     # --force-replay is the dangerous mode: it ignores recorded receipts.
     broadcast = []
-    migration = _with_log(tmp_path, ["0xRECORDED"], force_replay=True)
+    call = _JournalCall("0x" + "2" * 40, b"\x01", "0xNEW", broadcast)
+    migration = _with_log(
+        tmp_path,
+        [],
+        force_replay=True,
+    )
 
-    result = migration.execute(lambda **_: broadcast.append("sent") or "0xNEW")
+    result = migration.execute(call)
 
     assert result == "0xNEW"
-    assert broadcast == ["sent"]
+    assert broadcast == [b"\x01"]
 
 
 def test_resume_restarts_at_the_first_incomplete_transaction(tmp_path):
     broadcast = []
-    migration = _with_log(tmp_path, ["0xONE", "0xTWO"], force_replay=False)
+    first_call = _JournalCall("0x" + "2" * 40, b"\x01", "new", broadcast)
+    second_call = _JournalCall("0x" + "3" * 40, b"\x02", "new", broadcast)
+    third_call = _JournalCall("0x" + "4" * 40, b"\x03", "0xTHREE", broadcast)
+    migration = _with_log(
+        tmp_path,
+        [],
+        force_replay=False,
+    )
+    migration._transactions = [
+        _record(migration, first_call, "0xONE"),
+        _record(migration, second_call, "0xTWO"),
+    ]
 
-    first = migration.execute(lambda **_: broadcast.append(1) or "new")
-    second = migration.execute(lambda **_: broadcast.append(2) or "new")
-    third = migration.execute(lambda **_: broadcast.append(3) or "0xTHREE")
+    first = migration.execute(first_call)
+    second = migration.execute(second_call)
+    third = migration.execute(third_call)
 
     assert [first, second, third] == ["0xONE", "0xTWO", "0xTHREE"]
-    assert broadcast == [3], "only the transaction past the log should run"
+    assert broadcast == [b"\x03"], "only the transaction past the log should run"
+
+
+def test_end_rejects_unconsumed_authenticated_journal_entries(tmp_path):
+    first_call = _JournalCall("0x" + "2" * 40, b"\x01", "new", [])
+    second_call = _JournalCall("0x" + "3" * 40, b"\x02", "new", [])
+    seed = _with_log(tmp_path, [], force_replay=False)
+    records = [
+        _record(seed, first_call, "0xONE"),
+        _record(seed, second_call, "0xTWO"),
+    ]
+    migration = _with_log(tmp_path, records, force_replay=False)
+    history = Path(migration._history_path)
+    current_before = (history / CURRENT_MANIFEST).read_bytes()
+
+    assert migration.execute(first_call) == "0xONE"
+    log_before = (history / "9999-log.json").read_bytes()
+    with pytest.raises(
+        RuntimeError,
+        match="MIGRATION_TRANSACTION_LOG_UNCONSUMED",
+    ):
+        migration.end()
+
+    assert (history / CURRENT_MANIFEST).read_bytes() == current_before
+    assert (history / "9999-log.json").read_bytes() == log_before
+    assert not (history / "9999-manifest.json").exists()
+
+
+def test_force_replay_replaces_the_journal_and_can_complete(tmp_path):
+    broadcasts = []
+    call = _JournalCall("0x" + "2" * 40, b"\x01", "0xNEW", broadcasts)
+    migration = _with_log(tmp_path, ["legacy-entry"], force_replay=True)
+    history = Path(migration._history_path)
+
+    assert migration.execute(call) == "0xNEW"
+    assert migration.end() == 0
+    assert broadcasts == [b"\x01"]
+    assert not (history / "9999-log.json").exists()
+    assert (history / "9999-manifest.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "error"),
+    (
+        (
+            "target",
+            "0x" + "9" * 40,
+            "MIGRATION_TRANSACTION_TARGET_MISMATCH",
+        ),
+        (
+            "calldata_sha256",
+            "0" * 64,
+            "MIGRATION_TRANSACTION_CALLDATA_MISMATCH",
+        ),
+        (
+            "chain",
+            "base-mainnet",
+            "MIGRATION_TRANSACTION_CHAIN_MISMATCH",
+        ),
+        (
+            "sender",
+            "0x" + "8" * 40,
+            "MIGRATION_TRANSACTION_SENDER_MISMATCH",
+        ),
+        (
+            "value",
+            1,
+            "MIGRATION_TRANSACTION_VALUE_MISMATCH",
+        ),
+    ),
+)
+def test_resume_rejects_changed_execution_intent(
+    tmp_path,
+    field,
+    replacement,
+    error,
+):
+    call = _JournalCall("0x" + "2" * 40, b"\x01", "new", [])
+    migration = _with_log(tmp_path, [], force_replay=False)
+    record = _record(migration, call, "0xRECORDED")
+    record[field] = replacement
+    migration._transactions = [record]
+
+    with pytest.raises(RuntimeError, match=error):
+        migration.execute(call)
+
+
+def test_resume_rejects_legacy_position_only_transaction_log(tmp_path):
+    call = _JournalCall("0x" + "2" * 40, b"\x01", "new", [])
+    migration = _with_log(tmp_path, ["0xRECORDED"], force_replay=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match="MIGRATION_TRANSACTION_LOG_UNAUTHENTICATED",
+    ):
+        migration.execute(call)
+
+
+@pytest.mark.parametrize("recorded", ({}, "", 0, False))
+def test_resume_rejects_falsey_malformed_transaction_log(tmp_path, recorded):
+    call = _JournalCall("0x" + "2" * 40, b"\x01", "new", [])
+    migration = _with_log(tmp_path, [recorded], force_replay=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match="MIGRATION_TRANSACTION_LOG_UNAUTHENTICATED",
+    ):
+        migration.execute(call)
+
+
+@pytest.mark.parametrize(
+    ("filename", "payload", "error"),
+    (
+        ("current-manifest.json", "{broken", "MIGRATION_CURRENT_MANIFEST_INVALID"),
+        (
+            "current-manifest.json",
+            json.dumps({}),
+            "MIGRATION_CURRENT_MANIFEST_INVALID",
+        ),
+        (
+            "current-manifest.json",
+            json.dumps([]),
+            "MIGRATION_CURRENT_MANIFEST_INVALID",
+        ),
+        ("9999-log.json", "{broken", "MIGRATION_TRANSACTION_LOG_INVALID"),
+        (
+            "9999-log.json",
+            json.dumps({"transactions": {}}),
+            "MIGRATION_TRANSACTION_LOG_INVALID",
+        ),
+    ),
+)
+def test_malformed_resume_state_fails_closed(tmp_path, filename, payload, error):
+    history = _history(tmp_path, deployed=False)
+    (history / filename).write_text(payload)
+
+    with pytest.raises(RuntimeError, match=error):
+        _migration(history)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        "{broken",
+        json.dumps({}),
+        json.dumps([]),
+        json.dumps({"contracts": []}),
+    ),
+)
+def test_end_revalidates_pending_checkpoint_before_any_completion_write(
+    tmp_path,
+    payload,
+):
+    history = _history(tmp_path, deployed=True)
+    pending = history / "9999-pending-manifest.json"
+    transaction_log = history / "9999-log.json"
+    pending.write_text(json.dumps({"contracts": {}}))
+    transaction_log.write_text(json.dumps({"transactions": []}))
+    migration = _migration(history)
+
+    pending.write_text(payload)
+    current_before = (history / CURRENT_MANIFEST).read_bytes()
+    pending_before = pending.read_bytes()
+    log_before = transaction_log.read_bytes()
+
+    with pytest.raises(
+        RuntimeError,
+        match="MIGRATION_PENDING_MANIFEST_INVALID",
+    ):
+        migration.end()
+
+    assert (history / CURRENT_MANIFEST).read_bytes() == current_before
+    assert pending.read_bytes() == pending_before
+    assert transaction_log.read_bytes() == log_before
+    assert not (history / "9999-manifest.json").exists()
+
+
+def test_solidity_deployment_resume_binds_artifact_args_sender_and_runtime(
+    tmp_path, monkeypatch
+):
+    history = _history(tmp_path, deployed=False)
+    address = "0x" + "7" * 40
+    runtime = b"runtime-v1"
+    contract = SimpleNamespace(address=address)
+    base_intent = {
+        "version": 1,
+        "kind": "solidity_deploy",
+        "chain": "robinhood-mainnet",
+        "sender": "0x" + "1" * 40,
+        "contract": "Synthetic",
+        "source_file": "Synthetic.sol",
+        "artifact_sha256": "a" * 64,
+        "creation_sha256": "b" * 64,
+    }
+    monkeypatch.setattr(
+        migration_module.solidity,
+        "deployment_intent",
+        lambda *_args, **_kwargs: dict(base_intent),
+    )
+    monkeypatch.setattr(
+        migration_module.solidity, "deploy", lambda *_args, **_kwargs: contract
+    )
+    monkeypatch.setattr(
+        migration_module.solidity, "at", lambda *_args, **_kwargs: contract
+    )
+    monkeypatch.setattr(migration_module.boa.env, "get_code", lambda _address: runtime)
+
+    migration = _migration(history)
+    assert migration.deploy_solidity("Synthetic") is contract
+
+    resumed = _migration(history)
+    assert resumed.deploy_solidity("Synthetic") is contract
+
+    changed_intent = dict(base_intent, creation_sha256="c" * 64)
+    monkeypatch.setattr(
+        migration_module.solidity,
+        "deployment_intent",
+        lambda *_args, **_kwargs: dict(changed_intent),
+    )
+    with pytest.raises(
+        RuntimeError, match="MIGRATION_SOLIDITY_DEPLOYMENT_INTENT_MISMATCH"
+    ):
+        _migration(history).deploy_solidity("Synthetic")
+
+    monkeypatch.setattr(
+        migration_module.solidity,
+        "deployment_intent",
+        lambda *_args, **_kwargs: dict(base_intent),
+    )
+    monkeypatch.setattr(
+        migration_module.boa.env, "get_code", lambda _address: b"runtime-v2"
+    )
+    with pytest.raises(
+        RuntimeError, match="MIGRATION_SOLIDITY_DEPLOYMENT_RUNTIME_MISMATCH"
+    ):
+        _migration(history).deploy_solidity("Synthetic")
 
 # --- one boundary, and it is the runner's -----------------------------------
 
@@ -478,6 +819,72 @@ def test_direct_construction_cannot_bypass_the_runner_boundary(tmp_path):
         runner.run(_args(), None, "0", True)
 
 
+def test_attaching_an_old_generation_hides_only_the_boa_bytecode_dump(
+    monkeypatch, tmp_path
+):
+    import warnings
+
+    migration = _migration(_history(tmp_path, deployed=False))
+    address = "0x" + "2" * 40
+    migration._previous_manifest = {
+        "contracts": {
+            "OldGeneration": {
+                "file": "contracts/core/OldGeneration.vy",
+                "address": address,
+            }
+        }
+    }
+
+    attached = object()
+
+    class Partial:
+        def at(self, observed_address):
+            assert observed_address == address
+            warnings.warn(
+                "casted bytecode does not match compiled bytecode at <old>",
+                UserWarning,
+            )
+            warnings.warn("separate useful warning", UserWarning)
+            return attached
+
+    monkeypatch.setattr(migration_module.boa, "load_partial", lambda _file: Partial())
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert migration.get_contract("OldGeneration") is attached
+
+    assert [str(item.message) for item in caught] == ["separate useful warning"]
+
+
+def test_accepted_start_constructs_and_runs_migration(tmp_path):
+    """The accepted runner path must construct the current Migration API.
+
+    The deployed-history boundary is owned by MigrationRunner. After that
+    boundary accepted an explicit start, run() still passed the removed
+    ``allow_deployed_history`` keyword to Migration and failed before invoking
+    the selected migration. Exercise a complete no-deployment step so this
+    constructor call cannot drift out of sync again.
+    """
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    (migrations / "0002_Accepted.py").write_text(
+        "def migrate(migration):\n"
+        "    assert migration.timestamp() == '0002'\n"
+    )
+
+    history = tmp_path / "history"
+    history.mkdir()
+    manifest = {"contracts": {}}
+    (history / CURRENT_MANIFEST).write_text(json.dumps(manifest))
+    (history / "0001-manifest.json").write_text(json.dumps(manifest))
+
+    runner = MigrationRunner(str(migrations), str(history), {})
+    assert runner.run(_args(), "0002", "0002", False) == 0
+
+    assert json.loads((history / CURRENT_MANIFEST).read_text()) == manifest
+    assert json.loads((history / "0002-manifest.json").read_text()) == manifest
+
+
 # --- the start point has to name something, and be after the frontier -------
 
 
@@ -488,6 +895,18 @@ def _real_runner(chain="robinhood-mainnet"):
         str(root / f"migration_history/{chain}/v1"),
         {},
     )
+
+
+def _ordered_runner(tmp_path):
+    """A deployed history with one required next step and one later step."""
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    for filename in ("0001_First.py", "0002_Completed.py", "0003_Next.py", "0004_Later.py"):
+        (migrations / filename).write_text("def migrate(migration):\n    pass\n")
+
+    history = _history(tmp_path, deployed=True)
+    (history / "0002-manifest.json").write_text(json.dumps({"contracts": {}}))
+    return MigrationRunner(str(migrations), str(history), {})
 
 
 @pytest.mark.parametrize(
@@ -502,24 +921,31 @@ def _real_runner(chain="robinhood-mainnet"):
         ("1", "H06_START_TIMESTAMP_UNKNOWN"),
         ("9", "H06_START_TIMESTAMP_UNKNOWN"),
         ("99999999999", "H06_START_TIMESTAMP_UNKNOWN"),
-        # Names a real migration, but one this history already completed.
-        ("2026080700", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
+        # Names real migrations, but ones this history already completed.
+        ("0001", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
+        ("0002", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
         ("0000", "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"),
-        ("0009", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
     ),
 )
-def test_unsafe_start_points_are_refused(start, code):
+def test_unsafe_start_points_are_refused(tmp_path, start, code):
     with pytest.raises(MigrationHistoryError, match=code):
-        _real_runner()._require_start_point(_args(), start)
+        _ordered_runner(tmp_path)._require_start_point(_args(), start)
 
 
-def test_a_start_point_after_the_frontier_is_accepted():
-    runner = _real_runner()
+def test_the_earliest_unfinished_start_point_is_accepted(tmp_path):
+    runner = _ordered_runner(tmp_path)
     frontier = runner._latest_manifest_timestamp()
 
-    # 2026080701 exists and is after the recorded frontier.
-    runner._require_start_point(_args(), "2026080701")
-    assert int("2026080701") > int(frontier)
+    runner._require_start_point(_args(), "0003")
+    assert int("0003") > int(frontier)
+
+
+def test_a_later_unfinished_start_point_cannot_skip_the_next_stage(tmp_path):
+    with pytest.raises(
+        MigrationHistoryError,
+        match=r"H06_START_TIMESTAMP_NOT_NEXT: .* would skip 0003",
+    ):
+        _ordered_runner(tmp_path)._require_start_point(_args(), "0004")
 
 
 @pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))

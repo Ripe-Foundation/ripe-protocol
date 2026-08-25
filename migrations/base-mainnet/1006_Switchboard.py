@@ -19,10 +19,12 @@ def migrate(migration: Migration):
     switchboard_alpha = migration.deploy(
         "SwitchboardAlpha",
         hq,
+        migration.account(),
         blueprint.PARAMS["PRICE_DESK_MIN_STALE_TIME"],
         blueprint.PARAMS["PRICE_DESK_MAX_STALE_TIME"],
         blueprint.PARAMS["MIN_HQ_CHANGE_TIMELOCK"],
-        blueprint.PARAMS["MAX_HQ_CHANGE_TIMELOCK"]
+        blueprint.PARAMS["MAX_HQ_CHANGE_TIMELOCK"],
+        blueprint.PARAMS["PYTH_PRICES_ID"],
     )
     migration.execute(switchboard.startAddNewAddressToRegistry, switchboard_alpha, "Switchboard Alpha")
     assert int(migration.execute(switchboard.confirmNewAddressToRegistry, switchboard_alpha)) == 1

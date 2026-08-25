@@ -5,6 +5,7 @@ import boa
 import pytest
 
 from config.BluePrint import ROBINHOOD_REGISTRY_TOPOLOGY
+from config.robinhood_launch import STALE_WINDOW_GLOBAL
 from registries.price_desk_aggregate_qualification import (
     DELEVERAGE_MANY_API_MAX,
     LIQUIDATE_MANY_API_MAX,
@@ -12,10 +13,12 @@ from registries.price_desk_aggregate_qualification import (
     QUALIFIED_DIRECT_PRICE_LTV_ASSET_ADDRESSES,
     QUALIFIED_PRICE_DESK_SOURCE_COUNT,
     QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND,
+    QUALIFIED_ROBINHOOD_PRICE_STALE_TIME,
     QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE,
     QUALIFIED_SATURATED_LIQUIDATION_BATCH_SIZE,
     ROBINHOOD_LIVE_PRICE_DESK_SLOT_3,
     ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS,
+    ROBINHOOD_PRICE_STALE_TIME,
 )
 
 
@@ -43,30 +46,46 @@ def _selected_price_sources():
     )
 
 
+def _robinhood_live_defaults(name):
+    contributor = boa.env.generate_address(f"{name}-contributor")
+    return boa.load(
+        "contracts/config/DefaultsRobinhoodLive.vy",
+        contributor,
+        name=name,
+    )
+
+
 def test_robinhood_price_desk_source_count_requires_gas_requalification_on_growth():
     selected_sources = _selected_price_sources()
     assert len(selected_sources) <= QUALIFIED_PRICE_DESK_SOURCE_COUNT, (
         "Robinhood PriceDesk source growth requires aggregate protocol-gas "
         "requalification before activation"
     )
-    assert [row.registry_id for row in selected_sources] == [1, 2, 3], (
+    assert [row.registry_id for row in selected_sources] == [1, 2], (
         "Robinhood PriceDesk registry ordering changed; aggregate protocol-gas "
         "requalification is required before activation"
     )
     assert [row.semantic_name for row in selected_sources] == [
         "Chainlink",
         "Curve",
-        "BlueChipYield",
     ], (
         "Robinhood PriceDesk source composition changed; aggregate protocol-gas "
         "requalification is required before activation"
     )
 
 
+def test_robinhood_stale_time_policy_is_the_independently_qualified_gas_profile():
+    assert QUALIFIED_ROBINHOOD_PRICE_STALE_TIME == 86_400
+    assert (
+        ROBINHOOD_PRICE_STALE_TIME
+        == STALE_WINDOW_GLOBAL
+        == QUALIFIED_ROBINHOOD_PRICE_STALE_TIME
+    )
+
+
 def test_robinhood_enumerable_position_count_requires_gas_requalification_on_growth():
-    defaults = boa.load(
-        "contracts/config/DefaultsRobinhoodLive.vy",
-        name="aggregate_gas_robinhood_live_defaults",
+    defaults = _robinhood_live_defaults(
+        "aggregate_gas_robinhood_live_defaults"
     )
     enumerable_non_stability_positions = tuple(
         (entry.asset, vault_id)
@@ -81,10 +100,8 @@ def test_robinhood_enumerable_position_count_requires_gas_requalification_on_gro
 
 
 def test_ltv_bearing_assets_remain_within_direct_price_allowlist():
-    defaults_path = "contracts/config/DefaultsRobinhoodLive.vy"
-    defaults = boa.load(
-        defaults_path,
-        name="aggregate_gas_robinhood_live_ltv_allowlist_defaults",
+    defaults = _robinhood_live_defaults(
+        "aggregate_gas_robinhood_live_ltv_allowlist_defaults"
     )
     configs_by_asset = {
         str(entry.asset).lower(): entry.config
@@ -131,13 +148,7 @@ def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
 
 
 def test_observed_live_slot_three_divergence_is_documented_for_manual_recheck():
-    repository_slot_three = next(
-        row for row in _selected_price_sources() if row.registry_id == 3
-    )
-    assert repository_slot_three.semantic_name == "BlueChipYield"
+    assert all(row.registry_id != 3 for row in _selected_price_sources())
     assert len(ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS) == 42
     assert int(ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS, 16) != 0
-    assert repository_slot_three.semantic_name != ROBINHOOD_LIVE_PRICE_DESK_SLOT_3, (
-        "the documented slot-3 snapshot no longer differs from the repository; "
-        "manually reread live state and update aggregate-gas qualification"
-    )
+    assert ROBINHOOD_LIVE_PRICE_DESK_SLOT_3 == "Uniswap V2 Prices"

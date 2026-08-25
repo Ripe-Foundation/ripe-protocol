@@ -41,7 +41,7 @@ post-H-05 candidate baseline.
 | Baseline commit | `a86650b187c523f27c92f05bfe959d06840025a6` |
 | Reviewed implementation snapshot | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` |
 | Branch | `rh-hardening` |
-| Worktree | `/Users/wigglez/dev/ripe-protocol-rh-hardening` |
+| Worktree | `${HOME}/dev/ripe-protocol-rh-hardening` |
 | Source branch captured once | `rh` |
 | Interpreter | `/private/tmp/ripe-rh-final-gate2.uZCfBL/venv/bin/python` |
 | Exact requirement pins | `90` |
@@ -707,7 +707,7 @@ The candidate starts directly from authoritative `rh`:
 | `rh` commit | `a8ec21f78e8b7c791952c6d01d8cf73f43ee2d48` |
 | `rh` tree | `be5d2dc78842550fda2c8c1fd4cb72bb6fbefadb` |
 | candidate branch | `rh-hardening-post-h05-reconciliation` |
-| candidate worktree | `/Users/wigglez/dev/ripe-protocol-rh-hardening-post-h05-reconciliation` |
+| candidate worktree | `${HOME}/dev/ripe-protocol-rh-hardening-post-h05-reconciliation` |
 | historical hardening tip | `2c7f09381888beb54322628fec44d284bcec5063` |
 | historical hardening tree | `8d100da5cdf40181c411afb8c0d28f7cc4e867bf` |
 | merge base | `a86650b187c523f27c92f05bfe959d06840025a6` |
@@ -718,9 +718,9 @@ index were clean, the branch was local-only, and its 16-commit / 35-path net
 scope matched the expected topology.
 
 The mode-0700 provenance source directory is
-`/Users/wigglez/dev/ripe-protocol-hardening-provenance.WLGBoc`; the mode-0600
+`${HOME}/dev/ripe-protocol-hardening-provenance.WLGBoc`; the mode-0600
 archive is
-`/Users/wigglez/dev/ripe-protocol-hardening-provenance.WLGBoc.tar.gz`.
+`${HOME}/dev/ripe-protocol-hardening-provenance.WLGBoc.tar.gz`.
 The archive SHA-256 is
 `d7e0cb91bf3c3719332f02fe3335dd143fe24dad8d6ac82fd0e65141970b52eb`;
 its member-manifest SHA-256 is

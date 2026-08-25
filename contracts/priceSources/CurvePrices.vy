@@ -2,6 +2,7 @@
 # Ripe Foundation (C) 2026
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: PriceSource
 
@@ -221,6 +222,7 @@ STABLESWAP_NG_FACTORY_ID: constant(uint256) = 12
 TWO_CRYPTO_NG_FACTORY_ID: constant(uint256) = 13
 
 MAX_SNAPSHOTS: constant(uint256) = 100
+MAX_CURVE_GRAPH_NODES: constant(uint256) = 51 # candidate plus PriceSourceData.MAX_ASSETS
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
@@ -351,6 +353,74 @@ def _lpUnderlyingCanonicalEquals(_asset: address, _config: CurvePriceConfig) -> 
             break
         if self._canonicalGreen(u) == canonicalAsset:
             return True
+    return False
+
+
+@view
+@internal
+def _getCurvePriceDependencies(_asset: address, _config: CurvePriceConfig) -> address[4]:
+    dependencies: address[4] = empty(address[4])
+
+    # stable/metapool LP pricing queries every underlying; crypto LP pricing
+    # only queries index zero.
+    if _asset == _config.lpToken:
+        if _config.poolType == PoolType.STABLESWAP_NG or _config.poolType == PoolType.METAPOOL:
+            return _config.underlying
+        dependencies[0] = _config.underlying[0]
+
+    # two-coin single-asset pricing queries only the alternate asset.
+    elif _config.numUnderlying == 2:
+        if _asset == _config.underlying[0]:
+            dependencies[0] = _config.underlying[1]
+        else:
+            dependencies[0] = _config.underlying[0]
+
+    return dependencies
+
+
+@view
+@internal
+def _wouldCreateCurveDependencyCycle(_asset: address, _config: CurvePriceConfig) -> bool:
+    target: address = self._canonicalGreen(_asset)
+    nodes: DynArray[address, MAX_CURVE_GRAPH_NODES] = []
+    nodes.append(target)
+    visited: bool[MAX_CURVE_GRAPH_NODES] = empty(bool[MAX_CURVE_GRAPH_NODES])
+
+    # Adding or updating a feed only changes the target's outgoing edges. A new
+    # cycle therefore exists iff one of those edges can reach the target through
+    # the active Curve graph. Worklist position zero uses the proposed config;
+    # later nodes use their active configs.
+    for i: uint256 in range(MAX_CURVE_GRAPH_NODES):
+        if i >= len(nodes):
+            break
+
+        node: address = nodes[i]
+        config: CurvePriceConfig = _config
+        if i != 0:
+            config = self.curveConfig[node]
+
+        dependencies: address[4] = self._getCurvePriceDependencies(node, config)
+        for dependency: address in dependencies:
+            if dependency == empty(address):
+                break
+
+            canonicalDependency: address = self._canonicalGreen(dependency)
+            if canonicalDependency == target:
+                return True
+
+            # Only an active config can recurse back into this Curve source.
+            if self.curveConfig[canonicalDependency].pool == empty(address):
+                continue
+
+            dependencyIndex: uint256 = priceData.indexOfAsset[canonicalDependency]
+            if dependencyIndex == 0 or dependencyIndex >= MAX_CURVE_GRAPH_NODES:
+                return True # inconsistent active graph; fail closed
+            if visited[dependencyIndex]:
+                continue
+
+            visited[dependencyIndex] = True
+            nodes.append(canonicalDependency)
+
     return False
 
 
@@ -530,10 +600,10 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate the pending admission-time config; do not reconstruct MetaRegistry
+    # bind confirmation to the reviewed MetaRegistry snapshot
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending new feed
-    if not self._isValidNewFeedStructure(_asset, d.config):
+    if not self._isCurrentCurvePoolConfig(d.config) or not self._isValidNewFeedStructure(_asset, d.config):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -641,11 +711,11 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate the pending admission-time config; do not reconstruct MetaRegistry
+    # bind confirmation to the reviewed MetaRegistry snapshot
     d: PendingCurvePrice = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending update feed
     prevPool: address = self.curveConfig[_asset].pool
-    if not self._isValidUpdateFeedStructure(_asset, d.config, prevPool):
+    if not self._isCurrentCurvePoolConfig(d.config) or not self._isValidUpdateFeedStructure(_asset, d.config, prevPool):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -719,9 +789,7 @@ def _isValidUpdateFeedStructure(_asset: address, _config: CurvePriceConfig, _pre
 @view
 @internal
 def _isValidFeedConfig(_asset: address, _config: CurvePriceConfig) -> bool:
-    if not self._isValidFeedStructure(_asset, _config):
-        return False
-
+    # Callers validate lifecycle and feed structure before checking priceability.
     # initial ecosystem lp deployment may be proposed before liquidity exists.
     if _config.hasEcoToken and _asset == _config.lpToken and staticcall IERC20(_config.lpToken).totalSupply() == 0:
         return True
@@ -745,23 +813,14 @@ def _isValidFeedStructure(_asset: address, _config: CurvePriceConfig) -> bool:
     if _asset not in _config.underlying and _asset != _config.lpToken:
         return False
 
-    canonicalAsset: address = self._canonicalGreen(_asset)
-
     # LP route: reject if a PriceDesk-queried underlying canonicalizes to this asset
     if _asset == _config.lpToken:
         if self._lpUnderlyingCanonicalEquals(_asset, _config):
             return False
 
-    # same-pool nested alt; both admission orders
-    elif _config.numUnderlying == 2:
-        alt: address = _config.underlying[0]
-        if alt == _asset:
-            alt = _config.underlying[1]
-        canonAlt: address = self._canonicalGreen(alt)
-        if canonAlt == canonicalAsset:
-            return False
-        if alt != empty(address) and (self.curveConfig[alt].pool == _config.pool or self.curveConfig[canonAlt].pool == _config.pool):
-            return False
+    # Reject direct, same-pool, cross-pool, and transitive dependency cycles.
+    if self._wouldCreateCurveDependencyCycle(_asset, _config):
+        return False
 
     return True
 
@@ -898,6 +957,13 @@ def _getCurvePoolConfig(_pool: address) -> CurvePriceConfig:
 
 @view
 @internal
+def _isCurrentCurvePoolConfig(_expected: CurvePriceConfig) -> bool:
+    current: CurvePriceConfig = self._getCurvePoolConfig(_expected.pool)
+    return keccak256(abi_encode(current)) == keccak256(abi_encode(_expected))
+
+
+@view
+@internal
 def _getPoolType(_pool: address, _mr: address) -> PoolType:
     # check what type of pool this is based on where it's registered on Curve
     registryHandlers: address[10] = staticcall CurveMetaRegistry(_mr).get_registry_handlers_from_pool(_pool)
@@ -977,10 +1043,17 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate pending parameter bounds and current pool-observation usability
+    # bind confirmation to the reviewed MetaRegistry/token-metadata snapshot
     d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
     assert d.pool != empty(address) # dev: no pending update
     assert self._isValidPendingGreenRefPoolConfig(d) # dev: invalid ref pool config
+    currentPoolConfig: CurvePriceConfig = self._getCurvePoolConfig(d.pool)
+    if (
+        not self._isValidGreenRefPoolIdentity(currentPoolConfig, d, GREEN)
+        or convert(staticcall IERC20Detailed(d.altAsset).decimals(), uint256) != d.altAssetDecimals
+    ):
+        self._cancelGreenRefPoolConfig(_aid)
+        return False
 
     # check time lock
     assert timeLock._confirmAction(_aid) # dev: time lock not reached
@@ -1051,11 +1124,16 @@ def cancelGreenRefPoolConfig(_aid: uint256) -> bool:
     d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
     assert d.pool != empty(address) # dev: no pending update
     
-    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
-    self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
+    self._cancelGreenRefPoolConfig(_aid)
 
     log GreenRefPoolConfigUpdateCancelled(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks, stabilizerAdjustWeight=d.stabilizerAdjustWeight, stabilizerMaxPoolDebt=d.stabilizerMaxPoolDebt)
     return True
+
+
+@internal
+def _cancelGreenRefPoolConfig(_aid: uint256):
+    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
 
 
 # validation
@@ -1128,6 +1206,26 @@ def _isValidGreenRefPoolConfig(
     _stabilizerMaxPoolDebt: uint256,
     _greenToken: address,
 ) -> bool:
+    if not self._isValidGreenRefPoolIdentity(_poolConfig, _refConfig, _greenToken):
+        return False
+
+    return self._isValidGreenRefPoolParams(
+        _refConfig,
+        _maxNumSnapshots,
+        _dangerTrigger,
+        _staleBlocks,
+        _stabilizerAdjustWeight,
+        _stabilizerMaxPoolDebt,
+    )
+
+
+@view
+@internal
+def _isValidGreenRefPoolIdentity(
+    _poolConfig: CurvePriceConfig,
+    _refConfig: GreenRefPoolConfig,
+    _greenToken: address,
+) -> bool:
     if _poolConfig.pool != _refConfig.pool or _poolConfig.lpToken != _refConfig.lpToken:
         return False
 
@@ -1145,15 +1243,7 @@ def _isValidGreenRefPoolConfig(
 
     if _poolConfig.underlying[1 - _refConfig.greenIndex] != _refConfig.altAsset:
         return False
-
-    return self._isValidGreenRefPoolParams(
-        _refConfig,
-        _maxNumSnapshots,
-        _dangerTrigger,
-        _staleBlocks,
-        _stabilizerAdjustWeight,
-        _stabilizerMaxPoolDebt,
-    )
+    return True
 
 
 ########################

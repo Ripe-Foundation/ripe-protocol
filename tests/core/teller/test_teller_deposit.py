@@ -1922,6 +1922,7 @@ def test_t6_vault_receipt_equality_mutant_silently_accepts_short_report(
             _t6_receipt_equality_bypass_mutant_source(),
             ripe_hq,
             False,
+            2,  # local test PriceDesk Curve ID
             name="t6_teller_without_receipt_equality",
             override_address=T6_RECEIPT_EQUALITY_MUTANT_ADDRESS,
         )
@@ -1962,6 +1963,7 @@ def test_t6_real_basic_vault_blocks_short_report_without_teller_equality(
         _t6_receipt_equality_bypass_mutant_source(),
         ripe_hq,
         False,
+        2,  # local test PriceDesk Curve ID
         name="t6_real_vault_without_receipt_equality",
         override_address=T6_RECEIPT_EQUALITY_MUTANT_ADDRESS,
     )
@@ -2289,6 +2291,7 @@ def test_t1_mutex_removal_mutant_exposes_offsetting_nested_receipt(
             _t1_mutex_removal_mutant_source(),
             ripe_hq,
             False,
+            2,  # local test PriceDesk Curve ID
             name="t1_teller_without_receipt_mutex",
             override_address=boa.env.generate_address(),
         )
@@ -2331,6 +2334,7 @@ def test_t1_real_basic_vault_blocks_offsetting_receipt_without_teller_mutex(
         _t1_mutex_removal_mutant_source(),
         ripe_hq,
         False,
+        2,  # local test PriceDesk Curve ID
         name="t1_real_vault_without_receipt_mutex",
         override_address=boa.env.generate_address(),
     )

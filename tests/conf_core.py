@@ -10,6 +10,7 @@ from constants import (
     RIPE_CCIP_POOL_HQ_ID,
     VAULT_MIGRATOR_HQ_ID,
     RIPE_RESERVE_ENGINE_HQ_ID,
+    RIPE_RESERVE_VESTING_HQ_ID,
 )
 
 
@@ -193,6 +194,7 @@ def ripe_hq(
         vault_migrator, sender=deploy3r,
     ) == VAULT_MIGRATOR_HQ_ID
     assert ripe_hq_deploy.getAddr(RIPE_RESERVE_ENGINE_HQ_ID) == ZERO_ADDRESS
+    assert ripe_hq_deploy.getAddr(RIPE_RESERVE_VESTING_HQ_ID) == ZERO_ADDRESS
 
     # special permission setup
 
@@ -407,10 +409,11 @@ def bond_room(ripe_hq_deploy, bond_booster):
 
 
 @pytest.fixture(scope="session")
-def credit_engine(ripe_hq_deploy):
+def credit_engine(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/CreditEngine.vy",
         ripe_hq_deploy,
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="credit_engine",
     )
 
@@ -425,6 +428,7 @@ def endaoment(ripe_hq_deploy, fork):
         ripe_hq_deploy,
         ADDYS[fork]["WETH"],
         ADDYS[fork]["ETH"],
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="endaoment",
     )
 
@@ -498,11 +502,12 @@ def lootbox(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def teller(ripe_hq_deploy):
+def teller(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/Teller.vy",
         ripe_hq_deploy,
         False,
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="teller",
     )
 
@@ -633,6 +638,7 @@ def switchboard_alpha(ripe_hq_deploy, fork):
         PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["PYTH_PRICES_ID"],
         name="switchboard_alpha",
     )
 
@@ -945,8 +951,10 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     CHAINLINK_ETH_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_ETH_USD"]
     CHAINLINK_BTC_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_BTC_USD"]
 
-    # For forked tests, use staleTime=0 since historical Chainlink data may be stale
-    default_stale_time = 0 if fork != "local" else 60 * 60 * 24  # 1 day for local
+    # This session fixture configures Chainlink before the autouse RipeHq fixture
+    # registers MissionControl. Use an explicit bounded policy during bootstrap;
+    # staleTime=0 now inherits MissionControl and must fail closed while it is absent.
+    default_stale_time = 7 * 24 * 60 * 60 if fork != "local" else 24 * 60 * 60
 
     c = boa.load(
         "contracts/priceSources/ChainlinkPrices.vy",
@@ -964,10 +972,14 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     )
 
     # testing setup with mock feeds (using sally/bob as fake assets here)
-    assert c.addNewPriceFeed(sally, mock_chainlink_feed_one, sender=deploy3r)
+    assert c.addNewPriceFeed(
+        sally, mock_chainlink_feed_one, default_stale_time, sender=deploy3r
+    )
     assert c.confirmNewPriceFeed(sally, sender=deploy3r)
 
-    assert c.addNewPriceFeed(bob, mock_chainlink_feed_two, sender=deploy3r)
+    assert c.addNewPriceFeed(
+        bob, mock_chainlink_feed_two, default_stale_time, sender=deploy3r
+    )
     assert c.confirmNewPriceFeed(bob, sender=deploy3r)
 
     # finish setup

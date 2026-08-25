@@ -47,7 +47,8 @@ from params_utils import (
     GREEN_CCIP_POOL_ID,
     RIPE_CCIP_POOL_ID,
     VAULT_MIGRATOR_ID,
-    INSTANT_BOND_LANE_ID,
+    RIPE_RESERVE_ENGINE_ID,
+    RIPE_RESERVE_VESTING_ID,
     setup_boa_etherscan,
     boa_fork_context,
     print_report_header,
@@ -113,7 +114,8 @@ def load_core_addresses(hq):
         GREEN_CCIP_POOL_ID: "GreenCcipBurnMintPool",
         RIPE_CCIP_POOL_ID: "RipeCcipBurnMintPool",
         VAULT_MIGRATOR_ID: "VaultMigrator",
-        INSTANT_BOND_LANE_ID: "InstantBondLane",
+        RIPE_RESERVE_ENGINE_ID: "RipeReserveEngine",
+        RIPE_RESERVE_VESTING_ID: "RipeReserveVesting",
     }
 
     num_addrs = hq.numAddrs()

@@ -3,26 +3,27 @@ name: Python tests
 on:
   pull_request:
     branches:
+      - master
       - rh
       - rh-audit-remediation
   merge_group:
     branches:
+      - master
       - rh
       - rh-audit-remediation
   push:
     # Push runs the full job set -- the same jobs as pull_request and
     # merge_group, not a reduced one.
     #
-    # master, rh, and rh-audit-remediation are not push-protected today, and
-    # master is not listed on pull_request or merge_group. Push is therefore
-    # the only automatic Python validation covering direct integration-branch
-    # updates and anything reaching master; PRs targeting master still get no
-    # pre-merge merge-ref run.
+    # master, rh, and rh-audit-remediation are not push-protected today. Push
+    # therefore remains the automatic validation covering direct
+    # integration-branch updates in addition to pull_request and merge_group
+    # validation of each prospective merge.
     #
     # Do not gate the validation jobs off of push again unless both are true:
-    # (1) all three branches reject direct pushes, and (2) master is listed on
-    # pull_request and merge_group. A unit test cannot see live branch
-    # protection -- the YAML routing here is the source of truth.
+    # all three branches reject direct pushes. A unit test cannot see live
+    # branch protection, so repository routing and the GitHub setting are
+    # separate release controls.
     #
     # A run on one of these branches is also what makes the Titanoboa cache
     # usable at all: a cache written during a pull_request run is scoped to
@@ -78,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core-a"},{"lane":"lean","shard":"core-b"},{"lane":"lean","shard":"core-teller"},{"lane":"lean","shard":"core-c"},{"lane":"lean","shard":"vaults"},{"lane":"lean","shard":"vaults-gov"},{"lane":"lean","shard":"vaults-modules"},{"lane":"lean","shard":"config"},{"lane":"lean","shard":"price-sources-a"},{"lane":"lean","shard":"price-sources-b"},{"lane":"lean","shard":"supporting"}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core-a"},{"lane":"lean","shard":"core-b"},{"lane":"lean","shard":"core-teller"},{"lane":"lean","shard":"core-c"},{"lane":"lean","shard":"core-reserve-engine"},{"lane":"lean","shard":"vaults"},{"lane":"lean","shard":"vaults-gov"},{"lane":"lean","shard":"vaults-modules"},{"lane":"lean","shard":"config"},{"lane":"lean","shard":"price-sources-a"},{"lane":"lean","shard":"price-sources-b"},{"lane":"lean","shard":"supporting"}]') }}
     env:
       # The runner context is not available in jobs.<id>.env — only inside
       # steps — so these use github.workspace, which is.
@@ -181,6 +182,9 @@ jobs:
                 tests/core/test_stale_vault_replacement.py
                 tests/core/test_sc24_gas_matrix.py
               )
+              ;;
+            core-reserve-engine)
+              shard_args=(tests/core/ripeReserveEngine)
               ;;
             vaults)
               shard_args=(
@@ -314,6 +318,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
+      - name: Verify production ABI exports
+        run: python scripts/export_abis.py --check
+
       - name: Run deployment control suites
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
@@ -394,18 +401,30 @@ jobs:
             -m gas \
             tests/priceSources/blueChip/test_bluechip_local.py \
             tests/priceSources/curve/test_robinhood_launch_route.py \
-            tests/core/test_sc24_gas_matrix.py
+            tests/core/test_sc24_gas_matrix.py \
+            tests/registries/test_price_desk_gas.py \
+            'tests/registries/test_price_desk_aggregate_protocol_gas.py::test_aggregate_protocol_gas[valuation-intended_prompt]'
 
   rh-pr-gate:
     name: rh-pr-gate
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     needs:
+      - solidity
       - test
       - deployment-controls
       - snapshot-gas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Require successful Solidity lane
+        env:
+          SOLIDITY_RESULT: ${{ needs.solidity.result }}
+        run: |
+          if [ "$SOLIDITY_RESULT" != "success" ]; then
+            echo "Solidity build and focused tests did not succeed: $SOLIDITY_RESULT"
+            exit 1
+          fi
+
       - name: Require successful lean lane
         env:
           TEST_RESULT: ${{ needs.test.result }}

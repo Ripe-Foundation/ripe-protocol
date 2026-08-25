@@ -3146,6 +3146,10 @@
       {
         "name": "_ripeHq",
         "type": "address"
+      },
+      {
+        "name": "_curvePricesId",
+        "type": "uint256"
       }
     ],
     "outputs": []

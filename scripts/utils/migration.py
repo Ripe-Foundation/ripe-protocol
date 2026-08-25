@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import warnings
 from typing import Any, Mapping
 
 import boa.contracts
@@ -19,6 +20,7 @@ from scripts.utils import json_file
 from scripts.utils import solidity
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import (
+    TransactionExecutionError,
     deployed_contracts_manifest,
     execute_transaction,
 )
@@ -32,7 +34,43 @@ _PROMOTABLE_SOLC_FIELDS = frozenset(
 _CANONICAL_HEX_RE = re.compile(r"(?:[0-9a-f]{2})*")
 _INTEGRITY_RE = re.compile(r"[0-9a-f]{64}")
 _COMPILER_VERSION_RE = re.compile(r"v?\d+\.\d+\.\d+(?:\+commit\.[0-9a-f]+)?")
+_ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
+_LEGACY_VYPER_DEPLOYMENT_RE = re.compile(
+    r"^<[^>]+ at (0x[0-9a-fA-F]{40})(?:, compiled with [^>]+)?>"
+)
+_LEGACY_BLUEPRINT_LOG_RE = re.compile(
+    r"^<boa\.contracts\.vyper\.vyper_contract\.VyperBlueprint "
+    r"object at 0x[0-9a-fA-F]+>$"
+)
 _ABI_ENTRY_TYPES = frozenset({"constructor", "event", "fallback", "function"})
+_TRANSACTION_LOG_VERSION = 2
+_TRANSACTION_LOG_FIELDS = frozenset(
+    {
+        "version",
+        "kind",
+        "chain",
+        "sender",
+        "target",
+        "calldata_sha256",
+        "value",
+        "receipt",
+    }
+)
+_SOLIDITY_DEPLOYMENT_LOG_FIELDS = frozenset(
+    {
+        "version",
+        "kind",
+        "chain",
+        "sender",
+        "contract",
+        "source_file",
+        "artifact_sha256",
+        "creation_sha256",
+        "address",
+        "runtime_sha256",
+    }
+)
+_BOA_CALL_OPTION_NAMES = frozenset(("gas", "sender", "simulate", "value"))
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _DISTINCT_ACTIVATION_POLICIES = frozenset(
     {
@@ -43,9 +81,27 @@ _DISTINCT_ACTIVATION_POLICIES = frozenset(
             "RipeHq",
             5,
             1,
-        )
+        ),
+        (
+            "BondBooster",
+            "contracts/config/BondBooster.vy",
+            "contracts/core/BondRoom.vy",
+            "RipeHq",
+            12,
+            1,
+        ),
     }
 )
+
+
+def _validated_manifest(manifest, error):
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest) != {"contracts"}
+        or not isinstance(manifest["contracts"], dict)
+    ):
+        raise RuntimeError(error)
+    return manifest
 
 
 @dataclass(frozen=True)
@@ -230,7 +286,9 @@ def _compile_authenticated_record(
             or hashlib.sha256(recorded_source).hexdigest() != recorded_sha256
         ):
             raise RuntimeError(f"MIGRATION_{kind}_RECORD_SOURCE_MISMATCH")
-        if not local_source.is_file() or local_source.read_bytes() != recorded_source:
+        if not local_source.is_file() or _normalized_vyper_source(
+            local_source.read_bytes()
+        ) != _normalized_vyper_source(recorded_source):
             raise RuntimeError(f"MIGRATION_{kind}_RECORD_SOURCE_MISMATCH")
 
     expected_compiler = f"v{vyper.__long_version__}"
@@ -395,6 +453,21 @@ class MigrationHistoryError(Exception):
     """Raised when a migration would execute against a deployed history."""
 
 
+def _deployment_address_from_log(value):
+    """Read a chain address from current or legacy deployment journal data."""
+    if not isinstance(value, str):
+        return None
+    if _ADDRESS_RE.fullmatch(value):
+        return value
+    match = _LEGACY_VYPER_DEPLOYMENT_RE.match(value)
+    return match.group(1) if match else None
+
+
+def _normalized_vyper_source(source):
+    """Match Vyper's compiler JSON normalization of whitespace-only lines."""
+    return re.sub(rb"(?m)^[ \t]+(?=\r?$)", b"", source)
+
+
 def history_has_deployment(history_path):
     """True if `history_path` already holds a deployed current manifest."""
     return os.path.exists(os.path.join(str(history_path), CURRENT_MANIFEST))
@@ -452,14 +525,22 @@ class Migration:
         self._args = {}
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
+        self._last_resumed_transaction_raw = None
         self.gas = 0
 
         try:
             filename = self._manifest_filename("current")
             log.h3(f"Loading previous manifest {filename}")
             self._previous_manifest = json_file.load(filename)
-        except:
+        except FileNotFoundError:
             self._previous_manifest = {}
+        except Exception:
+            raise RuntimeError("MIGRATION_CURRENT_MANIFEST_INVALID") from None
+        else:
+            self._previous_manifest = _validated_manifest(
+                self._previous_manifest,
+                "MIGRATION_CURRENT_MANIFEST_INVALID",
+            )
 
         pending_filename = self._pending_manifest_filename()
         has_pending_manifest = os.path.exists(pending_filename)
@@ -470,23 +551,36 @@ class Migration:
                 pending_manifest = json_file.load(pending_filename)
             except Exception:
                 raise RuntimeError("MIGRATION_PENDING_MANIFEST_INVALID") from None
+            pending_manifest = _validated_manifest(
+                pending_manifest,
+                "MIGRATION_PENDING_MANIFEST_INVALID",
+            )
             # Pending manifests are complete snapshots, not deltas. Treat the
             # checkpoint as authoritative so recursive merging cannot revive
             # stale fields from the prior canonical contract record.
             self._previous_manifest = pending_manifest
 
         loaded_log = False
-        try:
-            self._load_log_file()
-            loaded_log = True
-            log.h3(f"Log file {self._log_filename()} loaded")
-        except:
-            log.h3(f"No previous log file: {self._log_filename()}")
+        if self._deploy_args.ignore_logs:
+            log.h3(f"Ignoring previous log file: {self._log_filename()}")
+        else:
+            try:
+                self._load_log_file()
+                loaded_log = True
+                log.h3(f"Log file {self._log_filename()} loaded")
+            except FileNotFoundError:
+                log.h3(f"No previous log file: {self._log_filename()}")
+            except Exception:
+                raise RuntimeError("MIGRATION_TRANSACTION_LOG_INVALID") from None
         if has_pending_manifest and not loaded_log:
             raise RuntimeError("MIGRATION_RESUME_STATE_INCOMPLETE")
 
     def rpc(self):
         return self._deploy_args.rpc
+
+    def is_local_preview(self):
+        """Whether the CLI selected a verified local/fork execution path."""
+        return getattr(self._deploy_args, "local_preview", False) is True
 
     def execute(self, transaction, *args, **kwargs):
         """
@@ -497,6 +591,37 @@ class Migration:
         self._save_log_file()
 
         return tx
+
+    def execute_reconciled(self, transaction, postcondition, *args, **kwargs):
+        """Record a call already proven complete after a receipt-side failure."""
+        if self._curr_transaction() is not None:
+            return self.execute(transaction, *args, **kwargs)
+        if postcondition():
+            return self._record_reconciled_transaction(
+                transaction,
+                args,
+                kwargs,
+            )
+        try:
+            return self.execute(transaction, *args, **kwargs)
+        except TransactionExecutionError:
+            if not postcondition():
+                raise
+            return self._record_reconciled_transaction(
+                transaction,
+                args,
+                kwargs,
+            )
+
+    def _record_reconciled_transaction(self, transaction, args, kwargs):
+        assert self._curr_transaction() is None
+        next_transaction = self._count + 1
+        log.h2(f"Transaction {next_transaction} — reconciled on-chain state")
+        intent = self._transaction_intent(transaction, args, kwargs)
+        self._transactions.append(self._transaction_record(intent, True))
+        self._count += 1
+        self._save_log_file()
+        return True
 
     def _expected_source_path(
         self,
@@ -591,11 +716,19 @@ class Migration:
             if not isinstance(record, dict):
                 raise RuntimeError("MIGRATION_RESUMED_CONTRACT_RECORD_MISSING")
             logged_address = self._last_resumed_transaction
+            raw_log_entry = self._last_resumed_transaction_raw
             recorded_address = record.get("address")
-            if (
-                not isinstance(logged_address, str)
-                or not isinstance(recorded_address, str)
-                or logged_address.lower() != recorded_address.lower()
+            legacy_blueprint = (
+                blueprint
+                and isinstance(raw_log_entry, str)
+                and _LEGACY_BLUEPRINT_LOG_RE.fullmatch(raw_log_entry) is not None
+            )
+            if not isinstance(recorded_address, str) or (
+                not legacy_blueprint
+                and (
+                    not isinstance(logged_address, str)
+                    or logged_address.lower() != recorded_address.lower()
+                )
             ):
                 raise RuntimeError("MIGRATION_RESUMED_CONTRACT_LOG_ADDRESS_MISMATCH")
             if str(contract.address).lower() != recorded_address.lower():
@@ -667,16 +800,44 @@ class Migration:
         """
         label = kwargs.pop("label", name)
         source_file = kwargs.pop("source_file", None)
+        intent = solidity.deployment_intent(
+            name,
+            *args,
+            sender=self._deploy_args.sender.address,
+            chain=self._deploy_args.chain,
+            source_file=source_file,
+        )
 
         next_transaction = self._count + 1
         log.h2(
-            f"Transaction {next_transaction} for migration with timestamp {self._timestamp} - Deploying {name}"
+            f"Transaction {next_transaction} — Deploying {name}"
         )
 
-        if self._curr_transaction():
+        recorded = self._curr_transaction()
+        if recorded is not None:
+            if (
+                not isinstance(recorded, dict)
+                or set(recorded) != _SOLIDITY_DEPLOYMENT_LOG_FIELDS
+                or any(recorded.get(key) != value for key, value in intent.items())
+            ):
+                raise RuntimeError("MIGRATION_SOLIDITY_DEPLOYMENT_INTENT_MISMATCH")
+            address = recorded.get("address")
+            if (
+                not isinstance(address, str)
+                or re.fullmatch(r"0x[0-9a-fA-F]{40}", address) is None
+                or str(self.get_address(label)).lower() != address.lower()
+            ):
+                raise RuntimeError("MIGRATION_SOLIDITY_DEPLOYMENT_ADDRESS_MISMATCH")
+            runtime = bytes(boa.env.get_code(address))
+            if (
+                not runtime
+                or hashlib.sha256(runtime).hexdigest()
+                != recorded.get("runtime_sha256")
+            ):
+                raise RuntimeError("MIGRATION_SOLIDITY_DEPLOYMENT_RUNTIME_MISMATCH")
             log.h3(f"Skipping transaction {next_transaction}")
             self._count += 1
-            return solidity.at(name, self.get_address(label), source_file)
+            return solidity.at(name, address, source_file)
 
         contract = solidity.deploy(
             name,
@@ -686,12 +847,21 @@ class Migration:
         )
         log.h3(f"Contract {name} deployed at {contract.address}")
 
-        self._transactions.append(str(contract.address))
+        runtime = bytes(boa.env.get_code(contract.address))
+        if not runtime:
+            raise RuntimeError("MIGRATION_SOLIDITY_DEPLOYMENT_RUNTIME_MISSING")
+        self._transactions.append(
+            {
+                **intent,
+                "address": str(contract.address),
+                "runtime_sha256": hashlib.sha256(runtime).hexdigest(),
+            }
+        )
         self._count += 1
 
-        # Solidity contracts are recorded by address only. The manifest stores
-        # Vyper compiler output for everything else, and Foundry artifacts have
-        # no equivalent (use `get_solidity_contract` to load them back).
+        # The current manifest remains the canonical address index; the
+        # transaction journal authenticates the Foundry artifact, constructor
+        # payload, execution domain, address, and deployed runtime for resume.
         self.include_contract(label, str(contract.address))
         self._save_log_file()
 
@@ -731,22 +901,40 @@ class Migration:
     def get_contract(self, name, address=None):
         file = self._previous_manifest["contracts"][name]["file"]
         address = address or self.get_address(name)
-        return boa.load_partial(file).at(address)
+        # Attaching current source to an older deployed generation is expected
+        # during replacement migrations. Boa's warning includes a full storage
+        # dump (potentially thousands of lines), obscuring the actual operator
+        # plan. Keep every other warning visible and suppress only this known
+        # attachment warning in this narrow scope.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"casted bytecode does not match compiled bytecode at ",
+                category=UserWarning,
+            )
+            return boa.load_partial(file).at(address)
 
     def end(self):
         """
         Ends the migration and saves the manifest file
         """
+        if self._count != len(self._transactions):
+            raise RuntimeError("MIGRATION_TRANSACTION_LOG_UNCONSUMED")
+
         # A numbered manifest is a completed-migration checkpoint. During the
         # migration, deployments live only in a timestamp-scoped pending file;
         # neither a partial step nor a failed retry may become `current`.
         pending_filename = self._pending_manifest_filename()
-        final_manifest = self._previous_manifest
+        final_manifest = self._previous_manifest or {"contracts": {}}
         if os.path.exists(pending_filename):
             try:
                 final_manifest = json_file.load(pending_filename)
             except Exception:
                 raise RuntimeError("MIGRATION_PENDING_MANIFEST_INVALID") from None
+        final_manifest = _validated_manifest(
+            final_manifest,
+            "MIGRATION_PENDING_MANIFEST_INVALID",
+        )
         # Publish current first and the numeric completion marker last. If the
         # process dies between them, auto-resume selects this same migration
         # and its log/pending journal completes the checkpoint; it never skips
@@ -774,6 +962,9 @@ class Migration:
 
     def timestamp(self):
         return self._timestamp
+
+    def previous_timestamp(self):
+        return self._previous_timestamp
 
     def blueprint(self):
         return self._deploy_args.blueprint
@@ -1005,6 +1196,81 @@ class Migration:
             return None
         return self._transactions[self._count]
 
+    def _transaction_intent(self, transaction, args, kwargs):
+        """Bind a resumable call to its execution domain and exact EVM intent."""
+        contract = getattr(transaction, "contract", None)
+        target = getattr(contract, "address", None)
+        prepare_calldata = getattr(transaction, "prepare_calldata", None)
+        target_text = str(target).lower() if target is not None else ""
+        if (
+            re.fullmatch(r"0x[0-9a-f]{40}", target_text) is None
+            or not callable(prepare_calldata)
+        ):
+            raise RuntimeError("MIGRATION_TRANSACTION_INTENT_UNAVAILABLE")
+
+        call_kwargs = {
+            name: value
+            for name, value in kwargs.items()
+            if name not in _BOA_CALL_OPTION_NAMES
+        }
+        try:
+            calldata = prepare_calldata(*args, **call_kwargs)
+            calldata = bytes(calldata)
+        except Exception:
+            raise RuntimeError("MIGRATION_TRANSACTION_CALLDATA_INVALID") from None
+
+        sender = str(self._deploy_args.sender.address).lower()
+        chain = str(self._deploy_args.chain)
+        value = kwargs.get("value", 0)
+        if (
+            re.fullmatch(r"0x[0-9a-f]{40}", sender) is None
+            or not chain
+            or isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+        ):
+            raise RuntimeError("MIGRATION_TRANSACTION_INTENT_UNAVAILABLE")
+
+        return {
+            "version": _TRANSACTION_LOG_VERSION,
+            "kind": "call",
+            "chain": chain,
+            "sender": sender,
+            "target": target_text,
+            "calldata_sha256": hashlib.sha256(calldata).hexdigest(),
+            "value": value,
+        }
+
+    @staticmethod
+    def _resume_transaction(record, intent):
+        if not isinstance(record, dict) or set(record) != _TRANSACTION_LOG_FIELDS:
+            raise RuntimeError("MIGRATION_TRANSACTION_LOG_UNAUTHENTICATED")
+        if (
+            record.get("version") != _TRANSACTION_LOG_VERSION
+            or record.get("kind") != "call"
+        ):
+            raise RuntimeError("MIGRATION_TRANSACTION_LOG_UNAUTHENTICATED")
+        if record.get("chain") != intent["chain"]:
+            raise RuntimeError("MIGRATION_TRANSACTION_CHAIN_MISMATCH")
+        if record.get("sender") != intent["sender"]:
+            raise RuntimeError("MIGRATION_TRANSACTION_SENDER_MISMATCH")
+        if record.get("target") != intent["target"]:
+            raise RuntimeError("MIGRATION_TRANSACTION_TARGET_MISMATCH")
+        if record.get("calldata_sha256") != intent["calldata_sha256"]:
+            raise RuntimeError("MIGRATION_TRANSACTION_CALLDATA_MISMATCH")
+        if record.get("value") != intent["value"]:
+            raise RuntimeError("MIGRATION_TRANSACTION_VALUE_MISMATCH")
+        receipt = record.get("receipt")
+        if not isinstance(receipt, (str, int, bool)) or receipt == "":
+            raise RuntimeError("MIGRATION_TRANSACTION_RECEIPT_INVALID")
+        return receipt
+
+    @staticmethod
+    def _transaction_record(intent, receipt):
+        if not isinstance(receipt, (str, int, bool)):
+            receipt = str(receipt)
+        return {**intent, "receipt": receipt}
+
     def _clean_message(self, message, contract_name, *args):
         if contract_name != "":
             return f"Deploying {contract_name}"
@@ -1027,16 +1293,20 @@ class Migration:
         """
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
+        self._last_resumed_transaction_raw = None
         next_transaction = self._count + 1
         message = self._clean_message(str(transaction), contract_name, *args)
+        intent = None
+        if contract_name == "":
+            intent = self._transaction_intent(transaction, args, kwargs)
 
         log.h2(
-            f"Transaction {next_transaction} for migration with timestamp {self._timestamp} - {message}"
+            f"Transaction {next_transaction} — {message}"
         )
 
-        tx = self._curr_transaction()
+        recorded = self._curr_transaction()
 
-        if not tx:
+        if recorded is None:
             # Only include sender in kwargs if contract_name is empty
             if contract_name == "":
                 kwargs["sender"] = self._deploy_args.sender.address
@@ -1044,7 +1314,15 @@ class Migration:
             tx = execute_transaction(transaction, *args, **kwargs)
             if tx is None:
                 raise RuntimeError("MIGRATION_TRANSACTION_RESULT_MISSING")
-            self._transactions.append(tx)
+            self._transactions.append(
+                self._transaction_record(intent, tx)
+                if contract_name == ""
+                # Deployment objects stringify to verbose representations,
+                # and a VyperBlueprint string contains only a Python memory
+                # address. Persist the actual chain address so a restart can
+                # authenticate the journal against the pending manifest.
+                else str(tx.address)
+            )
             gas = 0
             if contract_name != "":
                 if hasattr(tx, "_computation") and tx._computation is not None:
@@ -1063,7 +1341,15 @@ class Migration:
         else:
             log.h3(f"Skipping transaction {next_transaction}")
             self._last_run_was_resume = True
-            self._last_resumed_transaction = str(tx)
+            if contract_name == "":
+                tx = self._resume_transaction(recorded, intent)
+                self._last_resumed_transaction = str(tx)
+            else:
+                self._last_resumed_transaction_raw = str(recorded)
+                self._last_resumed_transaction = _deployment_address_from_log(
+                    str(recorded)
+                )
+                tx = recorded
             if contract_name != "":
                 self._count += 1
                 return self.get_contract(kwargs["name"])
@@ -1094,20 +1380,29 @@ class Migration:
 
         json_file.save(self._pending_manifest_filename(), merged_manifest)
 
-        log.h3(f"{contract_name} added to pending manifest")
+        log.detail(f"{contract_name} added to pending manifest")
         return merged_manifest
 
     def _load_log_file(self):
-        if self._deploy_args.ignore_logs:
-            raise RuntimeError("MIGRATION_LOG_REPLAY_REQUESTED")
         logs = json_file.load(self._log_filename())
+        if (
+            not isinstance(logs, dict)
+            or set(logs) != {"transactions"}
+            or not isinstance(logs["transactions"], list)
+        ):
+            raise RuntimeError("MIGRATION_TRANSACTION_LOG_INVALID")
         self._transactions = logs["transactions"]
 
     def _save_log_file(self):
+        def serializable(value):
+            if isinstance(value, dict):
+                return copy.deepcopy(value)
+            return str(value)
+
         json_file.save(
             self._log_filename(),
             {
-                "transactions": [str(tx) for tx in self._transactions],
+                "transactions": [serializable(tx) for tx in self._transactions],
             },
         )
 

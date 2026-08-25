@@ -1910,6 +1910,10 @@
       {
         "name": "_eth",
         "type": "address"
+      },
+      {
+        "name": "_curvePricesId",
+        "type": "uint256"
       }
     ],
     "outputs": []

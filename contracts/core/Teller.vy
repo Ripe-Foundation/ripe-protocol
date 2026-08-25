@@ -38,6 +38,14 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
+interface TellerUtils:
+    def validateOnDeposit(_asset: address, _amount: uint256, _user: address, _vaultId: uint256, _vaultAddr: address, _depositor: address, _didAlreadyValidateSender: bool, _areFundsHereAlready: bool, _d: DepositLedgerData, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
+    def validateOnWithdrawal(_asset: address, _amount: uint256, _user: address, _vaultAddr: address, _vaultId: uint256, _caller: address, _config: TellerWithdrawConfig, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
+    def getVaultAddrAndId(_asset: address, _vaultAddr: address, _vaultId: uint256, _vaultBook: address, _missionControl: address) -> (address, uint256): view
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
+    def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
+    def isUnderscoreWalletOrVault(_addr: address, _mc: address = empty(address)) -> bool: view
+
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
@@ -46,14 +54,6 @@ interface MissionControl:
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
     def shouldCheckLastTouch() -> bool: view
-
-interface TellerUtils:
-    def validateOnDeposit(_asset: address, _amount: uint256, _user: address, _vaultId: uint256, _vaultAddr: address, _depositor: address, _didAlreadyValidateSender: bool, _areFundsHereAlready: bool, _d: DepositLedgerData, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
-    def validateOnWithdrawal(_asset: address, _amount: uint256, _user: address, _vaultAddr: address, _vaultId: uint256, _caller: address, _config: TellerWithdrawConfig, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
-    def getVaultAddrAndId(_asset: address, _vaultAddr: address, _vaultId: uint256, _vaultBook: address, _missionControl: address) -> (address, uint256): view
-    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
-    def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
-    def isUnderscoreWalletOrVault(_addr: address, _mc: address = empty(address)) -> bool: view
 
 interface RipeGovVault:
     def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -222,13 +222,14 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
-CURVE_PRICES_ID: constant(uint256) = 2
+CURVE_PRICES_ID: immutable(uint256)
 
 
 @deploy
-def __init__(_ripeHq: address, _shouldPause: bool):
+def __init__(_ripeHq: address, _shouldPause: bool, _curvePricesId: uint256):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
+    CURVE_PRICES_ID = _curvePricesId
 
 
 ############
@@ -784,7 +785,7 @@ def adjustLock(
 ):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, msg.sender, a)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
     self._performHousekeeping(False, _user, True, True, a)
 
@@ -798,7 +799,7 @@ def releaseLock(
 ):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, msg.sender, a)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
     self._performHousekeeping(True, _user, True, True, a)
 
@@ -971,11 +972,11 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
 
 @view
 @internal
-def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _sender: address, _a: addys.Addys) -> address:
+def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _a: addys.Addys) -> address:
     assert (
-        _user == _sender
-        or addys._isSwitchboardAddr(_sender)
-        or staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, _sender, _a.missionControl)
+        _user == msg.sender
+        or addys._isSwitchboardAddr(msg.sender)
+        or staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, _a.missionControl)
     ) # dev: no perms
     vaultId: uint256 = self._getCoreRipeGovVaultId(_a.missionControl)
     if _vaultId != 0:

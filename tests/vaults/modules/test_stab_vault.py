@@ -1392,7 +1392,7 @@ def test_stab_vault_swap_with_claimable_green_multiple_stab_assets(
     assert stability_pool.claimableBalances(alpha_token, delta_token) == delta_amount
 
 
-def test_stab_vault_swap_with_claimable_green_partial_balance(
+def test_stab_vault_swap_with_claimable_green_custody_deficit_reverts_atomically(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -1411,9 +1411,8 @@ def test_stab_vault_swap_with_claimable_green_partial_balance(
     whale,
     setGeneralConfig,
     setAssetConfig,
-    _test,
 ):
-    """Test when green balance is less than claimable amount"""
+    """A GREEN custody deficit must not be socialized through a partial swap."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -1448,18 +1447,31 @@ def test_stab_vault_swap_with_claimable_green_partial_balance(
     green_balance = green_token.balanceOf(stability_pool)
     green_token.transfer(whale, green_balance - 20 * EIGHTEEN_DECIMALS, sender=stability_pool.address)
 
-    # Try to swap - should be limited by actual balance
+    # A liquidation attempt first reports new collateral to the pool. The
+    # existing GREEN deficit must still fail closed and roll that report back.
     liq_amount = 50 * (10 ** charlie_token.decimals())
     charlie_token.transfer(stability_pool, liq_amount, sender=charlie_token_whale)
-    
-    requested_green = 50 * EIGHTEEN_DECIMALS
-    amount_swapped = stability_pool.swapWithClaimableGreen(
-        alpha_token, requested_green, charlie_token, liq_amount, green_token,
-        sender=auction_house.address
-    )
 
-    # Should only swap what's actually available
-    _test(20 * EIGHTEEN_DECIMALS, amount_swapped)
+    green_pair_before = stability_pool.claimableBalances(alpha_token, green_token)
+    green_total_before = stability_pool.totalClaimableBalances(green_token)
+    liq_pair_before = stability_pool.claimableBalances(alpha_token, charlie_token)
+    liq_total_before = stability_pool.totalClaimableBalances(charlie_token)
+    green_custody_before = green_token.balanceOf(stability_pool)
+    green_supply_before = green_token.totalSupply()
+
+    requested_green = 50 * EIGHTEEN_DECIMALS
+    with boa.reverts("claim custody deficit"):
+        stability_pool.swapWithClaimableGreen(
+            alpha_token, requested_green, charlie_token, liq_amount, green_token,
+            sender=auction_house.address
+        )
+
+    assert stability_pool.claimableBalances(alpha_token, green_token) == green_pair_before
+    assert stability_pool.totalClaimableBalances(green_token) == green_total_before
+    assert stability_pool.claimableBalances(alpha_token, charlie_token) == liq_pair_before
+    assert stability_pool.totalClaimableBalances(charlie_token) == liq_total_before
+    assert green_token.balanceOf(stability_pool) == green_custody_before
+    assert green_token.totalSupply() == green_supply_before
 
 
 def test_stab_vault_swap_with_claimable_green_burn_behavior(

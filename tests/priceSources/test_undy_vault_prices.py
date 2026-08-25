@@ -2931,6 +2931,509 @@ def test_undy_sc23_zero_stale_time_and_deadline_overflow(
     assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
 
 
+MUTABLE_UNDY_UNDERLYING = """
+# @version 0.4.3
+
+_decimals: uint8
+_revertMetadata: bool
+
+@deploy
+def __init__():
+    self._decimals = 18
+
+@external
+def setDecimals(_decimals: uint8):
+    self._decimals = _decimals
+
+@external
+def setRevertMetadata(_shouldRevert: bool):
+    self._revertMetadata = _shouldRevert
+
+@view
+@external
+def decimals() -> uint8:
+    assert not self._revertMetadata
+    return self._decimals
+"""
+
+
+MUTABLE_UNDY_VAULT = """
+# @version 0.4.3
+
+_asset: address
+_decimals: uint8
+_pricePerShare: uint256
+_totalSupply: uint256
+_revertAsset: bool
+_revertDecimals: bool
+
+@deploy
+def __init__(_underlying: address):
+    self._asset = _underlying
+    self._decimals = 18
+    self._pricePerShare = 10 ** 18
+    self._totalSupply = 10 ** 18
+
+@external
+def setAsset(_underlying: address):
+    self._asset = _underlying
+
+@external
+def setDecimals(_decimals: uint8):
+    self._decimals = _decimals
+
+@external
+def setPricePerShare(_pricePerShare: uint256):
+    self._pricePerShare = _pricePerShare
+
+@external
+def setRevertAsset(_shouldRevert: bool):
+    self._revertAsset = _shouldRevert
+
+@external
+def setRevertDecimals(_shouldRevert: bool):
+    self._revertDecimals = _shouldRevert
+
+@view
+@external
+def asset() -> address:
+    assert not self._revertAsset
+    return self._asset
+
+@view
+@external
+def decimals() -> uint8:
+    assert not self._revertDecimals
+    return self._decimals
+
+@view
+@external
+def convertToAssets(_shares: uint256) -> uint256:
+    return self._pricePerShare
+
+@view
+@external
+def totalSupply() -> uint256:
+    return self._totalSupply
+"""
+
+
+def _deploy_mutable_undy_feed(
+    prices,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    underlying = boa.loads(MUTABLE_UNDY_UNDERLYING)
+    alternate = boa.loads(MUTABLE_UNDY_UNDERLYING)
+    vault = boa.loads(MUTABLE_UNDY_VAULT, underlying.address)
+    mock_price_source.setPrice(underlying, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alternate, EIGHTEEN_DECIMALS)
+    return vault, underlying, alternate
+
+
+def _apply_undy_metadata_drift(kind, vault, underlying, alternate):
+    if kind == "asset":
+        vault.setAsset(alternate)
+    elif kind == "underlying_decimals":
+        underlying.setDecimals(17)
+    else:
+        assert kind == "vault_decimals"
+        vault.setDecimals(17)
+
+
+@pytest.mark.parametrize(
+    "drift_kind",
+    ("asset", "underlying_decimals", "vault_decimals"),
+)
+def test_undy_new_confirmation_cancels_live_metadata_drift(
+    drift_kind,
+    undy_vault_prices,
+    governance,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, underlying, alternate = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    assert undy_vault_prices.addNewPriceFeed(
+        vault, 0, 3, 0, 0, sender=governance.address
+    )
+    pending = undy_vault_prices.pendingPriceConfigs(vault)
+    assert pending.config.underlyingAsset == underlying.address
+    assert pending.config.underlyingDecimals == 18
+    assert pending.config.vaultTokenDecimals == 18
+
+    _apply_undy_metadata_drift(drift_kind, vault, underlying, alternate)
+    boa.env.time_travel(blocks=undy_vault_prices.actionTimeLock() + 1)
+    assert not undy_vault_prices.confirmNewPriceFeed(
+        vault,
+        sender=governance.address,
+    )
+    assert not undy_vault_prices.hasPriceFeed(vault)
+    assert not undy_vault_prices.hasPendingPriceFeedUpdate(vault)
+    assert undy_vault_prices.pendingPriceConfigs(vault).actionId == 0
+
+
+@pytest.mark.parametrize(
+    "drift_kind",
+    ("asset", "underlying_decimals", "vault_decimals"),
+)
+def test_undy_update_confirmation_cancels_metadata_drift_and_preserves_active(
+    drift_kind,
+    undy_vault_prices,
+    governance,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, underlying, alternate = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        vault,
+        max_snapshots=3,
+    )
+    active_before = _undy_config_state(undy_vault_prices.priceConfigs(vault))
+    ring_before = _undy_ring_state(undy_vault_prices, vault)
+    assert undy_vault_prices.updatePriceConfig(
+        vault, 0, 3, 100, 77, sender=governance.address
+    )
+
+    _apply_undy_metadata_drift(drift_kind, vault, underlying, alternate)
+    boa.env.time_travel(blocks=undy_vault_prices.actionTimeLock() + 1)
+    assert not undy_vault_prices.confirmPriceFeedUpdate(
+        vault,
+        sender=governance.address,
+    )
+    assert _undy_config_state(undy_vault_prices.priceConfigs(vault)) == active_before
+    assert _undy_ring_state(undy_vault_prices, vault) == ring_before
+    assert not undy_vault_prices.hasPendingPriceFeedUpdate(vault)
+
+
+@pytest.mark.parametrize("phase", ("new", "update"))
+@pytest.mark.parametrize(
+    "unavailable_metadata",
+    ("asset", "underlying_decimals", "vault_decimals"),
+)
+def test_undy_confirmation_metadata_read_failure_is_atomic_and_retryable(
+    phase,
+    unavailable_metadata,
+    undy_vault_prices,
+    governance,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, underlying, _ = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    active_before = None
+    ring_before = None
+    if phase == "new":
+        assert undy_vault_prices.addNewPriceFeed(
+            vault, 0, 3, 0, 0, sender=governance.address
+        )
+    else:
+        _register_undy_integrity_feed(
+            undy_vault_prices,
+            governance,
+            vault,
+            max_snapshots=3,
+        )
+        active_before = _undy_config_state(undy_vault_prices.priceConfigs(vault))
+        ring_before = _undy_ring_state(undy_vault_prices, vault)
+        assert undy_vault_prices.updatePriceConfig(
+            vault, 0, 3, 100, 77, sender=governance.address
+        )
+
+    pending_before = undy_vault_prices.pendingPriceConfigs(vault)
+    if unavailable_metadata == "asset":
+        vault.setRevertAsset(True)
+    elif unavailable_metadata == "underlying_decimals":
+        underlying.setRevertMetadata(True)
+    else:
+        assert unavailable_metadata == "vault_decimals"
+        vault.setRevertDecimals(True)
+
+    boa.env.time_travel(blocks=undy_vault_prices.actionTimeLock() + 1)
+    confirm = (
+        undy_vault_prices.confirmNewPriceFeed
+        if phase == "new"
+        else undy_vault_prices.confirmPriceFeedUpdate
+    )
+    with boa.reverts("external call failed"):
+        confirm(vault, sender=governance.address)
+
+    assert undy_vault_prices.pendingPriceConfigs(vault).actionId == (
+        pending_before.actionId
+    )
+    assert undy_vault_prices.hasPendingPriceFeedUpdate(vault)
+    if phase == "new":
+        assert not undy_vault_prices.hasPriceFeed(vault)
+    else:
+        assert _undy_config_state(undy_vault_prices.priceConfigs(vault)) == (
+            active_before
+        )
+        assert _undy_ring_state(undy_vault_prices, vault) == ring_before
+
+
+def test_undy_runtime_prices_use_confirmed_metadata_snapshot_only(
+    undy_vault_prices,
+    governance,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, underlying, _ = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        vault,
+        max_snapshots=3,
+    )
+    confirmed = undy_vault_prices.priceConfigs(vault)
+    assert confirmed.underlyingAsset == underlying.address
+    assert confirmed.underlyingDecimals == 18
+    assert confirmed.vaultTokenDecimals == 18
+
+    vault.setRevertAsset(True)
+    vault.setRevertDecimals(True)
+    underlying.setRevertMetadata(True)
+    assert undy_vault_prices.getWeightedPrice(vault) == EIGHTEEN_DECIMALS
+    assert undy_vault_prices.getPrice(vault) == EIGHTEEN_DECIMALS
+    assert undy_vault_prices.getPriceAndHasFeed(vault) == (
+        EIGHTEEN_DECIMALS,
+        True,
+    )
+    assert undy_vault_prices.getLatestSnapshot(vault).pricePerShare == (
+        EIGHTEEN_DECIMALS
+    )
+
+
+def test_undy_snapshot_deadline_overflow_fails_soft_without_state_write(
+    undy_vault_prices,
+    governance,
+    teller,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, _, _ = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        vault,
+        min_delay=1,
+        max_snapshots=3,
+    )
+    undy_vault_prices.eval(
+        f"self.priceConfigs[{vault.address}].lastSnapshot.lastUpdate = {2**256 - 1}"
+    )
+    before = _undy_config_state(undy_vault_prices.priceConfigs(vault))
+    ring_before = _undy_ring_state(undy_vault_prices, vault)
+    assert not undy_vault_prices.addPriceSnapshot(vault, sender=teller.address)
+    assert _undy_config_state(undy_vault_prices.priceConfigs(vault)) == before
+    assert _undy_ring_state(undy_vault_prices, vault) == ring_before
+    assert filter_logs(undy_vault_prices, "PricePerShareSnapshotAdded") == []
+
+
+def test_undy_snapshot_deadline_exact_boundary_remains_healthy(
+    undy_vault_prices,
+    governance,
+    teller,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, _, _ = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        vault,
+        min_delay=5,
+        max_snapshots=3,
+    )
+    previous = undy_vault_prices.priceConfigs(vault).lastSnapshot
+    boa.env.time_travel(seconds=5)
+    assert boa.env.evm.patch.timestamp == previous.lastUpdate + 5
+    assert undy_vault_prices.addPriceSnapshot(vault, sender=teller.address)
+    assert undy_vault_prices.priceConfigs(vault).lastSnapshot.lastUpdate == (
+        boa.env.evm.patch.timestamp
+    )
+
+
+@pytest.mark.parametrize(
+    ("previous_pps", "max_upside"),
+    (
+        ((2**256 - 1) // 2 + 1, 2),
+        (2**256 - 1, 1),
+    ),
+    ids=("multiplication-overflow", "addition-overflow"),
+)
+def test_undy_upside_throttle_overflow_rejects_snapshot_without_state_write(
+    previous_pps,
+    max_upside,
+    undy_vault_prices,
+    governance,
+    teller,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, _, _ = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        vault,
+        max_snapshots=3,
+        max_upside=max_upside,
+    )
+    vault.setPricePerShare(2**256 - 1)
+    undy_vault_prices.eval(
+        f"self.priceConfigs[{vault.address}].lastSnapshot.pricePerShare = {previous_pps}"
+    )
+    boa.env.time_travel(seconds=1)
+    before = _undy_config_state(undy_vault_prices.priceConfigs(vault))
+    ring_before = _undy_ring_state(undy_vault_prices, vault)
+    assert not undy_vault_prices.addPriceSnapshot(vault, sender=teller.address)
+    assert _undy_config_state(undy_vault_prices.priceConfigs(vault)) == before
+    assert _undy_ring_state(undy_vault_prices, vault) == ring_before
+    assert filter_logs(undy_vault_prices, "PricePerShareSnapshotAdded") == []
+
+
+def test_undy_upside_throttle_allows_exact_uint256_addition_boundary(
+    undy_vault_prices,
+    governance,
+    teller,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, _, _ = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        vault,
+        max_snapshots=3,
+        max_upside=1,
+    )
+    max_uint256 = 2**256 - 1
+    previous_pps = max_uint256 * 10_000 // 10_001 + 1
+    assert previous_pps + previous_pps // 10_000 == max_uint256
+    vault.setPricePerShare(max_uint256)
+    undy_vault_prices.eval(
+        f"self.priceConfigs[{vault.address}].lastSnapshot.pricePerShare = {previous_pps}"
+    )
+    boa.env.time_travel(seconds=1)
+    assert undy_vault_prices.addPriceSnapshot(vault, sender=teller.address)
+    assert undy_vault_prices.priceConfigs(vault).lastSnapshot.pricePerShare == (
+        max_uint256
+    )
+
+
+@pytest.mark.parametrize(
+    ("price_per_share", "expected"),
+    (
+        (1, (2**256 - 1) // EIGHTEEN_DECIMALS),
+        (2, 0),
+    ),
+    ids=("exact-uint256-product", "product-overflow"),
+)
+def test_undy_final_price_multiplication_boundary_fails_soft(
+    price_per_share,
+    expected,
+    undy_vault_prices,
+    governance,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    mock_price_source,
+):
+    vault, underlying, _ = _deploy_mutable_undy_feed(
+        undy_vault_prices,
+        mission_control,
+        mock_undy_v2,
+        switchboard_alpha,
+        mock_price_source,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        vault,
+        max_snapshots=3,
+    )
+    vault.setPricePerShare(price_per_share)
+    undy_vault_prices.eval(
+        f"self.priceConfigs[{vault.address}].lastSnapshot.pricePerShare = {price_per_share}"
+    )
+    undy_vault_prices.eval(
+        f"self.snapShots[{vault.address}][0].pricePerShare = {price_per_share}"
+    )
+    mock_price_source.setPrice(underlying, 2**256 - 1)
+    boa.env.time_travel(seconds=1)
+    assert undy_vault_prices.getWeightedPrice(vault) == price_per_share
+    assert undy_vault_prices.getPrice(vault) == expected
+
+
 def test_undy_final_deployed_runtime_measurement(undy_vault_prices):
     # Deliberately NOT artifact-marked. This asserts the EIP-170 ceiling, which
     # is deployability, not artifact identity: it cannot go stale from a source
@@ -2943,4 +3446,4 @@ def test_undy_final_deployed_runtime_measurement(undy_vault_prices):
         f"sha256={hashlib.sha256(runtime).hexdigest()}",
         f"headroom={24_576 - len(runtime)}",
     )
-    assert len(runtime) < 24_576
+    assert len(runtime) <= 24_576

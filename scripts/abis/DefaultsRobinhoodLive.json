@@ -660,5 +660,16 @@
         "type": "address[]"
       }
     ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_contribTemplate",
+        "type": "address"
+      }
+    ],
+    "outputs": []
   }
 ]

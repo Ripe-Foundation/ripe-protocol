@@ -1,6 +1,6 @@
 # Vault Migrator / Base Legacy RipeGov Migration — Branch State & Handoff
 
-**Canonical worktree:** `/Users/wigglez/dev/ripe-protocol-base-gov-migration-phase1`
+**Canonical worktree:** `${HOME}/dev/ripe-protocol-base-gov-migration-phase1`
 **Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Merged base:** `rh` @ `26e8270`
 **Status (2026-08-11):** VaultMigrator architecture and the latest live `rh` are integrated. The
 core-remediation candidate preserves pre-wind-down lock records on both governance routes, leaves

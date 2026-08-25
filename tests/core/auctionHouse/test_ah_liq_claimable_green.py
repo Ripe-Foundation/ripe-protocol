@@ -317,7 +317,7 @@ def test_ah_liquidation_claimable_green_insufficient(
 
 @pytest.mark.parametrize(
     "health_failure",
-    ("unpriced_claim", "fully_reserved_stab"),
+    ("unpriced_claim", "partially_reserved_stab", "fully_reserved_stab"),
 )
 def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
     health_failure,
@@ -435,7 +435,7 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
         mock_price_source.disablePriceFeed(charlie_token)
         with boa.reverts("no price for claim asset"):
             stability_pool.getTotalValue(bravo_token)
-    else:
+    elif health_failure == "fully_reserved_stab":
         # Current deposits prevent this overlap, but migrated/legacy state can
         # reserve the raw stabilization-asset custody for another cohort.
         # Write the compiler-pinned mapping slot directly: contract.eval() is
@@ -443,11 +443,26 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
         reserved = bravo_token.balanceOf(stability_pool)
         _set_total_claimable_balance(stability_pool, bravo_token, reserved)
         assert stability_pool.getTotalValue(bravo_token) == 20 * EIGHTEEN_DECIMALS
+    else:
+        # A partial cross-cohort reservation is the important F16 boundary:
+        # AuctionHouse observes raw custody, but StabilityPool may spend only
+        # the unreserved portion. Admission must reject the cohort before any
+        # collateral moves, even though usable custody remains.
+        custody = bravo_token.balanceOf(stability_pool)
+        reserved = custody - 1
+        assert 0 < reserved < custody
+        _set_total_claimable_balance(stability_pool, bravo_token, reserved)
+        assert stability_pool.getTotalValue(bravo_token) > 0
     assert not stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
-    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
-        bravo_token.address,
-        0,
-    )
+    if health_failure == "partially_reserved_stab":
+        # Receiver admission is disabled without hiding this user's own
+        # StabilityPool position from the liquidation iterator.
+        assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
+    else:
+        assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+            bravo_token.address,
+            0,
+        )
     assert stability_pool.getUserAssetAtIndexAndHasBalance(bob, 1) == (
         bravo_token.address,
         True,
@@ -458,12 +473,19 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
     assert terms_during_outage.lowestLtv == terms_before.lowestLtv
 
     pool_alpha_before = alpha_token.balanceOf(stability_pool)
+    stab_custody_before = bravo_token.balanceOf(stability_pool)
+    stab_reservation_before = stability_pool.totalClaimableBalances(bravo_token)
     claimable_alpha_before = stability_pool.claimableBalances(
         bravo_token,
         alpha_token,
     )
     mock_price_source.setPrice(alpha_token, 49 * EIGHTEEN_DECIMALS // 100)
     assert credit_engine.canLiquidateUser(bob)
+    if health_failure == "partially_reserved_stab":
+        assert (
+            auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
+            > stab_custody_before - stab_reservation_before
+        )
     teller.liquidateUser(bob, False, sender=sally)
 
     assert filter_logs(teller, "CollateralSwappedWithStabPool") == []
@@ -473,6 +495,11 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
         alpha_token,
     ) == claimable_alpha_before
     assert stability_pool.userBalances(bob, bravo_token) == shares_before
+    assert bravo_token.balanceOf(stability_pool) == stab_custody_before
+    assert (
+        stability_pool.totalClaimableBalances(bravo_token)
+        == stab_reservation_before
+    )
     assert stability_pool.getUserAssetAtIndexAndHasBalance(bob, 1) == (
         bravo_token.address,
         True,

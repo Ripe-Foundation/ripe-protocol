@@ -1,12 +1,12 @@
-#    ___  ________   ________  _________  ________  ________   _________        ________  ________  ________   ________  ________      
-#   |\  \|\   ___  \|\   ____\|\___   ___\\   __  \|\   ___  \|\___   ___\     |\   __  \|\   __  \|\   ___  \|\   ___ \|\   ____\     
-#   \ \  \ \  \\ \  \ \  \___|\|___ \  \_\ \  \|\  \ \  \\ \  \|___ \  \_|     \ \  \|\ /\ \  \|\  \ \  \\ \  \ \  \_|\ \ \  \___|_    
-#    \ \  \ \  \\ \  \ \_____  \   \ \  \ \ \   __  \ \  \\ \  \   \ \  \       \ \   __  \ \  \\\  \ \  \\ \  \ \  \ \\ \ \_____  \   
-#     \ \  \ \  \\ \  \|____|\  \   \ \  \ \ \  \ \  \ \  \\ \  \   \ \  \       \ \  \|\  \ \  \\\  \ \  \\ \  \ \  \_\\ \|____|\  \  
-#      \ \__\ \__\\ \__\____\_\  \   \ \__\ \ \__\ \__\ \__\\ \__\   \ \__\       \ \_______\ \_______\ \__\\ \__\ \_______\____\_\  \ 
+#    ___  ________   ________  _________  ________  ________   _________        ________  ________  ________   ________  ________
+#   |\  \|\   ___  \|\   ____\|\___   ___\\   __  \|\   ___  \|\___   ___\     |\   __  \|\   __  \|\   ___  \|\   ___ \|\   ____\
+#   \ \  \ \  \\ \  \ \  \___|\|___ \  \_\ \  \|\  \ \  \\ \  \|___ \  \_|     \ \  \|\ /\ \  \|\  \ \  \\ \  \ \  \_|\ \ \  \___|_
+#    \ \  \ \  \\ \  \ \_____  \   \ \  \ \ \   __  \ \  \\ \  \   \ \  \       \ \   __  \ \  \\\  \ \  \\ \  \ \  \ \\ \ \_____  \
+#     \ \  \ \  \\ \  \|____|\  \   \ \  \ \ \  \ \  \ \  \\ \  \   \ \  \       \ \  \|\  \ \  \\\  \ \  \\ \  \ \  \_\\ \|____|\  \
+#      \ \__\ \__\\ \__\____\_\  \   \ \__\ \ \__\ \__\ \__\\ \__\   \ \__\       \ \_______\ \_______\ \__\\ \__\ \_______\____\_\  \
 #       \|__|\|__| \|__|\_________\   \|__|  \|__|\|__|\|__| \|__|    \|__|        \|_______|\|_______|\|__| \|__|\|_______|\_________\
 #                      \|_________|                                                                                        \|_________|
-#                                                                                                                                   
+#
 #     ╔════════════════════════════════════════╗
 #     ║  ** ripe reserve engine **             ║
 #     ║  fixed-price direct RIPE allocations   ║
@@ -48,6 +48,7 @@ interface RipeReserveVesting:
 
 interface RipeToken:
     def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
+    def blacklisted(_account: address) -> bool: view
     def ripeHq() -> address: view
     def isPaused() -> bool: view
 
@@ -183,7 +184,7 @@ event VestedRipeClaimed:
     totalClaimedForPosition: uint256
     ripeAllocation: uint256
     autoDeposited: bool
-    lockDuration: uint256
+    requestedLockDuration: uint256
 
 event ReserveEngineConfigSet:
     paymentCapPerEpoch: uint256
@@ -507,6 +508,9 @@ def _claimVestedRipe(
     assert len(_positionIds) != 0 # dev: empty positions
     assert self._isMintReady() # dev: claim not ready
 
+    ripeToken: address = addys._getRipeToken()
+    assert not staticcall RipeToken(ripeToken).blacklisted(msg.sender) # dev: beneficiary blacklisted
+
     vesting: address = addys._getRipeReserveVestingAddr()
     totalClaimedRipe: uint256 = 0
     for i: uint256 in range(len(_positionIds), bound=MAX_BATCH_CLAIMS):
@@ -522,7 +526,7 @@ def _claimVestedRipe(
             totalClaimedForPosition=totalClaimedForPosition,
             ripeAllocation=ripeAllocation,
             autoDeposited=_autoDeposit,
-            lockDuration=_lockDuration,
+            requestedLockDuration=_lockDuration,
         )
 
     self._settleVestedRipe(msg.sender, totalClaimedRipe, _autoDeposit, _lockDuration)
@@ -886,7 +890,7 @@ def _getCurrentLatenessBps() -> uint256:
 ###############
 
 
-# start 
+# start
 
 
 @nonreentrant

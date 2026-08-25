@@ -54,6 +54,13 @@ interface RipeToken:
 interface RipeGovVault:
     def totalGovPoints() -> uint256: view
 
+interface StabilityPool:
+    def vaultAssets(_index: uint256) -> address: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
+    def totalClaimableBalances(_claimAsset: address) -> uint256: view
+    def isPaused() -> bool: view
+
 @deploy
 def __init__(
     _ripeHq: address,
@@ -107,7 +114,7 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
     assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
 
     assert self._canPerformAction(msg.sender) # dev: no perms
-    self._assertValidRipeGovVaultReplacement(_regId, _newAddr)
+    self._assertValidVaultReplacement(_regId, _newAddr)
     return registry._startAddressUpdateToRegistry(_regId, _newAddr)
 
 
@@ -117,7 +124,7 @@ def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
     assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
     didUpdate: bool = registry._confirmAddressUpdateToRegistry(_regId)
     if didUpdate:
-        self._assertValidRipeGovVaultReplacement(_regId, registry._getAddr(_regId))
+        self._assertValidVaultReplacement(_regId, registry._getAddr(_regId))
     return didUpdate
 
 
@@ -156,12 +163,25 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 @view
 @internal
-def _assertValidRipeGovVaultReplacement(_vaultId: uint256, _vaultAddr: address):
+def _assertValidVaultReplacement(_vaultId: uint256, _vaultAddr: address):
     missionControl: address = addys._getMissionControlAddr()
-    if missionControl != empty(address) and staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
+    if missionControl == empty(address):
+        return
+
+    if staticcall MissionControl(missionControl).isRipeGovVaultId(_vaultId):
         # historical IDs remain routable forever, so replacements must retain
         # the RipeGov points interface used by future maintenance checks.
         points: uint256 = staticcall RipeGovVault(_vaultAddr).totalGovPoints()
+
+    if staticcall MissionControl(missionControl).isStabVaultId(_vaultId):
+        # Stability IDs retain reward-mint authority, so replacements must keep
+        # the StabilityPool surface used by claims, liquidations, and config.
+        naFunds: bool = staticcall Vault(_vaultAddr).doesVaultHaveAnyFunds()
+        naStabAsset: address = staticcall StabilityPool(_vaultAddr).vaultAssets(1)
+        naPair: uint256 = staticcall StabilityPool(_vaultAddr).claimableBalances(empty(address), empty(address))
+        naCanAccept: bool = staticcall StabilityPool(_vaultAddr).canAcceptLiquidationAsset(empty(address), empty(address))
+        naTotal: uint256 = staticcall StabilityPool(_vaultAddr).totalClaimableBalances(empty(address))
+        naPaused: bool = staticcall StabilityPool(_vaultAddr).isPaused()
 
 
 @view

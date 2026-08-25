@@ -28,6 +28,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from scripts import verify_defaults
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
@@ -114,3 +116,64 @@ def test_mission_control_fields_are_all_reachable_from_the_verifier():
         f"MissionControl copies {missing} from Defaults and verify_defaults.py "
         "never mentions them"
     )
+
+
+def test_vault_topology_state_outside_defaults_is_covered():
+    assert verify_defaults.VAULT_POINTER_GETTERS == (
+        "coreRipeGovVaultId",
+        "preferredStabVaultId",
+    )
+    assert verify_defaults.VAULT_CLASSIFICATION_GETTERS == (
+        "isStabVaultId",
+        "isRipeGovVaultId",
+    )
+
+
+def test_vault_topology_comparison_walks_every_registered_id_and_getter():
+    class Replacement:
+        def isStabVaultId(self, vault_id):
+            return vault_id in {1, 3}
+
+        def isRipeGovVaultId(self, vault_id):
+            return vault_id in {2, 3}
+
+    live_values = {
+        ("isStabVaultId", 1): True,
+        ("isStabVaultId", 2): False,
+        ("isStabVaultId", 3): False,
+        ("isRipeGovVaultId", 1): False,
+        ("isRipeGovVaultId", 2): True,
+        ("isRipeGovVaultId", 3): True,
+    }
+    comparisons = []
+
+    verify_defaults._compare_vault_topology(
+        Replacement(),
+        lambda name, vault_id: live_values[(name, vault_id)],
+        4,
+        verify_defaults.VAULT_CLASSIFICATION_GETTERS,
+        lambda label, got, want: comparisons.append((label, got, want)),
+    )
+
+    assert comparisons == [
+        ("isStabVaultId(1)", True, True),
+        ("isRipeGovVaultId(1)", False, False),
+        ("isStabVaultId(2)", False, False),
+        ("isRipeGovVaultId(2)", True, True),
+        ("isStabVaultId(3)", True, False),
+        ("isRipeGovVaultId(3)", True, True),
+    ]
+
+
+def test_function_names_uses_live_abi_as_the_topology_feature_boundary():
+    abi = [
+        {"type": "constructor", "inputs": []},
+        {"type": "event", "name": "Ignored"},
+        {"type": "function", "name": "isStabVaultId"},
+        {"type": "function", "name": "preferredStabVaultId"},
+    ]
+
+    assert verify_defaults._function_names(abi) == {
+        "isStabVaultId",
+        "preferredStabVaultId",
+    }

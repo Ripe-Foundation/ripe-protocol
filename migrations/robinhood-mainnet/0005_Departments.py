@@ -6,6 +6,7 @@ from config.robinhood_launch import (
     BOND_BOOSTER_MAX_BOOST_RATIO,
     BOND_BOOSTER_MAX_UNITS,
     BOND_BOOSTER_MIN_LOCK_DURATION,
+    CURVE_PRICES_ID,
     DELEVERAGE_BUFFER,
     DELEVERAGE_COOLDOWN,
     DELEVERAGE_DUST_BPS,
@@ -57,13 +58,18 @@ def migrate(migration: Migration):
     )
     register(migration.deploy("BondRoom", hq, bond_booster), "BondRoom", 12)
 
-    register(migration.deploy("CreditEngine", hq), "CreditEngine", 13)
+    register(
+        migration.deploy("CreditEngine", hq, CURVE_PRICES_ID),
+        "CreditEngine",
+        13,
+    )
     register(
         migration.deploy(
             "Endaoment",
             hq,
             address("WETH"),
             address("NATIVE_ETH_SENTINEL"),
+            CURVE_PRICES_ID,
         ),
         "Endaoment",
         14,
@@ -98,7 +104,7 @@ def migrate(migration: Migration):
     # Teller launches paused.
     register(
         migration.deploy(
-            "Teller", hq, TELLER_SHOULD_PAUSE
+            "Teller", hq, TELLER_SHOULD_PAUSE, CURVE_PRICES_ID
         ),
         "Teller",
         17,

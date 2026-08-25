@@ -49,12 +49,14 @@ from scripts.utils import log
 from scripts.utils.migration import Migration
 
 from config.robinhood_launch import (
+    CURVE_PRICES_ID,
     HR_MAX_TIMELOCK,
     HR_MIN_TIMELOCK,
     LOOTBOX_DEPOSIT_REWARD,
     LOOTBOX_MIN_SEND_INTERVAL,
     LOOTBOX_SEND_INTERVAL,
     LOOTBOX_YIELD_BONUS,
+    PYTH_PRICES_ID,
     STALE_WINDOW_MAX,
     STALE_WINDOW_MIN,
     SWITCHBOARD_MAX_TIMELOCK,
@@ -140,7 +142,7 @@ def migrate(migration: Migration):
     redeploy("MissionControl", RIPE_HQ, 5, hq, defaults)
     redeploy("AuctionHouse", RIPE_HQ, 9, hq)
     redeploy("BondRoom", RIPE_HQ, 12, hq, bond_booster)
-    redeploy("CreditEngine", RIPE_HQ, 13, hq)
+    redeploy("CreditEngine", RIPE_HQ, 13, hq, CURVE_PRICES_ID)
     human_resources = redeploy(
         "HumanResources",
         RIPE_HQ,
@@ -156,7 +158,14 @@ def migrate(migration: Migration):
         LOOTBOX_DEPOSIT_REWARD,
         LOOTBOX_YIELD_BONUS,
     )
-    redeploy("Teller", RIPE_HQ, 17, hq, TELLER_SHOULD_PAUSE)
+    redeploy(
+        "Teller",
+        RIPE_HQ,
+        17,
+        hq,
+        TELLER_SHOULD_PAUSE,
+        CURVE_PRICES_ID,
+    )
     redeploy("CreditRedeem", RIPE_HQ, 19, hq)
     redeploy("TellerUtils", RIPE_HQ, 20, hq)
 
@@ -175,6 +184,7 @@ def migrate(migration: Migration):
         STALE_WINDOW_MAX,
         SWITCHBOARD_MIN_TIMELOCK,
         SWITCHBOARD_MAX_TIMELOCK,
+        PYTH_PRICES_ID,
     )
     switchboard_bravo = redeploy(
         "SwitchboardBravo", SWITCHBOARD, 2, hq, migration.account(),

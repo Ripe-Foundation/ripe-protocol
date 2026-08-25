@@ -32,7 +32,7 @@ a custody reader
 | --- | --- |
 | Reviewed implementation parent | `fdf19226f0d8f4b42741f2ce324f8ccb9ba20336`; the source hash below binds the subsequent reviewer-fix revision |
 | CreditEngine source | `contracts/core/CreditEngine.vy`, SHA-256 `05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb` |
-| Environment | validation venv `/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312`; installed-distribution manifest SHA-256 `9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92`; interpreter SHA-256 `d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`; `requirements.txt` SHA-256 `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` |
+| Environment | validation venv `${HOME}/dev/ripe-protocol-validation-envs/rh-wave2-py312`; installed-distribution manifest SHA-256 `9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92`; interpreter SHA-256 `d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`; `requirements.txt` SHA-256 `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` |
 | Compiler | `Vyper 0.4.3+commit.bff19ea2`; CreditEngine source pragma governs `codesize`; no `-O` override |
 | EVM harness | Titanoboa from the validation environment above; local ephemeral deployment only |
 | Public subject | `credit_engine.getUserBorrowTerms(user, True)` |

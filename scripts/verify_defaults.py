@@ -13,9 +13,11 @@ With no --block-number it verifies at the block pinned in the generated file's
 provenance header, so it checks the same snapshot that was reviewed. A
 mismatch exits 1 and prints the field.
 
-What this cannot prove is the state Defaults has no slot for. userConfig and
-userDelegation are per-user and do not survive the redeploy at all; see the
-coverage report prepare_defaults.py prints.
+The finite vault topology also has no Defaults slot, so this verifier compares
+the live pointers and every registered vault classification directly. The
+remaining unprovable state is userConfig and userDelegation: they are per-user,
+cannot be enumerated, and do not survive the redeploy at all. See the coverage
+report prepare_defaults.py prints.
 """
 
 from __future__ import annotations
@@ -74,6 +76,22 @@ SCALAR_GETTERS = (
 )
 PER_ASSET_GETTERS = ("assetConfig", "ripeGovVaultConfig", "indexOfAsset")
 
+# These values are not carried by Defaults. A replacement MissionControl
+# initializes the pointers to 1/2 and reconstructs only the currently configured
+# Stability vault IDs; historical classifications created by governance do not
+# have a Defaults slot. Compare every getter the live deployment exposes so a
+# future replacement cannot silently retarget the pointers or forget an old
+# vault classification. Older deployments predate some or all of these getters,
+# so ABI presence is the feature boundary.
+VAULT_POINTER_GETTERS = (
+    "coreRipeGovVaultId",
+    "preferredStabVaultId",
+)
+VAULT_CLASSIFICATION_GETTERS = (
+    "isStabVaultId",
+    "isRipeGovVaultId",
+)
+
 
 class VerificationError(RuntimeError):
     """The generated defaults cannot be shown to reproduce the live state."""
@@ -113,6 +131,32 @@ def _manifest_address(manifest: dict, name: str) -> str:
     return Web3.to_checksum_address(entry["address"])
 
 
+def _function_names(abi: list[dict]) -> set[str]:
+    """Return the callable names exposed by a deployed contract ABI."""
+    return {
+        entry["name"]
+        for entry in abi
+        if entry.get("type") == "function" and isinstance(entry.get("name"), str)
+    }
+
+
+def _compare_vault_topology(
+    replacement,
+    live_call,
+    num_vault_addrs: int,
+    getters: tuple[str, ...],
+    compare,
+) -> None:
+    """Compare every registered vault ID for each live topology getter."""
+    for vault_id in range(1, num_vault_addrs):
+        for name in getters:
+            compare(
+                f"{name}({vault_id})",
+                getattr(replacement, name)(vault_id),
+                live_call(name, vault_id),
+            )
+
+
 def verify(network: Network, defaults_path: Path, block_number: int | None) -> int:
     import boa
     from web3 import Web3
@@ -141,7 +185,9 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
             f"expected {network.display_name} chain id {network.chain_id}, "
             f"got {chain_id!r}"
         )
-    live = w3.eth.contract(address=live_addr, abi=manifest["MissionControl"]["abi"])
+    mission_control_abi = manifest["MissionControl"]["abi"]
+    live = w3.eth.contract(address=live_addr, abi=mission_control_abi)
+    live_function_names = _function_names(mission_control_abi)
 
     def live_call(name, *args):
         return getattr(live.functions, name)(*args).call(block_identifier=block)
@@ -167,6 +213,14 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     for name in SCALAR_GETTERS:
         compare(name, getattr(replacement, name)(), live_call(name))
 
+    # Defaults cannot carry these pointers. Compare them whenever the deployed
+    # MissionControl ABI makes the live value observable. This keeps the
+    # verifier compatible with older deployments that predate the getters while
+    # making replacement of current/future deployments fail closed on drift.
+    for name in VAULT_POINTER_GETTERS:
+        if name in live_function_names:
+            compare(name, getattr(replacement, name)(), live_call(name))
+
     num_assets = live_call("numAssets")
     assets = [live_call("assets", i) for i in range(1, num_assets)]
     assets = [a for a in assets if int(a, 16) != 0]
@@ -188,6 +242,31 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
             f"canPerformLiteAction({signer})",
             replacement.canPerformLiteAction(signer),
             live_call("canPerformLiteAction", signer),
+        )
+
+    # Historical true entries in these mappings survive pointer/config
+    # rotations but are not representable in Defaults. Walk the complete
+    # VaultBook registry so a replacement that forgets any observable entry is
+    # rejected before deployment.
+    topology_getters = tuple(
+        name
+        for name in VAULT_CLASSIFICATION_GETTERS
+        if name in live_function_names
+    )
+    if topology_getters:
+        vault_book_addr = _manifest_address(manifest, "VaultBook")
+        live_vault_book = w3.eth.contract(
+            address=vault_book_addr, abi=manifest["VaultBook"]["abi"]
+        )
+        num_vault_addrs = live_vault_book.functions.numAddrs().call(
+            block_identifier=block
+        )
+        _compare_vault_topology(
+            replacement,
+            live_call,
+            num_vault_addrs,
+            topology_getters,
+            compare,
         )
 
     # Ledger, the other half. It copies three values from the same defaults

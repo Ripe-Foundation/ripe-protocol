@@ -10,7 +10,7 @@ from constants import (
     RIPE_RESERVE_ENGINE_HQ_ID,
     ZERO_ADDRESS,
 )
-from tests.core.instantBondLane.conftest import (
+from tests.core.ripeReserveEngine.conftest import (
     lane_factory,  # noqa: F401
     replace_config,
     travel_blocks,
@@ -542,6 +542,21 @@ def test_immediate_start_targets_live_engine_registry_entry(foxtrot_env):
     )
     assert replacement.isRunning() is True
     assert ctx.lane.genesisBlock() != replacement.genesisBlock()
+
+
+def test_immediate_action_rejects_eoa_engine_registry_entry(foxtrot_env):
+    ctx = foxtrot_env
+    ctx.foxtrot.stopReserveEngine(sender=ctx.governance.address)
+    ctx.ripe_hq.eval(
+        f"registry.addrInfo[{RIPE_RESERVE_ENGINE_HQ_ID}].addr = {ctx.bob}"
+    )
+
+    with boa.reverts("invalid engine"):
+        ctx.foxtrot.startReserveEngine(
+            0,
+            ctx.epoch_length,
+            sender=ctx.governance.address,
+        )
 
 
 def test_unknown_or_cancelled_action_cannot_execute(foxtrot_env):

@@ -25,7 +25,8 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MIN_STALE_TIME"],
         blueprint.PARAMS["PRICE_DESK_MAX_STALE_TIME"],
         blueprint.PARAMS["MIN_SWITCHBOARD_CHANGE_TIMELOCK"],
-        blueprint.PARAMS["MAX_SWITCHBOARD_CHANGE_TIMELOCK"]
+        blueprint.PARAMS["MAX_SWITCHBOARD_CHANGE_TIMELOCK"],
+        blueprint.PARAMS["PYTH_PRICES_ID"],
     )
 
     migration.execute(switchboard_alpha.setUnderscoreRegistry, ZERO_ADDRESS)

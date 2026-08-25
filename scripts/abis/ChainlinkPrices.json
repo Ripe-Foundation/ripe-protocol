@@ -1662,6 +1662,27 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "updateStaleTime",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "confirmPriceFeedUpdate",
     "inputs": [
       {
@@ -1684,6 +1705,27 @@
       {
         "name": "_asset",
         "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidStaleTimeUpdate",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
       }
     ],
     "outputs": [

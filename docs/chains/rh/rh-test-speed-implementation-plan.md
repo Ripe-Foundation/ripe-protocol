@@ -34,19 +34,19 @@ This file is the authoritative implementation instruction. A fresh agent must:
 
 ## Frozen starting point
 
-- Repository: `/Users/wigglez/dev/ripe-protocol`
+- Repository: `${HOME}/dev/ripe-protocol`
 - Source branch: `rh`
 - Starting commit: `7d8c76e5134bf866ccbb051fdf5030b6e83cef8b`
 - Starting tree: `1d115e9a01f01f933e3e80747902080387f2113c`
 - Planning branch: `codex/rh-test-speed-implementation-plan`
-- Planning worktree: `/Users/wigglez/dev/ripe-protocol-rh-test-speed-plan`
+- Planning worktree: `${HOME}/dev/ripe-protocol-rh-test-speed-plan`
 
 The source `rh` branch was clean and matched `origin/rh` when this plan was created. The primary `master` worktree contained pre-existing untracked `docs/` content and must not be used or cleaned.
 
 The implementing agent must begin with:
 
 ```bash
-cd /Users/wigglez/dev/ripe-protocol-rh-test-speed-plan
+cd ${HOME}/dev/ripe-protocol-rh-test-speed-plan
 git rev-parse HEAD^{commit} HEAD^{tree}
 git status --short --branch
 ```
@@ -586,7 +586,7 @@ All explicit material feedback was incorporated as follows:
 | `PYTHONDONTWRITEBYTECODE=1` distorts repeat benchmarks | Accepted. Benchmarks keep bytecode enabled under a private `PYTHONPYCACHEPREFIX`. |
 | Lean CI does not run unraisable-exception assurance | Accepted as an intentional owner-aligned tradeoff. The comprehensive workflow remains manual; no nightly or required gate is added. |
 | Repaired baseline was ambiguous | Accepted. It is now precisely after runner repair, lane classification, and bytecode cleanup, before every performance cut. |
-| Temporary uncommitted worktree risks data loss | Accepted. The worktree is moved to the durable `/Users/wigglez/dev/ripe-protocol-rh-test-speed-plan` path while remaining unstaged and uncommitted. |
+| Temporary uncommitted worktree risks data loss | Accepted. The worktree is moved to the durable `${HOME}/dev/ripe-protocol-rh-test-speed-plan` path while remaining unstaged and uncommitted. |
 | Boa cache silently expires | Accepted. The one-week access-time TTL is documented as a recurring cold-run cause on every branch. |
 | No checkpoint timing bisect | Partly accepted. It remains a diagnostic after the repaired-lane profile and must not delay the already verified cuts. |
 | Reclassification could look like an unapproved policy change | Accepted with clarification. The StabilityPool spec records completed validation rather than a default-run mandate; release documents that call for a full suite remain satisfied by the comprehensive lane. |

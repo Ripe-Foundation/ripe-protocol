@@ -1,3 +1,5 @@
+import ast
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +12,7 @@ from scripts.utils import ledger_deployment
 LEDGER_ADDRESS = "0x" + "1" * 40
 SOURCE_SELECTOR = RealWeb3.keccak(text="ACTION_BLOCK_SOURCE()")[:4]
 ACTION_BLOCK_SELECTOR = RealWeb3.keccak(text="getArbActionBlock()")[:4]
+VALIDATION_ERROR = ledger_deployment.LedgerDeploymentValidationError
 
 
 class _Migration:
@@ -153,21 +156,24 @@ def test_correct_nonzero_source_and_positive_action_block(node):
 def test_wrong_stored_source_fails(node):
     node.results[SOURCE_SELECTOR] = _word(0x65)
 
-    with pytest.raises(AssertionError, match="Ledger action-block source mismatch"):
+    with pytest.raises(
+        VALIDATION_ERROR,
+        match="Ledger action-block source mismatch",
+    ):
         _validate(node)
 
 
 def test_zero_action_block_fails(node):
     node.results[ACTION_BLOCK_SELECTOR] = _word(0)
 
-    with pytest.raises(AssertionError, match="ArbSys action block reads zero"):
+    with pytest.raises(VALIDATION_ERROR, match="ArbSys action block reads zero"):
         _validate(node)
 
 
 @pytest.mark.parametrize("rpc", [None, "boa"])
 def test_strict_mode_requires_real_rpc(rpc):
     with pytest.raises(
-        AssertionError,
+        VALIDATION_ERROR,
         match="production Ledger requires a real RPC node",
     ):
         ledger_deployment.validate_ledger_action_block_source(
@@ -181,7 +187,7 @@ def test_rpc_connection_failure_fails_closed(node):
     node.connected = False
 
     with pytest.raises(
-        AssertionError,
+        VALIDATION_ERROR,
         match="production Ledger RPC is unavailable",
     ):
         _validate(node)
@@ -212,7 +218,7 @@ def test_rpc_constructor_failure_preserves_cause(node):
     node.constructor_error = failure
 
     with pytest.raises(
-        AssertionError,
+        VALIDATION_ERROR,
         match="production Ledger RPC is unavailable",
     ) as exc_info:
         _validate(node)
@@ -223,7 +229,7 @@ def test_missing_ledger_code_has_specific_strict_diagnosis(node):
     node.code = b""
 
     with pytest.raises(
-        AssertionError,
+        VALIDATION_ERROR,
         match="Ledger is not deployed on the configured RPC",
     ):
         _validate(node)
@@ -234,7 +240,7 @@ def test_malformed_action_block_source_readback_fails(node):
     node.results[SOURCE_SELECTOR] = b"\x00" * 31
 
     with pytest.raises(
-        AssertionError,
+        VALIDATION_ERROR,
         match=r"malformed ACTION_BLOCK_SOURCE\(\) readback",
     ):
         _validate(node)
@@ -244,7 +250,7 @@ def test_malformed_get_arb_action_block_readback_fails(node):
     node.results[ACTION_BLOCK_SELECTOR] = b"\x00" * 33
 
     with pytest.raises(
-        AssertionError,
+        VALIDATION_ERROR,
         match=r"malformed getArbActionBlock\(\) readback",
     ):
         _validate(node)
@@ -296,18 +302,22 @@ def test_local_preview_without_upstream_candidate_code_is_an_explicit_skip(
 @pytest.mark.parametrize(
     "case,error_type,message",
     [
-        ("wrong-source", AssertionError, "Ledger action-block source mismatch"),
+        (
+            "wrong-source",
+            VALIDATION_ERROR,
+            "Ledger action-block source mismatch",
+        ),
         (
             "malformed-source",
-            AssertionError,
+            VALIDATION_ERROR,
             r"malformed ACTION_BLOCK_SOURCE\(\) readback",
         ),
         (
             "malformed-action-block",
-            AssertionError,
+            VALIDATION_ERROR,
             r"malformed getArbActionBlock\(\) readback",
         ),
-        ("zero-action-block", AssertionError, "ArbSys action block reads zero"),
+        ("zero-action-block", VALIDATION_ERROR, "ArbSys action block reads zero"),
         ("node-call-failure", RuntimeError, "node call failed"),
     ],
 )
@@ -330,3 +340,10 @@ def test_local_preview_with_node_code_performs_full_validation(
 
     with pytest.raises(error_type, match=message):
         _validate(node, allow_local_preview=True)
+
+
+def test_ledger_validation_cannot_be_removed_by_optimized_mode():
+    source_path = Path(ledger_deployment.__file__)
+    tree = ast.parse(source_path.read_text(), filename=str(source_path))
+
+    assert not [node for node in ast.walk(tree) if isinstance(node, ast.Assert)]

@@ -408,6 +408,7 @@ def _install_endaoment_lock_mutant(ctx, function_name):
         ctx.endaoment.getRipeHq(),
         ctx.endaoment.WETH(),
         ctx.endaoment.ETH(),
+        2,  # local test PriceDesk Curve ID
         name=f"endaoment_without_{function_name}_lock",
     )
     boa.env.set_code(ctx.endaoment.address, boa.env.get_code(mutant.address))
