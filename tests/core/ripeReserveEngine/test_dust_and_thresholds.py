@@ -3,7 +3,10 @@ import pytest
 
 from conf_utils import filter_logs, get_boa_dev_reasons
 
-from tests.core.ripeReserveEngine.conftest import controller_rate
+from tests.core.ripeReserveEngine.conftest import (
+    MIN_BASE_PAYOUT_RATE,
+    controller_rate,
+)
 
 
 def test_fractional_token_minimum_is_valid_and_enforced(lane_env):
@@ -22,6 +25,34 @@ def test_fractional_token_minimum_is_valid_and_enforced(lane_env):
     with pytest.raises(boa.BoaError) as err:
         lane_env.buy(below_minimum)
     assert "below minimum payment" in get_boa_dev_reasons(err.value)
+
+
+def test_minimum_payment_always_produces_ripe_at_minimum_rate(lane_env):
+    minimum = (
+        lane_env.scale + MIN_BASE_PAYOUT_RATE - 1
+    ) // MIN_BASE_PAYOUT_RATE
+    common = {
+        "maxAllInPayoutRate": MIN_BASE_PAYOUT_RATE,
+        "seedBasePayoutRate": MIN_BASE_PAYOUT_RATE,
+        "maxVestingBonus": 0,
+    }
+    invalid = lane_env.make_config(
+        minPaymentAmount=minimum - 1,
+        **common,
+    )
+    assert lane_env.lane.isValidConfig(invalid) is False
+    with boa.reverts("invalid config"):
+        lane_env.lane.setConfig(
+            invalid,
+            sender=lane_env.switchboard.address,
+        )
+
+    lane_env.set_config(minPaymentAmount=minimum, **common)
+    quote = lane_env.quote(minimum)
+    assert quote.available is True
+    assert quote.baseRipe == 1
+    assert quote.totalRipe == 1
+    assert lane_env.buy(minimum) == 1
 
 
 def test_remainder_below_min_payment_is_unbuyable(lane_env):

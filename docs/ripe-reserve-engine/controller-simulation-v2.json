@@ -2,9 +2,9 @@
   "arithmetic": "uint256-style floor integer model; no floats",
   "authority": "implemented mechanism evidence; not calibration, deployment, or integration authority",
   "bound_implementation": {
-    "ripe_reserve_engine_source_sha256": "100a747fb6044983260a53a37524afdabf291980cf2d66ef883de0a494046f97",
-    "ripe_reserve_vesting_source_sha256": "faa5f3e7efe12e991d7c73cb15e89233ca21502a218acbba3f716136d8cf2b7f",
-    "switchboard_foxtrot_source_sha256": "f3a814b65878d40ba97f71fdd9766a5d1e57dc5fc29daa06a31feded07e80747"
+    "ripe_reserve_engine_source_sha256": "4a33d5f9587081ee37f58d482cf858a507fdaadf653dee0b8633ce8400b3b59c",
+    "ripe_reserve_vesting_source_sha256": "01ef0c0f32cfa0378fad3baf317e5dd2932a2bb06b78a7f64af67f6eda11f21d",
+    "switchboard_foxtrot_source_sha256": "4f4be48bc07ffaccf27d97f2521243847c5ed1fef02c9b1666554bfef924f67e"
   },
   "calibration_status": "not_approved",
   "economic_metrics": {

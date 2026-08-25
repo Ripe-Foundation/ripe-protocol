@@ -4,7 +4,11 @@ from vyper.compiler.output import build_abi_output
 
 from conf_utils import filter_logs
 from constants import MAX_UINT256, ZERO_ADDRESS
-from tests.core.ripeReserveEngine.conftest import DEFAULT_EPOCH_LENGTH, make_config
+from tests.core.ripeReserveEngine.conftest import (
+    DEFAULT_EPOCH_LENGTH,
+    MIN_BASE_PAYOUT_RATE,
+    make_config,
+)
 
 
 MAX_EPOCH_LENGTH = MAX_UINT256 // 10_000 + 1
@@ -151,6 +155,9 @@ def test_epoch_length_validation_boundaries(ripe_hq, charlie_token):
 def test_valid_config_boundaries(lane_env):
     lane = lane_env.lane
     scale = lane_env.scale
+    minimum_nonzero_payout = (
+        scale + MIN_BASE_PAYOUT_RATE - 1
+    ) // MIN_BASE_PAYOUT_RATE
     valid_cases = [
         lane_env.make_config(uLowBps=1, uHighBps=2),
         lane_env.make_config(uHighBps=9_999),
@@ -164,7 +171,7 @@ def test_valid_config_boundaries(lane_env):
         lane_env.make_config(maxUpBps=10_000),
         lane_env.make_config(maxDecayEpochs=1),
         lane_env.make_config(maxDecayEpochs=32),
-        lane_env.make_config(minPaymentAmount=1),
+        lane_env.make_config(minPaymentAmount=minimum_nonzero_payout),
         lane_env.make_config(minPaymentAmount=scale - 1),
         lane_env.make_config(minPaymentAmount=scale),
         lane_env.make_config(minPaymentAmount=1_000 * scale),
@@ -200,6 +207,9 @@ def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
     lane = lane_env.lane
     scale = lane_env.scale
     cap = lane.engineConfig().paymentCapPerEpoch
+    minimum_nonzero_payout = (
+        scale + MIN_BASE_PAYOUT_RATE - 1
+    ) // MIN_BASE_PAYOUT_RATE
     invalid_cases = [
         lane_env.make_config(uLowBps=0),
         lane_env.make_config(uLowBps=8_000, uHighBps=8_000),
@@ -228,6 +238,7 @@ def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
         lane_env.make_config(paymentCapPerEpoch=scale - 1),
         lane_env.make_config(paymentCapPerEpoch=MAX_UINT256 // 10_000 + 1),
         lane_env.make_config(minPaymentAmount=0),
+        lane_env.make_config(minPaymentAmount=minimum_nonzero_payout - 1),
         lane_env.make_config(minPaymentAmount=cap + 1),
         lane_env.make_config(maxAllInPayoutRate=MAX_UINT256 // cap + 1),
         lane_env.make_config(maxVestingBonus=100_001),

@@ -67,8 +67,9 @@ the dated owner decision below.
     registered RIPE token. It is stored, not immutable, and may be swapped only while
     the lane is stopped. The lane derives `paymentDecimals` / `paymentScale` at each
     store rather than assuming USDC or a fixed decimal count.
-12. Purchases have a governed, epoch-snapshotted minimum payment amount of at least one
-    whole payment token.
+12. Purchases have a governed, epoch-snapshotted minimum payment amount that is
+    nonzero, no greater than the epoch cap, and large enough to produce nonzero RIPE
+    at the minimum legal base payout rate.
 13. Purchases are permissionless and always settle to `msg.sender`; the lane does not
     add a buyer allowlist.
 14. The last committed epoch snapshot is `epochState()`. The live projection is
@@ -460,13 +461,15 @@ seedRate <= baseRateCeiling(maxEffectiveRate, maxLockBonus)
 mintBudget >= cumulativeMinted
 ```
 
-The one-whole-token minimum purchase prevents base-unit dust from selecting the sold
-epoch controller branch. Governance may set a materially higher minimum, but never a
-minimum above the epoch cap. The `10_000` minimum base rate prevents the inverse-rate
-recovery formula from becoming an integer fixed point for any valid down step; it is
-still economically tiny and does not replace calibrated operator bounds or unit-aware
-tooling. The range ordering ensures that the strongest nonempty price-down step is no
-larger than empty decay and is smaller than the weakest price-up step. Because
+The minimum purchase may be fractional, but it must produce at least one RIPE wei at
+the `10_000` minimum base rate. Governance may set a materially higher minimum, but
+never a minimum above the epoch cap. This nonzero-payout floor keeps preview and
+execution aligned at every legal controller rate. The minimum base rate also prevents
+the inverse-rate recovery formula from becoming an integer fixed point for any valid
+down step; it is still economically tiny and does not replace calibrated operator
+bounds or unit-aware tooling. The range ordering ensures that the strongest nonempty
+price-down step is no larger than empty decay and is smaller than the weakest price-up
+step. Because
 `maxDownBps <= decayBps`, the retained minimum-up/decay product constraint strictly
 implies the former minimum-up/maximum-down product check; duplicating it in bytecode
 adds no protection. The engineering floor and ceiling can still dominate arithmetic
@@ -1461,8 +1464,9 @@ Tests must prove:
     `epochState.rate >= MIN_BASE_RATE`; a sequence of high-utilization epochs cannot round the
     rate permanently to zero, and every valid low-utilization step strictly increases a
     sub-ceiling rate.
-16. **Controller anti-dust:** the active minimum is at least one whole payment token,
-    below-minimum purchases revert, and `maxDownBps <= decayBps` for every valid config.
+16. **Controller anti-dust:** the active minimum is nonzero and always produces RIPE at
+    the minimum legal base rate, below-minimum purchases revert, and
+    `maxDownBps <= decayBps` for every valid config.
 17. **Controller anti-ratchet:** away from the explicit rate bounds and integer
     saturation, one weakest high-utilization price-up step followed by either the
     strongest positive low-utilization price-down step or one empty-decay step cannot
@@ -1630,7 +1634,7 @@ Tests must prove:
 - no historical storage arrays or mappings;
 - no oracle or DEX interfaces;
 - no partial fills;
-- a governed minimum payment of at least one whole payment token;
+- a governed fractional minimum payment that always produces nonzero RIPE;
 - no delegated recipient;
 - no rebaseline state machine;
 - no target-epoch/window scheduler or automatic override expiry;
@@ -1668,7 +1672,8 @@ credentialed gate and must never silently fall back to the transport-only test.
 - every §3.3 boundary and invalid combination;
 - invalid min/max ordering, `maxDownBps > decayBps`, the retained minimum-up/decay anti-ratchet factor failure,
   denominator boundaries, oversized decay cap, unsafe epoch-length/payment/timing
-  multiplication bounds, minimum payment outside `[paymentScale, cap]`,
+  multiplication bounds, minimum payment below
+  `ceil(paymentScale / MIN_BASE_RATE)` or above the cap,
   ceiling below `MIN_BASE_RATE`, and seed outside `[MIN_BASE_RATE, ceiling]` reject;
 - config writes are last-write-wins; Foxtrot execute re-validates; a different
   `epochLength` rejects once one is installed;

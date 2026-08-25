@@ -106,6 +106,12 @@ and base payout rate. Later configuration changes do not rewrite that epoch.
 Controller changes are based on the previous committed epoch's utilization and
 timing data, with bounded idle decay across skipped epochs.
 
+The configured minimum payment may be fractional. It must be nonzero, no greater
+than the epoch cap, and large enough to produce at least one RIPE wei at the
+minimum legal base payout rate. Changing payment tokens revalidates these raw-unit
+values against the new scale, but a decimal change does not inherently force a
+configuration rewrite; operators must review the resulting whole-token amounts.
+
 The configured `maxAllInPayoutRate` caps the base rate after applying the maximum
 vesting bonus. When minimum and maximum vesting lengths differ, configuration
 validation also requires:

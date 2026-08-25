@@ -1,19 +1,18 @@
-#    ___  ________   ________  _________  ________  ________   _________        ________  ________  ________   ________  ________
-#   |\  \|\   ___  \|\   ____\|\___   ___\\   __  \|\   ___  \|\___   ___\     |\   __  \|\   __  \|\   ___  \|\   ___ \|\   ____\
-#   \ \  \ \  \\ \  \ \  \___|\|___ \  \_\ \  \|\  \ \  \\ \  \|___ \  \_|     \ \  \|\ /\ \  \|\  \ \  \\ \  \ \  \_|\ \ \  \___|_
-#    \ \  \ \  \\ \  \ \_____  \   \ \  \ \ \   __  \ \  \\ \  \   \ \  \       \ \   __  \ \  \\\  \ \  \\ \  \ \  \ \\ \ \_____  \
-#     \ \  \ \  \\ \  \|____|\  \   \ \  \ \ \  \ \  \ \  \\ \  \   \ \  \       \ \  \|\  \ \  \\\  \ \  \\ \  \ \  \_\\ \|____|\  \
-#      \ \__\ \__\\ \__\____\_\  \   \ \__\ \ \__\ \__\ \__\\ \__\   \ \__\       \ \_______\ \_______\ \__\\ \__\ \_______\____\_\  \
-#       \|__|\|__| \|__|\_________\   \|__|  \|__|\|__|\|__| \|__|    \|__|        \|_______|\|_______|\|__| \|__|\|_______|\_________\
-#                      \|_________|                                                                                        \|_________|
+#     _______    _______   ________  _______   _______  ___      ___  _______       _______  _____  ___    _______   __    _____  ___    _______
+#    /"      \  /"     "| /"       )/"     "| /"      \|"  \    /"  |/"     "|     /"     "|(\"   \|"  \  /" _   "| |" \  (\"   \|"  \  /"     "|
+#   |:        |(: ______)(:   \___/(: ______)|:        |\   \  //  /(: ______)    (: ______)|.\\   \    |(: ( \___) ||  | |.\\   \    |(: ______)
+#   |_____/   ) \/    |   \___  \   \/    |  |_____/   ) \\  \/. ./  \/    |       \/    |  |: \.   \\  | \/ \      |:  | |: \.   \\  | \/    |
+#    //      /  // ___)_   __/  \\  // ___)_  //      /   \.    //   // ___)_      // ___)_ |.  \    \. | //  \ ___ |.  | |.  \    \. | // ___)_
+#   |:  __   \ (:      "| /" \   :)(:      "||:  __   \    \\   /   (:      "|    (:      "||    \    \ |(:   _(  _|/\  |\|    \    \ |(:      "|
+#   |__|  \___) \_______)(_______/  \_______)|__|  \___)    \__/     \_______)     \_______) \___|\____\) \_______)(__\_|_)\___|\____\) \_______)
 #
 #     ╔════════════════════════════════════════╗
-#     ║  ** ripe reserve engine **             ║
-#     ║  fixed-price direct RIPE allocations   ║
+#     ║  ** Reserve Engine **                  ║
+#     ║  Fixed-price direct RIPE allocations   ║
 #     ╚════════════════════════════════════════╝
 #
-#     ripe protocol license: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     ripe foundation (C) 2025
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -52,19 +51,15 @@ interface RipeToken:
     def ripeHq() -> address: view
     def isPaused() -> bool: view
 
-interface MissionControl:
-    def coreRipeGovVaultId() -> uint256: view
+interface Teller:
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
 
-interface Teller:
-    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+interface MissionControl:
+    def coreRipeGovVaultId() -> uint256: view
 
-# high utilization reduces RIPE per payment unit; low utilization increases it.
-# idle decay also increases RIPE per payment unit toward the configured ceiling.
-# the vesting bonus is applied after the epoch's base payout rate.
-# one-shot rate overrides replace a derived epoch rate without changing these terms.
 struct ReserveEngineConfig:
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
@@ -119,7 +114,7 @@ struct EpochSnapshot:
     maxVestingLength: uint256
     acceptedPayment: uint256
     weightedLateness: uint256
-    timingEligible: bool # first epoch is eligible only when opened on its boundary
+    timingEligible: bool
 
 struct CalculatedPayout:
     baseRipe: uint256
@@ -251,7 +246,6 @@ canAcquireRipe: public(bool)
 
 # state
 isRunning: public(bool)
-# current committed epoch while running; getEpochSnapshot() may project a later one.
 epochState: public(EpochSnapshot)
 
 paymentToken: public(address)
@@ -265,7 +259,6 @@ MAX_BATCH_CLAIMS: public(constant(uint256)) = 20
 MAX_PRICE_STEP_BPS: constant(uint256) = 100_00 # 100.00%
 MAX_DECAY_EPOCHS: constant(uint256) = 32
 MAX_PAYMENT_DECIMALS: constant(uint8) = 73
-# numerically equals the BPS denominator, but represents the base-rate policy floor.
 MIN_BASE_PAYOUT_RATE: constant(uint256) = 10_000
 RATE_SOURCE_SEED: public(constant(uint256)) = 1
 RATE_SOURCE_CONTROLLER: public(constant(uint256)) = 2
@@ -288,7 +281,7 @@ def __init__(
 
 
 ################
-# acquire ripe #
+# Acquire Ripe #
 ################
 
 
@@ -475,7 +468,7 @@ def _calculatePayout(
 
 
 ##########
-# claims #
+# Claims #
 ##########
 
 
@@ -604,7 +597,7 @@ def _isAcquisitionReady() -> bool:
 
 
 ##########
-# epochs #
+# Epochs #
 ##########
 
 
@@ -669,7 +662,6 @@ def _calculateControllerTransition(
 def getEpochSnapshot() -> EpochSnapshot:
     if not self.isRunning:
         return empty(EpochSnapshot)
-    # vyper requires binding every returned value; only the snapshot is used here.
     candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
     candidateSnapshot, transition = self._deriveEpochSnapshot(self.epochState, self.engineConfig)
@@ -886,7 +878,7 @@ def _getCurrentLatenessBps() -> uint256:
 
 
 ###############
-# core config #
+# Core Config #
 ###############
 
 
@@ -994,7 +986,7 @@ def _invalidateInstalledOverride():
 
 
 #################
-# rate override #
+# Rate Override #
 #################
 
 
@@ -1082,7 +1074,7 @@ def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
 
 
 #################
-# payment token #
+# Payment Token #
 #################
 
 
@@ -1133,7 +1125,7 @@ def _isValidPaymentToken(_token: address) -> bool:
 
 
 ##############
-# validation #
+# Validation #
 ##############
 
 
@@ -1200,6 +1192,10 @@ def _isValidConfigValues(_config: ReserveEngineConfig) -> bool:
 
     # min payment must be nonzero and cannot exceed the cap
     if _config.minPaymentAmount == 0 or _config.minPaymentAmount > _config.paymentCapPerEpoch:
+        return False
+
+    # min payment must produce nonzero ripe even at the minimum legal base rate
+    if _config.minPaymentAmount * MIN_BASE_PAYOUT_RATE < paymentScale:
         return False
 
     # live ceiling must be safe against both the new cap and a committed epoch's cap

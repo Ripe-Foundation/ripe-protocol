@@ -240,7 +240,7 @@ def test_config_execution_revalidates_against_live_payment_token(
         governance,
         "Other",
         "OTH",
-        8,
+        10,
         1_000_000,
     )
     ctx.foxtrot.setReserveEnginePaymentToken(

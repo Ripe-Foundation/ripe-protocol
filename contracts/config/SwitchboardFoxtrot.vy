@@ -8,7 +8,7 @@
 #                                    ╚  └─┘┴ └─ ┴ ┴└─└─┘ ┴
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025
+#      Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -22,21 +22,21 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 
 interface RipeReserveEngine:
-    def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
-    def genesisBlock() -> uint256: view
+    def setRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
     def isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> bool: view
+    def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
     def isValidConfig(_config: ReserveEngineConfig) -> bool: view
     def isValidEpochLength(_epochLength: uint256) -> bool: view
     def setConfig(_newConfig: ReserveEngineConfig): nonpayable
-    def isValidPaymentToken(_token: address) -> bool: view
-    def setRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
-    def setPaymentToken(_token: address): nonpayable
     def setCanAcquireRipe(_canAcquireRipe: bool): nonpayable
-    def canAcquireRipe() -> bool: view
-    def engineConfig() -> ReserveEngineConfig: view
+    def isValidPaymentToken(_token: address) -> bool: view
     def overrideTargetBasePayoutRate() -> uint256: view
+    def setPaymentToken(_token: address): nonpayable
+    def engineConfig() -> ReserveEngineConfig: view
     def overrideTargetEpoch() -> uint256: view
     def cancelRateOverride(): nonpayable
+    def genesisBlock() -> uint256: view
+    def canAcquireRipe() -> bool: view
     def isRunning() -> bool: view
     def stop(): nonpayable
 
@@ -157,7 +157,7 @@ def _getRipeReserveVestingAddr() -> address:
 
 
 #########################
-# reserve engine config #
+# Reserve Engine Config #
 #########################
 
 

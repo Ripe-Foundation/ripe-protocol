@@ -3,6 +3,7 @@ import json
 import sys
 from pathlib import Path
 
+import boa
 import pytest
 
 from scripts.qualify_ripe_reserve_engine_activation import (
@@ -40,14 +41,14 @@ def _engine_config(**overrides):
     values = {
         "paymentCapPerEpoch": 1_000_000,
         "minPaymentAmount": 100,
-        "maxAllInPayoutRate": 2_000,
-        "seedBasePayoutRate": 1_000,
+        "maxAllInPayoutRate": 20_000,
+        "seedBasePayoutRate": 10_000,
         "uHighBps": 8_000,
         "uLowBps": 2_000,
         "minUpBps": 100,
         "maxUpBps": 500,
-        "minDownBps": 100,
-        "maxDownBps": 500,
+        "minDownBps": 25,
+        "maxDownBps": 50,
         "decayBps": 50,
         "maxDecayEpochs": 4,
         "maxVestingBonus": 1_000,
@@ -225,6 +226,20 @@ def test_complete_synthetic_ready_manifest_passes():
     data = _ready_manifest()
     assert readiness_errors(data, current_block=CURRENT_BLOCK) == []
     assert "draft manifest must not self-authorize activation" in draft_errors(data)
+
+
+def test_complete_synthetic_engine_config_is_contract_valid(
+    ripe_hq_deploy,
+    charlie_token,
+):
+    config = _engine_config()
+    engine = boa.load(
+        "contracts/core/RipeReserveEngine.vy",
+        ripe_hq_deploy,
+        charlie_token,
+        tuple(config.values()),
+    )
+    assert engine.isValidConfig(tuple(config.values()))
 
 
 def test_require_ready_cli_accepts_complete_manifest(tmp_path, monkeypatch):
