@@ -1,4 +1,4 @@
-"""Opt-in Robinhood mainnet-fork coverage for the Instant Bond Lane.
+"""Opt-in Robinhood mainnet-fork coverage for the Ripe Reserve Engine.
 
 The suite never broadcasts.  RPC is used only to bind an exact historical block and
 to hydrate Titanoboa's disposable local fork.  All deployments, registrations,
@@ -54,8 +54,8 @@ MISSION_CONTROL_ID = 5
 SWITCHBOARD_ID = 6
 VAULT_BOOK_ID = 8
 ENDAOMENT_FUNDS_ID = 21
-INSTANT_BOND_LANE_ID = 26
-INSTANT_BOND_CLAIMS_ID = 27
+RIPE_RESERVE_ENGINE_ID = 26
+RIPE_RESERVE_VESTING_ID = 27
 SWITCHBOARD_ALPHA_ID = 1
 SWITCHBOARD_CHARLIE_ID = 3
 MAX_UINT256 = 2**256 - 1
@@ -422,17 +422,17 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     config = _fork_config(scale, inputs.epoch_length)
 
     lane = boa.load(
-        "contracts/core/InstantBondLane.vy",
+        "contracts/core/RipeReserveEngine.vy",
         live.hq,
         live.payment_token,
         config,
-        name="robinhood_fork_instant_bond_lane",
+        name="robinhood_fork_ripe_reserve_engine",
         sender=operator,
     )
     claims = boa.load(
-        "contracts/core/InstantBondClaims.vy",
+        "contracts/core/RipeReserveVesting.vy",
         live.hq,
-        name="robinhood_fork_instant_bond_claims",
+        name="robinhood_fork_ripe_reserve_vesting",
         sender=operator,
     )
     alpha = boa.load_partial("contracts/config/SwitchboardAlpha.vy").at(
@@ -457,8 +457,8 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     assert live.switchboard.getAddr(foxtrot_reg_id) == foxtrot.address
     assert live.switchboard.isSwitchboardAddr(foxtrot)
 
-    lane_reg_id = _register(live.hq, lane, "Instant Bond Lane", governance)
-    assert lane_reg_id == INSTANT_BOND_LANE_ID
+    lane_reg_id = _register(live.hq, lane, "Ripe Reserve Engine", governance)
+    assert lane_reg_id == RIPE_RESERVE_ENGINE_ID
     hq_delay = live.hq.registryChangeTimeLock()
     live.hq.initiateHqConfigChange(
         lane_reg_id, False, True, False, sender=governance
@@ -470,27 +470,27 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     claims_reg_id = _register(
         live.hq,
         claims,
-        "Instant Bond Claims",
+        "Ripe Reserve Vesting",
         governance,
     )
-    assert claims_reg_id == INSTANT_BOND_CLAIMS_ID
+    assert claims_reg_id == RIPE_RESERVE_VESTING_ID
 
     charlie = live.switchboard.getAddr(SWITCHBOARD_CHARLIE_ID)
     lane.pause(False, sender=charlie)
     claims.pause(False, sender=charlie)
 
-    action_id = foxtrot.setInstantBondConfig(config, sender=operator)
+    action_id = foxtrot.setReserveEngineConfig(config, sender=operator)
     _advance_blocks(foxtrot.actionTimeLock())
     assert foxtrot.executePendingAction(action_id, sender=operator)
-    assert tuple(lane.bondConfig()) == config
-    budget_action_id = foxtrot.setInstantBondRemainingAllocationBudget(
+    assert tuple(lane.engineConfig()) == config
+    budget_action_id = foxtrot.setReserveVestingRemainingAllocationBudget(
         100_000 * 10**18,
         sender=operator,
     )
     _advance_blocks(foxtrot.actionTimeLock())
     assert foxtrot.executePendingAction(budget_action_id, sender=operator)
-    foxtrot.setCanBuyNow(True, sender=operator)
-    foxtrot.startInstantBond(genesis, inputs.epoch_length, sender=operator)
+    foxtrot.setCanAcquireRipe(True, sender=operator)
+    foxtrot.startReserveEngine(genesis, inputs.epoch_length, sender=operator)
 
     return SimpleNamespace(
         lane=lane,
@@ -581,10 +581,10 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_purchase_and_claim_paths
 
         payment_before = live.payment_token.balanceOf(endaoment_funds)
         direct_ripe_before = live.ripe_token.balanceOf(direct_buyer)
-        direct_quote = lane.previewBuyNow(purchase_amount, 0)
+        direct_quote = lane.previewAcquireRipe(purchase_amount, 0)
         assert direct_quote.available
         assert direct_quote.vestingLength == 1
-        direct_payout = lane.buyNow(
+        direct_payout = lane.acquireRipe(
             purchase_amount,
             0,
             direct_quote.vestingLength,
@@ -599,11 +599,11 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_purchase_and_claim_paths
         auto_vault_before = live.ripe_gov.getTotalAmountForUser(
             auto_buyer, live.ripe_token
         )
-        auto_quote = lane.previewBuyNow(purchase_amount, MAX_UINT256)
+        auto_quote = lane.previewAcquireRipe(purchase_amount, MAX_UINT256)
         assert auto_quote.available
         assert auto_quote.vestingLength == 1_000
         assert auto_quote.bonusRipe > 0
-        auto_payout = lane.buyNow(
+        auto_payout = lane.acquireRipe(
             purchase_amount,
             MAX_UINT256,
             auto_quote.vestingLength,

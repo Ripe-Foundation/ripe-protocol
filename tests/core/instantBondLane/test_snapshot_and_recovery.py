@@ -50,7 +50,11 @@ def test_epoch_cap_minimum_bonus_and_vesting_bounds_are_snapshotted(lane_env):
         minVestingLength=100,
         maxVestingLength=1_000,
     )
+    first_quote = lane_env.quote(10 * lane_env.scale, 1_000)
     lane_env.buy(10 * lane_env.scale, requested_vesting=1_000)
+    first_position = lane_env.claims.positions(lane_env.bob, 1)
+    assert first_quote.claimStartBlock == first_quote.creationBlock + 100
+    assert first_position.claimStartBlock == first_quote.claimStartBlock
 
     lane_env.set_config(
         paymentCapPerEpoch=20 * lane_env.scale,
@@ -71,6 +75,11 @@ def test_epoch_cap_minimum_bonus_and_vesting_bounds_are_snapshotted(lane_env):
     assert quote.minPaymentAmount == lane_env.scale
     assert quote.vestingLength == 1_000
     assert quote.bonusRatio == 5_000
+    assert quote.claimStartBlock == quote.creationBlock + 100
+
+    lane_env.buy(lane_env.scale, requested_vesting=1_000)
+    second_position = lane_env.claims.positions(lane_env.bob, 2)
+    assert second_position.claimStartBlock == quote.claimStartBlock
 
     boa.env.time_travel(blocks=lane_env.epoch_length)
     next_quote = lane_env.quote(5 * lane_env.scale, 1_000)
@@ -78,6 +87,7 @@ def test_epoch_cap_minimum_bonus_and_vesting_bounds_are_snapshotted(lane_env):
     assert next_quote.minPaymentAmount == 5 * lane_env.scale
     assert next_quote.vestingLength == 500
     assert next_quote.bonusRatio == 0
+    assert next_quote.claimStartBlock == next_quote.creationBlock + 400
 
 
 def test_pause_keeps_clock_snapshot_and_override(lane_env):
@@ -183,7 +193,7 @@ def test_high_utilization_late_fill_weakens_up_step(lane_env):
         maxDownBps=100,
         decayBps=196,
     )
-    seed = lane_env.lane.bondConfig().seedBasePayoutRate
+    seed = lane_env.lane.engineConfig().seedBasePayoutRate
 
     lane_env.buy(90 * lane_env.scale)
     boa.env.time_travel(blocks=lane_env.epoch_length)

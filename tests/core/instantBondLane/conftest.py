@@ -4,8 +4,8 @@ import boa
 import pytest
 
 from constants import (
-    INSTANT_BOND_CLAIMS_HQ_ID,
-    INSTANT_BOND_LANE_HQ_ID,
+    RIPE_RESERVE_VESTING_HQ_ID,
+    RIPE_RESERVE_ENGINE_HQ_ID,
     MAX_UINT256,
 )
 
@@ -203,16 +203,16 @@ def lane_factory(
                 **(config_overrides or {}),
             )
             lane = boa.load(
-                "contracts/core/InstantBondLane.vy",
+                "contracts/core/RipeReserveEngine.vy",
                 ripe_hq,
                 payment_token,
                 config,
-                name="instant_bond_lane",
+                name="ripe_reserve_engine",
             )
             claims = boa.load(
-                "contracts/core/InstantBondClaims.vy",
+                "contracts/core/RipeReserveVesting.vy",
                 ripe_hq,
-                name="instant_bond_claims",
+                name="ripe_reserve_vesting",
             )
 
             lane_reg_id = 0
@@ -221,8 +221,8 @@ def lane_factory(
                     ripe_hq,
                     governance,
                     lane,
-                    "Instant Bond Lane",
-                    INSTANT_BOND_LANE_HQ_ID,
+                    "Ripe Reserve Engine",
+                    RIPE_RESERVE_ENGINE_HQ_ID,
                 )
                 ripe_hq.initiateHqConfigChange(
                     lane_reg_id,
@@ -243,8 +243,8 @@ def lane_factory(
                     ripe_hq,
                     governance,
                     claims,
-                    "Instant Bond Claims",
-                    INSTANT_BOND_CLAIMS_HQ_ID,
+                    "Ripe Reserve Vesting",
+                    RIPE_RESERVE_VESTING_HQ_ID,
                 )
 
             if unpause_lane:
@@ -256,7 +256,7 @@ def lane_factory(
                 sender=switchboard_alpha.address,
             )
             if can_buy:
-                lane.setCanBuyNow(True, sender=switchboard_alpha.address)
+                lane.setCanAcquireRipe(True, sender=switchboard_alpha.address)
 
             started_genesis = 0
             if auto_start:
@@ -376,7 +376,7 @@ def lane_factory(
                 return lock_terms
 
             def quote(payment_amount, requested_vesting=0, sender=bob):
-                return lane.previewBuyNow(
+                return lane.previewAcquireRipe(
                     payment_amount,
                     requested_vesting,
                     sender=sender,
@@ -402,7 +402,7 @@ def lane_factory(
                     expected_epoch = preview.epoch
                 if deadline is None:
                     deadline = boa.env.evm.patch.block_number
-                return lane.buyNow(
+                return lane.acquireRipe(
                     payment_amount,
                     requested_vesting,
                     expected_vesting,

@@ -7,8 +7,8 @@ from constants import MAX_UINT256
 REENTRANT_PAYMENT = """
 # @version 0.4.3
 
-interface Lane:
-    def buyNow(
+interface ReserveEngine:
+    def acquireRipe(
         _paymentAmount: uint256,
         _requestedVestingLength: uint256,
         _expectedVestingLength: uint256,
@@ -58,14 +58,14 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     self.allowance[_from][msg.sender] -= _value
     if not self.attackAttempted and self.attackTarget != empty(address):
         self.attackAttempted = True
-        state: (uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, bool) = staticcall Lane(self.attackTarget).epochState()
+        state: (uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, bool) = staticcall ReserveEngine(self.attackTarget).epochState()
         self.observedAccepted = state[9]
         success: bool = False
         response: Bytes[32] = b""
         success, response = raw_call(
             self.attackTarget,
             concat(
-                method_id("buyNow(uint256,uint256,uint256,uint256,uint256,uint256)"),
+                method_id("acquireRipe(uint256,uint256,uint256,uint256,uint256,uint256)"),
                 convert(self.attackAmount, bytes32),
                 empty(bytes32),
                 convert(100, bytes32),
@@ -83,7 +83,7 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
 """
 
 
-def test_first_quote_matches_purchase_position_and_events(lane_env):
+def test_first_quote_matches_allocation_position_and_events(lane_env):
     amount = lane_env.scale
     quote = lane_env.quote(amount)
     budget_before = lane_env.claims.remainingAllocationBudget()
@@ -92,18 +92,21 @@ def test_first_quote_matches_purchase_position_and_events(lane_env):
 
     assert quote.available is True
     assert quote.epoch == 0
-    assert quote.controllerBasePayoutRate == lane_env.lane.bondConfig().seedBasePayoutRate
+    assert quote.controllerBasePayoutRate == lane_env.lane.engineConfig().seedBasePayoutRate
     assert quote.basePayoutRate == quote.controllerBasePayoutRate
     assert quote.rateSource == lane_env.lane.RATE_SOURCE_SEED()
-    assert quote.remainingPayment == lane_env.lane.bondConfig().paymentCapPerEpoch
+    assert quote.remainingPayment == lane_env.lane.engineConfig().paymentCapPerEpoch
     assert quote.minPaymentAmount == amount
-    assert quote.vestingLength == lane_env.lane.bondConfig().minVestingLength
+    assert quote.vestingLength == lane_env.lane.engineConfig().minVestingLength
     assert quote.totalRipe == quote.baseRipe + quote.bonusRipe
+    assert quote.claimStartBlock == (
+        quote.creationBlock + lane_env.lane.engineConfig().minVestingLength
+    )
     assert quote.maturityBlock == quote.creationBlock + quote.vestingLength
 
     payout = lane_env.buy(amount, min_ripe_out=quote.totalRipe)
     initialized = filter_logs(lane_env.lane, "EpochInitialized")[-1]
-    purchased = filter_logs(lane_env.lane, "InstantBondPurchased")[-1]
+    purchased = filter_logs(lane_env.lane, "RipeAllocated")[-1]
     position = lane_env.claims.positions(lane_env.bob, 1)
 
     assert payout == quote.totalRipe
@@ -117,16 +120,18 @@ def test_first_quote_matches_purchase_position_and_events(lane_env):
         payout,
         0,
         quote.creationBlock,
+        quote.claimStartBlock,
         quote.maturityBlock,
     )
     assert initialized.epoch == quote.epoch
     assert initialized.basePayoutRate == quote.basePayoutRate
-    assert purchased.buyer == lane_env.bob
-    assert purchased.positionIndex == 1
+    assert purchased.acquirer == lane_env.bob
+    assert purchased.positionId == 1
     assert purchased.paymentAmount == amount
     assert purchased.totalRipe == payout
     assert purchased.vestingLength == quote.vestingLength
     assert purchased.creationBlock == quote.creationBlock
+    assert purchased.claimStartBlock == quote.claimStartBlock
     assert purchased.maturityBlock == quote.maturityBlock
 
 
@@ -134,7 +139,7 @@ def test_getters_are_stale_until_successful_purchase_but_snapshot_is_live(lane_e
     live = lane_env.lane.getEpochSnapshot()
     stored = lane_env.lane.epochState()
     assert stored.basePayoutRate == 0
-    assert live.basePayoutRate == lane_env.lane.bondConfig().seedBasePayoutRate
+    assert live.basePayoutRate == lane_env.lane.engineConfig().seedBasePayoutRate
     assert live.epoch == 0
 
     lane_env.buy(lane_env.scale)
@@ -150,9 +155,9 @@ def test_purchase_constraint_reverts_are_exact(lane_env):
     with boa.reverts("below minimum payment"):
         lane_env.buy(amount - 1)
     with boa.reverts("exceeds available amount"):
-        lane_env.buy(lane_env.lane.bondConfig().paymentCapPerEpoch + 1)
+        lane_env.buy(lane_env.lane.engineConfig().paymentCapPerEpoch + 1)
     with boa.reverts("epoch moved"):
-        lane_env.lane.buyNow(
+        lane_env.lane.acquireRipe(
             amount,
             0,
             quote.vestingLength,
@@ -162,7 +167,7 @@ def test_purchase_constraint_reverts_are_exact(lane_env):
             sender=lane_env.bob,
         )
     with boa.reverts("vesting length moved"):
-        lane_env.lane.buyNow(
+        lane_env.lane.acquireRipe(
             amount,
             0,
             quote.vestingLength + 1,
@@ -219,13 +224,13 @@ def test_paused_disabled_and_readiness_gates_leave_preview_math_visible(
     lane_env, governance
 ):
     amount = lane_env.scale
-    lane_env.lane.setCanBuyNow(False, sender=lane_env.switchboard.address)
+    lane_env.lane.setCanAcquireRipe(False, sender=lane_env.switchboard.address)
     quote = lane_env.quote(amount)
     assert quote.available is False
     assert quote.totalRipe > 0
     with boa.reverts("disabled"):
         lane_env.buy(amount)
-    lane_env.lane.setCanBuyNow(True, sender=lane_env.switchboard.address)
+    lane_env.lane.setCanAcquireRipe(True, sender=lane_env.switchboard.address)
 
     lane_env.lane.pause(True, sender=lane_env.switchboard.address)
     assert lane_env.quote(amount).available is False

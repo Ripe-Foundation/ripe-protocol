@@ -7,20 +7,20 @@ def test_preview_before_genesis_is_empty(lane_factory):
     future = boa.env.evm.patch.block_number + 20
     ctx.start(future)
     quote = ctx.quote(ctx.scale)
-    assert tuple(quote) == (False,) + (0,) * 14
+    assert tuple(quote) == (False,) + (0,) * 15
 
 
 def test_preview_when_not_running_is_empty(lane_factory):
     ctx = lane_factory(auto_start=False)
-    assert tuple(ctx.quote(ctx.scale)) == (False,) + (0,) * 14
+    assert tuple(ctx.quote(ctx.scale)) == (False,) + (0,) * 15
 
 
 def test_preview_illegal_size_keeps_market_and_payout_disclosure(lane_env):
     quote = lane_env.quote(lane_env.scale - 1)
     assert quote.available is False
     assert quote.epoch == 0
-    assert quote.basePayoutRate == lane_env.lane.bondConfig().seedBasePayoutRate
-    assert quote.remainingPayment == lane_env.lane.bondConfig().paymentCapPerEpoch
+    assert quote.basePayoutRate == lane_env.lane.engineConfig().seedBasePayoutRate
+    assert quote.remainingPayment == lane_env.lane.engineConfig().paymentCapPerEpoch
     assert quote.minPaymentAmount == lane_env.scale
     assert quote.totalRipe > 0
 
@@ -35,8 +35,9 @@ def test_preview_matches_successful_purchase_terms(lane_env):
     )
     position = lane_env.claims.positions(lane_env.bob, 1)
     assert payout == quote.totalRipe
-    assert position.ripePayout == quote.totalRipe
+    assert position.ripeAllocation == quote.totalRipe
     assert position.creationBlock == quote.creationBlock
+    assert position.claimStartBlock == quote.claimStartBlock
     assert position.maturityBlock == quote.maturityBlock
 
 
@@ -49,7 +50,7 @@ def test_preview_does_not_require_wallet_balance_or_allowance(lane_env, alice):
 
 
 def test_preview_clamps_vesting_and_computes_linear_bonus(lane_env):
-    config = lane_env.lane.bondConfig()
+    config = lane_env.lane.engineConfig()
     below = lane_env.quote(lane_env.scale, 1)
     midpoint_length = (config.minVestingLength + config.maxVestingLength) // 2
     midpoint = lane_env.quote(lane_env.scale, midpoint_length)
@@ -70,8 +71,9 @@ def test_preview_clamps_vesting_and_computes_linear_bonus(lane_env):
 
 def test_zero_requested_vesting_uses_minimum(lane_env):
     quote = lane_env.quote(lane_env.scale, 0)
-    assert quote.vestingLength == lane_env.lane.bondConfig().minVestingLength
+    assert quote.vestingLength == lane_env.lane.engineConfig().minVestingLength
     assert quote.bonusRatio == 0
+    assert quote.claimStartBlock == quote.maturityBlock
 
 
 def test_equal_vesting_bounds_pay_full_configured_bonus(lane_env):

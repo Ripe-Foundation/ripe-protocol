@@ -1,7 +1,7 @@
 import boa
 
 from constants import (
-    INSTANT_BOND_CLAIMS_HQ_ID,
+    RIPE_RESERVE_VESTING_HQ_ID,
     MAX_UINT256,
     ZERO_ADDRESS,
 )
@@ -37,7 +37,7 @@ def test_payment_token_swap_requires_matching_config_units(lane_env, governance)
     lane_env.stop()
     lane_env.lane.setPaymentToken(other.address, sender=lane_env.switchboard.address)
     assert lane_env.lane.paymentScale() == 10**8
-    assert lane_env.lane.isValidConfig(lane_env.lane.bondConfig()) is False
+    assert lane_env.lane.isValidConfig(lane_env.lane.engineConfig()) is False
     with boa.reverts("not configured"):
         lane_env.lane.start(
             0,
@@ -52,8 +52,8 @@ def test_payment_token_swap_requires_matching_config_units(lane_env, governance)
     other.transfer(lane_env.bob, 100 * new_scale, sender=governance.address)
     other.approve(lane_env.lane, MAX_UINT256, sender=lane_env.bob)
 
-    quote = lane_env.lane.previewBuyNow(new_scale, 0, sender=lane_env.bob)
-    payout = lane_env.lane.buyNow(
+    quote = lane_env.lane.previewAcquireRipe(new_scale, 0, sender=lane_env.bob)
+    payout = lane_env.lane.acquireRipe(
         new_scale,
         0,
         quote.vestingLength,
@@ -67,7 +67,7 @@ def test_payment_token_swap_requires_matching_config_units(lane_env, governance)
     assert lane_env.payment_token.balanceOf(lane_env.endaoment_funds) == old_funds
 
 
-def test_live_ripe_pause_fails_preview_and_purchase_closed(lane_env):
+def test_live_ripe_pause_fails_preview_and_acquisition_closed(lane_env):
     quote = lane_env.quote(lane_env.scale)
     assert quote.available is True
     lane_env.ripe_token.pause(True, sender=lane_env.governance.address)
@@ -78,12 +78,12 @@ def test_live_ripe_pause_fails_preview_and_purchase_closed(lane_env):
         lane_env.buy(lane_env.scale)
 
 
-def test_lane_reads_replacement_claims_from_ripe_hq(lane_env):
+def test_engine_reads_replacement_vesting_from_ripe_hq(lane_env):
     original = lane_env.claims
     replacement = boa.load(
-        "contracts/core/InstantBondClaims.vy",
+        "contracts/core/RipeReserveVesting.vy",
         lane_env.ripe_hq,
-        name="replacement_instant_bond_claims",
+        name="replacement_ripe_reserve_vesting",
     )
     replacement.pause(False, sender=lane_env.switchboard.address)
     replacement.setRemainingAllocationBudget(
@@ -92,13 +92,13 @@ def test_lane_reads_replacement_claims_from_ripe_hq(lane_env):
     )
     lock = lane_env.ripe_hq.registryChangeTimeLock()
     assert lane_env.ripe_hq.startAddressUpdateToRegistry(
-        INSTANT_BOND_CLAIMS_HQ_ID,
+        RIPE_RESERVE_VESTING_HQ_ID,
         replacement,
         sender=lane_env.governance.address,
     )
     travel_blocks(lock)
     assert lane_env.ripe_hq.confirmAddressUpdateToRegistry(
-        INSTANT_BOND_CLAIMS_HQ_ID,
+        RIPE_RESERVE_VESTING_HQ_ID,
         sender=lane_env.governance.address,
     )
 

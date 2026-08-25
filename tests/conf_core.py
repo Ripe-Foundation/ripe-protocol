@@ -9,7 +9,7 @@ from constants import (
     GREEN_CCIP_POOL_HQ_ID,
     RIPE_CCIP_POOL_HQ_ID,
     VAULT_MIGRATOR_HQ_ID,
-    INSTANT_BOND_LANE_HQ_ID,
+    RIPE_RESERVE_ENGINE_HQ_ID,
 )
 
 
@@ -192,7 +192,7 @@ def ripe_hq(
     assert ripe_hq_deploy.confirmNewAddressToRegistry(
         vault_migrator, sender=deploy3r,
     ) == VAULT_MIGRATOR_HQ_ID
-    assert ripe_hq_deploy.getAddr(INSTANT_BOND_LANE_HQ_ID) == ZERO_ADDRESS
+    assert ripe_hq_deploy.getAddr(RIPE_RESERVE_ENGINE_HQ_ID) == ZERO_ADDRESS
 
     # special permission setup
 

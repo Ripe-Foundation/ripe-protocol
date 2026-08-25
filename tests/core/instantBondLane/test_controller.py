@@ -117,9 +117,9 @@ def test_first_purchase_many_epochs_after_genesis_uses_seed(lane_factory):
     boa.env.time_travel(blocks=25 * ctx.epoch_length)
     quote = ctx.quote(ctx.scale)
     assert quote.epoch == 25
-    assert quote.basePayoutRate == ctx.lane.bondConfig().seedBasePayoutRate
+    assert quote.basePayoutRate == ctx.lane.engineConfig().seedBasePayoutRate
     ctx.buy(ctx.scale)
-    assert ctx.lane.epochState().basePayoutRate == ctx.lane.bondConfig().seedBasePayoutRate
+    assert ctx.lane.epochState().basePayoutRate == ctx.lane.engineConfig().seedBasePayoutRate
     assert ctx.lane.epochState().epoch == 25
 
 

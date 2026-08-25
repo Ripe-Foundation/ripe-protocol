@@ -4,21 +4,21 @@ import pytest
 from conf_utils import filter_logs
 
 
-def _purchase(ctx, vesting_length=10, amount=None):
+def _purchase(ctx, vesting_length=10, min_vesting_length=1, amount=None):
     amount = ctx.scale if amount is None else amount
     ctx.set_config(
-        minVestingLength=vesting_length,
+        minVestingLength=min_vesting_length,
         maxVestingLength=vesting_length,
         maxVestingBonus=0,
     )
-    payout = ctx.buy(amount)
+    payout = ctx.buy(amount, requested_vesting=vesting_length)
     position_id = ctx.claims.nextPositionId() - 1
     return position_id, payout
 
 
 def _claim_state(ctx, position_id):
     index = ctx.claims.indexOfPosition(ctx.bob, position_id)
-    position = (0, 0, 0, 0, 0)
+    position = (0, 0, 0, 0, 0, 0)
     if index:
         position = tuple(ctx.claims.positions(ctx.bob, index))
     return (
@@ -42,17 +42,17 @@ def test_direct_claim_mints_only_the_newly_vested_amount(lane_env):
 
     first = lane_env.claim(position_id)
     expected_first = payout * 4 // 10
-    lane_event = filter_logs(lane_env.lane, "InstantBondClaimed")[-1]
+    lane_event = filter_logs(lane_env.lane, "VestedRipeClaimed")[-1]
     assert first == expected_first
     assert lane_env.ripe_token.balanceOf(lane_env.bob) == buyer_before + first
     assert lane_env.claims.totalClaimedRipe() == first
     assert lane_env.claims.totalOutstandingRipe() == payout - first
     assert lane_env.claims.remainingAllocationBudget() == budget_after_purchase
     assert lane_event.beneficiary == lane_env.bob
-    assert lane_event.positionIndex == position_id
+    assert lane_event.positionId == position_id
     assert lane_event.amountClaimed == first
     assert lane_event.totalClaimedForPosition == first
-    assert lane_event.ripePayout == payout
+    assert lane_event.ripeAllocation == payout
     assert lane_event.autoDeposited is False
     assert lane_event.lockDuration == 0
 
@@ -66,27 +66,46 @@ def test_direct_claim_mints_only_the_newly_vested_amount(lane_env):
     assert lane_env.claims.totalClaimedRipe() == payout
     assert lane_env.claims.totalOutstandingRipe() == 0
     assert lane_env.claims.getNumUserPositions(lane_env.bob) == 0
-    assert filter_logs(lane_env.lane, "InstantBondClaimed")[-1].lockDuration == 999
+    assert filter_logs(lane_env.lane, "VestedRipeClaimed")[-1].lockDuration == 999
 
 
-def test_claim_before_first_vesting_block_reverts_atomically(lane_env):
-    position_id, _ = _purchase(lane_env, 10)
+def test_claim_before_cliff_reverts_atomically(lane_env):
+    position_id, _ = _purchase(
+        lane_env,
+        vesting_length=10,
+        min_vesting_length=4,
+    )
     before = _claim_state(lane_env, position_id)
     with boa.reverts("nothing to claim"):
         lane_env.claim(position_id)
     assert _claim_state(lane_env, position_id) == before
 
+    boa.env.time_travel(blocks=3)
+    with boa.reverts("nothing to claim"):
+        lane_env.claim(position_id)
+    assert _claim_state(lane_env, position_id) == before
 
-def test_claims_continue_when_sales_are_disabled_paused_and_stopped(lane_env):
+
+def test_claim_at_cliff_catches_up_from_creation(lane_env):
+    position_id, allocation = _purchase(
+        lane_env,
+        vesting_length=10,
+        min_vesting_length=4,
+    )
+    boa.env.time_travel(blocks=4)
+    assert lane_env.claim(position_id) == allocation * 4 // 10
+
+
+def test_claims_continue_when_acquisitions_are_disabled_paused_and_stopped(lane_env):
     position_id, payout = _purchase(lane_env, 2)
     boa.env.time_travel(blocks=2)
-    lane_env.lane.setCanBuyNow(False, sender=lane_env.switchboard.address)
+    lane_env.lane.setCanAcquireRipe(False, sender=lane_env.switchboard.address)
     lane_env.lane.pause(True, sender=lane_env.switchboard.address)
     lane_env.stop()
 
     assert lane_env.lane.isRunning() is False
     assert lane_env.lane.isPaused() is True
-    assert lane_env.lane.canBuyNow() is False
+    assert lane_env.lane.canAcquireRipe() is False
     assert lane_env.claim(position_id) == payout
 
 
@@ -153,10 +172,10 @@ def test_batch_claim_sums_positions_and_emits_one_event_per_position(lane_env):
         0,
         sender=lane_env.bob,
     )
-    events = filter_logs(lane_env.lane, "InstantBondClaimed")
+    events = filter_logs(lane_env.lane, "VestedRipeClaimed")
     assert total == sum(payouts)
     assert lane_env.ripe_token.balanceOf(lane_env.bob) == balance_before + total
-    assert [event.positionIndex for event in events] == position_ids
+    assert [event.positionId for event in events] == position_ids
     assert [event.amountClaimed for event in events] == payouts
     assert lane_env.claims.getNumUserPositions(lane_env.bob) == 0
 
@@ -197,6 +216,7 @@ def test_maximum_batch_of_twenty_claims_succeeds(lane_env):
             lane_env.bob,
             payout,
             1,
+            1,
             sender=lane_env.lane.address,
         )
     boa.env.time_travel(blocks=1)
@@ -225,7 +245,7 @@ def test_auto_deposit_claim_mints_to_lane_then_deposits_exactly(lane_env):
         auto_deposit=True,
         lock_duration=500,
     )
-    event = filter_logs(lane_env.lane, "InstantBondClaimed")[-1]
+    event = filter_logs(lane_env.lane, "VestedRipeClaimed")[-1]
     assert claimed == payout
     assert event.autoDeposited is True
     assert event.lockDuration == 500
@@ -301,6 +321,7 @@ def test_blacklist_enforcement_is_atomic_for_both_settlement_paths(
     auto_id = lane_env.claims.createVestingPosition(
         lane_env.bob,
         10**18,
+        1,
         1,
         sender=lane_env.lane.address,
     )

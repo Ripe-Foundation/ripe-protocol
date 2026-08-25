@@ -15,8 +15,8 @@ from tests.core.instantBondLane.conftest import config_dict, make_config
 
 
 EIP170_LIMIT = 24_576
-LANE_PATH = "contracts/core/InstantBondLane.vy"
-CLAIMS_PATH = "contracts/core/InstantBondClaims.vy"
+ENGINE_PATH = "contracts/core/RipeReserveEngine.vy"
+VESTING_PATH = "contracts/core/RipeReserveVesting.vy"
 FOXTROT_PATH = "contracts/config/SwitchboardFoxtrot.vy"
 
 
@@ -103,8 +103,8 @@ def reference_controller_rate(
 def test_runtime_sizes_have_eip170_headroom(lane_env, ripe_hq):
     foxtrot = boa.load(FOXTROT_PATH, ripe_hq, ZERO_ADDRESS, 2, 20)
     sizes = {
-        "instant_bond_lane": len(boa.env.get_code(lane_env.lane.address)),
-        "instant_bond_claims": len(boa.env.get_code(lane_env.claims.address)),
+        "ripe_reserve_engine": len(boa.env.get_code(lane_env.lane.address)),
+        "ripe_reserve_vesting": len(boa.env.get_code(lane_env.claims.address)),
         "switchboard_foxtrot": len(boa.env.get_code(foxtrot.address)),
     }
     assert all(0 < size < EIP170_LIMIT for size in sizes.values()), sizes
@@ -140,14 +140,14 @@ def test_purchase_and_claim_gas_benchmarks_are_reported(lane_env):
     gas["claim_direct"] = lane_env.lane._computation.get_gas_used()
 
     assert all(value > 0 for value in gas.values())
-    print("instant bond gas: " + json.dumps(gas, sort_keys=True))
+    print("ripe reserve engine gas: " + json.dumps(gas, sort_keys=True))
     report_path = os.environ.get("INSTANT_BOND_GAS_REPORT")
     if report_path:
         Path(report_path).write_text(json.dumps(gas, indent=2, sort_keys=True) + "\n")
 
 
 @pytest.mark.artifact
-def test_lane_event_abi_names_order_and_indexing():
+def test_engine_event_abi_names_order_and_indexing():
     expected = {
         "EpochInitialized": (
             [
@@ -187,16 +187,17 @@ def test_lane_event_abi_names_order_and_indexing():
             ],
             ["fromEpoch", "toEpoch"],
         ),
-        "InstantBondPurchased": (
+        "RipeAllocated": (
             [
-                "buyer",
-                "positionIndex",
+                "acquirer",
+                "positionId",
                 "paymentAmount",
                 "baseRipe",
                 "bonusRipe",
                 "bonusRatio",
                 "vestingLength",
                 "creationBlock",
+                "claimStartBlock",
                 "maturityBlock",
                 "totalRipe",
                 "controllerBasePayoutRate",
@@ -204,19 +205,19 @@ def test_lane_event_abi_names_order_and_indexing():
                 "rateSource",
                 "epoch",
             ],
-            ["buyer", "positionIndex", "epoch"],
+            ["acquirer", "positionId", "epoch"],
         ),
-        "InstantBondClaimed": (
+        "VestedRipeClaimed": (
             [
                 "beneficiary",
-                "positionIndex",
+                "positionId",
                 "amountClaimed",
                 "totalClaimedForPosition",
-                "ripePayout",
+                "ripeAllocation",
                 "autoDeposited",
                 "lockDuration",
             ],
-            ["beneficiary", "positionIndex"],
+            ["beneficiary", "positionId"],
         ),
         "RateOverrideInstalled": (
             ["targetEpoch", "targetBasePayoutRate"],
@@ -250,24 +251,25 @@ def test_lane_event_abi_names_order_and_indexing():
         ),
     }
     for event_name, (names, indexed) in expected.items():
-        event = event_abi(LANE_PATH, event_name)
+        event = event_abi(ENGINE_PATH, event_name)
         assert [item["name"] for item in event["inputs"]] == names
         assert indexed_fields(event) == indexed
 
 
 @pytest.mark.artifact
-def test_claims_event_abi_names_order_and_indexing():
+def test_vesting_event_abi_names_order_and_indexing():
     expected = {
         "VestingPositionCreated": (
             [
                 "user",
                 "positionId",
-                "sourceLane",
-                "ripePayout",
+                "sourceEngine",
+                "ripeAllocation",
                 "creationBlock",
+                "claimStartBlock",
                 "maturityBlock",
             ],
-            ["user", "positionId", "sourceLane"],
+            ["user", "positionId", "sourceEngine"],
         ),
         "ClaimRecorded": (
             [
@@ -275,7 +277,7 @@ def test_claims_event_abi_names_order_and_indexing():
                 "positionId",
                 "amountClaimed",
                 "totalClaimedForPosition",
-                "ripePayout",
+                "ripeAllocation",
                 "fullyClaimed",
             ],
             ["user", "positionId"],
@@ -283,20 +285,20 @@ def test_claims_event_abi_names_order_and_indexing():
         "RemainingAllocationBudgetSet": (["amount"], []),
     }
     for event_name, (names, indexed) in expected.items():
-        event = event_abi(CLAIMS_PATH, event_name)
+        event = event_abi(VESTING_PATH, event_name)
         assert [item["name"] for item in event["inputs"]] == names
         assert indexed_fields(event) == indexed
 
 
 @pytest.mark.artifact
-def test_lane_and_claims_function_abi_is_explicit():
-    lane_abi = contract_abi(LANE_PATH)
+def test_engine_and_vesting_function_abi_is_explicit():
+    lane_abi = contract_abi(ENGINE_PATH)
     functions = {
         item["name"]: item
         for item in lane_abi
         if item.get("type") == "function"
     }
-    assert [item["name"] for item in functions["buyNow"]["inputs"]] == [
+    assert [item["name"] for item in functions["acquireRipe"]["inputs"]] == [
         "_paymentAmount",
         "_requestedVestingLength",
         "_expectedVestingLength",
@@ -322,7 +324,7 @@ def test_lane_and_claims_function_abi_is_explicit():
     assert "cumulativeMinted" not in functions
     assert "setCumulativeMinted" not in functions
 
-    quote_components = functions["previewBuyNow"]["outputs"][0]["components"]
+    quote_components = functions["previewAcquireRipe"]["outputs"][0]["components"]
     assert [component["name"] for component in quote_components] == [
         "available",
         "epoch",
@@ -337,11 +339,12 @@ def test_lane_and_claims_function_abi_is_explicit():
         "bonusRipe",
         "vestingLength",
         "creationBlock",
+        "claimStartBlock",
         "maturityBlock",
         "totalRipe",
     ]
 
-    claims_abi = contract_abi(CLAIMS_PATH)
+    claims_abi = contract_abi(VESTING_PATH)
     claim_functions = {
         item["name"]: item
         for item in claims_abi
@@ -349,8 +352,9 @@ def test_lane_and_claims_function_abi_is_explicit():
     }
     assert [item["name"] for item in claim_functions["createVestingPosition"]["inputs"]] == [
         "_user",
-        "_ripePayout",
+        "_ripeAllocation",
         "_vestingLength",
+        "_minVestingLength",
     ]
     assert [item["name"] for item in claim_functions["recordClaim"]["inputs"]] == [
         "_user",
@@ -359,18 +363,18 @@ def test_lane_and_claims_function_abi_is_explicit():
 
 
 @pytest.mark.artifact
-def test_instant_bond_config_structs_are_identical():
-    assert extract_struct(LANE_PATH, "InstantBondConfig") == extract_struct(
+def test_reserve_engine_config_structs_are_identical():
+    assert extract_struct(ENGINE_PATH, "ReserveEngineConfig") == extract_struct(
         FOXTROT_PATH,
-        "InstantBondConfig",
+        "ReserveEngineConfig",
     )
 
 
 @pytest.mark.artifact
 def test_indexed_epoch_and_position_topics_filter_raw_logs(lane_env):
-    initialized_topic = event_topic(LANE_PATH, "EpochInitialized")
-    rolled_topic = event_topic(LANE_PATH, "EpochRolled")
-    purchased_topic = event_topic(LANE_PATH, "InstantBondPurchased")
+    initialized_topic = event_topic(ENGINE_PATH, "EpochInitialized")
+    rolled_topic = event_topic(ENGINE_PATH, "EpochRolled")
+    purchased_topic = event_topic(ENGINE_PATH, "RipeAllocated")
     buyer_topic = int(str(lane_env.bob), 16)
 
     lane_env.buy(lane_env.scale)
@@ -501,6 +505,7 @@ def test_worst_case_valid_config_executes_purchase_without_overflow(
         max_bonus = 100_000
         max_all_in = 11 * 10**18
         seed = 10**18
+    max_vesting_length = max_bonus // 10_000 + 2
     ctx.set_config(
         paymentCapPerEpoch=cap,
         minPaymentAmount=scale,
@@ -509,11 +514,15 @@ def test_worst_case_valid_config_executes_purchase_without_overflow(
         maxDecayEpochs=32,
         maxVestingBonus=max_bonus,
         minVestingLength=1,
-        maxVestingLength=2,
+        maxVestingLength=max_vesting_length,
     )
-    quote = ctx.quote(cap, 2)
+    quote = ctx.quote(cap, max_vesting_length)
     ripe_supply_before = ctx.ripe_token.totalSupply()
-    payout = ctx.buy(cap, requested_vesting=2, min_ripe_out=quote.totalRipe)
+    payout = ctx.buy(
+        cap,
+        requested_vesting=max_vesting_length,
+        min_ripe_out=quote.totalRipe,
+    )
     assert payout == quote.totalRipe
     assert quote.bonusRatio == max_bonus
     assert quote.totalRipe * scale <= cap * max_all_in
@@ -560,6 +569,7 @@ def test_fuzz_payout_respects_all_in_ceiling(
                 target_ceiling * (10_000 + max_bonus) + 9_999
             ) // 10_000
         derived_ceiling = max_all_in * 10_000 // (10_000 + max_bonus)
+        max_vesting_length = max_bonus // 10_000 + 2
         config = make_config(
             scale,
             paymentCapPerEpoch=cap,
@@ -569,11 +579,11 @@ def test_fuzz_payout_respects_all_in_ceiling(
             maxDecayEpochs=32,
             maxVestingBonus=max_bonus,
             minVestingLength=1,
-            maxVestingLength=2,
+            maxVestingLength=max_vesting_length,
         )
-        lane = boa.load(LANE_PATH, ripe_hq, token, config)
+        lane = boa.load(ENGINE_PATH, ripe_hq, token, config)
         lane.start(0, config[-1], sender=switchboard_alpha.address)
-        quote = lane.previewBuyNow(cap, 2)
+        quote = lane.previewAcquireRipe(cap, max_vesting_length)
         assert quote.basePayoutRate == derived_ceiling
         assert quote.baseRipe == cap * derived_ceiling // scale
         assert quote.bonusRatio == max_bonus

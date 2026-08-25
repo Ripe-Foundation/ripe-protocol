@@ -11,7 +11,7 @@ def test_start_zero_genesis_means_now(lane_factory):
     ctx = lane_factory(auto_start=False)
     before = boa.env.evm.patch.block_number
     ctx.start(0)
-    logs = filter_logs(ctx.lane, "InstantBondStarted")
+    logs = filter_logs(ctx.lane, "ReserveEngineStarted")
     assert ctx.lane.isRunning() is True
     assert ctx.lane.genesisBlock() == before
     assert ctx.lane.epochLength() == DEFAULT_EPOCH_LENGTH
@@ -33,7 +33,7 @@ def test_start_future_genesis_blocks_buys_and_zeros_snapshot(lane_factory):
     assert quote.epoch == 0
 
     with pytest.raises(boa.BoaError) as err:
-        ctx.lane.buyNow(
+        ctx.lane.acquireRipe(
             ctx.scale,
             0,
             0,
@@ -47,7 +47,7 @@ def test_start_future_genesis_blocks_buys_and_zeros_snapshot(lane_factory):
     boa.env.time_travel(blocks=20)
     quote = ctx.quote(ctx.scale)
     assert quote.available is True
-    assert quote.basePayoutRate == ctx.lane.bondConfig().seedBasePayoutRate
+    assert quote.basePayoutRate == ctx.lane.engineConfig().seedBasePayoutRate
     payout = ctx.buy(ctx.scale)
     assert payout > 0
 
@@ -61,10 +61,10 @@ def test_start_past_genesis_is_allowed(lane_factory):
     quote = ctx.quote(ctx.scale)
     assert quote.available is True
     assert quote.epoch == epoch
-    assert quote.basePayoutRate == ctx.lane.bondConfig().seedBasePayoutRate
+    assert quote.basePayoutRate == ctx.lane.engineConfig().seedBasePayoutRate
     ctx.buy(ctx.scale)
     assert ctx.lane.epochState().epoch == epoch
-    assert ctx.lane.epochState().basePayoutRate == ctx.lane.bondConfig().seedBasePayoutRate
+    assert ctx.lane.epochState().basePayoutRate == ctx.lane.engineConfig().seedBasePayoutRate
 
 
 def test_start_can_change_epoch_length(lane_factory):
@@ -123,7 +123,7 @@ def test_stop_clears_clock_and_epoch_but_keeps_config_and_claim_liabilities(lane
     assert lane_env.lane.overrideTargetBasePayoutRate() != 0
 
     lane_env.stop()
-    logs = filter_logs(lane_env.lane, "InstantBondStopped")
+    logs = filter_logs(lane_env.lane, "ReserveEngineStopped")
     assert logs[-1].epochLength == lane_env.epoch_length
 
     assert lane_env.lane.isRunning() is False
@@ -154,7 +154,7 @@ def test_stop_then_start_is_a_fresh_clock(lane_env):
     assert lane_env.lane.epochLength() == 80
     lane_env.buy(lane_env.scale)
     assert lane_env.lane.epochState().epoch == 0
-    assert lane_env.lane.epochState().basePayoutRate == lane_env.lane.bondConfig().seedBasePayoutRate
+    assert lane_env.lane.epochState().basePayoutRate == lane_env.lane.engineConfig().seedBasePayoutRate
 
 
 def test_payment_token_only_while_stopped(lane_env, governance):

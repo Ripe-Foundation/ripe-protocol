@@ -43,7 +43,7 @@ def test_uncommitted_bonus_seed_and_vesting_terms_apply_on_opening_buy(lane_env)
         requested_vesting=2_000,
         min_ripe_out=original.totalRipe,
     )
-    event = filter_logs(lane_env.lane, "InstantBondPurchased")[-1]
+    event = filter_logs(lane_env.lane, "RipeAllocated")[-1]
     assert payout == live.totalRipe
     assert event.basePayoutRate == 11 * 10**17
     assert event.bonusRatio == 10_000
@@ -54,7 +54,7 @@ def test_expected_vesting_length_detects_live_config_race(lane_env):
     old = lane_env.quote(lane_env.scale, 0)
     lane_env.set_config(minVestingLength=200, maxVestingLength=2_000)
     with boa.reverts("vesting length moved"):
-        lane_env.lane.buyNow(
+        lane_env.lane.acquireRipe(
             lane_env.scale,
             0,
             old.vestingLength,

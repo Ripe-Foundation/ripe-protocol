@@ -20,9 +20,9 @@ def test_override_requires_running_valid_rate_and_governance(lane_factory, alice
     ctx.start(0)
     assert ctx.lane.isValidRateOverride(9_999, 0) is False
     ceiling = (
-        ctx.lane.bondConfig().maxAllInPayoutRate
+        ctx.lane.engineConfig().maxAllInPayoutRate
         * 10_000
-        // (10_000 + ctx.lane.bondConfig().maxVestingBonus)
+        // (10_000 + ctx.lane.engineConfig().maxVestingBonus)
     )
     assert ctx.lane.isValidRateOverride(ceiling, 0) is True
     assert ctx.lane.isValidRateOverride(ceiling + 1, 0) is False
@@ -188,6 +188,6 @@ def test_pause_and_purchase_disable_do_not_mutate_installed_override(lane_env):
     target = 9 * 10**17
     lane_env.set_rate_override(target, 2)
     lane_env.lane.pause(True, sender=lane_env.switchboard.address)
-    lane_env.lane.setCanBuyNow(False, sender=lane_env.switchboard.address)
+    lane_env.lane.setCanAcquireRipe(False, sender=lane_env.switchboard.address)
     assert lane_env.lane.overrideTargetBasePayoutRate() == target
     assert lane_env.lane.overrideTargetEpoch() == 2
