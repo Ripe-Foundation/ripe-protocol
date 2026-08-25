@@ -855,6 +855,90 @@ def test_deleverage_credits_forward_value_of_zero_decimal_delivery(
     assert credit_engine.getUserDebtAmount(bob) == debt_before - 3 * EIGHTEEN_DECIMALS
 
 
+def test_deleverage_full_quote_tolerates_only_one_wei_roundtrip_loss(
+    bob,
+    deleverage,
+    switchboard_alpha,
+    setupDeleverage,
+    mock_price_source,
+    price_desk,
+    credit_engine,
+    alpha_token,
+    alpha_token_whale,
+):
+    debt = 5 * EIGHTEEN_DECIMALS
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=100 * EIGHTEEN_DECIMALS,
+        borrow_amount=debt,
+        get_sgreen=False,
+    )
+    mock_price_source.setPrice(alpha_token, 6 * EIGHTEEN_DECIMALS // 10)
+    quoted_amount = price_desk.getAssetAmount(alpha_token, debt, True)
+    assert price_desk.getUsdValue(alpha_token, quoted_amount, True) == debt - 1
+
+    repaid = deleverage.deleverageWithVolAssets(
+        bob,
+        [(3, alpha_token.address, debt)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert repaid == debt
+    log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
+    assert log.amountSent == quoted_amount
+    assert log.usdValue == debt
+    assert credit_engine.getUserDebtAmount(bob) == 0
+
+
+def test_deleverage_reverts_zero_value_partial_delivery_atomically(
+    bob,
+    deleverage,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    mock_price_source,
+    price_desk,
+    credit_engine,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    simple_erc20_vault,
+    endaoment_funds,
+):
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=200 * EIGHTEEN_DECIMALS,
+        borrow_amount=50 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    dust_amount = EIGHTEEN_DECIMALS // 2
+    # Leave the healthy debt-bearing position intact and make only this asset's
+    # mathematical delivery worth less than one USD wei.
+    performDeposit(bob, dust_amount, bravo_token, bravo_token_whale)
+    mock_price_source.setPrice(bravo_token, 1)
+    assert price_desk.getUsdValue(bravo_token, dust_amount, True) == 1
+
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    vault_before = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    endao_before = bravo_token.balanceOf(endaoment_funds)
+
+    with boa.reverts("zero collateral value (vault under-send)"):
+        deleverage.deleverageWithVolAssets(
+            bob,
+            [(3, bravo_token.address, 50 * EIGHTEEN_DECIMALS)],
+            sender=switchboard_alpha.address,
+        )
+
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == vault_before
+    assert bravo_token.balanceOf(endaoment_funds) == endao_before
+
+
 def test_emits_deleverage_vol_assets_event(
     deleverage,
     switchboard_alpha,

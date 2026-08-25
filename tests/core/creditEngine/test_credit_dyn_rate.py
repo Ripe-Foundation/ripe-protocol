@@ -477,6 +477,35 @@ def test_extreme_danger_increase_saturates_without_overflow(
     assert credit_engine.getDynamicBorrowRate(1000) == 20_000
 
 
+@pytest.mark.parametrize(
+    ("increase_per_block", "danger_blocks", "expected_rate"),
+    (
+        (40, 250, 1_100),
+        (MAX_UINT256 - 1, 2, 20_000),
+        (2, MAX_UINT256 - 1, 20_000),
+        (MAX_UINT256 - 1, MAX_UINT256 - 1, 20_000),
+    ),
+)
+def test_compact_danger_math_preserves_exact_result_and_saturates_either_operand(
+    increase_per_block,
+    danger_blocks,
+    expected_rate,
+    setupDynamicRate,
+    credit_engine,
+):
+    setupDynamicRate(
+        _minDynamicRateBoost=0,
+        _maxDynamicRateBoost=0,
+        _increasePerDangerBlock=increase_per_block,
+        _maxBorrowRate=20_000,
+        _weightedRatio=8000,
+        _dangerTrigger=6000,
+        _numBlocksInDanger=danger_blocks,
+    )
+
+    assert credit_engine.getDynamicBorrowRate(1_000) == expected_rate
+
+
 def test_calc_dynamic_rate_boost_with_zero_ratio(
     setupDynamicRate,
     credit_engine,

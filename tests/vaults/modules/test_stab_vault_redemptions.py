@@ -115,15 +115,19 @@ def test_stab_redemption_spends_forward_value_of_zero_decimal_delivery(
         bob, alpha_token, deposit_amount, sender=teller.address
     )
     coarse_token.transfer(stability_pool, 1, sender=governance.address)
+    recipient_balance_before = alpha_token.balanceOf(governance)
     stability_pool.swapForLiquidatedCollateral(
         alpha_token,
         3 * EIGHTEEN_DECIMALS,
         coarse_token,
         1,
-        ZERO_ADDRESS,
+        governance,
         green_token,
         savings_green,
         sender=auction_house.address,
+    )
+    assert alpha_token.balanceOf(governance) - recipient_balance_before == (
+        3 * EIGHTEEN_DECIMALS
     )
 
     payment = 5 * EIGHTEEN_DECIMALS
@@ -143,6 +147,88 @@ def test_stab_redemption_spends_forward_value_of_zero_decimal_delivery(
     assert green_spent == 3 * EIGHTEEN_DECIMALS
     assert coarse_token.balanceOf(bob) == 1
     assert green_token.balanceOf(bob) == 2 * EIGHTEEN_DECIMALS
+
+
+def test_stab_redemption_rounds_each_transaction_up(
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    alice,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    setGeneralConfig()
+    setAssetConfig(
+        bravo_token,
+        _shouldSwapInStabPools=True,
+        _canRedeemInStabPool=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 3 * EIGHTEEN_DECIMALS // 2)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        alice, alpha_token, deposit_amount, sender=teller.address
+    )
+    claimable_amount = EIGHTEEN_DECIMALS // 10
+    bravo_token.transfer(
+        stability_pool, claimable_amount, sender=bravo_token_whale
+    )
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        15 * EIGHTEEN_DECIMALS // 100,
+        bravo_token,
+        claimable_amount,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    payment_per_call = 2
+    green_token.transfer(bob, 2 * payment_per_call, sender=whale)
+    green_token.approve(teller, 2 * payment_per_call, sender=bob)
+    vault_id = vault_book.getRegId(stability_pool)
+    bravo_before = bravo_token.balanceOf(bob)
+
+    first_spent = redeem_from_stability_pool(
+        teller,
+        vault_id,
+        bravo_token,
+        payment_per_call,
+        bob,
+        sender=bob,
+    )
+    second_spent = redeem_from_stability_pool(
+        teller,
+        vault_id,
+        bravo_token,
+        payment_per_call,
+        bob,
+        sender=bob,
+    )
+
+    assert first_spent == payment_per_call
+    assert second_spent == payment_per_call
+    amount_received = bravo_token.balanceOf(bob) - bravo_before
+    assert amount_received == 2
+    aggregate_floor_value = (
+        amount_received * 3 * EIGHTEEN_DECIMALS // 2 // EIGHTEEN_DECIMALS
+    )
+    assert first_spent + second_spent > aggregate_floor_value
 
 
 def test_stab_vault_redemptions_refund(
@@ -2038,7 +2124,7 @@ def test_stab_vault_redemptions_mixed_assets_with_sgreen(
     assert green_token.balanceOf(stability_pool) == bravo_for_alpha  # Only from alpha redemption
 
 
-def test_stab_vault_redeem_fragmented_claims_refunds_profit(
+def test_stab_vault_redeem_fragmented_claims_round_up_for_protocol(
     stability_pool,
     alpha_token,
     charlie_token,
@@ -2062,8 +2148,8 @@ def test_stab_vault_redeem_fragmented_claims_refunds_profit(
 ):
     """
     Test that verifies the rounding vulnerability fix.
-    Before the fix: redeemers could profit from fragmented claims by harvesting per-asset rounding losses.
-    After the fix: redeemers pay at least the USD value of collateral (round up favors protocol).
+    Before the fix, redeemers could harvest each cohort's floor-rounding loss.
+    After the fix, each delivered cohort rounds up in favor of the protocol.
     """
     setGeneralConfig()
     setAssetConfig(alpha_token)
@@ -2127,17 +2213,16 @@ def test_stab_vault_redeem_fragmented_claims_refunds_profit(
     bravo_received = bravo_token.balanceOf(bob)
     redeemed_value = bravo_received * claim_price // EIGHTEEN_DECIMALS
 
-    # After the fix: GREEN spent should be >= USD value (protocol favored by rounding up)
-    # The exploit no longer works
-    assert green_spent >= redeemed_value, f"Vulnerability still exists! green_spent ({green_spent}) < redeemed_value ({redeemed_value})"
+    # Splitting one redemption across cohorts must not harvest each cohort's
+    # floor-rounding remainder.
+    assert green_spent >= redeemed_value
 
-    # With rounding up, redeemer should receive almost all collateral
-    # They may be a few wei short if they budgeted using floor division (which is acceptable)
+    # The floor-derived aggregate budget can leave only a few raw units behind.
     assert bravo_received >= total_claimable - 10, f"Redeemer should receive nearly all collateral"
 
     # The key metric: verify the exploit is not profitable
     # Before fix: green_spent < redeemed_value (redeemer profits)
-    # After fix: green_spent >= redeemed_value (protocol protected)
+    # After fix: green_spent >= redeemed_value (protocol-favoring round-up)
     profit_or_loss = redeemed_value - green_spent
     assert profit_or_loss <= 0, f"Redeemer should not profit from rounding! Profit: {profit_or_loss}"
 

@@ -583,7 +583,7 @@ def isSupportedAsset(_asset: address) -> bool:
 @view
 @external
 def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
-    return _vaultId in self.assetConfig[_asset].vaultIds
+    return self.indexOfAsset[_asset] != 0 and _vaultId in self.assetConfig[_asset].vaultIds
 
 
 @view

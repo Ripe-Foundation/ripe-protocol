@@ -220,7 +220,6 @@ userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # 
 
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
-ONE_PERCENT: constant(uint256) = 1_00 # 1%
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
@@ -665,8 +664,6 @@ def _swapWithSpecificStabPool(
 
     # swap with stability pool
     return self._swapAssetsWithStabPool(True, _liqUser, _liqVaultId, _liqVaultAddr, _liqAsset, _liqFeeRatio, maxAmountInStabPool, maxUsdValueInStabPool, remainingToRepay, collateralValueOut, _stabPool, stabProceedsAddr, _a)
-
-
 @view
 @internal
 def _getUsdValue(
@@ -1254,10 +1251,15 @@ def _transferCollateral(
     userAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_fromUser, _asset)
     maxAssetAmount: uint256 = 0
     if userAmount != 0:
-        maxAssetAmount = self._getAssetAmount(_asset, _targetUsdValue, _a)
+        # GREEN is one USD per unit; specialized branches overwrite this.
+        maxAssetAmount = _targetUsdValue
+        if _asset == _a.savingsGreen:
+            maxAssetAmount = staticcall IERC4626(_a.savingsGreen).convertToShares(_targetUsdValue)
+        elif _asset != _a.greenToken:
+            maxAssetAmount = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
     # Skip when the maximum expected outflow produces zero creditable USD under the current quote.
     # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
-    if maxAssetAmount == 0 or min(userAmount, maxAssetAmount) <= (maxAssetAmount - 1) // _targetUsdValue:
+    if maxAssetAmount == 0 or userAmount <= unsafe_sub(maxAssetAmount, 1) // _targetUsdValue:
         return 0, 0, False, True
 
     amountSent: uint256 = 0
@@ -1268,14 +1270,16 @@ def _transferCollateral(
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
     assert amountSent <= maxAssetAmount # dev: outflow
-    usdValue: uint256 = min(
-        self._getUsdValue(_asset, amountSent, _a),
-        _targetUsdValue,
-    )
+    usdValue: uint256 = self._getUsdValue(_asset, amountSent, _a)
     # Bytecode: range(2)+break beats two unrolled checkpoints. Post-mutation, sender
     # first so lastBalance writes the live share (else stale), then in-vault recipient.
     if amountSent != 0:
-        assert usdValue != 0 # dev: amounts do not match up
+        # PriceDesk deliberately floors nonzero dust to one USD wei, so bind the
+        # post-transfer amount to the inverse quote instead of trusting that floor.
+        assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: amounts do not match up
+        assert usdValue != 0 and usdValue <= _targetUsdValue # dev: amounts do not match up
+        if usdValue == unsafe_sub(_targetUsdValue, 1):
+            usdValue = _targetUsdValue
         for i: uint256 in range(2):
             user: address = _fromUser
             if i != 0:
@@ -1286,20 +1290,6 @@ def _transferCollateral(
             extcall LootBox(_a.lootbox).updateDepositPoints(user, _vaultId, _vaultAddr, _asset, _a)
 
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted
-
-
-@view
-@internal
-def _getAssetAmount(
-    _asset: address,
-    _targetUsdValue: uint256,
-    _a: addys.Addys,
-) -> uint256:
-    if _asset == _a.greenToken:
-        return _targetUsdValue
-    if _asset == _a.savingsGreen:
-        return staticcall IERC4626(_a.savingsGreen).convertToShares(_targetUsdValue)
-    return staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
 
 
 # green handling
@@ -1342,8 +1332,10 @@ def _handleGreenForUser(
 @internal
 def _isPaymentCloseEnough(_requestedAmount: uint256, _actualAmount: uint256) -> bool:
     # An extra safety check to make sure what was paid was actually close-ish to what was requested
-    buffer: uint256 = _requestedAmount * ONE_PERCENT // HUNDRED_PERCENT
-    return _requestedAmount + buffer >= _actualAmount and _actualAmount >= _requestedAmount - buffer
+    buffer: uint256 = _requestedAmount // 100
+    if _actualAmount > _requestedAmount:
+        return unsafe_sub(_actualAmount, _requestedAmount) <= buffer
+    return unsafe_sub(_requestedAmount, _actualAmount) <= buffer
 
 
 # calc amount of debt to repay

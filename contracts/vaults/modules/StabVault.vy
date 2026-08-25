@@ -819,14 +819,17 @@ def _claimFromStabilityPool(
     isDepleted: bool = False
     claimShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_claimer, _stabAsset, claimShares, True)
 
-    # reduce claimable balances - compute remaining USD value using price ratio from claim calculation
+    # reduce claimable balances using the remaining asset's direct value
     remainingUsdValue: uint256 = 0
     if claimAmount < maxClaimableAsset:
-        numerator: uint256 = (maxClaimableAsset - claimAmount) * claimUsdValue
-        if numerator < claimAmount:
-            remainingUsdValue = 1 # very small dust, trigger removal
-        else:
-            remainingUsdValue = numerator // claimAmount
+        remainingUsdValue = self._getUsdValue(
+            _claimAsset,
+            maxClaimableAsset - claimAmount,
+            _a.greenToken,
+            _a.savingsGreen,
+            _a.priceDesk,
+            True,
+        )
     self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset, remainingUsdValue)
 
     # move tokens to recipient
@@ -881,6 +884,17 @@ def _calcClaimSharesAndAmount(
     )
     if _maxUsdValue != max_value(uint256):
         claimUsdValue = min(claimUsdValue, _maxUsdValue)
+
+    # Preserve the empty-cohort exit only when the inverse/forward quote is
+    # exact or loses at most one USD wei. Coarse assets can have a materially
+    # smaller delivered value and must leave the corresponding shares intact.
+    if (
+        _maxUsdValue >= maxClaimUsdValue
+        and maxClaimAmount <= totalClaimAsset
+        and claimUsdValue >= unsafe_sub(maxClaimUsdValue, 1)
+    ):
+        return maxUserShares, claimAmount, claimUsdValue
+
     claimShares: uint256 = min(maxUserShares, self._valueToShares(claimUsdValue, totalShares, totalValue, True))
     return claimShares, claimAmount, claimUsdValue
 
@@ -1062,10 +1076,21 @@ def _redeemFromStabilityPool(
 
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
 
-        redeemAmount: uint256 = min(
-            self._getUsdValue(_asset, claimAmount, _a.greenToken, _a.savingsGreen, _a.priceDesk, True),
-            remainingRedeemValue,
+        # Value the amount actually delivered, then round its USD charge up.
+        # The inverse quote distinguishes an exact forward value from a floor,
+        # so splitting across cohorts or separate transactions cannot harvest
+        # the discarded remainder.
+        redeemAmount: uint256 = self._getUsdValue(
+            _asset,
+            claimAmount,
+            _a.greenToken,
+            _a.savingsGreen,
+            _a.priceDesk,
+            True,
         )
+        if self._getAssetAmount(_asset, redeemAmount, _a.greenToken, _a.savingsGreen, _a.priceDesk, True) < claimAmount:
+            redeemAmount += 1
+        redeemAmount = min(redeemAmount, remainingRedeemValue)
         if redeemAmount == 0:
             continue
 

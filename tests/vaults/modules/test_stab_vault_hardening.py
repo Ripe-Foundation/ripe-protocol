@@ -301,11 +301,11 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     # The post-claim Lootbox checkpoint adds one strict NAV traversal per
     # distinct stability asset, after all batch mutations. F17's aggregate
     # custody check adds one balance read before each claim reduction. At this
-    # ceiling the measured paths are single_claim=1,280,407 and
-    # claim_many=8,042,519. The ceilings retain 5.43% and 3.20% local-EVM
-    # headroom, respectively.
-    assert single_claim_gas < 1_350_000
-    assert claim_many_gas < 8_300_000
+    # ceiling the delivered-value quote plus fragmentation-safe inverse check
+    # makes the measured paths single_claim=1,339,047 and claim_many=8,770,471.
+    # The ceilings retain about 3.7% local-EVM headroom.
+    assert single_claim_gas < 1_390_000
+    assert claim_many_gas < 9_100_000
     # Preflight and iteration each traverse the bounded claim set once. The
     # iterator must not repeat the strict NAV traversal after readiness passes.
     assert liquidation_preflight_gas < 600_000

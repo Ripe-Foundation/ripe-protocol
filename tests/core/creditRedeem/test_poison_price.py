@@ -1,12 +1,15 @@
 import boa
 import pytest
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs, redeem_collateral, sync_deployed_token
 
 
 UNDER_SEND_VAULT_SOURCE = """
 # @version 0.4.3
+
+interface MutablePriceSource:
+    def setPrice(_asset: address, _price: uint256): nonpayable
 
 struct Addys:
     hq: address
@@ -32,13 +35,15 @@ asset: public(address)
 underSendAmount: public(uint256)
 vaultAmount: public(uint256)
 balances: public(HashMap[address, uint256])
+priceSourceToZero: address
 
 @external
-def configure(_asset: address, _user: address, _amount: uint256, _underSendAmount: uint256):
+def configure(_asset: address, _user: address, _amount: uint256, _underSendAmount: uint256, _priceSourceToZero: address):
     self.asset = _asset
     self.balances[_user] = _amount
     self.vaultAmount = _amount
     self.underSendAmount = _underSendAmount
+    self.priceSourceToZero = _priceSourceToZero
 
 @view
 @external
@@ -91,6 +96,8 @@ def transferBalanceWithinVault(
     sent: uint256 = self.underSendAmount
     self.balances[_fromUser] -= sent
     self.balances[_toUser] += sent
+    if self.priceSourceToZero != empty(address):
+        extcall MutablePriceSource(self.priceSourceToZero).setPrice(self.asset, 0)
     return sent, self.balances[_fromUser] == 0
 """
 
@@ -726,7 +733,20 @@ def test_credit_redeem_rebase_vault_preview_skips_zero_credit(
     assert bravo_token.balanceOf(alice) == 0
 
 
+@pytest.mark.parametrize(
+    "price,under_send,payment_amount,zero_forward_price",
+    [
+        (1, EIGHTEEN_DECIMALS // 2, 100 * EIGHTEEN_DECIMALS, False),
+        # The vault changes the source after the inverse quote. With a one-wei
+        # target, zero must be rejected before target-1 normalization.
+        (EIGHTEEN_DECIMALS, 1, 1, True),
+    ],
+)
 def test_credit_redeem_registered_under_send_reverts_atomically(
+    price,
+    under_send,
+    payment_amount,
+    zero_forward_price,
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -747,6 +767,7 @@ def test_credit_redeem_registered_under_send_reverts_atomically(
     bravo_token,
     green_token,
     whale,
+    price_desk,
 ):
     setGeneralConfig()
     debt_terms = _redeem_terms(createDebtTerms)
@@ -767,11 +788,14 @@ def test_credit_redeem_registered_under_send_reverts_atomically(
     performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
     teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
-    mock_price_source.setPrice(bravo_token, 1)
+    mock_price_source.setPrice(bravo_token, price)
 
     reported = EIGHTEEN_DECIMALS
-    under_send = EIGHTEEN_DECIMALS // 2
-    mock.configure(bravo_token.address, bob, reported, under_send)
+    source_to_zero = mock_price_source.address if zero_forward_price else ZERO_ADDRESS
+    mock.configure(bravo_token.address, bob, reported, under_send, source_to_zero)
+    # The raw value is below one USD wei, while PriceDesk deliberately returns
+    # one; the amount-domain guard must still reject the vault under-send.
+    assert price_desk.getUsdValue(bravo_token, under_send, True) == 1
     ledger.addVaultToUser(bob, mock_vault_id, sender=teller.address)
     assert credit_engine.canRedeemUserCollateral(bob)
     assert mock.getTotalAmountForUser(bob, bravo_token) == reported
@@ -793,7 +817,7 @@ def test_credit_redeem_registered_under_send_reverts_atomically(
     with boa.reverts("zero repayment value (vault under-send)"):
         teller.redeemCollateralFromMany(
             [(bob, mock_vault_id, bravo_token.address, MAX_UINT256)],
-            100 * EIGHTEEN_DECIMALS,
+            payment_amount,
             False,
             True,
             False,

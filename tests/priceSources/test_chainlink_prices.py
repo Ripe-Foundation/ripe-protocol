@@ -262,6 +262,52 @@ def test_confirm_feed_update_qualifies_under_live_pricedesk_stipend_atomically(
     assert mock_chainlink.feedConfig(alpha_token) == previous
 
 
+def test_zero_timelock_live_confirmation_still_qualifies_atomically(
+    mock_chainlink,
+    ripe_hq,
+    alpha_token,
+    governance,
+):
+    with boa.env.anchor():
+        source = boa.load(
+            "contracts/priceSources/ChainlinkPrices.vy",
+            ripe_hq,
+            ZERO_ADDRESS,
+            mock_chainlink.minActionTimeLock(),
+            mock_chainlink.maxActionTimeLock(),
+            mock_chainlink.WETH(),
+            mock_chainlink.ETH(),
+            mock_chainlink.BTC(),
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ONE_DAY_IN_SECS,
+            name="zero_timelock_live_chainlink",
+        )
+        assert source.actionTimeLock() == 0
+        feed = boa.loads(
+            GAS_SENSITIVE_CHAINLINK_FEED,
+            name="gas_sensitive_zero_timelock_feed",
+        )
+        assert source.addNewPriceFeed(
+            alpha_token,
+            feed,
+            600,
+            sender=governance.address,
+            gas=2_000_000,
+        )
+        pending = source.pendingUpdates(alpha_token)
+
+        with boa.reverts("price source not executable"):
+            source.confirmNewPriceFeed(
+                alpha_token,
+                sender=governance.address,
+                gas=2_000_000,
+            )
+
+        assert source.pendingUpdates(alpha_token) == pending
+        assert source.feedConfig(alpha_token).feed == ZERO_ADDRESS
+
+
 def test_post_setup_confirmation_rejects_missing_price_desk(
     mock_chainlink,
     ripe_hq,
@@ -308,7 +354,7 @@ def test_post_setup_confirmation_rejects_missing_price_desk(
             boa.env.timestamp,
         )
 
-        with boa.reverts("extcodesize is zero"):
+        with boa.reverts("missing price desk"):
             mock_chainlink.confirmNewPriceFeed(
                 alpha_token,
                 sender=governance.address,

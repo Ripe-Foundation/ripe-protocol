@@ -210,6 +210,9 @@ event UserDelegationSet:
     canClaimLoot: bool
     caller: indexed(address)
 
+event CurveSnapshotFailed:
+    pass
+
 receiptMeasurementActive: transient(bool)
 
 MAX_BALANCE_ACTION: constant(uint256) = 20
@@ -1028,13 +1031,14 @@ def _performHousekeeping(
     if curvePrices != empty(address):
         # Snapshot maintenance is best-effort housekeeping. A broken or
         # unexpectedly expensive Curve route must not block the user action.
-        success: bool = raw_call(
+        if not raw_call(
             curvePrices,
             method_id("addGreenRefPoolSnapshot()"),
             gas=500_000,
             max_outsize=0,
             revert_on_failure=False,
-        )
+        ):
+            log CurveSnapshotFailed()
 
     # update debt
     if _shouldUpdateDebt:

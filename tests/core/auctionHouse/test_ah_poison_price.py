@@ -180,10 +180,12 @@ userAssets: HashMap[address, HashMap[uint256, address]]
 indexOfUserAsset: HashMap[address, HashMap[address, uint256]]
 numUserAssets: public(HashMap[address, uint256])
 underSendAmount: public(uint256)
+underSendEnabled: bool
 
 @external
 def setUnderSendAmount(_amount: uint256):
     self.underSendAmount = _amount
+    self.underSendEnabled = True
 
 @internal
 def _register(_user: address, _asset: address):
@@ -212,7 +214,7 @@ def depositTokensInVault(
 def _outflow(_user: address, _asset: address, _amount: uint256) -> (uint256, bool):
     available: uint256 = self.userBalances[_user][_asset]
     sendAmount: uint256 = min(_amount, available)
-    if self.underSendAmount != 0:
+    if self.underSendEnabled:
         sendAmount = min(sendAmount, self.underSendAmount)
     if sendAmount == 0:
         return 0, available == 0
@@ -496,6 +498,70 @@ def test_auction_house_credits_forward_value_of_zero_decimal_delivery(
     assert log.collateralAmountSent == 1
     assert log.collateralUsdValueSent == 3 * EIGHTEEN_DECIMALS
     assert coarse_token.balanceOf(alice) == 1
+
+
+def test_auction_house_full_quote_tolerates_only_one_wei_roundtrip_loss(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    bob,
+    alice,
+    sally,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    price_desk,
+):
+    _make_bob_auctionable_on_bravo(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        credit_engine,
+        bob,
+        sally,
+        alpha_token,
+        alpha_token_whale,
+        bravo_token,
+        bravo_token_whale,
+        green_token,
+        100 * EIGHTEEN_DECIMALS,
+        12 * EIGHTEEN_DECIMALS // 100,
+    )
+    target = 5 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(bravo_token, 6 * EIGHTEEN_DECIMALS // 10)
+    quoted_amount = price_desk.getAssetAmount(bravo_token, target, True)
+    assert price_desk.getUsdValue(bravo_token, quoted_amount, True) == target - 1
+
+    _fund_alice(green_token, whale, teller, alice, target)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    green_spent = teller.buyManyFungibleAuctions(
+        [(bob, vault_id, bravo_token, MAX_UINT256)],
+        target,
+        False,
+        False,
+        False,
+        alice,
+        sender=alice,
+    )
+
+    assert green_spent == target
+    log = filter_logs(teller, "FungAuctionPurchased")[0]
+    assert log.collateralAmountSent == quoted_amount
+    assert log.collateralUsdValueSent == target
 
 
 def test_auction_house_dust_only_purchase_reverts_no_green_spent(
@@ -897,7 +963,19 @@ def test_wsuper_price_desk_auction_house_tx(
     assert price_desk.getPrice(bravo_token) == EIGHTEEN_DECIMALS
 
 
+@pytest.mark.parametrize(
+    "under_send,payment_amount,expected_reason",
+    [
+        (1, 100 * EIGHTEEN_DECIMALS, "amounts do not match up"),
+        # Regression: a zero send against a one-wei target must not be rounded
+        # from target - 1 into one wei of collateral credit.
+        (0, 1, "no green spent"),
+    ],
+)
 def test_auction_house_undersend_vault_hits_zero_usd_backstop(
+    under_send,
+    payment_amount,
+    expected_reason,
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -911,6 +989,7 @@ def test_auction_house_undersend_vault_hits_zero_usd_backstop(
     vault_book,
     governance,
     lootbox,
+    price_desk,
 ):
     with boa.env.anchor():
         vault = boa.loads(UNDERSEND_VAULT_SOURCE, name="undersend_vault")
@@ -949,7 +1028,11 @@ def test_auction_house_undersend_vault_hits_zero_usd_backstop(
         assert credit_engine.canLiquidateUser(borrower)
         teller.liquidateUser(borrower, False, sender=keeper)
         mock_price_source.setPrice(token, 1)
-        vault.setUnderSendAmount(1)
+        vault.setUnderSendAmount(under_send)
+        # PriceDesk's deliberate dust floor is exactly why the amount-domain
+        # post-transfer guard is required.
+        if under_send != 0:
+            assert price_desk.getUsdValue(token, under_send, True) == 1
         _fund_alice(green_token, whale, teller, buyer, 100 * EIGHTEEN_DECIMALS)
         before = {
             "debt": credit_engine.getUserDebtAmount(borrower),
@@ -960,10 +1043,10 @@ def test_auction_house_undersend_vault_hits_zero_usd_backstop(
             "has_auc": ledger.hasFungibleAuction(borrower, vault_id, token),
             "points": lootbox.getLatestDepositPoints(borrower, vault_id, token),
         }
-        with boa.reverts("amounts do not match up"):
+        with boa.reverts(expected_reason):
             teller.buyManyFungibleAuctions(
                 [(borrower, vault_id, token.address, MAX_UINT256)],
-                100 * EIGHTEEN_DECIMALS,
+                payment_amount,
                 False,
                 False,
                 False,

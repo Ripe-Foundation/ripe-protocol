@@ -833,38 +833,36 @@ def _performDeleveragePhases(
 
     # PHASE 1 -- look at stability pool assets first
 
-    if len(_priorityStabVaults) != 0:
-        for stabPool: VaultData in _priorityStabVaults:
-            if remainingToRepay == 0:
-                break
+    for stabPool: VaultData in _priorityStabVaults:
+        if remainingToRepay == 0:
+            break
 
-            if not staticcall Ledger(_a.ledger).isParticipatingInVault(_user, stabPool.vaultId):
-                continue
+        if not staticcall Ledger(_a.ledger).isParticipatingInVault(_user, stabPool.vaultId):
+            continue
 
-            # Phase 1 vaults are Stability Pool cohorts by construction, so apply
-            # the fail-soft availability gate.
-            remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, True, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
-            if self.vaultAddrs[stabPool.vaultId] == empty(address):
-                self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
+        # Phase 1 vaults are Stability Pool cohorts by construction, so apply
+        # the fail-soft availability gate.
+        remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, True, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
+        if self.vaultAddrs[stabPool.vaultId] == empty(address):
+            self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
 
     # PHASE 2 -- Go thru priority liq assets (set in mission control)
 
-    if len(_priorityLiqAssetVaults) != 0 and remainingToRepay != 0:
-        for pData: VaultData in _priorityLiqAssetVaults:
-            if remainingToRepay == 0:
-                break
+    for pData: VaultData in _priorityLiqAssetVaults:
+        if remainingToRepay == 0:
+            break
 
-            # Never process Stability Pool cohorts as ordinary priority liq assets here — that would use strict NAV and re-open a broad-Deleverage revert if a stab vault is listed.
-            # Executable exclusion; the cohort is still reachable via phase 1 / phase 3 with fail-soft handling.
-            if staticcall MissionControl(_a.missionControl).isStabVaultId(pData.vaultId):
-                continue
+        # Never process Stability Pool cohorts as ordinary priority liq assets here — that would use strict NAV and re-open a broad-Deleverage revert if a stab vault is listed.
+        # Executable exclusion; the cohort is still reachable via phase 1 / phase 3 with fail-soft handling.
+        if staticcall MissionControl(_a.missionControl).isStabVaultId(pData.vaultId):
+            continue
 
-            if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_user, pData.asset):
-                continue
+        if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_user, pData.asset):
+            continue
 
-            remainingToRepay = self._handleSpecificAsset(_user, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, False, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
-            if self.vaultAddrs[pData.vaultId] == empty(address):
-                self.vaultAddrs[pData.vaultId] = pData.vaultAddr # cache
+        remainingToRepay = self._handleSpecificAsset(_user, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, False, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
+        if self.vaultAddrs[pData.vaultId] == empty(address):
+            self.vaultAddrs[pData.vaultId] = pData.vaultAddr # cache
 
     # PHASE 3 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
 
@@ -1210,7 +1208,7 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
     if _debtAmount <= collValueAdjusted:
         return _debtAmount
 
-    debtToRepay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
+    debtToRepay: uint256 = unsafe_sub(_debtAmount, collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
     return min(debtToRepay, _debtAmount)
 
 
@@ -1255,7 +1253,29 @@ def _transferCollateral(
         underlyingAsset = staticcall IERC4626(_asset).asset()
 
     # calculate max asset amount
-    maxAssetAmount: uint256 = self._getMaxAssetAmount(_asset, _targetUsdValue, isUnderscoreBasicEarnVault, underlyingAsset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    # GREEN is one USD per unit; specialized branches overwrite this.
+    maxAssetAmount: uint256 = _targetUsdValue
+    if _asset == _a.savingsGreen:
+        maxAssetAmount = staticcall IERC4626(_a.savingsGreen).convertToShares(_targetUsdValue)
+    elif isUnderscoreBasicEarnVault:
+        if underlyingAsset == empty(address):
+            return 0, 0, False
+        underlyingAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(underlyingAsset, _targetUsdValue, True)
+        adjustedUnderlyingAmount: uint256 = underlyingAmount
+
+        # Scale the inverse quote when the vault's safe conversion is below its
+        # nominal conversion, using one whole share to avoid dust noise.
+        sampleShareUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+        maxSampleUnderlying: uint256 = 0
+        cappedSampleUnderlying: uint256 = 0
+        maxSampleUnderlying, cappedSampleUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, sampleShareUnit)
+        if cappedSampleUnderlying == 0:
+            return 0, 0, False
+        if maxSampleUnderlying > cappedSampleUnderlying:
+            adjustedUnderlyingAmount = (underlyingAmount * maxSampleUnderlying + cappedSampleUnderlying - 1) // cappedSampleUnderlying
+        maxAssetAmount = staticcall IERC4626(_asset).convertToShares(adjustedUnderlyingAmount)
+    elif _asset != _a.greenToken:
+        maxAssetAmount = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
     if maxAssetAmount == 0:
         return 0, 0, False
 
@@ -1263,30 +1283,30 @@ def _transferCollateral(
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
     amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, isUnderscoreBasicEarnVault, _a)
+    assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
+    # GREEN is worth one USD per unit; specialized branches overwrite this.
+    usdValue: uint256 = amountSent
     if amountSent != 0:
+        # PriceDesk floors nonzero dust to one USD wei; enforce the inverse
+        # quote's minimum creditable delivery before collateral can leave.
+        assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: zero collateral value (vault under-send)
         self._checkpointSender(_fromUser, _vaultId, _vaultAddr, _asset, _a.lootbox)
-
-    usdValue: uint256 = 0
-    if amountSent != 0:
-        if _asset == _a.greenToken:
-            usdValue = amountSent
+        if isUnderscoreBasicEarnVault:
+            # Cap max conversion at convertToAssetsSafe + configured spread so
+            # crediting remains bounded for Underscore basic earn vault assets.
+            na: uint256 = 0
+            cappedUnderlying: uint256 = 0
+            na, cappedUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, amountSent)
+            # AuctionHouse preflights BasicVault's known amount clamps; retain
+            # this as a consistency invariant for divergent vault behavior.
+            assert cappedUnderlying != 0 # dev: zero safe underlying
+            usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
         elif _asset == _a.savingsGreen:
             usdValue = staticcall IERC4626(_a.savingsGreen).convertToAssets(amountSent)
-        else:
+        elif _asset != _a.greenToken:
             usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, True)
-
-    # For underscore basic earn vault assets, cap max conversion at
-    # convertToAssetsSafe + configured spread so crediting remains bounded.
-    if isUnderscoreBasicEarnVault and amountSent != 0 and underlyingAsset != empty(address):
-        na: uint256 = 0
-        cappedUnderlying: uint256 = 0
-        na, cappedUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, amountSent)
-        # AuctionHouse preflights BasicVault's known amount clamps; retain this
-        # as a consistency invariant for divergent vault or asset behavior.
-        assert cappedUnderlying != 0 # dev: zero safe underlying
-        usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
-
-    usdValue = min(usdValue, _targetUsdValue)
+        assert usdValue != 0 and usdValue <= _targetUsdValue # dev: zero collateral value (vault under-send)
+        usdValue = unsafe_add(usdValue, convert(usdValue == unsafe_sub(_targetUsdValue, 1), uint256))
 
     return usdValue, amountSent, isPositionDepleted
 
@@ -1346,50 +1366,6 @@ def _getMaxAndCappedUnderlyingForShares(_asset: address, _shares: uint256) -> (u
 @internal
 def _psmYieldToken(_psm: address) -> address:
     return staticcall EndaomentPSM(_psm).getUsdcYieldPositionVaultToken()
-
-
-# get asset amount
-
-
-@view
-@internal
-def _getMaxAssetAmount(
-    _asset: address,
-    _targetUsdValue: uint256,
-    _isUnderscoreBasicEarnVault: bool,
-    _underlyingAsset: address,
-    _greenToken: address,
-    _savingsGreen: address,
-    _priceDesk: address,
-) -> uint256:
-    amount: uint256 = 0
-    if _asset == _greenToken:
-        amount = _targetUsdValue
-    elif _asset == _savingsGreen:
-        amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
-    elif _isUnderscoreBasicEarnVault:
-
-        if _underlyingAsset == empty(address):
-            return 0
-        underlyingAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_underlyingAsset, _targetUsdValue, True)
-        adjustedUnderlyingAmount: uint256 = underlyingAmount
-
-        # Compare max vs capped value for one whole-share unit.
-        # Using a fixed share unit avoids noisy tiny-amount rounding.
-        sampleShareUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
-        maxSampleUnderlying: uint256 = 0
-        cappedSampleUnderlying: uint256 = 0
-        maxSampleUnderlying, cappedSampleUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, sampleShareUnit)
-        if cappedSampleUnderlying == 0:
-            return 0
-        if maxSampleUnderlying > cappedSampleUnderlying:
-            # ceil(a / b) = (a + b - 1) // b
-            adjustedUnderlyingAmount = (underlyingAmount * maxSampleUnderlying + cappedSampleUnderlying - 1) // cappedSampleUnderlying
-
-        amount = staticcall IERC4626(_asset).convertToShares(adjustedUnderlyingAmount)
-    else:
-        amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
-    return amount
 
 
 # cache tools

@@ -150,15 +150,19 @@ def test_stab_claim_credits_forward_value_of_zero_decimal_delivery(
         bob, alpha_token, deposit_amount, sender=teller.address
     )
     coarse_token.transfer(stability_pool, 1, sender=governance.address)
+    recipient_balance_before = alpha_token.balanceOf(governance)
     stability_pool.swapForLiquidatedCollateral(
         alpha_token,
         3 * EIGHTEEN_DECIMALS,
         coarse_token,
         1,
-        ZERO_ADDRESS,
+        governance,
         green_token,
         savings_green,
         sender=auction_house.address,
+    )
+    assert alpha_token.balanceOf(governance) - recipient_balance_before == (
+        3 * EIGHTEEN_DECIMALS
     )
 
     vault_id = vault_book.getRegId(stability_pool)
@@ -176,6 +180,73 @@ def test_stab_claim_credits_forward_value_of_zero_decimal_delivery(
     assert log.claimAmount == 1
     assert log.claimUsdValue == 3 * EIGHTEEN_DECIMALS
     assert coarse_token.balanceOf(bob) == 1
+
+
+def test_stab_claim_coarse_full_quote_preserves_unpaid_share_value(
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Full Claim",
+        "CFC",
+        0,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+
+    deposit_amount = 5 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    coarse_token.transfer(stability_pool, 1, sender=governance.address)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        3 * EIGHTEEN_DECIMALS,
+        coarse_token,
+        1,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == deposit_amount
+
+    vault_id = vault_book.getRegId(stability_pool)
+    claimed_value = claim_from_stability_pool(
+        teller,
+        vault_id,
+        alpha_token,
+        coarse_token,
+        deposit_amount,
+        sender=bob,
+    )
+
+    assert claimed_value == 3 * EIGHTEEN_DECIMALS
+    assert coarse_token.balanceOf(bob) == 1
+    assert stability_pool.userBalances(bob, alpha_token) != 0
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == (
+        2 * EIGHTEEN_DECIMALS
+    )
+    log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
+    assert not log.isDepleted
 
 
 def test_stability_claim_checkpoints_deposit_points_after_share_burn(

@@ -208,6 +208,35 @@ def test_liquidation_and_redemption_thresholds_use_exact_inclusive_boundaries(
     assert credit_engine.canLiquidateUser(bob)
 
 
+def test_deregistered_debt_position_remains_liquidatable_and_redeemable(
+    liquidation_state_position,
+    alpha_token,
+    bob,
+    mock_price_source,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    setAssetConfig,
+):
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _debtTerms=liquidation_state_position,
+    )
+    assert mission_control.deregisterAsset(
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+
+    mock_price_source.setPrice(alpha_token, LIQUIDATION_PRICE)
+    terms = credit_engine.getUserBorrowTerms(bob, False)
+    assert not terms.hasQuarantinedAsset
+    assert terms.highestLtv == 100_01
+    assert credit_engine.canLiquidateUser(bob)
+    assert credit_engine.canRedeemUserCollateral(bob)
+
+
 def test_removing_last_auction_reenables_only_liquidation_check(
     liquidation_state_position,
     alpha_token,
@@ -285,4 +314,3 @@ def test_no_debt_health_results_remain_well_defined(
     assert not credit_engine.canRedeemUserCollateral(bob)
     assert credit_engine.getLiquidationThreshold(bob) == 0
     assert credit_engine.getRedemptionThreshold(bob) == 0
-
