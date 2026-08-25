@@ -14,17 +14,11 @@ from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 _C2_INTERPRETER_PATH = os.environ.get("RIPE_C2_MEASUREMENT_INTERPRETER")
+_C2_REPO_ROOT = Path(__file__).resolve().parents[3]
 C2_MEASUREMENT_INTERPRETER = (
     Path(_C2_INTERPRETER_PATH).resolve()
     if _C2_INTERPRETER_PATH
-    else (
-        Path.home()
-        / "dev"
-        / "ripe-protocol-validation-envs"
-        / "rh-wave2-py312"
-        / "bin"
-        / "python"
-    ).resolve()
+    else (_C2_REPO_ROOT / ".venv" / "bin" / "python").resolve()
 )
 
 
@@ -209,6 +203,19 @@ def getUserAssetAndAmountAtIndex(
     if _index == 0 or _index > position_count:
         return empty(address), 0
     return asset, position_amount
+
+@view
+@external
+def doesUserHaveBalance(
+    _user: address,
+    _asset: address,
+) -> bool:
+    return _asset == asset
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    return 0
 """
 
 
@@ -934,15 +941,15 @@ def test_c2_marginal_gas_protocol(
         f"{name}=={version}" for name, version in manifest_rows
     ) + "\n"
     assert hashlib.sha256(manifest.encode()).hexdigest() == (
-        "9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92"
+        "5df5fbc4e94b394f4fbc26a7b2877c731ee33fe7db267a734010c6039ac61138"
     )
     interpreter = Path(sys.executable).resolve()
     assert interpreter == C2_MEASUREMENT_INTERPRETER
     assert hashlib.sha256(interpreter.read_bytes()).hexdigest() == (
-        "d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765"
+        "e2605291e058fdbe3102e8185d0ac5fe0e063398de617010a6af3a42a78f05e3"
     )
     assert hashlib.sha256(Path("requirements.txt").read_bytes()).hexdigest() == (
-        "214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010"
+        "4f0097670e618e8210fc7d961d851df643332b3b52d156a0a0b9171e86d1906f"
     )
     protocol = Path(
         "docs/chains/rh/hardening/creditengine-gas-measurements.md"
@@ -993,6 +1000,7 @@ def test_c2_marginal_gas_protocol(
                 assert warm_up.collateralVal == expected_value
                 assert warm_up.totalMaxDebt == expected_value // 2
                 assert warm_up.debtTerms.ltv == 50_00
+                assert warm_up.hasQuarantinedAsset == (position_amount == 0)
 
                 observations = []
                 price_calls = []
