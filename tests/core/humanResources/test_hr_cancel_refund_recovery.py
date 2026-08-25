@@ -296,14 +296,33 @@ def test_post_cliff_non_burn_cancel_behavior_is_unchanged(
     contributor_contract,
     setupRipeGovVaultConfig,
     ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    setAssetConfig,
+    mission_control,
+    switchboard_alpha,
     switchboard_delta,
     governance,
+    human_resources,
     ripe_token,
     ledger,
 ):
     setupRipeGovVaultConfig()
     contributor = contributor_contract
     compensation = contributor.compensation()
+    claimed_before = _cash_pre_cliff(contributor)
+    historical_vault_id, replacement_vault_id = _rotate_core(
+        alternate_ripe_gov_vault,
+        registerVault,
+        mission_control,
+        switchboard_alpha,
+    )
+    setAssetConfig(
+        ripe_token, _vaultIds=[historical_vault_id, replacement_vault_id]
+    )
+    human_resources.setLegacyContributorRipeGovVaultId(
+        contributor, historical_vault_id, sender=contributor.owner()
+    )
     travel_to_ts(contributor.cliffTime() + 1)
     budget_before = ledger.ripeAvailForHr()
     supply_before = ripe_token.totalSupply()
@@ -311,8 +330,19 @@ def test_post_cliff_non_burn_cancel_behavior_is_unchanged(
     _cancel(switchboard_delta, governance, contributor)
 
     claimed = contributor.totalClaimed()
-    assert claimed > 0
+    assert claimed > claimed_before
     assert contributor.compensation() == claimed
-    assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == claimed
-    assert ripe_token.totalSupply() == supply_before + claimed
+    assert (
+        ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
+        == claimed_before
+    )
+    assert (
+        alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
+        == claimed - claimed_before
+    )
+    assert (
+        human_resources.legacyContributorRipeGovVaultId(contributor)
+        == historical_vault_id
+    )
+    assert ripe_token.totalSupply() == supply_before + claimed - claimed_before
     assert ledger.ripeAvailForHr() == budget_before + compensation - claimed
