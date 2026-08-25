@@ -4,6 +4,8 @@
 .pytest_cache
 __pycache__
 .hypothesis/
+.coverage
+.coverage.*
 
 # dev environment
 .vscode

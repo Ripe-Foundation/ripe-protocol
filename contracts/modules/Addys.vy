@@ -62,6 +62,8 @@ ENDAOMENT_PSM_ID: constant(uint256) = 22
 RIPE_CCIP_POOL_ID: constant(uint256) = 23
 GREEN_CCIP_POOL_ID: constant(uint256) = 24
 VAULT_MIGRATOR_ID: constant(uint256) = 25
+RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
+RIPE_RESERVE_VESTING_ID: constant(uint256) = 27
 
 
 @deploy
@@ -495,3 +497,33 @@ def _getVaultMigratorId() -> uint256:
 @internal
 def _getVaultMigratorAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_MIGRATOR_ID)
+
+
+# ripe reserve engine
+
+
+@view
+@internal
+def _getRipeReserveEngineId() -> uint256:
+    return RIPE_RESERVE_ENGINE_ID
+
+
+@view
+@internal
+def _getRipeReserveEngineAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_RESERVE_ENGINE_ID)
+
+
+# ripe reserve vesting
+
+
+@view
+@internal
+def _getRipeReserveVestingId() -> uint256:
+    return RIPE_RESERVE_VESTING_ID
+
+
+@view
+@internal
+def _getRipeReserveVestingAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_RESERVE_VESTING_ID)
