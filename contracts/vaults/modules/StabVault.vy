@@ -120,6 +120,9 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
+# Strictly sub-micro-dollar inverse/forward rounding may otherwise strand an
+# unclaimable final share balance when the claim asset has coarse decimals.
+SUB_MICRO_USD_EXIT_TOLERANCE: constant(uint256) = 10 ** 12
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
 RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
@@ -885,13 +888,13 @@ def _calcClaimSharesAndAmount(
     if _maxUsdValue != max_value(uint256):
         claimUsdValue = min(claimUsdValue, _maxUsdValue)
 
-    # Preserve the empty-cohort exit only when the inverse/forward quote is
-    # exact or loses at most one USD wei. Coarse assets can have a materially
-    # smaller delivered value and must leave the corresponding shares intact.
+    # Preserve the full-position exit when inverse/forward rounding loses less
+    # than one micro-dollar. Larger coarse-asset gaps must leave the
+    # corresponding shares intact.
     if (
         _maxUsdValue >= maxClaimUsdValue
         and maxClaimAmount <= totalClaimAsset
-        and claimUsdValue >= unsafe_sub(maxClaimUsdValue, 1)
+        and maxClaimUsdValue - claimUsdValue < SUB_MICRO_USD_EXIT_TOLERANCE
     ):
         return maxUserShares, claimAmount, claimUsdValue
 

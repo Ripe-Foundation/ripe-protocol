@@ -15,7 +15,8 @@ EIP170_LIMIT = 24_576
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
-# StabilityPool headroom is 233 bytes after the actual-delivery claim and
+# StabilityPool headroom is 216 bytes after the actual-delivery claim,
+# strict sub-micro-dollar final-exit tolerance, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
 # and partial-reservation admission remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
@@ -51,7 +52,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Endaoment": 23386,
     "PriceDesk": 17742,
     "Deleverage": 24562,
-    "StabilityPool": 24343,
+    "StabilityPool": 24360,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 16672,
     "CurvePrices": 23406,

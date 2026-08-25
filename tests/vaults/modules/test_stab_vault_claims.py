@@ -829,10 +829,15 @@ def test_stab_vault_claims_multiple_assets(
     # Claim charlie tokens  
     claim_from_stability_pool(teller, vault_id, alpha_token, charlie_token, sender=bob)
     charlie_claimed = charlie_token.balanceOf(bob)
-    _test(charlie_amount, charlie_claimed)
+    assert charlie_claimed == charlie_amount - 1
+    assert stability_pool.claimableBalances(alpha_token, charlie_token) == 1
 
-    # User should be fully depleted
-    assert stability_pool.getTotalUserValue(bob, alpha_token) <= 1
+    # The last raw 6-decimal unit is worth one micro-dollar. Before the strict
+    # sub-micro-dollar exit tolerance, virtual-share rounding left the user one
+    # USD wei below that unit with nonzero shares, while a retry quoted zero
+    # tokens and reverted `nothing claimed`.
+    assert stability_pool.userBalances(bob, alpha_token) == 0
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == 0
 
 
 def test_claim_after_effects_guard_rejection_rolls_back_second_claim(
