@@ -7,8 +7,8 @@
 #       \|__|\|__| \|__|\_________\   \|__|  \|__|\|__|\|__| \|__|    \|__|        \|_______|\|_______|\|__| \|__|\|_______|\_________\
 #                      \|_________|                                                                                        \|_________|
 #
-#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2026
+#     ripe protocol license: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     ripe foundation (C) 2026
 
 # @version 0.4.3
 
@@ -71,7 +71,7 @@ def __init__(_ripeHq: address):
 
 
 #############
-# Positions #
+# positions #
 #############
 
 
@@ -160,7 +160,7 @@ def _removePositionFromUser(_user: address, _positionId: uint256):
 
 
 #################
-# Record Claims #
+# record claims #
 #################
 
 
@@ -203,7 +203,7 @@ def recordClaim(_user: address, _positionId: uint256) -> (uint256, uint256, uint
 
 
 #################
-# Vesting Views #
+# vesting views #
 #################
 
 
@@ -272,19 +272,19 @@ def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
         convert(mm < lo, uint256),
     )
 
-    # Fast path: the product fits in 256 bits.
+    # fast path: the product fits in 256 bits.
     if hi == 0:
         return lo // _d
 
-    # The full-precision result must fit in uint256.
+    # the full-precision result must fit in uint256.
     assert _d > hi # dev: result overflows
 
-    # Make the 512-bit product exactly divisible by the denominator.
+    # make the 512-bit product exactly divisible by the denominator.
     rem: uint256 = uint256_mulmod(_x, _y, _d)
     hi = unsafe_sub(hi, convert(rem > lo, uint256))
     lo = unsafe_sub(lo, rem)
 
-    # Factor powers of two out of the denominator and shift the
+    # factor powers of two out of the denominator and shift the
     # high product bits into the low product word.
     tz: uint256 = unsafe_sub(0, _d) & _d
     d2: uint256 = _d // tz
@@ -297,7 +297,7 @@ def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
         ),
     )
 
-    # Compute the modular inverse of the now-odd denominator.
+    # compute the modular inverse of the now-odd denominator.
     inv: uint256 = unsafe_mul(3, d2) ^ 2
     for i: uint256 in range(6):
         inv = unsafe_mul(
@@ -309,7 +309,7 @@ def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
 
 
 #####################
-# Allocation Budget #
+# allocation budget #
 #####################
 
 

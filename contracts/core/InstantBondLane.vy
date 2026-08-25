@@ -12,8 +12,8 @@
 #     ║  Fixed-price direct RIPE purchases     ║
 #     ╚════════════════════════════════════════╝
 #
-#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     ripe protocol license: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     ripe foundation (C) 2025
 
 # @version 0.4.3
 
@@ -60,10 +60,10 @@ interface RipeHq:
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-# High utilization reduces RIPE per payment unit; low utilization increases it.
-# Idle decay also increases RIPE per payment unit toward the configured ceiling.
-# The vesting bonus is applied after the epoch's base payout rate.
-# One-shot rate overrides replace a derived epoch rate without changing these terms.
+# high utilization reduces RIPE per payment unit; low utilization increases it.
+# idle decay also increases RIPE per payment unit toward the configured ceiling.
+# the vesting bonus is applied after the epoch's base payout rate.
+# one-shot rate overrides replace a derived epoch rate without changing these terms.
 struct InstantBondConfig:
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
@@ -248,7 +248,7 @@ canBuyNow: public(bool)
 
 # state
 isRunning: public(bool)
-# Current committed epoch while running; getEpochSnapshot() may project a later one.
+# current committed epoch while running; getEpochSnapshot() may project a later one.
 epochState: public(EpochSnapshot)
 
 paymentToken: public(address)
@@ -262,7 +262,7 @@ MAX_BATCH_CLAIMS: public(constant(uint256)) = 20
 MAX_PRICE_STEP_BPS: constant(uint256) = 100_00 # 100.00%
 MAX_DECAY_EPOCHS: constant(uint256) = 32
 MAX_PAYMENT_DECIMALS: constant(uint8) = 73
-# Numerically equals the BPS denominator, but represents the base-rate policy floor.
+# numerically equals the BPS denominator, but represents the base-rate policy floor.
 MIN_BASE_PAYOUT_RATE: constant(uint256) = 10_000
 RATE_SOURCE_SEED: public(constant(uint256)) = 1
 RATE_SOURCE_CONTROLLER: public(constant(uint256)) = 2
@@ -285,7 +285,7 @@ def __init__(
 
 
 #################
-# Purchase Bond #
+# purchase bond #
 #################
 
 
@@ -369,7 +369,7 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
     if not self.isRunning or block.number < self.genesisBlock:
         return quote
 
-    # Vyper requires binding every returned value; only the quote is used in this view.
+    # vyper requires binding every returned value; only the quote is used in this view.
     candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
     quote, candidateSnapshot, transition = self._quote(
@@ -465,7 +465,7 @@ def _calculatePayout(
 
 
 ##########
-# Claims #
+# claims #
 ##########
 
 
@@ -591,7 +591,7 @@ def _isPurchaseReady() -> bool:
 
 
 ##########
-# Epochs #
+# epochs #
 ##########
 
 
@@ -619,7 +619,7 @@ def _calculateControllerTransition(
     else:
         utilizationBps = _previousSnapshot.acceptedPayment * HUNDRED_PERCENT // _previousSnapshot.paymentCap
 
-        # Strong demand lowers RIPE per payment unit, increasing RIPE's effective price.
+        # strong demand lowers RIPE per payment unit, increasing RIPE's effective price.
         if utilizationBps >= _config.uHighBps:
             strengthBps: uint256 = (utilizationBps - _config.uHighBps) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.uHighBps)
             earlinessBps: uint256 = 0
@@ -629,7 +629,7 @@ def _calculateControllerTransition(
             adjustmentBps = _config.minUpBps + (_config.maxUpBps - _config.minUpBps) * demandBps // HUNDRED_PERCENT
             basePayoutRate = max(basePayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + adjustmentBps), MIN_BASE_PAYOUT_RATE)
 
-        # Weak demand raises RIPE per payment unit, decreasing RIPE's effective price.
+        # weak demand raises RIPE per payment unit, decreasing RIPE's effective price.
         elif utilizationBps <= _config.uLowBps:
             weaknessBps: uint256 = (_config.uLowBps - utilizationBps) * HUNDRED_PERCENT // _config.uLowBps
             adjustmentBps = _config.minDownBps + (_config.maxDownBps - _config.minDownBps) * weaknessBps // HUNDRED_PERCENT
@@ -656,7 +656,7 @@ def _calculateControllerTransition(
 def getEpochSnapshot() -> EpochSnapshot:
     if not self.isRunning:
         return empty(EpochSnapshot)
-    # Vyper requires binding every returned value; only the snapshot is used here.
+    # vyper requires binding every returned value; only the snapshot is used here.
     candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
     candidateSnapshot, transition = self._deriveEpochSnapshot(self.epochState, self.bondConfig)
@@ -682,7 +682,7 @@ def _deriveEpochSnapshot(_previousSnapshot: EpochSnapshot, _config: InstantBondC
         transition.controllerBasePayoutRate = _config.seedBasePayoutRate
         timingEligible = (block.number - self.genesisBlock) % _config.epochLength == 0
     else:
-        # Later epochs roll the controller and always have meaningful timing data.
+        # later epochs roll the controller and always have meaningful timing data.
         transition = self._calculateControllerTransition(
             _previousSnapshot,
             epoch - _previousSnapshot.epoch,
@@ -690,7 +690,7 @@ def _deriveEpochSnapshot(_previousSnapshot: EpochSnapshot, _config: InstantBondC
         )
         defaultRateSource = RATE_SOURCE_CONTROLLER
 
-    # Apply an override only after deriving the normal rate for this epoch.
+    # apply an override only after deriving the normal rate for this epoch.
     basePayoutRate: uint256 = 0
     rateSource: uint256 = 0
     basePayoutRate, rateSource = self._applyScheduledRateOverride(epoch, transition.controllerBasePayoutRate, defaultRateSource)
@@ -873,7 +873,7 @@ def _getCurrentLatenessBps() -> uint256:
 
 
 ###############
-# Core Config #
+# core config #
 ###############
 
 
@@ -981,7 +981,7 @@ def _invalidateInstalledOverride():
 
 
 #################
-# Rate Override #
+# rate override #
 #################
 
 
@@ -1060,7 +1060,7 @@ def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
             return False, 0
         earliestApplicableEpoch = previousSnapshot.epoch + 1
 
-    # Zero means the earliest epoch that has not already accepted a purchase.
+    # zero means the earliest epoch that has not already accepted a purchase.
     if _targetEpoch == 0:
         return True, earliestApplicableEpoch
     if _targetEpoch < earliestApplicableEpoch:
@@ -1069,7 +1069,7 @@ def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
 
 
 #################
-# Payment Token #
+# payment token #
 #################
 
 
@@ -1120,7 +1120,7 @@ def _isValidPaymentToken(_token: address) -> bool:
 
 
 ##############
-# Validation #
+# validation #
 ##############
 
 
