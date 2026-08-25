@@ -1570,6 +1570,31 @@ full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and
 GREEN-reference activation remain open. This wrap-up grants no
 deployment or activation authority.
 
+**25 August 2026 — Group 11 Human Resources cancellation-credit
+supersession.** The owner authorized PR #211's narrow burn-coupled
+cancellation-credit candidate; integration remains pending. Contributor
+cancellation state and `RipePaycheckCancelled` reporting remain unchanged:
+official pre-cliff cancellation after an early cash still reports full original
+compensation. On the burn path, Human Resources now restores the unclaimed
+amount plus claimed compensation offset by RIPE actually burned from the one
+selected position, then applies the existing uint256 budget-headroom clamp.
+The non-burn path, zero-credit Ledger call, ABI, storage, and events remain
+unchanged.
+
+The calculation trusts the Contributor clone's `totalClaimed()`, treats burned
+RIPE as fungible, and does not automatically recover claimed capacity left
+unoffset after the one-shot cancellation. No event reports the credited amount;
+operations must reconcile `ripeAvailForHr` before and after cancellation. Any
+later budget adjustment requires separate owner authority and the normal
+timelocked SwitchboardDelta path. Pre-cliff vesting remains possible; whether
+the cliff should gate claiming is a separate unresolved owner policy question.
+This record grants no integration, deployment, configuration, activation,
+budget-adjustment, or release authority.
+
+Source:
+[`user-flow-audit-group-11-trusted-clone-hr-clamp.md`](user-flow-audit-group-11-trusted-clone-hr-clamp.md)
+and draft PR #211.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

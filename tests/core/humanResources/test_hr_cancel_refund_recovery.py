@@ -2,18 +2,27 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS
+from tests.core.humanResources.g11_proof_helpers import (
+    official_delta_cancel,
+    travel_to_ts,
+)
 
 
 def _cash_pre_cliff(contributor):
     target = contributor.startTime() + (
         contributor.cliffTime() - contributor.startTime()
     ) // 2
-    boa.env.time_travel(seconds=target - boa.env.evm.patch.timestamp)
+    travel_to_ts(target)
     assert boa.env.evm.patch.timestamp < contributor.cliffTime()
     claimed = contributor.cashRipeCheck(sender=contributor.owner())
     assert claimed == contributor.totalClaimed()
     assert claimed > 0
     return claimed
+
+
+def _cancel(switchboard_delta, governance, contributor):
+    _, ok = official_delta_cancel(switchboard_delta, governance, contributor)
+    assert ok is True
 
 
 def _rotate_core(
@@ -41,6 +50,8 @@ def test_pre_cliff_cancel_does_not_refund_claimed_ripe_left_in_historical_vault(
     registerVault,
     mission_control,
     switchboard_alpha,
+    switchboard_delta,
+    governance,
     ripe_token,
     ledger,
 ):
@@ -59,15 +70,95 @@ def test_pre_cliff_cancel_does_not_refund_claimed_ripe_left_in_historical_vault(
     budget_before = ledger.ripeAvailForHr()
     supply_before = ripe_token.totalSupply()
 
-    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+    _cancel(switchboard_delta, governance, contributor)
 
+    assert contributor.compensation() == 0
+    assert contributor.totalClaimed() == claimed
     assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == claimed
     assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
     assert ripe_token.totalSupply() == supply_before
     assert ledger.ripeAvailForHr() == budget_before + compensation - claimed
 
 
+def test_burn_path_formula_zero_keeps_budget_when_claimed_position_is_elsewhere(
+    contributor_contract,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    human_resources,
+    ripe_token,
+    ledger,
+):
+    setupRipeGovVaultConfig()
+    contributor = contributor_contract
+    claimed = _cash_pre_cliff(contributor)
+    _rotate_core(
+        alternate_ripe_gov_vault,
+        registerVault,
+        mission_control,
+        switchboard_alpha,
+    )
+    budget_before = ledger.ripeAvailForHr()
+    supply_before = ripe_token.totalSupply()
+
+    human_resources.refundAfterCancelPaycheck(
+        claimed,
+        True,
+        sender=contributor.address,
+    )
+
+    assert contributor.totalClaimed() == claimed
+    assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == claimed
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
+    assert ripe_token.totalSupply() == supply_before
+    assert ledger.ripeAvailForHr() == budget_before
+
+
 def test_pre_cliff_cancel_refunds_full_compensation_when_historical_vault_is_selected(
+    contributor_contract,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    switchboard_delta,
+    governance,
+    human_resources,
+    ripe_token,
+    ledger,
+):
+    setupRipeGovVaultConfig()
+    contributor = contributor_contract
+    compensation = contributor.compensation()
+    claimed = _cash_pre_cliff(contributor)
+    historical_vault_id, _ = _rotate_core(
+        alternate_ripe_gov_vault,
+        registerVault,
+        mission_control,
+        switchboard_alpha,
+    )
+    human_resources.setLegacyContributorRipeGovVaultId(
+        contributor, historical_vault_id, sender=contributor.owner()
+    )
+    budget_before = ledger.ripeAvailForHr()
+    supply_before = ripe_token.totalSupply()
+
+    _cancel(switchboard_delta, governance, contributor)
+
+    assert contributor.compensation() == 0
+    assert contributor.totalClaimed() == claimed
+    assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
+    assert ripe_token.totalSupply() == supply_before - claimed
+    assert ledger.ripeAvailForHr() == budget_before + compensation
+    assert human_resources.legacyContributorRipeGovVaultId(contributor) == 0
+
+
+def test_explicit_historical_vault_burn_does_not_clear_legacy_selection(
     contributor_contract,
     setupRipeGovVaultConfig,
     ripe_gov_vault,
@@ -95,16 +186,23 @@ def test_pre_cliff_cancel_refunds_full_compensation_when_historical_vault_is_sel
     budget_before = ledger.ripeAvailForHr()
     supply_before = ripe_token.totalSupply()
 
-    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+    human_resources.refundAfterCancelPaycheck(
+        compensation,
+        True,
+        historical_vault_id,
+        sender=contributor.address,
+    )
 
     assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
-    assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
     assert ripe_token.totalSupply() == supply_before - claimed
     assert ledger.ripeAvailForHr() == budget_before + compensation
-    assert human_resources.legacyContributorRipeGovVaultId(contributor) == 0
+    assert (
+        human_resources.legacyContributorRipeGovVaultId(contributor)
+        == historical_vault_id
+    )
 
 
-@pytest.mark.parametrize("residue_relation", ["below", "above"])
+@pytest.mark.parametrize("residue_relation", ["below", "equal", "above"])
 def test_pre_cliff_cancel_caps_recovered_claimed_amount_at_actual_residue_burned(
     residue_relation,
     contributor_contract,
@@ -114,6 +212,8 @@ def test_pre_cliff_cancel_caps_recovered_claimed_amount_at_actual_residue_burned
     registerVault,
     mission_control,
     switchboard_alpha,
+    switchboard_delta,
+    governance,
     ripe_token,
     whale,
     teller,
@@ -133,6 +233,8 @@ def test_pre_cliff_cancel_caps_recovered_claimed_amount_at_actual_residue_burned
     if residue_relation == "below":
         residue = claimed // 2
         assert residue < claimed
+    elif residue_relation == "equal":
+        residue = claimed
     else:
         residue = claimed + 1_000 * EIGHTEEN_DECIMALS
         assert residue > claimed
@@ -149,9 +251,13 @@ def test_pre_cliff_cancel_caps_recovered_claimed_amount_at_actual_residue_burned
     budget_before = ledger.ripeAvailForHr()
     supply_before = ripe_token.totalSupply()
 
-    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+    _cancel(switchboard_delta, governance, contributor)
 
     expected_refund = compensation - claimed + min(claimed, actual_burn_amount)
+    if residue_relation in ("equal", "above"):
+        assert expected_refund == compensation
+    assert contributor.compensation() == 0
+    assert contributor.totalClaimed() == claimed
     assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == claimed
     assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
     assert ripe_token.totalSupply() == supply_before - actual_burn_amount
@@ -161,7 +267,8 @@ def test_pre_cliff_cancel_caps_recovered_claimed_amount_at_actual_residue_burned
 def test_pre_cliff_cancel_without_prior_claim_still_refunds_full_compensation(
     contributor_contract,
     setupRipeGovVaultConfig,
-    switchboard_alpha,
+    switchboard_delta,
+    governance,
     ripe_token,
     ledger,
 ):
@@ -173,7 +280,7 @@ def test_pre_cliff_cancel_without_prior_claim_still_refunds_full_compensation(
     budget_before = ledger.ripeAvailForHr()
     supply_before = ripe_token.totalSupply()
 
-    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+    _cancel(switchboard_delta, governance, contributor)
 
     assert contributor.compensation() == 0
     assert ledger.ripeAvailForHr() == budget_before + compensation
@@ -184,20 +291,19 @@ def test_post_cliff_non_burn_cancel_behavior_is_unchanged(
     contributor_contract,
     setupRipeGovVaultConfig,
     ripe_gov_vault,
-    switchboard_alpha,
+    switchboard_delta,
+    governance,
     ripe_token,
     ledger,
 ):
     setupRipeGovVaultConfig()
     contributor = contributor_contract
     compensation = contributor.compensation()
-    boa.env.time_travel(
-        seconds=contributor.cliffTime() + 1 - boa.env.evm.patch.timestamp
-    )
+    travel_to_ts(contributor.cliffTime() + 1)
     budget_before = ledger.ripeAvailForHr()
     supply_before = ripe_token.totalSupply()
 
-    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+    _cancel(switchboard_delta, governance, contributor)
 
     claimed = contributor.totalClaimed()
     assert claimed > 0

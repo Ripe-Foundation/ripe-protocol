@@ -397,8 +397,8 @@ def _swap_ripe_runtime(ripe_token, path):
     original = ripe_token.env.get_code(ripe_token.address)
     # stomp keeps storage and rebinds Boa's source map so # dev: reasons
     # from the mutant (not the original RipeToken) appear in traces.
-    boa.load_partial(path).stomp(ripe_token.address)
-    return original
+    mutant = boa.load_partial(path).stomp(ripe_token.address)
+    return original, mutant
 
 
 def _restore_ripe_runtime(ripe_token, original):
@@ -565,7 +565,7 @@ def test_g11_pre_cliff_cancel_burn_returns_false_rolls_back(
     snap = _grant_snapshot(
         human_resources, ledger, c, ripe_gov_vault, ripe_token, switchboard_delta, aid
     )
-    original = _swap_ripe_runtime(
+    original, _ = _swap_ripe_runtime(
         ripe_token, "tests/core/humanResources/Group11BurnFalseRipe.vy"
     )
     try:
@@ -577,6 +577,58 @@ def test_g11_pre_cliff_cancel_burn_returns_false_rolls_back(
     assert _grant_snapshot(
         human_resources, ledger, c, ripe_gov_vault, ripe_token, switchboard_delta, aid
     ) == snap
+
+
+def test_g11_pre_cliff_cancel_uses_actual_burn_not_reported_withdrawal(
+    contributor_contract,
+    setupRipeGovVaultConfig,
+    switchboard_delta,
+    governance,
+    owner_address,
+    ripe_token,
+    ripe_gov_vault,
+    ledger,
+    human_resources,
+):
+    """A vault-reported withdrawal cannot restore capacity without a real burn."""
+    _prep(setupRipeGovVaultConfig)
+    c = contributor_contract
+    travel_to_ts(c.startTime() + 1)
+    claimed = c.cashRipeCheck(sender=owner_address)
+    assert claimed > 0
+    assert claimed == c.totalClaimed()
+
+    compensation = c.compensation()
+    budget_before = ledger.ripeAvailForHr()
+    supply_before = ripe_token.totalSupply()
+    vault_balance_before = ripe_token.balanceOf(ripe_gov_vault)
+    assert ripe_token.balanceOf(human_resources) == 0
+
+    aid = _initiate_mature_cancel(switchboard_delta, governance, c)
+    original, reported_ripe = _swap_ripe_runtime(
+        ripe_token,
+        "tests/core/humanResources/Group11ReportedWithdrawalNoDeliveryRipe.vy",
+    )
+    try:
+        assert (
+            switchboard_delta.executePendingAction(
+                aid, sender=governance.address
+            )
+            is True
+        )
+        assert reported_ripe.reportedVault() == ripe_gov_vault.address
+        assert reported_ripe.reportedRecipient() == human_resources.address
+        assert reported_ripe.reportedAmount() == claimed
+    finally:
+        _restore_ripe_runtime(ripe_token, original)
+
+    assert c.compensation() == 0
+    assert c.totalClaimed() == claimed
+    assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == 0
+    assert ripe_token.balanceOf(ripe_gov_vault) == vault_balance_before
+    assert ripe_token.balanceOf(human_resources) == 0
+    assert ripe_token.totalSupply() == supply_before
+    assert ledger.ripeAvailForHr() == budget_before + compensation - claimed
 
 
 def test_g11_pre_cliff_cash_then_unfrozen_after_cliff_cancel_leaves_cashed_notional(

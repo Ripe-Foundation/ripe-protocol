@@ -45,7 +45,7 @@ EXPECTED_RUNTIME_BYTES = {
     "RipeToken": 8760,
     "RebaseErc20": 11602,
     "RipeGov": 24116,
-    "HumanResources": 15057,
+    "HumanResources": 14932,
     "AuctionHouse": 24557,
     "CreditEngine": 24560,
     "CreditRedeem": 8523,

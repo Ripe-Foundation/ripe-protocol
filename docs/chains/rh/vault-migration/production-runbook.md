@@ -154,6 +154,32 @@ target paused. Teller remains paused and VaultMigrator remains unpaused in
 both cases. Bind the selected function and prove its exact matrix; do not carry
 the generic unpaused-endpoint rule into a RipeGov batch.
 
+### Human Resources cancellations across RipeGov generations
+
+Before rotating the core RipeGov pointer or cancelling a pre-cliff Contributor,
+inventory that Contributor's RIPE across every current and historical RipeGov
+vault. Resolve and record `legacyContributorRipeGovVaultId`, the current core
+RipeGov vault id, the exact vault Human Resources will select, the Contributor's
+`totalClaimed()`, the selected position, and Ledger `ripeAvailForHr` immediately
+before submission. Normal Contributor cancellation uses the nonzero legacy id
+when one is set and otherwise uses the current core id; changing the core pointer
+does not migrate a historical balance.
+
+Cancellation burns only the selected position. After the receipt, reconcile the
+selected-position debit, actual RIPE burn, and exact `ripeAvailForHr` delta.
+`RipePaycheckCancelled.forfeitedAmount` is the full forfeiture, not the credited
+amount. If the actual burn is below claimed compensation, record the claimed
+capacity that the one-shot cancellation did not automatically recover.
+
+Any owner-approved compensation-budget restoration must use the normal
+governance/Safe and timelocked
+`SwitchboardDelta.setRipeAvailableForHr(targetAmount)` route. Retain the pending
+action id and confirmation block, re-read `ripeAvailForHr` immediately before
+execution, and cancel and repropose if it changed. The action writes an absolute
+budget rather than adding a delta, so competing contributor creation,
+cancellation, or budget actions must be serialized. Record the execution event
+and final Ledger readback. This runbook does not authorize the adjustment.
+
 For the Base legacy wind-down, governance may reduce the RIPE and RIPE-LP
 minimum lock durations together by one block only after the census proves the
 new minimum is below every migrating position's stored historical minimum.
