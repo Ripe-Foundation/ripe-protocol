@@ -1,0 +1,155 @@
+{
+  "schema": "ripe.reserve-engine.activation.v2",
+  "status": "BLOCKED — contract candidate only",
+  "owner_decision_url": "https://github.com/Ripe-Foundation/ripe-protocol/pull/156",
+  "activation_approved": false,
+  "runtime_limits": {
+    "eip170": 24576
+  },
+  "design": {
+    "allocation_budget_scope": "global_remaining_in_vesting",
+    "claims_replenish_budget": false,
+    "mint_on_claim": true,
+    "dynamic_registry_addresses": true,
+    "cliff_mode": "catch_up_from_creation",
+    "beneficiary_blacklist_enforced": true,
+    "vesting_replacement_requires_zero_outstanding_or_migration": true
+  },
+  "pricing": {
+    "snapshot_only_mid_epoch": true,
+    "emergency_control": "pause_or_disable",
+    "timing_is_strategically_selectable": true,
+    "calibration_approved": false,
+    "calibration_owner": "",
+    "calibration_artifact_sha256": "",
+    "approved_min_up_bps": null,
+    "approved_max_up_bps": null,
+    "maximum_acceptable_late_sellout_catch_up_epochs": null,
+    "approved_engine_config": {
+      "paymentCapPerEpoch": null,
+      "minPaymentAmount": null,
+      "maxAllInPayoutRate": null,
+      "seedBasePayoutRate": null,
+      "uHighBps": null,
+      "uLowBps": null,
+      "minUpBps": null,
+      "maxUpBps": null,
+      "minDownBps": null,
+      "maxDownBps": null,
+      "decayBps": null,
+      "maxDecayEpochs": null,
+      "maxVestingBonus": null,
+      "minVestingLength": null,
+      "maxVestingLength": null,
+      "epochLength": null
+    }
+  },
+  "allocation": {
+    "remaining_budget": null,
+    "budget_owner": "",
+    "budget_evidence_sha256": ""
+  },
+  "payment_token": {
+    "chain_id": null,
+    "address": "",
+    "decimals": null,
+    "code_hash": "",
+    "callbacks_supported": false,
+    "qualification_owner": "",
+    "qualification_evidence_url": "",
+    "monitoring_owner": "",
+    "pause_authority": ""
+  },
+  "acquisition_execution": {
+    "full_fill_only": true,
+    "client_retry_guidance_url": ""
+  },
+  "rate_override": {
+    "mode": "one_shot_named_epoch",
+    "install_and_cancel_immediate": true,
+    "zero_epoch": "earliest_applicable",
+    "invalidated_on_clock_or_config_change": true,
+    "ceiling": "maxAllInPayoutRate",
+    "operator_checklist_url": ""
+  },
+  "registry": {
+    "engine_id": 26,
+    "vesting_id": 27
+  },
+  "deployment": {
+    "chain_id": null,
+    "ripe_hq": "",
+    "payment_token": "",
+    "payment_decimals": null,
+    "payment_token_code_hash": "",
+    "configured_epoch_length": null,
+    "approved_max_epoch_length": null,
+    "start_genesis_block": null,
+    "approved_max_genesis_lead_blocks": null,
+    "deployment_manifest_sha256": "",
+    "post_deploy_state_verified": false,
+    "observed_state": {
+      "engine_ripe_hq": "",
+      "engine_payment_token": "",
+      "engine_payment_decimals": null,
+      "engine_payment_scale": null,
+      "engine_config": null,
+      "vesting_ripe_hq": "",
+      "vesting_remaining_allocation_budget": null,
+      "registry_engine": "",
+      "registry_vesting": "",
+      "engine_paused": null,
+      "vesting_paused": null,
+      "ripe_token_paused": null,
+      "engine_is_running": null,
+      "engine_can_acquire_ripe": null,
+      "hq_can_mint_ripe_engine": null,
+      "foxtrot_registered_switchboard": null
+    },
+    "deployed_engine": "",
+    "deployed_vesting": "",
+    "deployed_foxtrot": "",
+    "engine_code_hash": "",
+    "vesting_code_hash": "",
+    "foxtrot_code_hash": "",
+    "proxy_permitted": false,
+    "proxy_implementation_code_hash": ""
+  },
+  "switchboard_authority": {
+    "model": "all_registered_switchboards",
+    "intended_semantic_entrypoint": "SwitchboardFoxtrot",
+    "source_inventory": [
+      "SwitchboardAlpha",
+      "SwitchboardBravo",
+      "SwitchboardCharlie",
+      "SwitchboardDelta",
+      "SwitchboardEcho",
+      "SwitchboardFoxtrot"
+    ],
+    "registered_deployment_inventory": [],
+    "inventory_owner": "",
+    "inventory_block_number": null,
+    "unknown_or_generic_routes_found": null
+  },
+  "fork_qualification": {
+    "approved": false,
+    "archive_rpc_owner": "",
+    "chain_id": null,
+    "block_number": null,
+    "block_hash": "",
+    "deployment_manifest_sha256": "",
+    "payment_token": "",
+    "payment_decimals": null,
+    "payment_token_code_hash": "",
+    "epoch_length": null,
+    "mission_control_topology_sha256": "",
+    "acquisition_passed": false,
+    "direct_claim_passed": false,
+    "auto_deposit_claim_passed": false
+  },
+  "indexer": {
+    "event_schema_approved": false,
+    "consumer_owner": "",
+    "requirements_url": ""
+  }
+}

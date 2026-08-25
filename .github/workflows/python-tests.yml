@@ -79,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core-a"},{"lane":"lean","shard":"core-b"},{"lane":"lean","shard":"core-teller"},{"lane":"lean","shard":"core-c"},{"lane":"lean","shard":"vaults"},{"lane":"lean","shard":"vaults-gov"},{"lane":"lean","shard":"vaults-modules"},{"lane":"lean","shard":"config"},{"lane":"lean","shard":"price-sources-a"},{"lane":"lean","shard":"price-sources-b"},{"lane":"lean","shard":"supporting"}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core-a"},{"lane":"lean","shard":"core-b"},{"lane":"lean","shard":"core-teller"},{"lane":"lean","shard":"core-c"},{"lane":"lean","shard":"core-reserve-engine"},{"lane":"lean","shard":"vaults"},{"lane":"lean","shard":"vaults-gov"},{"lane":"lean","shard":"vaults-modules"},{"lane":"lean","shard":"config"},{"lane":"lean","shard":"price-sources-a"},{"lane":"lean","shard":"price-sources-b"},{"lane":"lean","shard":"supporting"}]') }}
     env:
       # The runner context is not available in jobs.<id>.env — only inside
       # steps — so these use github.workspace, which is.
@@ -182,6 +182,9 @@ jobs:
                 tests/core/test_stale_vault_replacement.py
                 tests/core/test_sc24_gas_matrix.py
               )
+              ;;
+            core-reserve-engine)
+              shard_args=(tests/core/ripeReserveEngine)
               ;;
             vaults)
               shard_args=(
