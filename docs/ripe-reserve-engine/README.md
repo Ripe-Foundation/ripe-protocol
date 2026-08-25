@@ -34,20 +34,22 @@ outstanding RIPE allocation.
 acquireRipe(
     paymentAmount,
     requestedVestingLength,
+    expectedVestingLength,
     expectedEpoch,
     minRipeOut,
     deadlineBlock,
 )
 ```
 
-The expected epoch, minimum RIPE allocation, and deadline protect the caller from
-state changes between preview and execution. Acquisitions are full-fill only.
-The Engine verifies the exact payment-token balance increase, so fee-on-transfer,
-short-receipt, false-return, and reentrant settlement cannot create an allocation.
+The expected vesting length, expected epoch, minimum RIPE allocation, and deadline
+protect the caller from state changes between preview and execution. Acquisitions
+are full-fill only. The Engine verifies the exact payment-token balance increase,
+so fee-on-transfer, short-receipt, false-return, and reentrant settlement cannot
+create an allocation.
 
-The quote and `RipeAllocated` event include the position ID, base and bonus RIPE,
-vesting duration, creation block, claim-start block, maturity block, and epoch
-rate information.
+The quote includes base and bonus RIPE, vesting duration, creation block,
+claim-start block, maturity block, and epoch rate information. The stable
+`positionId` is created only during execution and is emitted by `RipeAllocated`.
 
 ## Allocation budget
 
@@ -82,6 +84,10 @@ claimVestedRipe(positionId, autoDeposit, requestedLockDuration)
 claimVestedRipeMany(positionIds, autoDeposit, requestedLockDuration)
 ```
 
+Batch callers should remove duplicate position IDs before submission. A duplicate
+causes the complete batch to revert atomically after the first occurrence is
+claimed in the same transaction.
+
 RIPE is minted only after Vesting records a valid nonzero claim. Direct claims
 mint to the beneficiary. Auto-deposit claims mint temporarily to the Engine and
 deposit the exact amount into the live core RipeGov vault for the beneficiary.
@@ -89,6 +95,9 @@ The caller's lock duration is a request; RipeGov applies its live lock terms.
 
 Both settlement modes reject a RIPE-blacklisted beneficiary before claim state is
 changed. Any downstream failure reverts the complete claim transaction.
+A blacklisted beneficiary's allocation is not forfeited: it remains outstanding
+until the beneficiary can claim or governance migrates the position. Accordingly,
+that liability continues to keep Vesting's `canRetire()` false.
 
 ## Epoch controller
 
@@ -118,9 +127,15 @@ genesis the first epoch.
 
 The resolved epoch is stored and emitted. The override is consumed only when its
 target epoch is first committed by a successful acquisition. A later acquisition
-misses and clears an unconsumed override whose target epoch has passed. Pause,
-disable, stop, payment-token change, or controller-configuration change
-invalidates an installed override.
+misses and clears an unconsumed override whose target epoch has passed. Start,
+stop, and controller-configuration changes invalidate an installed override.
+Pause and acquisition-availability changes preserve it, so reopening requires
+explicit cancellation or revalidation. Payment-token changes require the Engine
+to be stopped, which has already invalidated the override.
+
+After a successful override, the overridden rate becomes the historical starting
+point for the following controller transition. It does not snap back after the
+one-shot override is consumed.
 
 ## Governance
 
@@ -132,6 +147,11 @@ Foxtrot actions are split deliberately:
 
 The Engine and Vesting use the protocol's registered-Switchboard authorization
 convention. Foxtrot is the intended named semantic entrypoint.
+
+Pausing the Engine stops acquisitions but does not stop claims. Claims are halted
+by pausing Vesting or RIPE, or by disabling the Engine's RipeHQ mint permission.
+`stopReserveEngine` is reflected by the Engine's `ReserveEngineStopped` event;
+indexers should subscribe to the Engine lifecycle events.
 
 ## Validation
 
@@ -159,3 +179,10 @@ python -m pytest -q -o addopts='' \
 The committed activation manifest remains fail-closed. Passing source and test
 validation does not approve production parameters, deployment, registry updates,
 allocation budget, payment token, or activation.
+
+Once those inputs are approved and populated, `--require-ready` cross-binds the
+approved Engine config and Vesting budget to observed deployment state; binds the
+payment token and epoch length across approval, deployment, and fork evidence; and
+requires the expected live pause, running, availability, mint-permission, and
+Switchboard states. A synthetic complete-ready fixture and independent field
+mutations keep that path executable and fail-closed.

@@ -1,9 +1,6 @@
 name: Ripe Reserve Engine
 
 on:
-  push:
-    branches:
-      - instant-bond-lane
   pull_request:
     branches:
       - rh

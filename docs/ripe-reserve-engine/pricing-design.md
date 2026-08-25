@@ -6,24 +6,24 @@ documented in [README.md](README.md) and bound to source by
 
 # Instant Bond Lane — On-Chain Pricing via a Demand Controller
 
-**Status:** Economic rationale for the current Instant Bond Lane implementation
-(specification revision 24). The dated
+**Historical status at revision 24:** Economic rationale for the then-current
+Instant Bond Lane candidate. The dated
 [owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427)
-still selects the operational policies. Local 13,000/6,500 project ceilings have
-been dropped; the only size limit is EIP-170 (24,576 bytes). Economic
-calibration is explicitly **not approved**.
+selected its operational policies at that checkpoint. Later owner decisions
+superseded parts of that record. Economic calibration remains explicitly **not
+approved**.
 
 > **New to the feature?** Start with [`README.md`](README.md) for the architecture,
 > transaction flow, governance model, safety boundaries, and reading path.
 >
-> **Authority:** [`implementation-spec.md`](implementation-spec.md) is the normative
-> source and supersedes this document wherever they differ. The companion
+> **Historical authority:** [`implementation-spec.md`](implementation-spec.md) was
+> the normative source for this proposal. The companion
 > [`dynamic-controller-proposal.md`](dynamic-controller-proposal.md) records the
 > controller and override derivation in more detail. The owner separately authorized
 > revision-23 remediation commit/push and continued draft review; this rationale does
 > not authorize merge, deployment, configuration, RIPE minting, or activation.
 
-**Prepared:** 5 August 2026 · **Revised:** 22 August 2026 for the implemented
+**Prepared:** 5 August 2026 · **Revised:** 22 August 2026 for the then-implemented
 start/stop clock, last-write-wins override, HQ-resolved Foxtrot, 17-field config,
 and EIP-170-only size policy.
 

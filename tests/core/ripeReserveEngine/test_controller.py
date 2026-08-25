@@ -154,9 +154,8 @@ def test_weighted_lateness_is_amount_weighted(lane_env):
     lane_env.buy(late)
     state = lane_env.lane.epochState()
     assert state.acceptedPayment == early + late
-    assert state.weightedLateness > 0
     # late fill should dominate lateness vs two early fills of the same total
-    assert state.weightedLateness > early * 0
+    assert state.weightedLateness == late * 10_000
 
 
 def test_single_block_epoch_has_zero_lateness(lane_factory):

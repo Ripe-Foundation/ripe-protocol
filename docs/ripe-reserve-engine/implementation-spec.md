@@ -9,20 +9,22 @@ for the current owner-approved design.
 
 **Mechanism version:** v2 · **Specification revision:** 24
 
-**Status:** Current Instant Bond Lane contract candidate. Revision 24 records the
-implemented start/stop clock, last-write-wins override, HQ-resolved Foxtrot, 17-field
-config, market-only preview, and EIP-170-only size policy. It does not authorize
-merge, deployment, production configuration, RIPE minting, economic calibration, or
-activation. Activation remains fail-closed through
-`config/instant-bond-lane-activation.json`.
+**Historical status at revision 24:** This was the current Instant Bond Lane
+contract candidate. Revision 24 recorded the then-implemented start/stop clock,
+last-write-wins override, HQ-resolved Foxtrot, 17-field config, market-only
+preview, and EIP-170-only size policy. It did not authorize merge, deployment,
+production configuration, RIPE minting, economic calibration, or activation.
+Current activation qualification is fail-closed through
+`config/ripe-reserve-engine-activation.json`.
 
 **Prepared:** 5 August 2026 · **Revised:** 22 August 2026 (start/stop lifecycle,
 HQ id 26 Foxtrot, last-write-wins override, lock-floor config, EIP-170-only size)
 
 **Start here:** [`README.md`](README.md) provides the onboarding map and plain-language
 mechanism overview. The pricing rationale is in
-[`pricing-design.md`](pricing-design.md). This specification is authoritative wherever
-the documents differ.
+[`pricing-design.md`](pricing-design.md). This specification was authoritative for
+the former proposal. The README and implementation guide named above govern the
+implemented Reserve Engine wherever the documents differ.
 
 **Worktree:** `ripe-protocol-instant-bond-lane`, branch `instant-bond-lane`.
 Revision 20 began from committed feature baseline

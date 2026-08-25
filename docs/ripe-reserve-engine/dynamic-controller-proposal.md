@@ -5,11 +5,12 @@ history and is not the current contract specification. See [README.md](README.md
 
 # Instant Bond Lane Dynamic Controller and Manual Rate Override Design Record
 
-**Status:** Current Instant Bond controller and override design record (specification
-revision 24) under the dated
+**Historical status at revision 24:** This was the current Instant Bond controller
+and override design record under the dated
 [owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427).
-Economic calibration is explicitly **not approved**. This document is not merge,
-deployment, configuration, minting, or activation authority.
+Later owner decisions superseded parts of that record. Economic calibration is
+explicitly **not approved**. This document is not merge, deployment,
+configuration, minting, or activation authority.
 
 > **New to the feature?** Start with [`README.md`](README.md). This design record is
 > the detailed controller and manual-override derivation, not the onboarding entry
@@ -22,8 +23,8 @@ committed and pushed `instant-bond-lane` checkpoint
 `origin/rh` commit `36ee0db42482c3e7d6c43d045fc02655b90bebf4`. Revision 23
 begins from reviewed PR head `55a2ef9ec25412d2f7bf7a9e8547a6ccc414e0ae`.
 
-The revision-24 [`implementation-spec.md`](implementation-spec.md) is authoritative.
-This document records the controller rationale and the implemented design at
+The revision-24 [`implementation-spec.md`](implementation-spec.md) was authoritative
+for that proposal. This document records the controller rationale and design at
 `contracts/core/InstantBondLane.vy` and
 `contracts/config/SwitchboardFoxtrot.vy`; it does not replace the normative source or
 the final evidence block in the implementation specification.

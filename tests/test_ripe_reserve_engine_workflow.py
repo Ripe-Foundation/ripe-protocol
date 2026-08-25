@@ -30,17 +30,15 @@ def _step(name):
     )
 
 
-def test_feature_workflow_is_permanent_and_deduplicates_branch_and_pr_runs():
+def test_feature_workflow_is_permanent_without_feature_branch_trigger():
     workflow = _workflow()
     assert set(workflow["on"]) == {
         "pull_request",
         "merge_group",
-        "push",
         "workflow_dispatch",
     }
     assert workflow["on"]["pull_request"]["branches"] == ["rh"]
     assert workflow["on"]["merge_group"]["branches"] == ["rh"]
-    assert workflow["on"]["push"]["branches"] == ["instant-bond-lane"]
     concurrency = workflow["concurrency"]
     assert concurrency["cancel-in-progress"] == "true"
     assert "github.event.pull_request.head.ref || github.ref_name" in concurrency[

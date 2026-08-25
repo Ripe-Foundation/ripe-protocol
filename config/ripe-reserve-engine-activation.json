@@ -1,7 +1,7 @@
 {
-  "schema": "ripe.reserve-engine.activation.v1",
+  "schema": "ripe.reserve-engine.activation.v2",
   "status": "BLOCKED — contract candidate only",
-  "owner_decision_url": "https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427",
+  "owner_decision_url": "https://github.com/Ripe-Foundation/ripe-protocol/pull/156",
   "activation_approved": false,
   "runtime_limits": {
     "eip170": 24576
@@ -24,7 +24,25 @@
     "calibration_artifact_sha256": "",
     "approved_min_up_bps": null,
     "approved_max_up_bps": null,
-    "maximum_acceptable_late_sellout_catch_up_epochs": null
+    "maximum_acceptable_late_sellout_catch_up_epochs": null,
+    "approved_engine_config": {
+      "paymentCapPerEpoch": null,
+      "minPaymentAmount": null,
+      "maxAllInPayoutRate": null,
+      "seedBasePayoutRate": null,
+      "uHighBps": null,
+      "uLowBps": null,
+      "minUpBps": null,
+      "maxUpBps": null,
+      "minDownBps": null,
+      "maxDownBps": null,
+      "decayBps": null,
+      "maxDecayEpochs": null,
+      "maxVestingBonus": null,
+      "minVestingLength": null,
+      "maxVestingLength": null,
+      "epochLength": null
+    }
   },
   "allocation": {
     "remaining_budget": null,
@@ -50,7 +68,7 @@
     "mode": "one_shot_named_epoch",
     "install_and_cancel_immediate": true,
     "zero_epoch": "earliest_applicable",
-    "invalidated_on_control_or_controller_change": true,
+    "invalidated_on_clock_or_config_change": true,
     "ceiling": "maxAllInPayoutRate",
     "operator_checklist_url": ""
   },
@@ -59,22 +77,34 @@
     "vesting_id": 27
   },
   "deployment": {
+    "chain_id": null,
     "ripe_hq": "",
     "payment_token": "",
     "payment_decimals": null,
+    "payment_token_code_hash": "",
     "configured_epoch_length": null,
     "approved_max_epoch_length": null,
     "start_genesis_block": null,
     "approved_max_genesis_lead_blocks": null,
+    "deployment_manifest_sha256": "",
     "post_deploy_state_verified": false,
     "observed_state": {
       "engine_ripe_hq": "",
       "engine_payment_token": "",
       "engine_payment_decimals": null,
       "engine_payment_scale": null,
+      "engine_config": null,
       "vesting_ripe_hq": "",
+      "vesting_remaining_allocation_budget": null,
       "registry_engine": "",
-      "registry_vesting": ""
+      "registry_vesting": "",
+      "engine_paused": null,
+      "vesting_paused": null,
+      "ripe_token_paused": null,
+      "engine_is_running": null,
+      "engine_can_acquire_ripe": null,
+      "hq_can_mint_ripe_engine": null,
+      "foxtrot_registered_switchboard": null
     },
     "deployed_engine": "",
     "deployed_vesting": "",
@@ -104,11 +134,13 @@
   "fork_qualification": {
     "approved": false,
     "archive_rpc_owner": "",
+    "chain_id": null,
     "block_number": null,
     "block_hash": "",
     "deployment_manifest_sha256": "",
     "payment_token": "",
     "payment_decimals": null,
+    "payment_token_code_hash": "",
     "epoch_length": null,
     "mission_control_topology_sha256": "",
     "acquisition_passed": false,
