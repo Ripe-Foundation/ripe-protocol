@@ -8,7 +8,7 @@
 
 ## 1. Commit confirmation
 
-Confirmed once, locally: `d136a262f560fe628d7c3f7b667b0220871cb951` resolves to tree `2cdcdd6e8f760995f57b05b529100cbcec6d4e5a` ("update docs"), present in `/Users/wigglez/dev/ripe-protocol-instant-bond-lane`. All file reads used `git show d136a262:<path>`. No working-tree reads, no writes, no other git operations. Web access was available and used; every URL in the research table was opened.
+Confirmed once, locally: `d136a262f560fe628d7c3f7b667b0220871cb951` resolves to tree `2cdcdd6e8f760995f57b05b529100cbcec6d4e5a` ("update docs") on branch `instant-bond-lane`. All file reads used `git show d136a262:<path>`. No working-tree reads, no writes, no other git operations. Web access was available and used; every URL in the research table was opened.
 
 Minor doc conflict noticed along the way: the PR description still cites "approved 11,000/6,500 local byte ceilings," while the rev-24 documents at this commit record that those ceilings were dropped (EIP-170 only). The commit's docs win; behavior at this commit is EIP-170-only.
 

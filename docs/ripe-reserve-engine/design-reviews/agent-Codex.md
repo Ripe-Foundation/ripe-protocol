@@ -215,14 +215,3 @@ This rejects §6.7’s rationale that target and expiry create an unnecessary st
 3. Is executable governance participation a core purpose of the locked path? If yes, usable voting integration and precise account-level lock disclosure must exist before the product markets a governance benefit or activates a lock bonus.
 
 No files or repository state were changed. Prior memory was used only to target likely review areas; potentially stale historical conclusions were not treated as current evidence and were rechecked against the pinned source.
-
-<oai-mem-citation>
-<citation_entries>
-MEMORY.md:1407-1415|note=[prior PR 156 context helped target exact source and evidence conflicts]
-MEMORY.md:4905-4929|note=[prior pricing design context helped frame fixed epoch and low operator touch tradeoffs]
-</citation_entries>
-<rollout_ids>
-01a0067b-578c-7363-9971-55825f59c7cd
-019faf9d-ae17-78b3-a4c4-7f9b754b7a3c
-</rollout_ids>
-</oai-mem-citation>

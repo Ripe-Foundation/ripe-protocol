@@ -209,8 +209,8 @@ Phase 1 is complete and must not be restarted from this section. The following r
 the original source-only execution boundary for provenance. Later owner-authorized
 review, test, and RH-alignment work is governed by §20 and the revision history.
 
-1. Work was limited to `/Users/wigglez/dev/ripe-protocol-instant-bond-lane`. The
-   original Phase-1 baseline was branch `instant-bond-lane` at
+1. Work was limited to the dedicated `instant-bond-lane` worktree. The original
+   Phase-1 baseline was branch `instant-bond-lane` at
    `91eda49ccd34a25090582aff0695075c4c806011`. That historical pin is not an instruction
    to reset or rebind the completed feature. Revision 20's starting baseline is
    recorded in the header above.
