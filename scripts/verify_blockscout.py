@@ -35,6 +35,25 @@ EXPLORER = "https://robinhoodchain.blockscout.com"
 MANIFEST = ROOT / "migration_history/robinhood-mainnet/v1/current-manifest.json"
 
 
+def source_for_record(
+    name: str,
+    record: dict,
+    sources: dict[str, Path],
+) -> Path | None:
+    """Resolve a contract source, including timestamped candidate labels."""
+    recorded_file = record.get("file")
+    if isinstance(recorded_file, str):
+        source = (ROOT / recorded_file).resolve()
+        contracts_root = (ROOT / "contracts").resolve()
+        try:
+            source.relative_to(contracts_root)
+        except ValueError:
+            return None
+        if source.suffix == ".vy" and source.is_file():
+            return source
+    return sources.get(name)
+
+
 def compiler_version() -> str:
     """Read the local vyper version, formatted the way Blockscout lists it."""
     out = subprocess.run(
@@ -120,7 +139,7 @@ def main() -> int:
             skipped += 1
             continue
         address = row["address"]
-        src = sources.get(name)
+        src = source_for_record(name, row, sources)
         if src is None:
             print(f"  {name:22} SKIP  no .vy source (blueprint or external)", flush=True)
             skipped += 1

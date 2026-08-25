@@ -21,7 +21,9 @@ from scripts.utils import solidity
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import (
     TransactionExecutionError,
+    canonical_abi_input_type,
     deployed_contracts_manifest,
+    encode_abi_inputs,
     execute_transaction,
 )
 
@@ -183,8 +185,8 @@ def _encode_expected_constructor_args(abi, values, *, blueprint=False):
     ):
         raise RuntimeError("MIGRATION_CANDIDATE_RECORD_INVALID")
     try:
-        return encode(
-            [item["type"] for item in inputs],
+        return encode_abi_inputs(
+            inputs,
             tuple(_canonical_address(value) for value in values),
         )
     except Exception:
@@ -350,7 +352,7 @@ def _validated_promotable_record(
         ):
             raise RuntimeError(f"MIGRATION_{kind}_RECORD_INVALID")
         try:
-            input_types = [item["type"] for item in inputs]
+            input_types = [canonical_abi_input_type(item) for item in inputs]
             encoded_args = bytes.fromhex(args)
             decoded_args = decode(input_types, encoded_args)
             if encode(input_types, decoded_args) != encoded_args:
@@ -424,7 +426,7 @@ def _validate_activation_dependency(
     if inputs[constructor_arg_index]["type"] != "address":
         raise RuntimeError("MIGRATION_ACTIVATION_DEPENDENCY_INVALID")
     try:
-        input_types = [item["type"] for item in inputs]
+        input_types = [canonical_abi_input_type(item) for item in inputs]
         encoded_args = bytes.fromhex(activation_record["args"])
         values = decode(input_types, encoded_args)
         if encode(input_types, values) != encoded_args:
@@ -1042,8 +1044,10 @@ class Migration:
 
         Deployment and registry activation are intentionally separate steps.
         Every source/compiler/ABI/constructor/dependency/registry condition is
-        validated before the pending manifest is written once. Candidate
-        records are copied whole so stale metadata cannot survive promotion.
+        validated before the pending manifest is written once. Promoted
+        records are copied whole, then candidate labels are removed from the
+        pending/current manifest. Timestamped manifests retain the deployment
+        evidence.
         """
         if not isinstance(promotions, (list, tuple)) or not promotions:
             raise RuntimeError("MIGRATION_PROMOTION_BATCH_INVALID")
@@ -1162,6 +1166,15 @@ class Migration:
             # this a promoted contract would be silently absent from its own
             # step manifest's attribution.
             self._contracts[canonical_name] = address
+
+        candidate_labels = tuple(
+            label
+            for label in promoted_manifest["contracts"]
+            if "Candidate" in label
+        )
+        for label in candidate_labels:
+            del promoted_manifest["contracts"][label]
+
         # A pending manifest is resumable only when its timestamp log exists.
         # Persist the (possibly empty) transaction list first. A crash after the
         # subsequent manifest save can then reload this same local checkpoint.
@@ -1178,6 +1191,11 @@ class Migration:
             log.h3(
                 f"{candidate_label} promoted to {canonical_name} in pending "
                 f"manifest after {activation_label} registry readback"
+            )
+        if candidate_labels:
+            log.h3(
+                f"Removed {len(candidate_labels)} candidate record(s) from "
+                "the pending/current manifest; timestamped history is retained"
             )
         return tuple(item[4] for item in validated)
 

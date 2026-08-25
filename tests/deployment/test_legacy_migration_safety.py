@@ -719,6 +719,10 @@ def test_candidate_promotion_copies_complete_record_after_registry_readback(
         "contracts": {
             "Service": old,
             "ServiceCandidate": candidate,
+            "OldCandidate2026082100": {
+                "address": "0x" + "9" * 40,
+                "file": "historical.vy",
+            },
         }
     }
     _write_json(tmp_path / "current-manifest.json", active)
@@ -743,12 +747,14 @@ def test_candidate_promotion_copies_complete_record_after_registry_readback(
     assert promoted == candidate["address"]
     pending = json.loads((tmp_path / "2-pending-manifest.json").read_text())
     assert pending["contracts"]["Service"] == candidate
-    assert pending["contracts"]["ServiceCandidate"] == candidate
+    assert "ServiceCandidate" not in pending["contracts"]
+    assert "OldCandidate2026082100" not in pending["contracts"]
     assert "old_only" not in pending["contracts"]["Service"]
     assert json.loads((tmp_path / "current-manifest.json").read_text()) == active
 
     migration.end()
     assert json.loads((tmp_path / "current-manifest.json").read_text()) == pending
+    assert json.loads((tmp_path / "1-manifest.json").read_text()) == active
     # The step manifest attributes only what this migration promoted -
     # "Service" (this step's canonical name) - not "ServiceCandidate", which
     # was already deployed and recorded in an earlier step. And per the
@@ -887,8 +893,8 @@ def test_candidate_promotion_accepts_distinct_activation_witness(tmp_path):
 
     pending = json.loads((tmp_path / "2-pending-manifest.json").read_text())
     assert pending["contracts"]["DefaultsRobinhoodLive"] == defaults
-    assert pending["contracts"]["DefaultsCandidate"] == defaults
-    assert pending["contracts"]["MissionControlCandidate"] == mission_control
+    assert "DefaultsCandidate" not in pending["contracts"]
+    assert "MissionControlCandidate" not in pending["contracts"]
 
 
 @pytest.mark.parametrize(
@@ -1458,7 +1464,7 @@ def test_candidate_promotion_can_create_first_canonical_label(tmp_path):
 
     pending = json.loads((tmp_path / "2-pending-manifest.json").read_text())
     assert pending["contracts"]["BlueChipYieldPrices"] == candidate
-    assert pending["contracts"]["BlueChipYieldPricesCandidate"] == candidate
+    assert "BlueChipYieldPricesCandidate" not in pending["contracts"]
     assert "BlueChipYieldPrices" not in active["contracts"]
 
 
