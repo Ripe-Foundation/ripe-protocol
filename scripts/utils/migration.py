@@ -1044,8 +1044,10 @@ class Migration:
 
         Deployment and registry activation are intentionally separate steps.
         Every source/compiler/ABI/constructor/dependency/registry condition is
-        validated before the pending manifest is written once. Candidate
-        records are copied whole so stale metadata cannot survive promotion.
+        validated before the pending manifest is written once. Promoted
+        records are copied whole, then candidate labels are removed from the
+        pending/current manifest. Timestamped manifests retain the deployment
+        evidence.
         """
         if not isinstance(promotions, (list, tuple)) or not promotions:
             raise RuntimeError("MIGRATION_PROMOTION_BATCH_INVALID")
@@ -1164,6 +1166,15 @@ class Migration:
             # this a promoted contract would be silently absent from its own
             # step manifest's attribution.
             self._contracts[canonical_name] = address
+
+        candidate_labels = tuple(
+            label
+            for label in promoted_manifest["contracts"]
+            if "Candidate" in label
+        )
+        for label in candidate_labels:
+            del promoted_manifest["contracts"][label]
+
         # A pending manifest is resumable only when its timestamp log exists.
         # Persist the (possibly empty) transaction list first. A crash after the
         # subsequent manifest save can then reload this same local checkpoint.
@@ -1180,6 +1191,11 @@ class Migration:
             log.h3(
                 f"{candidate_label} promoted to {canonical_name} in pending "
                 f"manifest after {activation_label} registry readback"
+            )
+        if candidate_labels:
+            log.h3(
+                f"Removed {len(candidate_labels)} candidate record(s) from "
+                "the pending/current manifest; timestamped history is retained"
             )
         return tuple(item[4] for item in validated)
 
