@@ -7,7 +7,7 @@ from conf_utils import assert_reverted_call, filter_logs
 from contracts.modules import Contributor
 
 EIP170_LIMIT = 24_576
-EXPECTED_CONTRIBUTOR_RUNTIME_BYTES = 5_280
+EXPECTED_CONTRIBUTOR_RUNTIME_BYTES = 5_381
 
 
 def _assert_zero_vesting_views(contributor):

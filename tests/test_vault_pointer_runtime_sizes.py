@@ -8,32 +8,33 @@ EIP170_LIMIT = 24_576
 # RipeGov headroom is 460 bytes after the migration, SharesVault, and
 # governance-remediation changes. Any RipeGov edit must remeasure this pin.
 # Composed SwitchboardAlpha headroom is 14 bytes after binding its chain-local
-# Pyth source ID. Teller and CreditEngine retain 33 and 39 bytes respectively
-# after binding their chain-local Curve source IDs. Endaoment retains 1,190
-# bytes after the same change. These pins include the deployed immutable data.
+# Pyth source ID. Teller and CreditEngine retain 7 and 28 bytes respectively at
+# this head. Endaoment retains 1,190 bytes after binding its chain-local Curve
+# source ID. These pins include the deployed immutable data.
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
-# StabilityPool headroom is 279 bytes after the deferred claim checkpoint,
-# exact-payment, claimable-aware retirement, and partial-reservation admission
-# remediations.
+# StabilityPool headroom is 233 bytes after the actual-delivery claim and
+# redemption hardening, deferred claim checkpoint, claimable-aware retirement,
+# and partial-reservation admission remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
-# SwitchboardBravo retains only 26 bytes of headroom. CurvePrices retains 1,170
-# bytes after switching to codesize optimization for confirmation-time registry
+# SwitchboardBravo retains 910 bytes of headroom. AuctionHouse and Deleverage
+# retain only 17 and 14 bytes respectively. CurvePrices retains 1,170 bytes
+# after switching to codesize optimization for confirmation-time registry
 # snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
 # metadata binding and checked runtime arithmetic. Any edit to these contracts
 # must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16143,
+    "MissionControl": 16222,
     "SwitchboardAlpha": 24562,
-    "SwitchboardBravo": 24550,
+    "SwitchboardBravo": 23666,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
-    "Teller": 24543,
+    "Teller": 24569,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
@@ -44,15 +45,15 @@ EXPECTED_RUNTIME_BYTES = {
     "RebaseErc20": 11602,
     "RipeGov": 24116,
     "HumanResources": 14777,
-    "AuctionHouse": 24566,
-    "CreditEngine": 24537,
-    "CreditRedeem": 8415,
+    "AuctionHouse": 24559,
+    "CreditEngine": 24548,
+    "CreditRedeem": 8501,
     "Endaoment": 23386,
     "PriceDesk": 17742,
-    "Deleverage": 24459,
-    "StabilityPool": 24297,
+    "Deleverage": 24562,
+    "StabilityPool": 24343,
     "BlueChipYieldPrices": 20857,
-    "ChainlinkPrices": 16436,
+    "ChainlinkPrices": 16672,
     "CurvePrices": 23406,
     "PythPrices": 16055,
     "RedStone": 15325,
