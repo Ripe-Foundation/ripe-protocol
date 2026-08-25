@@ -26,7 +26,7 @@ import hashlib
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -54,11 +54,13 @@ MISSION_CONTROL_ID = 5
 SWITCHBOARD_ID = 6
 VAULT_BOOK_ID = 8
 ENDAOMENT_FUNDS_ID = 21
+VAULT_MIGRATOR_ID = 25
 RIPE_RESERVE_ENGINE_ID = 26
 RIPE_RESERVE_VESTING_ID = 27
 SWITCHBOARD_ALPHA_ID = 1
 SWITCHBOARD_CHARLIE_ID = 3
 MAX_UINT256 = 2**256 - 1
+ZERO_ADDRESS = "0x" + "0" * 40
 IMPLEMENTATION_SLOT = (
     "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 )
@@ -100,7 +102,7 @@ ERC20_ABI = """
 
 @dataclass(frozen=True, slots=True)
 class ForkInputs:
-    rpc_url: str
+    rpc_url: str = field(repr=False)
     block_number: int
     block_hash: str
     evm_number: int
@@ -391,24 +393,24 @@ def _register(registry, address, description: str, governance) -> int:
 
 
 def _fork_config(scale: int, epoch_length: int) -> tuple[object, ...]:
-    # Synthetic test-only economics. The fork test validates integration and
-    # settlement; deployment calibration remains a separate owner decision.
+    # Owner-selected RH launch values. Raw payment amounts track token scale so
+    # the same test also authenticates the accepted six-decimal USDG instance.
     return (
         10 * scale,
-        scale,
-        10 * 10**18,
+        scale // 10,
+        8 * 10**18,
         4 * 10**18,
-        8_000,
-        2_000,
+        6_000,
+        4_000,
+        1_000,
+        3_000,
+        300,
         800,
         800,
-        300,
-        300,
-        400,
-        12,
+        4,
         1_000,
-        1,
-        1_000,
+        100,
+        600,
         epoch_length,
     )
 
@@ -416,24 +418,27 @@ def _fork_config(scale: int, epoch_length: int) -> tuple[object, ...]:
 def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNamespace:
     operator = boa.env.generate_address("ibl-rh-fork-operator")
     boa.env.set_balance(operator, 100 * 10**18)
-    current_number = boa.env.evm.patch.block_number
-    genesis = current_number - current_number % inputs.epoch_length
     scale = 10 ** live.payment_token.decimals()
     config = _fork_config(scale, inputs.epoch_length)
 
+    vault_migrator = boa.load(
+        "contracts/core/VaultMigrator.vy",
+        live.hq,
+        True,
+        ZERO_ADDRESS,
+        name="robinhood_fork_vault_migrator",
+    )
     lane = boa.load(
         "contracts/core/RipeReserveEngine.vy",
         live.hq,
         live.payment_token,
         config,
         name="robinhood_fork_ripe_reserve_engine",
-        sender=operator,
     )
     claims = boa.load(
         "contracts/core/RipeReserveVesting.vy",
         live.hq,
         name="robinhood_fork_ripe_reserve_vesting",
-        sender=operator,
     )
     alpha = boa.load_partial("contracts/config/SwitchboardAlpha.vy").at(
         live.switchboard.getAddr(SWITCHBOARD_ALPHA_ID)
@@ -445,9 +450,10 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
         alpha.minActionTimeLock(),
         alpha.maxActionTimeLock(),
         name="robinhood_fork_switchboard_foxtrot",
-        sender=operator,
     )
-    assert foxtrot.setActionTimeLockAfterSetup(sender=operator)
+    assert foxtrot.actionTimeLock() == 0
+    foxtrot.relinquishGov(sender=operator)
+    assert str(foxtrot.governance()).lower() == ZERO_ADDRESS
 
     governance = live.hq.governance()
     assert str(governance).lower() != "0x0000000000000000000000000000000000000000"
@@ -456,6 +462,12 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     )
     assert live.switchboard.getAddr(foxtrot_reg_id) == foxtrot.address
     assert live.switchboard.isSwitchboardAddr(foxtrot)
+
+    vault_migrator_reg_id = _register(
+        live.hq, vault_migrator, "VaultMigrator", governance
+    )
+    assert vault_migrator_reg_id == VAULT_MIGRATOR_ID
+    assert vault_migrator.isPaused()
 
     lane_reg_id = _register(live.hq, lane, "Ripe Reserve Engine", governance)
     assert lane_reg_id == RIPE_RESERVE_ENGINE_ID
@@ -475,24 +487,25 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     )
     assert claims_reg_id == RIPE_RESERVE_VESTING_ID
 
-    charlie = live.switchboard.getAddr(SWITCHBOARD_CHARLIE_ID)
-    lane.pause(False, sender=charlie)
-    claims.pause(False, sender=charlie)
+    charlie = boa.load_partial("contracts/config/SwitchboardCharlie.vy").at(
+        live.switchboard.getAddr(SWITCHBOARD_CHARLIE_ID)
+    )
+    assert charlie.pause(lane, False, sender=governance)
+    assert charlie.pause(claims, False, sender=governance)
 
-    action_id = foxtrot.setReserveEngineConfig(config, sender=operator)
-    _advance_blocks(foxtrot.actionTimeLock())
-    assert foxtrot.executePendingAction(action_id, sender=operator)
     assert tuple(lane.engineConfig()) == config
     budget_action_id = foxtrot.setReserveVestingRemainingAllocationBudget(
-        100_000 * 10**18,
-        sender=operator,
+        1_000 * 10**18,
+        sender=governance,
     )
-    _advance_blocks(foxtrot.actionTimeLock())
-    assert foxtrot.executePendingAction(budget_action_id, sender=operator)
-    foxtrot.setCanAcquireRipe(True, sender=operator)
-    foxtrot.startReserveEngine(genesis, inputs.epoch_length, sender=operator)
+    assert budget_action_id == 1
+    assert foxtrot.executePendingAction(budget_action_id, sender=governance)
+    foxtrot.setCanAcquireRipe(True, sender=governance)
+    foxtrot.startReserveEngine(0, inputs.epoch_length, sender=governance)
+    genesis = lane.genesisBlock()
 
     return SimpleNamespace(
+        vault_migrator=vault_migrator,
         lane=lane,
         claims=claims,
         foxtrot=foxtrot,
@@ -501,6 +514,7 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
         lane_reg_id=lane_reg_id,
         claims_reg_id=claims_reg_id,
         foxtrot_reg_id=foxtrot_reg_id,
+        vault_migrator_reg_id=vault_migrator_reg_id,
     )
 
 
@@ -568,7 +582,7 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_purchase_and_claim_paths
         assert scale == 10**rh_fork.payment_decimals
         assert lane.paymentToken() == live.payment_token.address
         assert lane.epochLength() == rh_fork.epoch_length
-        assert lane.genesisBlock() % lane.epochLength() == 0
+        assert lane.genesisBlock() == deployed.genesis
         assert lane.isRunning() is True
 
         endaoment_funds = live.hq.getAddr(ENDAOMENT_FUNDS_ID)
@@ -583,7 +597,7 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_purchase_and_claim_paths
         direct_ripe_before = live.ripe_token.balanceOf(direct_buyer)
         direct_quote = lane.previewAcquireRipe(purchase_amount, 0)
         assert direct_quote.available
-        assert direct_quote.vestingLength == 1
+        assert direct_quote.vestingLength == 100
         direct_payout = lane.acquireRipe(
             purchase_amount,
             0,
@@ -601,7 +615,7 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_purchase_and_claim_paths
         )
         auto_quote = lane.previewAcquireRipe(purchase_amount, MAX_UINT256)
         assert auto_quote.available
-        assert auto_quote.vestingLength == 1_000
+        assert auto_quote.vestingLength == 600
         assert auto_quote.bonusRipe > 0
         auto_payout = lane.acquireRipe(
             purchase_amount,
@@ -617,7 +631,7 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_purchase_and_claim_paths
         assert claims.getNumUserPositions(auto_buyer) == 1
         assert claims.totalAllocatedRipe() == direct_payout + auto_payout
 
-        _advance_blocks(1_000)
+        _advance_blocks(600)
         assert lane.claimVestedRipe(1, False, 0, sender=direct_buyer) == direct_payout
         assert live.ripe_token.balanceOf(direct_buyer) == (
             direct_ripe_before + direct_payout

@@ -333,6 +333,43 @@ def write_contract_abi(abis_dir, contract_name):
     return json.dumps(contract_abis)
 
 
+def canonical_abi_input_type(input_: Mapping) -> str:
+    """Return the canonical eth-abi type for one JSON ABI input."""
+    abi_type = input_.get("type")
+    if not isinstance(abi_type, str):
+        raise ValueError("invalid ABI input type")
+    if not abi_type.startswith("tuple"):
+        return abi_type
+
+    components = input_.get("components")
+    if not isinstance(components, list):
+        raise ValueError("tuple ABI input has no components")
+    suffix = abi_type[len("tuple") :]
+    return (
+        "("
+        + ",".join(canonical_abi_input_type(component) for component in components)
+        + ")"
+        + suffix
+    )
+
+
+def normalize_abi_argument(value):
+    """Replace Boa contract objects with addresses, including inside structs."""
+    if hasattr(value, "address"):
+        return value.address
+    if isinstance(value, (tuple, list)):
+        return tuple(normalize_abi_argument(item) for item in value)
+    return value
+
+
+def encode_abi_inputs(inputs: list, args) -> bytes:
+    """Encode values against JSON ABI inputs, including nested Vyper structs."""
+    return encode(
+        [canonical_abi_input_type(input_) for input_ in inputs],
+        [normalize_abi_argument(arg) for arg in args],
+    )
+
+
 def encode_constructor_args(abi: list, args: list) -> str:
     """
     Encode constructor arguments based on the contract's ABI
@@ -344,20 +381,7 @@ def encode_constructor_args(abi: list, args: list) -> str:
     if not constructor or not args:
         return ""
 
-    # Get the input types from the constructor
-    input_types = [input_['type'] for input_ in constructor['inputs']]
-
-    # Convert objects with address attribute to their address
-    processed_args = []
-    for arg in args:
-        if hasattr(arg, 'address'):
-            processed_args.append(arg.address)
-        else:
-            processed_args.append(arg)
-
-    # Encode the arguments
-    encoded = encode(input_types, processed_args)
-    return encoded.hex()
+    return encode_abi_inputs(constructor["inputs"], args).hex()
 
 
 def deployed_contracts_manifest(contracts: dict, contract_files: dict, args: dict, files: dict):

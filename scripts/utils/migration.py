@@ -21,7 +21,9 @@ from scripts.utils import solidity
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import (
     TransactionExecutionError,
+    canonical_abi_input_type,
     deployed_contracts_manifest,
+    encode_abi_inputs,
     execute_transaction,
 )
 
@@ -183,8 +185,8 @@ def _encode_expected_constructor_args(abi, values, *, blueprint=False):
     ):
         raise RuntimeError("MIGRATION_CANDIDATE_RECORD_INVALID")
     try:
-        return encode(
-            [item["type"] for item in inputs],
+        return encode_abi_inputs(
+            inputs,
             tuple(_canonical_address(value) for value in values),
         )
     except Exception:
@@ -350,7 +352,7 @@ def _validated_promotable_record(
         ):
             raise RuntimeError(f"MIGRATION_{kind}_RECORD_INVALID")
         try:
-            input_types = [item["type"] for item in inputs]
+            input_types = [canonical_abi_input_type(item) for item in inputs]
             encoded_args = bytes.fromhex(args)
             decoded_args = decode(input_types, encoded_args)
             if encode(input_types, decoded_args) != encoded_args:
@@ -424,7 +426,7 @@ def _validate_activation_dependency(
     if inputs[constructor_arg_index]["type"] != "address":
         raise RuntimeError("MIGRATION_ACTIVATION_DEPENDENCY_INVALID")
     try:
-        input_types = [item["type"] for item in inputs]
+        input_types = [canonical_abi_input_type(item) for item in inputs]
         encoded_args = bytes.fromhex(activation_record["args"])
         values = decode(input_types, encoded_args)
         if encode(input_types, values) != encoded_args:
