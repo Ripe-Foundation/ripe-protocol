@@ -10,6 +10,7 @@ from pathlib import Path
 
 CONTRACT_THRESHOLDS = {
     "contracts/core/InstantBondLane.vy": 85.0,
+    "contracts/core/InstantBondClaims.vy": 85.0,
     "contracts/config/SwitchboardFoxtrot.vy": 85.0,
 }
 

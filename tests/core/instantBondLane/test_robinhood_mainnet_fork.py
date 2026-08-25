@@ -55,6 +55,7 @@ SWITCHBOARD_ID = 6
 VAULT_BOOK_ID = 8
 ENDAOMENT_FUNDS_ID = 21
 INSTANT_BOND_LANE_ID = 26
+INSTANT_BOND_CLAIMS_ID = 27
 SWITCHBOARD_ALPHA_ID = 1
 SWITCHBOARD_CHARLIE_ID = 3
 MAX_UINT256 = 2**256 - 1
@@ -393,10 +394,8 @@ def _fork_config(scale: int, epoch_length: int) -> tuple[object, ...]:
     # Synthetic test-only economics. The fork test validates integration and
     # settlement; deployment calibration remains a separate owner decision.
     return (
-        True,
         10 * scale,
         scale,
-        100_000 * 10**18,
         10 * 10**18,
         4 * 10**18,
         8_000,
@@ -408,7 +407,8 @@ def _fork_config(scale: int, epoch_length: int) -> tuple[object, ...]:
         400,
         12,
         1_000,
-        0,
+        1,
+        1_000,
         epoch_length,
     )
 
@@ -427,6 +427,12 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
         live.payment_token,
         config,
         name="robinhood_fork_instant_bond_lane",
+        sender=operator,
+    )
+    claims = boa.load(
+        "contracts/core/InstantBondClaims.vy",
+        live.hq,
+        name="robinhood_fork_instant_bond_claims",
         sender=operator,
     )
     alpha = boa.load_partial("contracts/config/SwitchboardAlpha.vy").at(
@@ -461,21 +467,39 @@ def _deploy_local_lane(inputs: ForkInputs, live: SimpleNamespace) -> SimpleNames
     assert live.hq.confirmHqConfigChange(lane_reg_id, sender=governance)
     assert live.hq.canMintRipe(lane)
 
+    claims_reg_id = _register(
+        live.hq,
+        claims,
+        "Instant Bond Claims",
+        governance,
+    )
+    assert claims_reg_id == INSTANT_BOND_CLAIMS_ID
+
     charlie = live.switchboard.getAddr(SWITCHBOARD_CHARLIE_ID)
     lane.pause(False, sender=charlie)
+    claims.pause(False, sender=charlie)
 
     action_id = foxtrot.setInstantBondConfig(config, sender=operator)
     _advance_blocks(foxtrot.actionTimeLock())
     assert foxtrot.executePendingAction(action_id, sender=operator)
     assert tuple(lane.bondConfig()) == config
+    budget_action_id = foxtrot.setInstantBondRemainingAllocationBudget(
+        100_000 * 10**18,
+        sender=operator,
+    )
+    _advance_blocks(foxtrot.actionTimeLock())
+    assert foxtrot.executePendingAction(budget_action_id, sender=operator)
+    foxtrot.setCanBuyNow(True, sender=operator)
     foxtrot.startInstantBond(genesis, inputs.epoch_length, sender=operator)
 
     return SimpleNamespace(
         lane=lane,
+        claims=claims,
         foxtrot=foxtrot,
         operator=operator,
         genesis=genesis,
         lane_reg_id=lane_reg_id,
+        claims_reg_id=claims_reg_id,
         foxtrot_reg_id=foxtrot_reg_id,
     )
 
@@ -526,7 +550,9 @@ def test_robinhood_mainnet_fork_binds_topology_token_and_evm_clock(rh_fork):
 
 
 @pytest.mark.fork_qualification
-def test_robinhood_mainnet_fork_executes_and_rolls_back_full_purchase_paths(rh_fork):
+def test_robinhood_mainnet_fork_executes_and_rolls_back_purchase_and_claim_paths(
+    rh_fork,
+):
     live = _live_contracts(rh_fork)
     baseline = {
         "hq_num_addrs": live.hq.numAddrs(),
@@ -537,70 +563,76 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_full_purchase_paths(rh_f
     with boa.env.anchor():
         deployed = _deploy_local_lane(rh_fork, live)
         lane = deployed.lane
+        claims = deployed.claims
         scale = lane.paymentScale()
-        assert lane.paymentDecimals() == rh_fork.payment_decimals
+        assert scale == 10**rh_fork.payment_decimals
         assert lane.paymentToken() == live.payment_token.address
         assert lane.epochLength() == rh_fork.epoch_length
         assert lane.genesisBlock() % lane.epochLength() == 0
         assert lane.isRunning() is True
 
         endaoment_funds = live.hq.getAddr(ENDAOMENT_FUNDS_ID)
-        unlocked_buyer = boa.env.generate_address("ibl-rh-fork-unlocked-buyer")
-        locked_buyer = boa.env.generate_address("ibl-rh-fork-locked-buyer")
+        direct_buyer = boa.env.generate_address("ibl-rh-fork-direct-buyer")
+        auto_buyer = boa.env.generate_address("ibl-rh-fork-auto-buyer")
         purchase_amount = scale
-        for buyer in (unlocked_buyer, locked_buyer):
+        for buyer in (direct_buyer, auto_buyer):
             boa.deal(live.payment_token, buyer, 2 * purchase_amount)
             assert live.payment_token.approve(lane, MAX_UINT256, sender=buyer)
 
         payment_before = live.payment_token.balanceOf(endaoment_funds)
-        unlocked_ripe_before = live.ripe_token.balanceOf(unlocked_buyer)
-        unlocked_quote = lane.previewBuyNow(purchase_amount, 0)
-        assert unlocked_quote.available
-        assert unlocked_quote.actualLock == 0
-        unlocked_payout = lane.buyNow(
+        direct_ripe_before = live.ripe_token.balanceOf(direct_buyer)
+        direct_quote = lane.previewBuyNow(purchase_amount, 0)
+        assert direct_quote.available
+        assert direct_quote.vestingLength == 1
+        direct_payout = lane.buyNow(
             purchase_amount,
             0,
-            unlocked_quote.epoch,
-            unlocked_quote.totalRipe,
+            direct_quote.vestingLength,
+            direct_quote.epoch,
+            direct_quote.totalRipe,
             boa.env.evm.patch.block_number,
-            sender=unlocked_buyer,
+            sender=direct_buyer,
         )
-        assert unlocked_payout == unlocked_quote.totalRipe
-        assert live.ripe_token.balanceOf(unlocked_buyer) == (
-            unlocked_ripe_before + unlocked_payout
-        )
+        assert direct_payout == direct_quote.totalRipe
+        assert live.ripe_token.balanceOf(direct_buyer) == direct_ripe_before
 
-        locked_vault_before = live.ripe_gov.getTotalAmountForUser(
-            locked_buyer, live.ripe_token
+        auto_vault_before = live.ripe_gov.getTotalAmountForUser(
+            auto_buyer, live.ripe_token
         )
-        locked_quote = lane.previewBuyNow(purchase_amount, MAX_UINT256)
-        assert locked_quote.available
-        assert locked_quote.actualLock > 0
-        assert locked_quote.bonusRipe > 0
-        locked_payout = lane.buyNow(
+        auto_quote = lane.previewBuyNow(purchase_amount, MAX_UINT256)
+        assert auto_quote.available
+        assert auto_quote.vestingLength == 1_000
+        assert auto_quote.bonusRipe > 0
+        auto_payout = lane.buyNow(
             purchase_amount,
             MAX_UINT256,
-            locked_quote.epoch,
-            locked_quote.totalRipe,
+            auto_quote.vestingLength,
+            auto_quote.epoch,
+            auto_quote.totalRipe,
             boa.env.evm.patch.block_number,
-            sender=locked_buyer,
+            sender=auto_buyer,
         )
-        assert locked_payout == locked_quote.totalRipe
-        purchase = next(
-            log
-            for log in lane.get_logs()
-            if type(log).__name__ == "InstantBondPurchased"
+        assert auto_payout == auto_quote.totalRipe
+        assert claims.getNumUserPositions(direct_buyer) == 1
+        assert claims.getNumUserPositions(auto_buyer) == 1
+        assert claims.totalAllocatedRipe() == direct_payout + auto_payout
+
+        _advance_blocks(1_000)
+        assert lane.claimVestedRipe(1, False, 0, sender=direct_buyer) == direct_payout
+        assert live.ripe_token.balanceOf(direct_buyer) == (
+            direct_ripe_before + direct_payout
         )
-        assert locked_quote.ripeGovVaultId == live.ripe_gov_vault_id
+        assert lane.claimVestedRipe(2, True, 500, sender=auto_buyer) == auto_payout
         assert live.ripe_gov.getTotalAmountForUser(
-            locked_buyer, live.ripe_token
-        ) == locked_vault_before + locked_payout
+            auto_buyer, live.ripe_token
+        ) == auto_vault_before + auto_payout
 
         assert live.payment_token.balanceOf(endaoment_funds) == (
             payment_before + 2 * purchase_amount
         )
         assert lane.epochState().acceptedPayment == 2 * purchase_amount
-        assert lane.cumulativeMinted() == unlocked_payout + locked_payout
+        assert claims.totalClaimedRipe() == direct_payout + auto_payout
+        assert claims.totalOutstandingRipe() == 0
         assert live.payment_token.balanceOf(lane) == 0
         assert live.ripe_token.balanceOf(lane) == 0
         assert live.ripe_token.allowance(

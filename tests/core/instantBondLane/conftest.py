@@ -3,20 +3,25 @@ from types import SimpleNamespace
 import boa
 import pytest
 
-from constants import MAX_UINT256
+from constants import (
+    INSTANT_BOND_CLAIMS_HQ_ID,
+    INSTANT_BOND_LANE_HQ_ID,
+    MAX_UINT256,
+)
 
 
 HUNDRED_PERCENT = 10_000
 DEFAULT_EPOCH_LENGTH = 100
-MIN_BASE_RATE = 10_000
+DEFAULT_MIN_VESTING_LENGTH = 100
+DEFAULT_MAX_VESTING_LENGTH = 1_000
+DEFAULT_ALLOCATION_BUDGET = 1_000_000 * 10**18
+MIN_BASE_PAYOUT_RATE = 10_000
 
 CONFIG_KEYS = (
-    "canBuyNow",
     "paymentCapPerEpoch",
     "minPaymentAmount",
-    "mintBudget",
-    "maxEffectiveRate",
-    "seedRate",
+    "maxAllInPayoutRate",
+    "seedBasePayoutRate",
     "uHighBps",
     "uLowBps",
     "minUpBps",
@@ -25,23 +30,26 @@ CONFIG_KEYS = (
     "maxDownBps",
     "decayBps",
     "maxDecayEpochs",
-    "maxLockBonus",
-    "minLockDuration",
+    "maxVestingBonus",
+    "minVestingLength",
+    "maxVestingLength",
     "epochLength",
 )
 
 
 def make_config(scale, epoch_length=DEFAULT_EPOCH_LENGTH, **overrides):
-    max_safe_scaled = (2**256 - 1) // 10_000
+    max_safe_scaled = MAX_UINT256 // HUNDRED_PERCENT
     cap = scale if 1_000 * scale > max_safe_scaled else 1_000 * scale
-    max_safe_rate = (2**256 - 1) // max(cap, 1)
+    max_safe_rate = MAX_UINT256 // max(cap, 1)
     values = {
-        "canBuyNow": True,
         "paymentCapPerEpoch": cap,
         "minPaymentAmount": scale,
-        "mintBudget": 1_000_000 * 10**18,
-        "maxEffectiveRate": 2 * 10**18 if 2 * 10**18 <= max_safe_rate else 11_000,
-        "seedRate": 10**18 if 10**18 <= max_safe_rate else 10_000,
+        "maxAllInPayoutRate": (
+            2 * 10**18 if 2 * 10**18 <= max_safe_rate else 11_000
+        ),
+        "seedBasePayoutRate": (
+            10**18 if 10**18 <= max_safe_rate else MIN_BASE_PAYOUT_RATE
+        ),
         "uHighBps": 8_000,
         "uLowBps": 2_000,
         "minUpBps": 1_000,
@@ -50,8 +58,9 @@ def make_config(scale, epoch_length=DEFAULT_EPOCH_LENGTH, **overrides):
         "maxDownBps": 500,
         "decayBps": 900,
         "maxDecayEpochs": 4,
-        "maxLockBonus": 5_000 if 2 * 10**18 <= max_safe_rate else 0,
-        "minLockDuration": 0,
+        "maxVestingBonus": 5_000 if 2 * 10**18 <= max_safe_rate else 0,
+        "minVestingLength": DEFAULT_MIN_VESTING_LENGTH,
+        "maxVestingLength": DEFAULT_MAX_VESTING_LENGTH,
         "epochLength": epoch_length,
     }
     values.update(overrides)
@@ -62,23 +71,15 @@ def config_dict(config):
     return dict(zip(CONFIG_KEYS, config))
 
 
+def replace_config(config, **overrides):
+    values = config_dict(config)
+    values.update(overrides)
+    return tuple(values[key] for key in CONFIG_KEYS)
+
+
 def travel_blocks(blocks):
     if blocks > 0:
         boa.env.time_travel(blocks=blocks)
-
-
-def settlement_accounting(ctx):
-    return (
-        ctx.lane.epochState().rate,
-        ctx.lane.epochState().acceptedPayment,
-        ctx.lane.cumulativeMinted(),
-        ctx.payment_token.balanceOf(ctx.bob),
-        ctx.payment_token.balanceOf(ctx.endaoment_funds),
-        ctx.ripe_token.balanceOf(ctx.lane),
-        ctx.ripe_token.balanceOf(ctx.bob),
-        ctx.ripe_gov_vault.getTotalAmountForUser(ctx.bob, ctx.ripe_token),
-        ctx.ripe_token.allowance(ctx.lane, ctx.teller),
-    )
 
 
 def controller_rate(
@@ -91,8 +92,8 @@ def controller_rate(
     timing_eligible=True,
 ):
     values = config_dict(config)
-    ceiling = values["maxEffectiveRate"] * HUNDRED_PERCENT // (
-        HUNDRED_PERCENT + values["maxLockBonus"]
+    ceiling = values["maxAllInPayoutRate"] * HUNDRED_PERCENT // (
+        HUNDRED_PERCENT + values["maxVestingBonus"]
     )
     rate = min(rate, ceiling)
     utilization = 0
@@ -118,7 +119,7 @@ def controller_rate(
             ) * demand // HUNDRED_PERCENT
             rate = max(
                 rate * HUNDRED_PERCENT // (HUNDRED_PERCENT + adjustment),
-                MIN_BASE_RATE,
+                MIN_BASE_PAYOUT_RATE,
             )
         elif utilization <= values["uLowBps"]:
             weakness = (
@@ -143,6 +144,22 @@ def controller_rate(
     return rate, utilization, decay_steps, adjustment
 
 
+def _register_hq_address(ripe_hq, governance, address, description, expected_id):
+    lock = ripe_hq.registryChangeTimeLock()
+    assert ripe_hq.startAddNewAddressToRegistry(
+        address,
+        description,
+        sender=governance.address,
+    )
+    travel_blocks(lock)
+    reg_id = ripe_hq.confirmNewAddressToRegistry(
+        address,
+        sender=governance.address,
+    )
+    assert reg_id == expected_id
+    return reg_id
+
+
 @pytest.fixture
 def lane_factory(
     ripe_hq,
@@ -162,16 +179,21 @@ def lane_factory(
     setAssetConfig,
 ):
     with boa.env.anchor():
+
         def factory(
             payment_token=charlie_token,
             epoch_length=DEFAULT_EPOCH_LENGTH,
             auto_start=True,
             genesis_block=0,
             register_lane=True,
+            register_claims=True,
             enable_mint=True,
             fund_buyer=True,
             buyer_funding=None,
-            unpause=True,
+            unpause_lane=True,
+            unpause_claims=True,
+            can_buy=True,
+            allocation_budget=DEFAULT_ALLOCATION_BUDGET,
             config_overrides=None,
         ):
             scale = 10 ** payment_token.decimals()
@@ -187,27 +209,54 @@ def lane_factory(
                 config,
                 name="instant_bond_lane",
             )
+            claims = boa.load(
+                "contracts/core/InstantBondClaims.vy",
+                ripe_hq,
+                name="instant_bond_claims",
+            )
 
-            reg_id = 0
+            lane_reg_id = 0
             if register_lane:
-                registry_lock = ripe_hq.registryChangeTimeLock()
-                assert ripe_hq.startAddNewAddressToRegistry(
-                    lane, "Instant Bond Lane", sender=governance.address
-                )
-                travel_blocks(registry_lock)
-                reg_id = ripe_hq.confirmNewAddressToRegistry(
-                    lane, sender=governance.address
+                lane_reg_id = _register_hq_address(
+                    ripe_hq,
+                    governance,
+                    lane,
+                    "Instant Bond Lane",
+                    INSTANT_BOND_LANE_HQ_ID,
                 )
                 ripe_hq.initiateHqConfigChange(
-                    reg_id, False, enable_mint, False, sender=governance.address
+                    lane_reg_id,
+                    False,
+                    enable_mint,
+                    False,
+                    sender=governance.address,
                 )
-                travel_blocks(registry_lock)
+                travel_blocks(ripe_hq.registryChangeTimeLock())
                 assert ripe_hq.confirmHqConfigChange(
-                    reg_id, sender=governance.address
+                    lane_reg_id,
+                    sender=governance.address,
                 )
 
-            if unpause:
+            claims_reg_id = 0
+            if register_claims:
+                claims_reg_id = _register_hq_address(
+                    ripe_hq,
+                    governance,
+                    claims,
+                    "Instant Bond Claims",
+                    INSTANT_BOND_CLAIMS_HQ_ID,
+                )
+
+            if unpause_lane:
                 lane.pause(False, sender=switchboard_alpha.address)
+            if unpause_claims:
+                claims.pause(False, sender=switchboard_alpha.address)
+            claims.setRemainingAllocationBudget(
+                allocation_budget,
+                sender=switchboard_alpha.address,
+            )
+            if can_buy:
+                lane.setCanBuyNow(True, sender=switchboard_alpha.address)
 
             started_genesis = 0
             if auto_start:
@@ -218,9 +267,7 @@ def lane_factory(
                 )
                 started_genesis = lane.genesisBlock()
                 if started_genesis > boa.env.evm.patch.block_number:
-                    travel_blocks(
-                        started_genesis - boa.env.evm.patch.block_number
-                    )
+                    travel_blocks(started_genesis - boa.env.evm.patch.block_number)
 
             if fund_buyer:
                 funding = (
@@ -237,12 +284,14 @@ def lane_factory(
 
             ctx = SimpleNamespace(
                 lane=lane,
+                claims=claims,
                 payment_token=payment_token,
                 scale=scale,
                 genesis=started_genesis,
                 epoch_length=epoch_length,
                 config=config,
-                reg_id=reg_id,
+                lane_reg_id=lane_reg_id,
+                claims_reg_id=claims_reg_id,
                 bob=bob,
                 ripe_whale=whale,
                 governance=governance,
@@ -257,11 +306,7 @@ def lane_factory(
             )
 
             def set_config(**overrides):
-                next_config = make_config(
-                    scale,
-                    epoch_length=lane.epochLength(),
-                    **overrides,
-                )
+                next_config = replace_config(ctx.config, **overrides)
                 lane.setConfig(next_config, sender=switchboard_alpha.address)
                 ctx.config = next_config
                 return next_config
@@ -274,21 +319,30 @@ def lane_factory(
                 lane.start(genesis, length, sender=switchboard_alpha.address)
                 ctx.genesis = resolved
                 ctx.epoch_length = length
+                ctx.config = replace_config(ctx.config, epochLength=length)
                 return ctx.genesis
 
             def stop():
                 lane.stop(sender=switchboard_alpha.address)
                 ctx.genesis = 0
 
-            def set_rate_override(target_rate):
+            def set_rate_override(target_rate, target_epoch=0):
                 return lane.setRateOverride(
-                    target_rate, sender=switchboard_alpha.address
+                    target_rate,
+                    target_epoch,
+                    sender=switchboard_alpha.address,
                 )
 
             def cancel_rate_override():
                 return lane.cancelRateOverride(sender=switchboard_alpha.address)
 
-            def setup_lock_terms(
+            def set_budget(amount):
+                claims.setRemainingAllocationBudget(
+                    amount,
+                    sender=switchboard_alpha.address,
+                )
+
+            def setup_ripe_vault(
                 min_lock=100,
                 max_lock=1_000,
                 can_exit=True,
@@ -312,44 +366,57 @@ def lane_factory(
                     lock_terms,
                     sender=switchboard_alpha.address,
                 )
-                core_vault_id = mission_control.coreRipeGovVaultId()
-                assert core_vault_id != 0
+                vault_id = mission_control.coreRipeGovVaultId()
+                assert vault_id != 0
                 setAssetConfig(
                     ripe_token,
-                    _vaultIds=[core_vault_id],
+                    _vaultIds=[vault_id],
                     _canDeposit=asset_can_deposit,
                 )
                 return lock_terms
 
-            def quote(payment_amount, requested_lock=0, sender=bob):
+            def quote(payment_amount, requested_vesting=0, sender=bob):
                 return lane.previewBuyNow(
                     payment_amount,
-                    requested_lock,
+                    requested_vesting,
                     sender=sender,
                 )
 
             def buy(
                 payment_amount,
-                requested_lock=0,
+                requested_vesting=0,
+                expected_vesting=None,
                 expected_epoch=None,
                 min_ripe_out=0,
                 deadline=None,
                 sender=bob,
             ):
+                preview = quote(
+                    payment_amount,
+                    requested_vesting,
+                    sender=sender,
+                )
+                if expected_vesting is None:
+                    expected_vesting = preview.vestingLength
                 if expected_epoch is None:
-                    expected_epoch = quote(
-                        payment_amount,
-                        requested_lock,
-                        sender=sender,
-                    ).epoch
+                    expected_epoch = preview.epoch
                 if deadline is None:
                     deadline = boa.env.evm.patch.block_number
                 return lane.buyNow(
                     payment_amount,
-                    requested_lock,
+                    requested_vesting,
+                    expected_vesting,
                     expected_epoch,
                     min_ripe_out,
                     deadline,
+                    sender=sender,
+                )
+
+            def claim(position_id, auto_deposit=False, lock_duration=0, sender=bob):
+                return lane.claimVestedRipe(
+                    position_id,
+                    auto_deposit,
+                    lock_duration,
                     sender=sender,
                 )
 
@@ -358,12 +425,15 @@ def lane_factory(
             ctx.stop = stop
             ctx.set_rate_override = set_rate_override
             ctx.cancel_rate_override = cancel_rate_override
-            ctx.make_config = lambda **overrides: make_config(
-                scale, epoch_length=lane.epochLength(), **overrides
+            ctx.set_budget = set_budget
+            ctx.make_config = lambda **overrides: replace_config(
+                ctx.config,
+                **overrides,
             )
-            ctx.setup_lock_terms = setup_lock_terms
+            ctx.setup_ripe_vault = setup_ripe_vault
             ctx.quote = quote
             ctx.buy = buy
+            ctx.claim = claim
             return ctx
 
         yield factory

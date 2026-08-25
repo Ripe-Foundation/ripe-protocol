@@ -17,12 +17,12 @@ def test_remainder_below_min_payment_is_unbuyable(lane_env):
 
     too_small = lane_env.quote(5 * lane_env.scale)
     assert too_small.available is False
-    assert too_small.totalRipe == 0
-    assert too_small.rate == lane_env.lane.epochState().rate
+    assert too_small.totalRipe > 0
+    assert too_small.basePayoutRate == lane_env.lane.epochState().basePayoutRate
 
     too_big = lane_env.quote(minimum)
     assert too_big.available is False
-    assert too_big.totalRipe == 0
+    assert too_big.totalRipe > 0
 
     with pytest.raises(boa.BoaError) as err:
         lane_env.buy(5 * lane_env.scale)
@@ -68,26 +68,26 @@ def test_controller_uses_inclusive_high_and_low_thresholds(
     )
     amount = accepted_units * lane_env.scale
     lane_env.buy(amount)
-    old = lane_env.lane.epochState().rate
+    old = lane_env.lane.epochState().basePayoutRate
     boa.env.time_travel(blocks=lane_env.epoch_length)
     quote = lane_env.quote(lane_env.scale)
     expected, utilization, _, _ = controller_rate(old, amount, cap, 1, config)
 
-    assert quote.rate == expected
+    assert quote.basePayoutRate == expected
     if expected_branch == "high":
         assert utilization >= 8_000
-        assert quote.rate < old
+        assert quote.basePayoutRate < old
     elif expected_branch == "low":
         assert utilization <= 2_000
-        assert quote.rate > old
+        assert quote.basePayoutRate > old
     else:
         assert 2_000 < utilization < 8_000
-        assert quote.rate == old
+        assert quote.basePayoutRate == old
 
     lane_env.buy(lane_env.scale)
     rolled = filter_logs(lane_env.lane, "EpochRolled")[-1]
     assert rolled.utilizationBps == utilization
-    assert rolled.controllerRate == expected
+    assert rolled.controllerBasePayoutRate == expected
 
 
 def test_weighted_lateness_matches_amount_times_offset(lane_env):

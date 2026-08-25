@@ -22,7 +22,7 @@ def test_controller_exact_thresholds_and_deadband(lane_env, accepted_units, bran
     )
     amount = accepted_units * lane_env.scale
     lane_env.buy(amount)
-    old_rate = lane_env.lane.epochState().rate
+    old_rate = lane_env.lane.epochState().basePayoutRate
     boa.env.time_travel(blocks=lane_env.epoch_length)
     quote = lane_env.quote(lane_env.scale)
     expected, utilization, _, _ = controller_rate(
@@ -32,20 +32,20 @@ def test_controller_exact_thresholds_and_deadband(lane_env, accepted_units, bran
         1,
         config,
     )
-    assert quote.rate == expected
+    assert quote.basePayoutRate == expected
     if branch == "high":
         assert utilization >= 8_000
-        assert quote.rate < old_rate
+        assert quote.basePayoutRate < old_rate
     elif branch == "low":
         assert utilization <= 2_000
-        assert quote.rate > old_rate
+        assert quote.basePayoutRate > old_rate
     else:
         assert 2_000 < utilization < 8_000
-        assert quote.rate == old_rate
+        assert quote.basePayoutRate == old_rate
     lane_env.buy(lane_env.scale)
     rolled = filter_logs(lane_env.lane, "EpochRolled")[-1]
-    assert rolled.controllerRate == expected
-    assert rolled.newRate == expected
+    assert rolled.controllerBasePayoutRate == expected
+    assert rolled.newBasePayoutRate == expected
 
 
 def test_high_utilization_lowers_rate(lane_env):
@@ -55,12 +55,12 @@ def test_high_utilization_lowers_rate(lane_env):
         minPaymentAmount=lane_env.scale,
     )
     lane_env.buy(80 * lane_env.scale)
-    old = lane_env.lane.epochState().rate
+    old = lane_env.lane.epochState().basePayoutRate
     boa.env.time_travel(blocks=lane_env.epoch_length)
     quote = lane_env.quote(lane_env.scale)
     expected, _, _, _ = controller_rate(old, 80 * lane_env.scale, cap, 1, config)
-    assert quote.rate == expected
-    assert quote.rate < old
+    assert quote.basePayoutRate == expected
+    assert quote.basePayoutRate < old
 
 
 def test_low_utilization_raises_rate(lane_env):
@@ -70,12 +70,12 @@ def test_low_utilization_raises_rate(lane_env):
         minPaymentAmount=lane_env.scale,
     )
     lane_env.buy(20 * lane_env.scale)
-    old = lane_env.lane.epochState().rate
+    old = lane_env.lane.epochState().basePayoutRate
     boa.env.time_travel(blocks=lane_env.epoch_length)
     quote = lane_env.quote(lane_env.scale)
     expected, _, _, _ = controller_rate(old, 20 * lane_env.scale, cap, 1, config)
-    assert quote.rate == expected
-    assert quote.rate > old
+    assert quote.basePayoutRate == expected
+    assert quote.basePayoutRate > old
 
 
 def test_deadband_keeps_rate(lane_env):
@@ -85,11 +85,11 @@ def test_deadband_keeps_rate(lane_env):
         minPaymentAmount=lane_env.scale,
     )
     lane_env.buy(50 * lane_env.scale)
-    old = lane_env.lane.epochState().rate
+    old = lane_env.lane.epochState().basePayoutRate
     boa.env.time_travel(blocks=lane_env.epoch_length)
     quote = lane_env.quote(lane_env.scale)
     expected, _, _, _ = controller_rate(old, 50 * lane_env.scale, cap, 1, config)
-    assert quote.rate == expected == old
+    assert quote.basePayoutRate == expected == old
 
 
 def test_skipped_empty_epochs_apply_bounded_decay(lane_env):
@@ -100,14 +100,14 @@ def test_skipped_empty_epochs_apply_bounded_decay(lane_env):
         maxDecayEpochs=4,
     )
     lane_env.buy(50 * lane_env.scale)
-    old = lane_env.lane.epochState().rate
+    old = lane_env.lane.epochState().basePayoutRate
     boa.env.time_travel(blocks=40 * lane_env.epoch_length)
     quote = lane_env.quote(lane_env.scale)
     expected, _, decay_steps, _ = controller_rate(
         old, 50 * lane_env.scale, cap, 40, config
     )
     assert decay_steps == 4
-    assert quote.rate == expected
+    assert quote.basePayoutRate == expected
     assert quote.epoch == 40
 
 
@@ -117,31 +117,31 @@ def test_first_purchase_many_epochs_after_genesis_uses_seed(lane_factory):
     boa.env.time_travel(blocks=25 * ctx.epoch_length)
     quote = ctx.quote(ctx.scale)
     assert quote.epoch == 25
-    assert quote.rate == ctx.lane.bondConfig().seedRate
+    assert quote.basePayoutRate == ctx.lane.bondConfig().seedBasePayoutRate
     ctx.buy(ctx.scale)
-    assert ctx.lane.epochState().rate == ctx.lane.bondConfig().seedRate
+    assert ctx.lane.epochState().basePayoutRate == ctx.lane.bondConfig().seedBasePayoutRate
     assert ctx.lane.epochState().epoch == 25
 
 
 def test_tighter_ceiling_clamps_at_rollover(lane_env):
     lane_env.buy(lane_env.scale)
-    old = lane_env.lane.epochState().rate
+    old = lane_env.lane.epochState().basePayoutRate
     ceiling_config = lane_env.set_config(
-        maxEffectiveRate=15_000,
-        maxLockBonus=0,
-        seedRate=10_000,
+        maxAllInPayoutRate=15_000,
+        maxVestingBonus=0,
+        seedBasePayoutRate=10_000,
     )
     boa.env.time_travel(blocks=lane_env.epoch_length)
     quote = lane_env.quote(lane_env.scale)
     expected, _, _, _ = controller_rate(
         old,
         lane_env.scale,
-        ceiling_config[1],
+        ceiling_config[0],
         1,
         ceiling_config,
     )
-    assert quote.rate == expected
-    assert quote.rate <= 15_000
+    assert quote.basePayoutRate == expected
+    assert quote.basePayoutRate <= 15_000
 
 
 def test_weighted_lateness_is_amount_weighted(lane_env):

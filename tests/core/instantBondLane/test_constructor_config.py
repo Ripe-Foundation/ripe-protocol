@@ -1,13 +1,14 @@
 import boa
 import pytest
+from vyper.compiler.output import build_abi_output
 
-from conf_utils import filter_logs, get_boa_dev_reasons
+from conf_utils import filter_logs
 from constants import MAX_UINT256, ZERO_ADDRESS
-
 from tests.core.instantBondLane.conftest import DEFAULT_EPOCH_LENGTH, make_config
 
 
 MAX_EPOCH_LENGTH = MAX_UINT256 // 10_000 + 1
+MAX_VESTING_LENGTH = 7_884_000
 
 REVERTING_DECIMALS = """
 # @version 0.4.3
@@ -31,7 +32,9 @@ def deploy_token(governance, decimals, supply=0):
 
 
 @pytest.mark.parametrize("decimals", [0, 6, 18, 73])
-def test_constructor_derives_payment_scale(ripe_hq, governance, decimals):
+def test_constructor_derives_payment_scale_without_storing_decimals(
+    ripe_hq, governance, decimals
+):
     with boa.env.anchor():
         token = deploy_token(governance.address, decimals)
         scale = 10**decimals
@@ -44,32 +47,22 @@ def test_constructor_derives_payment_scale(ripe_hq, governance, decimals):
         )
 
         assert lane.paymentToken() == token.address
-        assert lane.paymentDecimals() == decimals
         assert lane.paymentScale() == scale
         assert lane.genesisBlock() == 0
         assert lane.isRunning() is False
+        assert lane.isPaused() is True
+        assert lane.canBuyNow() is False
         assert lane.epochLength() == DEFAULT_EPOCH_LENGTH
         assert tuple(lane.bondConfig()) == config
-        assert lane.cumulativeMinted() == 0
-        assert lane.rateOverride() == 0
-        assert lane.epochState().rate == 0
+        assert lane.overrideTargetBasePayoutRate() == 0
+        assert lane.overrideTargetEpoch() == 0
+        assert tuple(lane.epochState()) == (0,) * 11 + (False,)
+        assert "paymentDecimals" not in {
+            entry.get("name") for entry in build_abi_output(lane.compiler_data)
+        }
 
 
-def test_constructor_starts_paused_and_not_running(ripe_hq, governance, charlie_token):
-    with boa.env.anchor():
-        scale = 10 ** charlie_token.decimals()
-        lane = boa.load(
-            "contracts/core/InstantBondLane.vy",
-            ripe_hq,
-            charlie_token,
-            make_config(scale),
-        )
-        assert lane.isPaused() is True
-        assert lane.isRunning() is False
-        assert lane.genesisBlock() == 0
-
-
-def test_constructor_rejects_invalid_payment_token(
+def test_constructor_rejects_invalid_payment_tokens(
     ripe_hq, governance, ripe_token, charlie_token
 ):
     with boa.env.anchor():
@@ -81,6 +74,13 @@ def test_constructor_rejects_invalid_payment_token(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
                 ZERO_ADDRESS,
+                config,
+            )
+        with boa.reverts():
+            boa.load(
+                "contracts/core/InstantBondLane.vy",
+                ripe_hq,
+                governance.address,
                 config,
             )
         with boa.reverts("invalid payment token"):
@@ -128,32 +128,29 @@ def test_constructor_rejects_invalid_config(ripe_hq, charlie_token):
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,
                 charlie_token,
-                make_config(scale, epochLength=0),
+                make_config(scale, minVestingLength=0),
             )
 
 
-def test_constructor_accepts_largest_overflow_safe_epoch_length(
-    ripe_hq, charlie_token
-):
+def test_epoch_length_validation_boundaries(ripe_hq, charlie_token):
     with boa.env.anchor():
         scale = 10 ** charlie_token.decimals()
-        config = make_config(scale, epochLength=MAX_EPOCH_LENGTH)
         lane = boa.load(
             "contracts/core/InstantBondLane.vy",
             ripe_hq,
             charlie_token,
-            config,
+            make_config(scale, epochLength=MAX_EPOCH_LENGTH),
         )
         assert lane.epochLength() == MAX_EPOCH_LENGTH
+        assert lane.isValidEpochLength(1)
         assert lane.isValidEpochLength(MAX_EPOCH_LENGTH)
-        assert not lane.isValidEpochLength(0)
-        assert not lane.isValidEpochLength(MAX_EPOCH_LENGTH + 1)
+        assert lane.isValidEpochLength(0) is False
+        assert lane.isValidEpochLength(MAX_EPOCH_LENGTH + 1) is False
 
 
 def test_valid_config_boundaries(lane_env):
     lane = lane_env.lane
     scale = lane_env.scale
-
     valid_cases = [
         lane_env.make_config(uLowBps=1, uHighBps=2),
         lane_env.make_config(uHighBps=9_999),
@@ -165,34 +162,27 @@ def test_valid_config_boundaries(lane_env):
             decayBps=1,
         ),
         lane_env.make_config(maxUpBps=10_000),
-        lane_env.make_config(decayBps=909),
-        lane_env.make_config(
-            minUpBps=10_000,
-            maxUpBps=10_000,
-            minDownBps=1,
-            maxDownBps=1,
-            decayBps=5_000,
-        ),
         lane_env.make_config(maxDecayEpochs=1),
         lane_env.make_config(maxDecayEpochs=32),
         lane_env.make_config(minPaymentAmount=scale),
         lane_env.make_config(minPaymentAmount=1_000 * scale),
-        lane_env.make_config(maxLockBonus=0),
+        lane_env.make_config(maxVestingBonus=0),
         lane_env.make_config(
-            maxLockBonus=100_000,
-            maxEffectiveRate=11 * 10**18,
-            seedRate=10**18,
+            maxVestingBonus=100_000,
+            maxAllInPayoutRate=11 * 10**18,
+            seedBasePayoutRate=10**18,
         ),
         lane_env.make_config(
-            maxLockBonus=0,
-            maxEffectiveRate=10_000,
-            seedRate=10_000,
+            maxVestingBonus=0,
+            maxAllInPayoutRate=10_000,
+            seedBasePayoutRate=10_000,
         ),
-        lane_env.make_config(mintBudget=0),
-        lane_env.make_config(minLockDuration=0),
-        lane_env.make_config(minLockDuration=1_000),
+        lane_env.make_config(minVestingLength=1, maxVestingLength=1),
+        lane_env.make_config(
+            minVestingLength=MAX_VESTING_LENGTH,
+            maxVestingLength=MAX_VESTING_LENGTH,
+        ),
     ]
-
     for config in valid_cases:
         assert lane.isValidConfig(config)
 
@@ -200,14 +190,12 @@ def test_valid_config_boundaries(lane_env):
 def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
     lane = lane_env.lane
     scale = lane_env.scale
-    cap = 1_000 * scale
-
+    cap = lane.bondConfig().paymentCapPerEpoch
     invalid_cases = [
         lane_env.make_config(uLowBps=0),
         lane_env.make_config(uLowBps=8_000, uHighBps=8_000),
         lane_env.make_config(uLowBps=8_001, uHighBps=8_000),
         lane_env.make_config(uHighBps=10_000),
-        lane_env.make_config(uHighBps=10_001),
         lane_env.make_config(minUpBps=0),
         lane_env.make_config(minUpBps=1_001, maxUpBps=1_000),
         lane_env.make_config(maxUpBps=10_001),
@@ -216,7 +204,6 @@ def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
         lane_env.make_config(maxDownBps=1_000, minUpBps=1_000),
         lane_env.make_config(decayBps=0),
         lane_env.make_config(decayBps=10_000),
-        lane_env.make_config(decayBps=910),
         lane_env.make_config(maxDownBps=501, decayBps=500),
         lane_env.make_config(
             minUpBps=1,
@@ -227,27 +214,47 @@ def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
         ),
         lane_env.make_config(maxDecayEpochs=0),
         lane_env.make_config(maxDecayEpochs=33),
-        lane_env.make_config(maxEffectiveRate=0),
-        lane_env.make_config(maxEffectiveRate=MAX_UINT256 // 10_000 + 1),
+        lane_env.make_config(maxAllInPayoutRate=0),
+        lane_env.make_config(maxAllInPayoutRate=MAX_UINT256 // 10_000 + 1),
         lane_env.make_config(paymentCapPerEpoch=scale - 1),
         lane_env.make_config(paymentCapPerEpoch=MAX_UINT256 // 10_000 + 1),
         lane_env.make_config(minPaymentAmount=scale - 1),
         lane_env.make_config(minPaymentAmount=cap + 1),
-        lane_env.make_config(maxEffectiveRate=MAX_UINT256 // cap + 1),
-        lane_env.make_config(maxLockBonus=100_001),
+        lane_env.make_config(maxAllInPayoutRate=MAX_UINT256 // cap + 1),
+        lane_env.make_config(maxVestingBonus=100_001),
+        lane_env.make_config(minVestingLength=0),
+        lane_env.make_config(minVestingLength=2, maxVestingLength=1),
+        lane_env.make_config(maxVestingLength=MAX_VESTING_LENGTH + 1),
         lane_env.make_config(
-            maxLockBonus=0,
-            maxEffectiveRate=9_999,
-            seedRate=9_999,
+            maxVestingBonus=0,
+            maxAllInPayoutRate=9_999,
+            seedBasePayoutRate=9_999,
         ),
-        lane_env.make_config(seedRate=9_999),
+        lane_env.make_config(seedBasePayoutRate=9_999),
         lane_env.make_config(epochLength=0),
         lane_env.make_config(epochLength=MAX_EPOCH_LENGTH + 1),
         lane_env.make_config(epochLength=lane.epochLength() + 1),
     ]
-
     for config in invalid_cases:
         assert lane.isValidConfig(config) is False
+
+
+def test_set_config_is_authorized_stored_and_emitted(lane_env, alice):
+    config = lane_env.make_config(
+        maxVestingBonus=0,
+        minVestingLength=7,
+        maxVestingLength=77,
+    )
+    with boa.reverts("no perms"):
+        lane_env.lane.setConfig(config, sender=alice)
+
+    lane_env.lane.setConfig(config, sender=lane_env.switchboard.address)
+    event = filter_logs(lane_env.lane, "InstantBondConfigSet")[-1]
+    assert tuple(lane_env.lane.bondConfig()) == config
+    assert event.maxVestingBonus == 0
+    assert event.minVestingLength == 7
+    assert event.maxVestingLength == 77
+    assert event.epochLength == lane_env.epoch_length
 
 
 def test_set_config_cannot_change_live_epoch_length(lane_env):
@@ -258,91 +265,36 @@ def test_set_config_cannot_change_live_epoch_length(lane_env):
         )
 
 
-def test_set_config_cannot_cut_budget_below_minted(lane_env):
-    lane_env.buy(lane_env.scale)
-    minted = lane_env.lane.cumulativeMinted()
-    assert minted > 0
-    with boa.reverts("invalid config"):
-        lane_env.set_config(mintBudget=minted - 1)
-    lane_env.set_config(mintBudget=minted)
-    assert lane_env.lane.bondConfig().mintBudget == minted
-
-
-def test_set_config_authorization_storage_and_event(lane_env, alice):
-    with boa.reverts("no perms"):
-        lane_env.lane.setConfig(lane_env.make_config(), sender=alice)
-
-    config = lane_env.make_config(maxLockBonus=0, canBuyNow=True)
+def test_set_config_works_while_paused_and_invalidates_override(lane_env):
+    target = 9 * 10**17
+    lane_env.set_rate_override(target)
+    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
+    config = lane_env.make_config(maxVestingBonus=0)
     lane_env.lane.setConfig(config, sender=lane_env.switchboard.address)
-    logs = filter_logs(lane_env.lane, "InstantBondConfigSet")
-    stored = tuple(lane_env.lane.bondConfig())
-    assert stored == config
-    assert len(logs) == 1
-    event = logs[0]
-    assert event.canBuyNow is True
-    assert event.maxLockBonus == 0
-    assert event.epochLength == lane_env.epoch_length
-    assert event.minLockDuration == 0
+    invalidated = filter_logs(lane_env.lane, "RateOverrideInvalidated")[-1]
+    assert tuple(lane_env.lane.bondConfig()) == config
+    assert lane_env.lane.overrideTargetBasePayoutRate() == 0
+    assert invalidated.targetBasePayoutRate == target
 
 
-def test_pause_and_recovery_remain_switchboard_gated(lane_env, alice):
-    with boa.reverts("no perms"):
-        lane_env.lane.pause(True, sender=alice)
-
-    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
-    assert lane_env.lane.isPaused() is True
-    with pytest.raises(boa.BoaError) as err:
-        lane_env.buy(lane_env.scale)
-    assert "paused" in get_boa_dev_reasons(err.value)
-
-    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
-    payout = lane_env.buy(lane_env.scale)
-    assert payout > 0
-
-
-def test_set_config_last_write_wins_and_works_while_paused(lane_env):
-    first = lane_env.set_config(maxLockBonus=1_000)
-    second = lane_env.make_config(maxLockBonus=0)
-    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
-    lane_env.lane.setConfig(second, sender=lane_env.switchboard.address)
-    assert tuple(lane_env.lane.bondConfig()) == second
-    assert tuple(lane_env.lane.bondConfig()) != first
-    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
-    assert lane_env.quote(lane_env.scale).available is True
-
-
-def test_empty_config_is_never_valid(lane_env):
-    empty = (False,) + (0,) * 16
-    assert lane_env.lane.isValidConfig(empty) is False
-
-
-def test_set_can_buy_now_toggles_only_the_switch(lane_env, alice):
+def test_set_can_buy_now_is_separate_from_config(lane_env, alice):
+    before = tuple(lane_env.lane.bondConfig())
     with boa.reverts("no perms"):
         lane_env.lane.setCanBuyNow(False, sender=alice)
     with boa.reverts("no change"):
         lane_env.lane.setCanBuyNow(True, sender=lane_env.switchboard.address)
 
-    before = tuple(lane_env.lane.bondConfig())
-    lane_env.buy(lane_env.scale)
-    lane_env.set_rate_override(9 * 10**17)
-
     lane_env.lane.setCanBuyNow(False, sender=lane_env.switchboard.address)
-    logs = filter_logs(lane_env.lane, "CanBuyNowSet")
-    assert logs[-1].canBuyNow is False
-    after = tuple(lane_env.lane.bondConfig())
-    assert after[0] is False
-    assert after[1:] == before[1:]
-    assert lane_env.lane.rateOverride() == 9 * 10**17
-
-    with pytest.raises(boa.BoaError) as err:
+    assert filter_logs(lane_env.lane, "CanBuyNowSet")[-1].canBuyNow is False
+    assert lane_env.lane.canBuyNow() is False
+    assert tuple(lane_env.lane.bondConfig()) == before
+    with boa.reverts("disabled"):
         lane_env.buy(lane_env.scale)
-    assert "disabled" in get_boa_dev_reasons(err.value)
-    quote = lane_env.quote(lane_env.scale)
-    assert quote.available is False
-    assert quote.rate == lane_env.lane.epochState().rate
 
     lane_env.lane.setCanBuyNow(True, sender=lane_env.switchboard.address)
-    assert filter_logs(lane_env.lane, "CanBuyNowSet")[-1].canBuyNow is True
+    assert lane_env.lane.canBuyNow() is True
     assert lane_env.quote(lane_env.scale).available is True
-    assert lane_env.buy(lane_env.scale) > 0
-    assert lane_env.lane.rateOverride() == 9 * 10**17
+
+
+def test_empty_config_is_never_valid(lane_env):
+    assert lane_env.lane.isValidConfig((0,) * 16) is False

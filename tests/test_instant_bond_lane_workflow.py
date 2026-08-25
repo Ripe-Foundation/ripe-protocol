@@ -82,6 +82,7 @@ def test_feature_workflow_runs_all_critical_suites_and_per_contract_coverage():
     assert "$GITHUB_STEP_SUMMARY" in coverage
     assert CONTRACT_THRESHOLDS == {
         "contracts/core/InstantBondLane.vy": 85.0,
+        "contracts/core/InstantBondClaims.vy": 85.0,
         "contracts/config/SwitchboardFoxtrot.vy": 85.0,
     }
 
@@ -121,6 +122,9 @@ def test_per_contract_coverage_gate_fails_closed(tmp_path):
                 "files": {
                     "contracts/core/InstantBondLane.vy": {
                         "summary": summary(84.99)
+                    },
+                    "contracts/core/InstantBondClaims.vy": {
+                        "summary": summary(95.0)
                     },
                     "contracts/config/SwitchboardFoxtrot.vy": {
                         "summary": summary(95.0)
