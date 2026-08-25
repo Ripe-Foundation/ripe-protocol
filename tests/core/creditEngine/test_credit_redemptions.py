@@ -897,6 +897,10 @@ def test_credit_redeem_many_skips_borrower_with_any_unpriceable_collateral(
     expected_charlie = price_desk.getAssetAmount(
         charlie_token, healthy_max, True
     )
+    expected_spent = price_desk.getUsdValue(
+        charlie_token, expected_charlie, True
+    )
+    assert expected_spent == healthy_max - 10**11
     bob_debt_before = credit_engine.getUserDebtAmount(bob)
     bob_alpha_before = simple_erc20_vault.getTotalAmountForUser(
         bob, alpha_token
@@ -920,7 +924,7 @@ def test_credit_redeem_many_skips_borrower_with_any_unpriceable_collateral(
         sender=alice,
     )
 
-    assert spent == healthy_max
+    assert spent == expected_spent
     assert credit_engine.getUserDebtAmount(bob) == bob_debt_before
     assert simple_erc20_vault.getTotalAmountForUser(
         bob, alpha_token
@@ -929,7 +933,7 @@ def test_credit_redeem_many_skips_borrower_with_any_unpriceable_collateral(
         bob, bravo_token
     ) == bob_bravo_before
     assert alpha_token.balanceOf(alice) == alice_alpha_before
-    assert credit_engine.getUserDebtAmount(sally) == sally_debt - healthy_max
+    assert credit_engine.getUserDebtAmount(sally) == sally_debt - expected_spent
     assert simple_erc20_vault.getTotalAmountForUser(
         sally, charlie_token
     ) == sally_charlie_before - expected_charlie
@@ -937,14 +941,14 @@ def test_credit_redeem_many_skips_borrower_with_any_unpriceable_collateral(
         charlie_token.balanceOf(alice)
         == alice_charlie_before + expected_charlie
     )
-    assert green_token.balanceOf(alice) == alice_green_before - healthy_max
+    assert green_token.balanceOf(alice) == alice_green_before - expected_spent
     assert green_token.balanceOf(credit_redeem) == 0
 
     logs = filter_logs(teller, "CollateralRedeemed")
     assert len(logs) == 1
     assert logs[0].user == sally
     assert logs[0].asset == charlie_token.address
-    assert logs[0].repayValue == healthy_max
+    assert logs[0].repayValue == expected_spent
 
 
 @pytest.mark.parametrize(

@@ -22,7 +22,7 @@ EIP170_LIMIT = 24_576
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
 # SwitchboardBravo retains 910 bytes of headroom. AuctionHouse and Deleverage
-# retain 19 and 76 bytes respectively. CurvePrices retains 1,170 bytes
+# retain 5 and 39 bytes respectively. CurvePrices retains 1,170 bytes
 # after switching to codesize optimization for confirmation-time registry
 # snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
 # metadata binding and checked runtime arithmetic. Any edit to these contracts
@@ -46,12 +46,12 @@ EXPECTED_RUNTIME_BYTES = {
     "RebaseErc20": 11602,
     "RipeGov": 24116,
     "HumanResources": 14932,
-    "AuctionHouse": 24557,
+    "AuctionHouse": 24571,
     "CreditEngine": 24560,
     "CreditRedeem": 8523,
     "Endaoment": 23386,
     "PriceDesk": 17742,
-    "Deleverage": 24500,
+    "Deleverage": 24537,
     "StabilityPool": 24334,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 16672,

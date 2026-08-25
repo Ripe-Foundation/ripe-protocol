@@ -1290,7 +1290,7 @@ def _transferCollateral(
         _toUser,
         _vaultAddr,
         isUnderscoreBasicEarnVault,
-        maxAssetAmount // _targetUsdValue,
+        unsafe_sub(maxAssetAmount, 1) // _targetUsdValue,
         _a,
     )
     assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
@@ -1299,7 +1299,7 @@ def _transferCollateral(
     if amountSent != 0:
         # PriceDesk floors nonzero dust to one USD wei; enforce the inverse
         # quote's minimum creditable delivery before collateral can leave.
-        assert amountSent > maxAssetAmount // _targetUsdValue # dev: zero collateral value (vault under-send)
+        assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: zero collateral value (vault under-send)
         self._checkpointSender(_fromUser, _vaultId, _vaultAddr, _asset, _a.lootbox)
         if isUnderscoreBasicEarnVault:
             # Cap max conversion at convertToAssetsSafe + configured spread so
@@ -1319,6 +1319,10 @@ def _transferCollateral(
         # never consume more debt than the deleverage target.
         usdValue = min(usdValue, _targetUsdValue)
         assert usdValue != 0 # dev: zero collateral value (vault under-send)
+        # Preserve full-quote semantics for the exact one-wei inverse/forward
+        # rounding loss. A short delivery always keeps its actual forward value.
+        if usdValue == unsafe_sub(_targetUsdValue, convert(amountSent == maxAssetAmount, uint256)):
+            usdValue = _targetUsdValue
 
     return usdValue, amountSent, isPositionDepleted
 

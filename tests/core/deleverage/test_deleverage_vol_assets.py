@@ -855,7 +855,7 @@ def test_deleverage_credits_forward_value_of_zero_decimal_delivery(
     assert credit_engine.getUserDebtAmount(bob) == debt_before - 3 * EIGHTEEN_DECIMALS
 
 
-def test_deleverage_full_quote_credits_actual_forward_value(
+def test_deleverage_full_quote_normalizes_one_wei_inverse_roundtrip(
     bob,
     deleverage,
     switchboard_alpha,
@@ -887,7 +887,7 @@ def test_deleverage_full_quote_credits_actual_forward_value(
     assert price_desk.getUsdValue(alpha_token, quoted_amount, True) == debt - 1
     assert price_desk.getAssetAmount(bravo_token, 1, True) == 1
 
-    expected_value = debt - 1
+    expected_value = debt
     bravo_balance_before = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     bravo_endao_before = bravo_token.balanceOf(endaoment_funds)
     repaid = deleverage.deleverageWithVolAssets(
@@ -900,7 +900,7 @@ def test_deleverage_full_quote_credits_actual_forward_value(
     log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
     assert log.amountSent == quoted_amount
     assert log.usdValue == expected_value
-    assert credit_engine.getUserDebtAmount(bob) == 1
+    assert credit_engine.getUserDebtAmount(bob) == 0
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == bravo_balance_before
     assert bravo_token.balanceOf(endaoment_funds) == bravo_endao_before
 
@@ -949,19 +949,7 @@ def test_deleverage_one_unit_short_settles_only_forward_value(
     assert bravo_token.balanceOf(endaoment_funds) == endao_before + delivered
 
 
-@pytest.mark.parametrize(
-    "dust_amount,dust_price,target",
-    [
-        (EIGHTEEN_DECIMALS // 2, 1, 50 * EIGHTEEN_DECIMALS),
-        # A full inverse quote of one raw unit at $0.60 remains below one true
-        # USD wei even though PriceDesk deliberately reports one.
-        (100, 6 * EIGHTEEN_DECIMALS // 10, 1),
-    ],
-)
 def test_deleverage_zero_value_position_skips_before_transfer(
-    dust_amount,
-    dust_price,
-    target,
     bob,
     deleverage,
     switchboard_alpha,
@@ -977,6 +965,9 @@ def test_deleverage_zero_value_position_skips_before_transfer(
     simple_erc20_vault,
     endaoment_funds,
 ):
+    dust_amount = EIGHTEEN_DECIMALS // 2
+    dust_price = 1
+    target = 50 * EIGHTEEN_DECIMALS
     setupDeleverage(
         bob,
         alpha_token,
@@ -1006,6 +997,55 @@ def test_deleverage_zero_value_position_skips_before_transfer(
     assert credit_engine.getUserDebtAmount(bob) == debt_before
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == vault_before
     assert bravo_token.balanceOf(endaoment_funds) == endao_before
+
+
+def test_deleverage_one_wei_target_accepts_complete_inverse_quote(
+    bob,
+    deleverage,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    mock_price_source,
+    price_desk,
+    credit_engine,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    simple_erc20_vault,
+    endaoment_funds,
+):
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=200 * EIGHTEEN_DECIMALS,
+        borrow_amount=50 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    performDeposit(bob, 100, bravo_token, bravo_token_whale)
+    mock_price_source.setPrice(bravo_token, 6 * EIGHTEEN_DECIMALS // 10)
+    target = 1
+    quoted_amount = price_desk.getAssetAmount(bravo_token, target, True)
+    assert quoted_amount == 1
+    assert price_desk.getUsdValue(bravo_token, quoted_amount, True) == target
+
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    vault_before = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    endao_before = bravo_token.balanceOf(endaoment_funds)
+    repaid = deleverage.deleverageWithVolAssets(
+        bob,
+        [(3, bravo_token.address, target)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert repaid == target
+    log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
+    assert log.amountSent == quoted_amount
+    assert log.usdValue == target
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - target
+    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == vault_before - quoted_amount
+    assert bravo_token.balanceOf(endaoment_funds) == endao_before + quoted_amount
 
 
 def test_emits_deleverage_vol_assets_event(

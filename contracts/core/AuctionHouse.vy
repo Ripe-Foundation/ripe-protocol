@@ -1280,7 +1280,12 @@ def _transferCollateral(
         # PriceDesk deliberately floors nonzero dust to one USD wei, so bind the
         # post-transfer amount to the inverse quote instead of trusting that floor.
         assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: amounts do not match up
-        assert usdValue != 0 and usdValue <= _targetUsdValue # dev: amounts do not match up
+        assert usdValue != 0 # dev: amounts do not match up
+        assert usdValue <= _targetUsdValue # dev: amounts do not match up
+        # Preserve full-quote semantics for the exact one-wei inverse/forward
+        # rounding loss. A short delivery always keeps its actual forward value.
+        if usdValue == unsafe_sub(_targetUsdValue, convert(amountSent == maxAssetAmount, uint256)):
+            usdValue = _targetUsdValue
         for i: uint256 in range(2):
             user: address = _fromUser
             if i != 0:
@@ -1333,10 +1338,8 @@ def _handleGreenForUser(
 @internal
 def _isPaymentCloseEnough(_requestedAmount: uint256, _actualAmount: uint256) -> bool:
     # An extra safety check to make sure what was paid was actually close-ish to what was requested
-    buffer: uint256 = _requestedAmount // 100
-    if _actualAmount > _requestedAmount:
-        return unsafe_sub(_actualAmount, _requestedAmount) <= buffer
-    return unsafe_sub(_requestedAmount, _actualAmount) <= buffer
+    difference: uint256 = unsafe_sub(_actualAmount, _requestedAmount) if _actualAmount > _requestedAmount else unsafe_sub(_requestedAmount, _actualAmount)
+    return difference <= _requestedAmount // 100
 
 
 # calc amount of debt to repay

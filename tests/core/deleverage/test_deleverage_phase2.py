@@ -2042,7 +2042,8 @@ def test_phase2_underscore_earn_vault_clamps_credit_and_sizing_when_safe_spread_
     expected_credited_underlying = min(max_underlying_sent, capped_underlying_sent)
     expected_usd = price_desk.getUsdValue(alpha_token, expected_credited_underlying, True)
 
-    assert vault_transfer_log.usdValue == expected_usd
+    assert expected_usd == target_repay - 1
+    assert vault_transfer_log.usdValue == target_repay
     assert vault_transfer_log.usdValue <= price_desk.getUsdValue(alpha_token, max_underlying_sent, True)
     assert repaid_amount == target_repay
 

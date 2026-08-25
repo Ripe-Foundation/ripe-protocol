@@ -500,7 +500,7 @@ def test_auction_house_credits_forward_value_of_zero_decimal_delivery(
     assert coarse_token.balanceOf(alice) == 1
 
 
-def test_auction_house_full_quote_credits_actual_forward_value(
+def test_auction_house_full_quote_normalizes_one_wei_inverse_roundtrip(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -558,7 +558,7 @@ def test_auction_house_full_quote_credits_actual_forward_value(
         sender=alice,
     )
 
-    expected_value = target - 1
+    expected_value = target
     assert green_spent == expected_value
     log = filter_logs(teller, "FungAuctionPurchased")[0]
     assert log.collateralAmountSent == quoted_amount
