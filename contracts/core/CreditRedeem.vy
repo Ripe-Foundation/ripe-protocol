@@ -259,9 +259,9 @@ def _redeemCollateral(
 
     deliveredValue: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, False)
     assert deliveredValue != 0 # dev: zero repayment value (vault under-send)
-    # Preserve nominal exact settlement only for the one-wei inverse/forward
-    # roundtrip loss; larger gaps remain valued at actual delivery.
-    if deliveredValue == unsafe_sub(maxRedeemValue, 1):
+    # A one-wei inverse/forward loss is exact only when the complete quote was
+    # delivered. A genuinely short vault delivery keeps its actual value.
+    if amountSent == maxAssetAmount and deliveredValue == unsafe_sub(maxRedeemValue, 1):
         deliveredValue = maxRedeemValue
     repayValue: uint256 = min(min(deliveredValue, maxRedeemValue), userDebt.amount)
     assert repayValue != 0 # dev: zero repayment value (vault under-send)

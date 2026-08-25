@@ -78,7 +78,7 @@ interface Registry:
     def isValidAddr(_addr: address) -> bool: view
 
 interface AuctionHouse:
-    def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _preflightSafeConversion: bool, _a: addys.Addys) -> (uint256, bool): nonpayable
+    def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _preflightSafeConversion: bool, _maxZeroValueAmount: uint256, _a: addys.Addys) -> (uint256, bool): nonpayable
 
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
@@ -522,6 +522,7 @@ def swapCollateral(
         msg.sender, # recipient is governance
         withdrawVaultAddr,
         False,
+        0,
         a,
     )
     assert withdrawnAmount != 0 # dev: no collateral withdrawn
@@ -1282,14 +1283,23 @@ def _transferCollateral(
     # withdraw and transfer to recipient -- AuctionHouse has permissions to perform this
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
-    amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, isUnderscoreBasicEarnVault, _a)
+    amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(
+        _fromUser,
+        _asset,
+        maxAssetAmount,
+        _toUser,
+        _vaultAddr,
+        isUnderscoreBasicEarnVault,
+        maxAssetAmount // _targetUsdValue,
+        _a,
+    )
     assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
     # GREEN is worth one USD per unit; specialized branches overwrite this.
     usdValue: uint256 = amountSent
     if amountSent != 0:
         # PriceDesk floors nonzero dust to one USD wei; enforce the inverse
         # quote's minimum creditable delivery before collateral can leave.
-        assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: zero collateral value (vault under-send)
+        assert amountSent > maxAssetAmount // _targetUsdValue # dev: zero collateral value (vault under-send)
         self._checkpointSender(_fromUser, _vaultId, _vaultAddr, _asset, _a.lootbox)
         if isUnderscoreBasicEarnVault:
             # Cap max conversion at convertToAssetsSafe + configured spread so
@@ -1305,8 +1315,10 @@ def _transferCollateral(
             usdValue = staticcall IERC4626(_a.savingsGreen).convertToAssets(amountSent)
         elif _asset != _a.greenToken:
             usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, True)
-        assert usdValue != 0 and usdValue <= _targetUsdValue # dev: zero collateral value (vault under-send)
-        usdValue = unsafe_add(usdValue, convert(usdValue == unsafe_sub(_targetUsdValue, 1), uint256))
+        # Safe-conversion rounding may slightly overshoot the requested USD;
+        # never consume more debt than the deleverage target.
+        usdValue = min(usdValue, _targetUsdValue)
+        assert usdValue != 0 # dev: zero collateral value (vault under-send)
 
     return usdValue, amountSent, isPositionDepleted
 
@@ -1324,7 +1336,11 @@ def _getUnderscoreAddrType(_addr: address, _mc: address, _basicEarnVaultOnly: bo
         # governance must keep full-payoff extras disabled while using it.
         return 0
 
-    vaultRegistry: address = self._getUnderscoreVaultRegistry(underscore)
+    vaultRegistry: address = self.underscoreVaultRegistry[underscore]
+    if vaultRegistry == empty(address):
+        vaultRegistry = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+        if vaultRegistry != empty(address):
+            self.underscoreVaultRegistry[underscore] = vaultRegistry
     if vaultRegistry != empty(address):
         if _basicEarnVaultOnly:
             return UNDERSCORE_EARN_VAULT_CALLER_TYPE if staticcall VaultRegistry(vaultRegistry).isBasicEarnVault(_addr) else 0
@@ -1338,17 +1354,6 @@ def _getUnderscoreAddrType(_addr: address, _mc: address, _basicEarnVaultOnly: bo
     if undyLegoBook == empty(address):
         return 0
     return UNDERSCORE_LEGO_CALLER_TYPE if staticcall Registry(undyLegoBook).isValidAddr(_addr) else 0
-
-
-@internal
-def _getUnderscoreVaultRegistry(_underscoreRegistry: address) -> address:
-    vaultRegistry: address = self.underscoreVaultRegistry[_underscoreRegistry]
-    if vaultRegistry == empty(address):
-        vaultRegistry = staticcall Registry(_underscoreRegistry).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
-        if vaultRegistry != empty(address):
-            self.underscoreVaultRegistry[_underscoreRegistry] = vaultRegistry
-    return vaultRegistry
-
 
 @view
 @internal

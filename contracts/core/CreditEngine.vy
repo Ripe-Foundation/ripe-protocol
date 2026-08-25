@@ -560,9 +560,10 @@ def _repayDebt(
         isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
         bt = self._getUserBorrowTerms(_user, _numUserVaults, _repayType != RepayType.STANDARD, 0, empty(address), isUndyVault, _repayType == RepayType.STANDARD, _a)
 
-        # highestLtv 0 = no eligible debt-bearing collateral; max_value = non-strict valuation saw amount without a usable price.
-        # Keep stored terms in both cases; conservative capacity still controls this repayment's health result.
-        if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT:
+        # Preserve stored terms only for no eligible collateral (0) or an
+        # unavailable-price sentinel (maxuint). Priced unsupported collateral
+        # remains exit-only, but repayment must still refresh its debt terms.
+        if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT + 1:
             userDebt.debtTerms = bt.debtTerms
         hasGoodDebtHealth = userDebt.amount <= bt.totalMaxDebt
 
@@ -746,7 +747,8 @@ def _getUserBorrowTerms(
                     if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
                         bt.hasQuarantinedAsset = True
             if hasBalance and staticcall MissionControl(_a.missionControl).indexOfAsset(asset) == 0:
-                bt.highestLtv = HUNDRED_PERCENT + 1
+                if bt.highestLtv < HUNDRED_PERCENT + 1:
+                    bt.highestLtv = HUNDRED_PERCENT + 1
             if amount != 0:
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
                 # A positive debt-bearing balance without a usable price

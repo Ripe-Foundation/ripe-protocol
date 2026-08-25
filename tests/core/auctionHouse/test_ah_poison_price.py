@@ -500,7 +500,7 @@ def test_auction_house_credits_forward_value_of_zero_decimal_delivery(
     assert coarse_token.balanceOf(alice) == 1
 
 
-def test_auction_house_full_quote_tolerates_only_one_wei_roundtrip_loss(
+def test_auction_house_full_quote_credits_actual_forward_value(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -546,7 +546,7 @@ def test_auction_house_full_quote_tolerates_only_one_wei_roundtrip_loss(
     quoted_amount = price_desk.getAssetAmount(bravo_token, target, True)
     assert price_desk.getUsdValue(bravo_token, quoted_amount, True) == target - 1
 
-    _fund_alice(green_token, whale, teller, alice, target)
+    alice_green_before = _fund_alice(green_token, whale, teller, alice, target)
     vault_id = vault_book.getRegId(simple_erc20_vault)
     green_spent = teller.buyManyFungibleAuctions(
         [(bob, vault_id, bravo_token, MAX_UINT256)],
@@ -558,10 +558,13 @@ def test_auction_house_full_quote_tolerates_only_one_wei_roundtrip_loss(
         sender=alice,
     )
 
-    assert green_spent == target
+    expected_value = target - 1
+    assert green_spent == expected_value
     log = filter_logs(teller, "FungAuctionPurchased")[0]
     assert log.collateralAmountSent == quoted_amount
-    assert log.collateralUsdValueSent == target
+    assert log.collateralUsdValueSent == expected_value
+    assert log.greenSpent == expected_value
+    assert green_token.balanceOf(alice) == alice_green_before - expected_value
 
 
 def test_auction_house_dust_only_purchase_reverts_no_green_spent(
@@ -964,18 +967,29 @@ def test_wsuper_price_desk_auction_house_tx(
 
 
 @pytest.mark.parametrize(
-    "under_send,payment_amount,expected_reason",
+    "settlement_price,under_send,payment_amount,expected_reason,expected_credit",
     [
-        (1, 100 * EIGHTEEN_DECIMALS, "amounts do not match up"),
+        (1, 1, 100 * EIGHTEEN_DECIMALS, "amounts do not match up", None),
         # Regression: a zero send against a one-wei target must not be rounded
         # from target - 1 into one wei of collateral credit.
-        (0, 1, "no green spent"),
+        (1, 0, 1, "no green spent", None),
+        # Exact $1 quote minus one raw unit may settle, but the buyer must pay
+        # only the forward value delivered.
+        (
+            EIGHTEEN_DECIMALS,
+            EIGHTEEN_DECIMALS - 1,
+            EIGHTEEN_DECIMALS,
+            None,
+            EIGHTEEN_DECIMALS - 1,
+        ),
     ],
 )
-def test_auction_house_undersend_vault_hits_zero_usd_backstop(
+def test_auction_house_undersend_vault_settles_actual_value_or_reverts(
+    settlement_price,
     under_send,
     payment_amount,
     expected_reason,
+    expected_credit,
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -1027,11 +1041,11 @@ def test_auction_house_undersend_vault_hits_zero_usd_backstop(
         mock_price_source.setPrice(token, 12 * EIGHTEEN_DECIMALS // 100)
         assert credit_engine.canLiquidateUser(borrower)
         teller.liquidateUser(borrower, False, sender=keeper)
-        mock_price_source.setPrice(token, 1)
+        mock_price_source.setPrice(token, settlement_price)
         vault.setUnderSendAmount(under_send)
         # PriceDesk's deliberate dust floor is exactly why the amount-domain
         # post-transfer guard is required.
-        if under_send != 0:
+        if settlement_price == 1 and under_send != 0:
             assert price_desk.getUsdValue(token, under_send, True) == 1
         _fund_alice(green_token, whale, teller, buyer, 100 * EIGHTEEN_DECIMALS)
         before = {
@@ -1043,8 +1057,28 @@ def test_auction_house_undersend_vault_hits_zero_usd_backstop(
             "has_auc": ledger.hasFungibleAuction(borrower, vault_id, token),
             "points": lootbox.getLatestDepositPoints(borrower, vault_id, token),
         }
-        with boa.reverts(expected_reason):
-            teller.buyManyFungibleAuctions(
+        if expected_reason is not None:
+            with boa.reverts(expected_reason):
+                teller.buyManyFungibleAuctions(
+                    [(borrower, vault_id, token.address, MAX_UINT256)],
+                    payment_amount,
+                    False,
+                    False,
+                    False,
+                    buyer,
+                    sender=buyer,
+                )
+            assert {
+                "debt": credit_engine.getUserDebtAmount(borrower),
+                "buyer_green": green_token.balanceOf(buyer),
+                "buyer_token": token.balanceOf(buyer),
+                "borrower_token": vault.getTotalAmountForUser(borrower, token),
+                "vault_token": token.balanceOf(vault),
+                "has_auc": ledger.hasFungibleAuction(borrower, vault_id, token),
+                "points": lootbox.getLatestDepositPoints(borrower, vault_id, token),
+            } == before
+        else:
+            green_spent = teller.buyManyFungibleAuctions(
                 [(borrower, vault_id, token.address, MAX_UINT256)],
                 payment_amount,
                 False,
@@ -1053,15 +1087,14 @@ def test_auction_house_undersend_vault_hits_zero_usd_backstop(
                 buyer,
                 sender=buyer,
             )
-        assert {
-            "debt": credit_engine.getUserDebtAmount(borrower),
-            "buyer_green": green_token.balanceOf(buyer),
-            "buyer_token": token.balanceOf(buyer),
-            "borrower_token": vault.getTotalAmountForUser(borrower, token),
-            "vault_token": token.balanceOf(vault),
-            "has_auc": ledger.hasFungibleAuction(borrower, vault_id, token),
-            "points": lootbox.getLatestDepositPoints(borrower, vault_id, token),
-        } == before
+            assert green_spent == expected_credit
+            log = filter_logs(teller, "FungAuctionPurchased")[0]
+            assert log.collateralAmountSent == under_send
+            assert log.collateralUsdValueSent == expected_credit
+            assert log.greenSpent == expected_credit
+            assert green_token.balanceOf(buyer) == before["buyer_green"] - expected_credit
+            assert token.balanceOf(buyer) == before["buyer_token"] + under_send
+            assert vault.getTotalAmountForUser(borrower, token) == before["borrower_token"] - under_send
 
 
 def test_auction_house_shares_vault_dust_preview_is_skipped(

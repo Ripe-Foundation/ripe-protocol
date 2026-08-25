@@ -1027,18 +1027,15 @@ def _performHousekeeping(
         assert not staticcall Ledger(_a.ledger).isLockedAccount(_user) # dev: account locked
 
     # update green ref pool snapshot
-    curvePrices: address = staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID)
-    if curvePrices != empty(address):
-        # Snapshot maintenance is best-effort housekeeping. A broken or
-        # unexpectedly expensive Curve route must not block the user action.
-        if not raw_call(
-            curvePrices,
+    # A call to the zero address succeeds as a no-op when CurvePrices is not
+    # configured. A broken or expensive configured route remains fail-open.
+    if not raw_call(
+            staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID),
             method_id("addGreenRefPoolSnapshot()"),
             gas=500_000,
-            max_outsize=0,
             revert_on_failure=False,
         ):
-            log CurveSnapshotFailed()
+        log CurveSnapshotFailed()
 
     # update debt
     if _shouldUpdateDebt:

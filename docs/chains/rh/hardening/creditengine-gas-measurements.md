@@ -33,9 +33,9 @@ does not price a zero amount or restore the prohibited `(asset, 0)` skip
 
 | Field | Frozen value and derivation |
 | --- | --- |
-| Reviewed implementation parent | `94c2185e5548eaff2f1e6ddd24de05fd21a63910`; the source hash below binds the measured CreditEngine exactly |
-| CreditEngine source | `contracts/core/CreditEngine.vy`, SHA-256 `6a9d3cf6c0b508a84622b0307673705d357a9633068b9b67a910309585ec40ab` |
-| Environment | repository-local `<repo root>/.venv/bin/python`, derived by the test from its own repository root; because the detached linked worktree had no local `.venv`, the run selected `/Users/wigglez/dev/ripe-protocol/.venv/bin/python` through `RIPE_C2_MEASUREMENT_INTERPRETER`, resolving to `/Users/wigglez/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/bin/python3.12`; installed-distribution manifest SHA-256 `5df5fbc4e94b394f4fbc26a7b2877c731ee33fe7db267a734010c6039ac61138`; interpreter SHA-256 `e2605291e058fdbe3102e8185d0ac5fe0e063398de617010a6af3a42a78f05e3`; `requirements.txt` SHA-256 `4f0097670e618e8210fc7d961d851df643332b3b52d156a0a0b9171e86d1906f` |
+| Reviewed candidate | PR #211 head `5a623218e6d39b6f1a4799db586160411fc255f9` plus the source-hash-bound remediation below |
+| CreditEngine source | `contracts/core/CreditEngine.vy`, SHA-256 `f0811ea1d20d8c68853608bc2fbef03168c6c3e23228d84c9304b6bb0f1b8688` |
+| Environment | repository-local `<repo root>/.venv/bin/python`, selected through `RIPE_C2_MEASUREMENT_INTERPRETER` and resolving to the attested Python 3.12 interpreter; installed-distribution manifest SHA-256 `5df5fbc4e94b394f4fbc26a7b2877c731ee33fe7db267a734010c6039ac61138`; interpreter SHA-256 `e2605291e058fdbe3102e8185d0ac5fe0e063398de617010a6af3a42a78f05e3`; `requirements.txt` SHA-256 `4f0097670e618e8210fc7d961d851df643332b3b52d156a0a0b9171e86d1906f` |
 | Compiler | `Vyper 0.4.3+commit.bff19ea2`; CreditEngine source pragma governs `codesize`; no `-O` override |
 | EVM harness | Titanoboa from the repository `.venv` above; local ephemeral deployment only |
 | Public subject | `credit_engine.getUserBorrowTerms(user, True)` |
@@ -104,7 +104,7 @@ row. The synthetic vault was extended only with the two current Vault reader
 methods needed to preserve that comparison. The previous external validation
 environment was no longer present, so the repository `.venv` was freshly
 attested with the hashes above before collection. The accepted run completed
-with `1 passed, 3 warnings in 107.11s`. All warnings were pytest
+with `1 passed, 3 warnings in 107.83s`. All warnings were pytest
 already-imported assertion-rewrite warnings for Hypothesis and Boa; no test was
 skipped, xfailed, or deselected.
 The accepted harness counts only PriceDesk frames whose calldata selector is

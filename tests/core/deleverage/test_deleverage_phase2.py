@@ -2750,6 +2750,93 @@ def test_phase2_dust_user_does_not_revert_later_healthy_batch_user(
     assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_dust
 
 
+def test_phase2_zero_value_plain_asset_does_not_block_later_batch_user(
+    ripe_hq,
+    switchboard,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alice,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    endaoment_funds,
+    switchboard_alpha,
+):
+    """A pre-transfer zero-credit skip preserves dust and later-user liveness."""
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    # Bob's healthy backing keeps his debt valid but is not in the phase-2 route.
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+    )
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    setupDeleverage(
+        alice,
+        charlie_token,
+        charlie_token_whale,
+        deposit_amount=100 * SIX_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    dust_amount = EIGHTEEN_DECIMALS // 2
+    performDeposit(bob, dust_amount, bravo_token, bravo_token_whale, simple_erc20_vault)
+    mock_price_source.setPrice(bravo_token, 1)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[
+            (simple_erc20_vault, bravo_token),
+            (simple_erc20_vault, charlie_token),
+        ],
+    )
+
+    target = 10 * EIGHTEEN_DECIMALS
+    bob_debt_before = credit_engine.getUserDebtAmount(bob)
+    alice_debt_before = credit_engine.getUserDebtAmount(alice)
+    bob_dust_before = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    dust_endao_before = bravo_token.balanceOf(endaoment_funds)
+    charlie_endao_before = charlie_token.balanceOf(endaoment_funds)
+
+    total_repaid = teller.deleverageManyUsers(
+        [(bob, target), (alice, target)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert total_repaid == target
+    assert credit_engine.getUserDebtAmount(bob) == bob_debt_before
+    assert credit_engine.getUserDebtAmount(alice) == alice_debt_before - target
+    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == bob_dust_before
+    assert bravo_token.balanceOf(endaoment_funds) == dust_endao_before
+    assert charlie_token.balanceOf(endaoment_funds) == charlie_endao_before + 10 * SIX_DECIMALS
+
+
 def test_phase2_underscore_earn_vault_depleted_position_credits_from_amount_sent(
     ripe_hq,  # Ensures switchboard is registered
     switchboard,  # Ensures switchboard_alpha is registered

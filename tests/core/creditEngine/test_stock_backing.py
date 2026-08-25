@@ -165,6 +165,11 @@ def isStabVaultId(_vaultId: uint256) -> bool:
 
 @view
 @external
+def indexOfAsset(_asset: address) -> uint256:
+    return 1 if _asset == allowed_asset else 0
+
+@view
+@external
 def getDebtTerms(_asset: address) -> cs.DebtTerms:
     assert _asset == allowed_asset, "zero-position terms lookup"
     return terms
@@ -924,7 +929,7 @@ def test_c2_marginal_gas_protocol(
         Path("contracts/core/CreditEngine.vy").read_bytes()
     ).hexdigest()
     assert source_sha256 == (
-        "6a9d3cf6c0b508a84622b0307673705d357a9633068b9b67a910309585ec40ab"
+        "f0811ea1d20d8c68853608bc2fbef03168c6c3e23228d84c9304b6bb0f1b8688"
     )
     manifest_rows = sorted(
         (

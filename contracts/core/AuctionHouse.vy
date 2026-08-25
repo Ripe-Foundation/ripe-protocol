@@ -1218,18 +1218,21 @@ def withdrawTokensFromVault(
     _recipient: address,
     _vaultAddr: address,
     _preflightSafeConversion: bool,
+    _maxZeroValueAmount: uint256,
     _a: addys.Addys,
 ) -> (uint256, bool):
     assert msg.sender == addys._getDeleverageAddr() # dev: only deleverage allowed
     totalAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset)
-    if totalAmount == 0:
+    withdrawableAmount: uint256 = min(_amount, totalAmount)
+    # Compare the capped request, not the whole position: a one-unit residual
+    # quote can be zero-value even when the user owns a larger balance.
+    if withdrawableAmount <= _maxZeroValueAmount:
         return 0, False
     if _preflightSafeConversion:
         # Mirror BasicVault's user-ledger and token-balance clamps up front; Deleverage
         # still asserts post-withdraw consistency for anything outside these bounds.
-        withdrawableAmount: uint256 = min(_amount, totalAmount)
         withdrawableAmount = min(withdrawableAmount, staticcall IERC20(_asset).balanceOf(_vaultAddr))
-        if staticcall UnderscoreVault(_asset).convertToAssetsSafe(withdrawableAmount) == 0:
+        if withdrawableAmount <= _maxZeroValueAmount or staticcall UnderscoreVault(_asset).convertToAssetsSafe(withdrawableAmount) == 0:
             return 0, False
     return extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
 
@@ -1278,8 +1281,6 @@ def _transferCollateral(
         # post-transfer amount to the inverse quote instead of trusting that floor.
         assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: amounts do not match up
         assert usdValue != 0 and usdValue <= _targetUsdValue # dev: amounts do not match up
-        if usdValue == unsafe_sub(_targetUsdValue, 1):
-            usdValue = _targetUsdValue
         for i: uint256 in range(2):
             user: address = _fromUser
             if i != 0:

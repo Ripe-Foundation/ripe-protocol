@@ -8,21 +8,21 @@ EIP170_LIMIT = 24_576
 # RipeGov headroom is 460 bytes after the migration, SharesVault, and
 # governance-remediation changes. Any RipeGov edit must remeasure this pin.
 # Composed SwitchboardAlpha headroom is 14 bytes after binding its chain-local
-# Pyth source ID. Teller and CreditEngine retain 7 and 28 bytes respectively at
+# Pyth source ID. Teller and CreditEngine retain 24 and 16 bytes respectively at
 # this head. Endaoment retains 1,190 bytes after binding its chain-local Curve
 # source ID. These pins include the deployed immutable data.
 # Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
 # runtime. Any Lootbox edit, however small, must recompile and remeasure this
 # pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
 # load-bearing.
-# StabilityPool headroom is 216 bytes after the actual-delivery claim,
-# strict sub-micro-dollar final-exit tolerance, and
+# StabilityPool headroom is 242 bytes after the actual-delivery claim,
+# retention-threshold final-exit tolerance, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
 # and partial-reservation admission remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
 # SwitchboardBravo retains 910 bytes of headroom. AuctionHouse and Deleverage
-# retain only 17 and 14 bytes respectively. CurvePrices retains 1,170 bytes
+# retain 19 and 76 bytes respectively. CurvePrices retains 1,170 bytes
 # after switching to codesize optimization for confirmation-time registry
 # snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
 # metadata binding and checked runtime arithmetic. Any edit to these contracts
@@ -35,7 +35,7 @@ EXPECTED_RUNTIME_BYTES = {
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
-    "Teller": 24569,
+    "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
@@ -46,13 +46,13 @@ EXPECTED_RUNTIME_BYTES = {
     "RebaseErc20": 11602,
     "RipeGov": 24116,
     "HumanResources": 14777,
-    "AuctionHouse": 24559,
-    "CreditEngine": 24548,
-    "CreditRedeem": 8501,
+    "AuctionHouse": 24557,
+    "CreditEngine": 24560,
+    "CreditRedeem": 8523,
     "Endaoment": 23386,
     "PriceDesk": 17742,
-    "Deleverage": 24562,
-    "StabilityPool": 24360,
+    "Deleverage": 24500,
+    "StabilityPool": 24334,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 16672,
     "CurvePrices": 23406,

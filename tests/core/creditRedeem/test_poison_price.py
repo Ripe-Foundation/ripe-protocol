@@ -326,6 +326,72 @@ def test_credit_redeem_credits_forward_value_of_zero_decimal_delivery(
     assert coarse_token.balanceOf(alice) == 1
 
 
+def test_credit_redeem_full_quote_preserves_one_wei_inverse_roundtrip(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    bob,
+    alice,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    price_desk,
+):
+    _make_bob_redeemable_on_poisoned_bravo(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        credit_engine,
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        bravo_token,
+        bravo_token_whale,
+        100 * EIGHTEEN_DECIMALS,
+    )
+    target = 5 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(bravo_token, 6 * EIGHTEEN_DECIMALS // 10)
+    mock_price_source.setPrice(alpha_token, 4 * EIGHTEEN_DECIMALS // 10)
+    assert credit_engine.canRedeemUserCollateral(bob)
+    quoted_amount = price_desk.getAssetAmount(bravo_token, target, False)
+    forward_value = price_desk.getUsdValue(bravo_token, quoted_amount, False)
+    assert forward_value == target - 1
+
+    alice_green_before = _fund_alice(green_token, whale, teller, alice, target)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    green_spent = redeem_collateral(
+        teller,
+        bob,
+        vault_id,
+        bravo_token,
+        target,
+        should_refund_savings_green=False,
+        sender=alice,
+    )
+
+    assert green_spent == target
+    log = filter_logs(teller, "CollateralRedeemed")[0]
+    assert log.amount == quoted_amount
+    assert log.repayValue == target
+    assert green_token.balanceOf(alice) == alice_green_before - target
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - target
+
+
 def test_credit_redeem_multi_token_payment_scales_by_whole_tokens(
     setGeneralConfig,
     setAssetConfig,
@@ -734,19 +800,29 @@ def test_credit_redeem_rebase_vault_preview_skips_zero_credit(
 
 
 @pytest.mark.parametrize(
-    "price,under_send,payment_amount,zero_forward_price",
+    "price,under_send,payment_amount,zero_forward_price,expected_repay",
     [
-        (1, EIGHTEEN_DECIMALS // 2, 100 * EIGHTEEN_DECIMALS, False),
+        (1, EIGHTEEN_DECIMALS // 2, 100 * EIGHTEEN_DECIMALS, False, None),
         # The vault changes the source after the inverse quote. With a one-wei
         # target, zero must be rejected before target-1 normalization.
-        (EIGHTEEN_DECIMALS, 1, 1, True),
+        (EIGHTEEN_DECIMALS, 1, 1, True, None),
+        # Exact $1 quote minus one raw unit: settle the forward value, never
+        # burn or repay the missing wei.
+        (
+            EIGHTEEN_DECIMALS,
+            EIGHTEEN_DECIMALS - 1,
+            EIGHTEEN_DECIMALS,
+            False,
+            EIGHTEEN_DECIMALS - 1,
+        ),
     ],
 )
-def test_credit_redeem_registered_under_send_reverts_atomically(
+def test_credit_redeem_registered_under_send_settles_actual_value_or_reverts(
     price,
     under_send,
     payment_amount,
     zero_forward_price,
+    expected_repay,
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -793,9 +869,10 @@ def test_credit_redeem_registered_under_send_reverts_atomically(
     reported = EIGHTEEN_DECIMALS
     source_to_zero = mock_price_source.address if zero_forward_price else ZERO_ADDRESS
     mock.configure(bravo_token.address, bob, reported, under_send, source_to_zero)
-    # The raw value is below one USD wei, while PriceDesk deliberately returns
-    # one; the amount-domain guard must still reject the vault under-send.
-    assert price_desk.getUsdValue(bravo_token, under_send, True) == 1
+    # The dust cases exercise PriceDesk's one-wei floor; the exact-under-send
+    # case remains in the normal forward-value domain.
+    if expected_repay is None:
+        assert price_desk.getUsdValue(bravo_token, under_send, True) == 1
     ledger.addVaultToUser(bob, mock_vault_id, sender=teller.address)
     assert credit_engine.canRedeemUserCollateral(bob)
     assert mock.getTotalAmountForUser(bob, bravo_token) == reported
@@ -814,8 +891,32 @@ def test_credit_redeem_registered_under_send_reverts_atomically(
         "alice_points": lootbox.getLatestDepositPoints(alice, mock_vault_id, bravo_token),
     }
 
-    with boa.reverts("zero repayment value (vault under-send)"):
-        teller.redeemCollateralFromMany(
+    if expected_repay is None:
+        with boa.reverts("zero repayment value (vault under-send)"):
+            teller.redeemCollateralFromMany(
+                [(bob, mock_vault_id, bravo_token.address, MAX_UINT256)],
+                payment_amount,
+                False,
+                True,
+                False,
+                alice,
+                sender=alice,
+            )
+
+        after_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0]
+        assert after_debt.amount == before["debt"]
+        assert after_debt.principal == before["principal"]
+        assert green_token.balanceOf(alice) == before["alice_green"]
+        assert green_token.allowance(alice, teller) == before["alice_allowance"]
+        assert green_token.balanceOf(credit_redeem) == before["credit_redeem_green"] == 0
+        assert green_token.totalSupply() == before["green_supply"]
+        assert mock.balances(bob) == before["bob_mock"] == reported
+        assert mock.balances(alice) == before["alice_mock"] == 0
+        assert lootbox.getLatestDepositPoints(bob, mock_vault_id, bravo_token) == before["bob_points"]
+        assert lootbox.getLatestDepositPoints(alice, mock_vault_id, bravo_token) == before["alice_points"]
+        assert filter_logs(teller, "CollateralRedeemed") == []
+    else:
+        green_spent = teller.redeemCollateralFromMany(
             [(bob, mock_vault_id, bravo_token.address, MAX_UINT256)],
             payment_amount,
             False,
@@ -824,19 +925,15 @@ def test_credit_redeem_registered_under_send_reverts_atomically(
             alice,
             sender=alice,
         )
-
-    after_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0]
-    assert after_debt.amount == before["debt"]
-    assert after_debt.principal == before["principal"]
-    assert green_token.balanceOf(alice) == before["alice_green"]
-    assert green_token.allowance(alice, teller) == before["alice_allowance"]
-    assert green_token.balanceOf(credit_redeem) == before["credit_redeem_green"] == 0
-    assert green_token.totalSupply() == before["green_supply"]
-    assert mock.balances(bob) == before["bob_mock"] == reported
-    assert mock.balances(alice) == before["alice_mock"] == 0
-    assert lootbox.getLatestDepositPoints(bob, mock_vault_id, bravo_token) == before["bob_points"]
-    assert lootbox.getLatestDepositPoints(alice, mock_vault_id, bravo_token) == before["alice_points"]
-    assert filter_logs(teller, "CollateralRedeemed") == []
+        log = filter_logs(teller, "CollateralRedeemed")[0]
+        assert green_spent == expected_repay
+        assert log.amount == under_send
+        assert log.repayValue == expected_repay
+        assert credit_engine.getUserDebtAmount(bob) == before["debt"] - expected_repay
+        assert green_token.balanceOf(alice) == before["alice_green"] - expected_repay
+        assert green_token.totalSupply() == before["green_supply"] - expected_repay
+        assert mock.balances(bob) == before["bob_mock"] - under_send
+        assert mock.balances(alice) == before["alice_mock"] + under_send
 
 
 def test_wsuper_price_desk_credit_redeem_tx(
