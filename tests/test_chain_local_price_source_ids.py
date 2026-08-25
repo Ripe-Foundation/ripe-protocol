@@ -27,6 +27,18 @@ def addGreenRefPoolSnapshot() -> bool:
 """
 
 
+EXPENSIVE_CURVE_SNAPSHOT_TARGET_SOURCE = """
+# @version 0.4.3
+
+@external
+def addGreenRefPoolSnapshot() -> bool:
+    total: uint256 = 0
+    for i: uint256 in range(10_000):
+        total = unsafe_add(total, i)
+    return total != 0
+"""
+
+
 REVERTING_STABILIZER_SOURCE = """
 # @version 0.4.3
 
@@ -275,3 +287,50 @@ def test_teller_uses_constructor_curve_id_and_zero_disables(
             sender=credit_engine.address,
         )
         assert target.snapshotCalls() == 1
+
+
+def test_teller_curve_snapshot_is_bounded_best_effort_housekeeping(
+    ripe_hq,
+    governance,
+    price_desk,
+    credit_engine,
+    ledger,
+    alice,
+):
+    with boa.env.anchor():
+        target = boa.loads(
+            EXPENSIVE_CURVE_SNAPSHOT_TARGET_SOURCE,
+            name="expensive_chain_local_teller_curve_target",
+        )
+        source_id = _register_price_source(
+            price_desk,
+            governance,
+            target,
+            "Expensive chain-local Curve snapshot target",
+        )
+        candidate = boa.load(
+            "contracts/core/Teller.vy",
+            ripe_hq,
+            False,
+            source_id,
+            name="teller_bounded_curve_snapshot",
+        )
+
+        assert ripe_hq.startAddressUpdateToRegistry(
+            17,
+            candidate,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
+        assert ripe_hq.confirmAddressUpdateToRegistry(17, sender=governance.address)
+
+        # The target exhausts the 500k stipend, but required Ledger
+        # housekeeping remains fail-closed and completes normally.
+        candidate.performHousekeeping(
+            False,
+            alice,
+            False,
+            sender=credit_engine.address,
+            gas=1_500_000,
+        )
+        assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number

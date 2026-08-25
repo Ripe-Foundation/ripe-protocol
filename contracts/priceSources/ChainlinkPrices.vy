@@ -29,6 +29,9 @@ interface ChainlinkFeed:
 interface MissionControl:
     def getPriceStaleTime() -> uint256: view
 
+interface PriceDesk:
+    def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
+
 struct ChainlinkRound:
     roundId: uint80
     answer: int256
@@ -495,6 +498,14 @@ def confirmNewPriceFeed(_asset: address) -> bool:
 
     # save new feed config
     self.feedConfig[_asset] = d.config
+    # Initial deployment seeds feeds before PriceDesk is registered and before
+    # the action timelock is activated. Every post-setup confirmation qualifies.
+    if timeLock.actionTimeLock != 0:
+        qualifiedPrice: uint256 = 0
+        sourceStatus: uint256 = 0
+        qualifiedPrice, sourceStatus = staticcall PriceDesk(addys._getPriceDeskAddr()).qualifyCallerPriceSource(_asset)
+        assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
+
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
     priceData._addPricedAsset(_asset)
 
@@ -643,6 +654,12 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 
     # save new feed config
     self.feedConfig[_asset] = d.config
+    if timeLock.actionTimeLock != 0:
+        qualifiedPrice: uint256 = 0
+        sourceStatus: uint256 = 0
+        qualifiedPrice, sourceStatus = staticcall PriceDesk(addys._getPriceDeskAddr()).qualifyCallerPriceSource(_asset)
+        assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
+
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
 
     log ChainlinkFeedUpdated(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, staleTime=d.config.staleTime, oldFeed=oldFeed)

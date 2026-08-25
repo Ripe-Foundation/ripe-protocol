@@ -1,7 +1,7 @@
 import boa
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs, redeem_from_stability_pool
+from conf_utils import filter_logs, redeem_from_stability_pool, sync_deployed_token
 
 
 def test_stab_vault_redemptions_basic(
@@ -76,6 +76,73 @@ def test_stab_vault_redemptions_basic(
     # these should stay the same!
     assert stability_pool.getTotalUserValue(alice, alpha_token) == pre_user_value
     assert stability_pool.getTotalValue(alpha_token) == pre_total_value
+
+
+def test_stab_redemption_spends_forward_value_of_zero_decimal_delivery(
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Token",
+        "COARSE",
+        0,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    coarse_token.transfer(stability_pool, 1, sender=governance.address)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        3 * EIGHTEEN_DECIMALS,
+        coarse_token,
+        1,
+        ZERO_ADDRESS,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    payment = 5 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, payment, sender=whale)
+    green_token.approve(teller, payment, sender=bob)
+    vault_id = vault_book.getRegId(stability_pool)
+    green_spent = redeem_from_stability_pool(
+        teller,
+        vault_id,
+        coarse_token,
+        payment,
+        bob,
+        should_refund_savings_green=False,
+        sender=bob,
+    )
+
+    assert green_spent == 3 * EIGHTEEN_DECIMALS
+    assert coarse_token.balanceOf(bob) == 1
+    assert green_token.balanceOf(bob) == 2 * EIGHTEEN_DECIMALS
 
 
 def test_stab_vault_redemptions_refund(

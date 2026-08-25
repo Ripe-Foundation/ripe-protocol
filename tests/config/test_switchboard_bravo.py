@@ -851,6 +851,58 @@ def test_asset_deposit_param_update_uses_target_mission_control_pointers(
     assert config.stakersPointsAlloc == 25_00
 
 
+@pytest.mark.parametrize(
+    "action_kind",
+    ("deposit", "liquidation", "debt", "whitelist"),
+)
+def test_queued_non_add_update_cannot_reregister_deregistered_asset(
+    action_kind,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+    mock_whitelist,
+):
+    _seed_binding_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+    )
+    action_id = _queue_binding_action(
+        action_kind,
+        switchboard_bravo,
+        governance,
+        alpha_token.address,
+        mock_whitelist,
+    )
+
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_bravo.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    with boa.reverts("invalid asset"):
+        switchboard_bravo.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    add_action_id = _add_asset(
+        switchboard_bravo,
+        governance,
+        alpha_token.address,
+        [1],
+        0,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, add_action_id)
+    assert mission_control.isSupportedAsset(alpha_token.address)
+
+
 def test_governance_permissions(switchboard_bravo, bob):
     # Test functions that require governance permissions
     with boa.reverts("no perms"):

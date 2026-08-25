@@ -4,7 +4,12 @@ from boa.contracts.base_evm_contract import BoaError
 from eth_utils import to_checksum_address
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import assert_reverted_call, claim_from_stability_pool, filter_logs
+from conf_utils import (
+    assert_reverted_call,
+    claim_from_stability_pool,
+    filter_logs,
+    sync_deployed_token,
+)
 
 
 ARB_SYS = to_checksum_address("0x0000000000000000000000000000000000000064")
@@ -108,6 +113,69 @@ def test_stab_vault_claims_full(
     assert stability_pool.getTotalValue(alpha_token) <= 1
 
     _test(claimable_amount, bravo_token.balanceOf(bob))
+
+
+def test_stab_claim_credits_forward_value_of_zero_decimal_delivery(
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Token",
+        "COARSE",
+        0,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    coarse_token.transfer(stability_pool, 1, sender=governance.address)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        3 * EIGHTEEN_DECIMALS,
+        coarse_token,
+        1,
+        ZERO_ADDRESS,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+    claimed_value = claim_from_stability_pool(
+        teller,
+        vault_id,
+        alpha_token,
+        coarse_token,
+        5 * EIGHTEEN_DECIMALS,
+        sender=bob,
+    )
+
+    assert claimed_value == 3 * EIGHTEEN_DECIMALS
+    log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
+    assert log.claimAmount == 1
+    assert log.claimUsdValue == 3 * EIGHTEEN_DECIMALS
+    assert coarse_token.balanceOf(bob) == 1
 
 
 def test_stability_claim_checkpoints_deposit_points_after_share_burn(

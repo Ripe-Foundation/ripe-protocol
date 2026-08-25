@@ -1625,11 +1625,16 @@ def test_mission_control_comprehensive_config_flow(mission_control, switchboard_
     
     # 6. Test that asset-specific configs now reflect deregistration
     deposit_config = mission_control.getTellerDepositConfig(1, alpha_token.address, alice)
-    # Note: Asset config remains but asset is no longer in registry
-    # The doesVaultSupportAsset still works because assetConfig is not cleared
-    # But isSupportedAsset should return False
-    assert deposit_config.doesVaultSupportAsset  # config still exists
-    assert not mission_control.isSupportedAsset(alpha_token.address)  # but not in registry
+    assert not deposit_config.canDepositAsset
+    assert not deposit_config.doesVaultSupportAsset
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    # Retained configuration remains available for existing positions to unwind.
+    withdraw_config = mission_control.getTellerWithdrawConfig(
+        alpha_token.address, alice, alice
+    )
+    assert withdraw_config.canWithdrawAsset
+    assert withdraw_config.canWithdrawForUser
 
 
 ####################

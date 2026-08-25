@@ -29,7 +29,7 @@ EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
     "SwitchboardAlpha": 24562,
     "SwitchboardBravo": 24550,
-    "SwitchboardCharlie": 23855,
+    "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,

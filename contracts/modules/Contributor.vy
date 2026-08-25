@@ -173,6 +173,12 @@ def _getHrAddr() -> address:
     return staticcall RipeHq(RIPE_HQ).getAddr(HUMAN_RESOURCES_ID)
 
 
+@view
+@internal
+def _assertCashVault(_hr: address, _vaultId: uint256):
+    assert _vaultId == staticcall HumanResources(_hr).getRipeGovVaultId(0) # dev: cash vault mismatch
+
+
 ###################
 # Cash Ripe Check #
 ###################
@@ -218,15 +224,17 @@ def initiateRipeTransfer(_shouldCashCheck: bool = True, _vaultId: uint256 = 0):
     owner: address = self.owner
     assert msg.sender in [owner, self.manager] # dev: no perms
 
-    # cash latest paycheck (doing this first)
     hr: address = self._getHrAddr()
+    vaultId: uint256 = staticcall HumanResources(hr).getRipeGovVaultId(_vaultId)
+
+    # cash latest paycheck
     if _shouldCashCheck:
+        self._assertCashVault(hr, vaultId)
         self._cashRipeCheck(owner, msg.sender, hr)
 
     # important validation
     assert not self._hasPendingOwnerChange() # dev: cannot do with pending ownership change
     assert block.timestamp > self.unlockTime # dev: time not past unlock
-    vaultId: uint256 = staticcall HumanResources(hr).getRipeGovVaultId(_vaultId)
     assert staticcall HumanResources(hr).hasRipeBalance(self, vaultId) # dev: no balance
 
     # set transfer data
@@ -255,14 +263,16 @@ def confirmRipeTransfer(_shouldCashCheck: bool = True):
 
     # cash latest paycheck
     hr: address = self._getHrAddr()
+    vaultId: uint256 = self.pendingRipeTransferVaultId
     if _shouldCashCheck:
+        self._assertCashVault(hr, vaultId)
         self._cashRipeCheck(owner, msg.sender, hr)
 
     # transfer Ripe position
     amount: uint256 = extcall HumanResources(hr).transferContributorRipeTokens(
         pending.recipient,
         self.depositLockDuration,
-        self.pendingRipeTransferVaultId,
+        vaultId,
     ) # dev: could not transfer
 
     # reset pending transfer

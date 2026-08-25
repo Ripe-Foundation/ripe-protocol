@@ -1266,7 +1266,14 @@ def _transferCollateral(
     if amountSent != 0:
         self._checkpointSender(_fromUser, _vaultId, _vaultAddr, _asset, _a.lootbox)
 
-    usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
+    usdValue: uint256 = 0
+    if amountSent != 0:
+        if _asset == _a.greenToken:
+            usdValue = amountSent
+        elif _asset == _a.savingsGreen:
+            usdValue = staticcall IERC4626(_a.savingsGreen).convertToAssets(amountSent)
+        else:
+            usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, True)
 
     # For underscore basic earn vault assets, cap max conversion at
     # convertToAssetsSafe + configured spread so crediting remains bounded.
@@ -1278,6 +1285,8 @@ def _transferCollateral(
         # as a consistency invariant for divergent vault or asset behavior.
         assert cappedUnderlying != 0 # dev: zero safe underlying
         usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
+
+    usdValue = min(usdValue, _targetUsdValue)
 
     return usdValue, amountSent, isPositionDepleted
 

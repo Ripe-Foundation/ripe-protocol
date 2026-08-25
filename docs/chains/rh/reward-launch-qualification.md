@@ -67,12 +67,15 @@ Only then may governance unpause it for a zero-rate checkpoint, by an explicitly
 bound registered RIPE contract caller, before any new nonzero rate can take
 effect.
 
-Disabling points preserves stored points. An affected point update while points
-are disabled advances its checkpoint without adding points and thereby skips
-that disabled interval. Re-enabling before the disabled-state checkpoint can
-recognize the still-uncheckpointed interval. The initial global and points
-checkpoint procedure is therefore an open operational procedure and operator
-binding, not an inferred deployment step.
+Disabling points preserves stored points, but current Lootbox point updates
+advance only the clocks they touch without adding points. In particular, a
+zero-user aggregate checkpoint while points are disabled advances global and
+asset clocks without advancing untouched user clocks. After re-enable, user
+balance points can exceed the asset aggregate and make a claim revert. Do not
+perform aggregate deposit-point checkpoints while points are disabled. A safe
+disable/re-enable procedure requires separate source remediation or a complete,
+proven user-level settlement procedure and remains an open operational
+prerequisite.
 
 The Lootbox emission path and Stability claim path both decrement Ledger's
 ripeAvailForRewards. Budget exhaustion produces zero new emission and zero new
@@ -132,16 +135,19 @@ blocks for any nonzero restart.
 While both claim gates remain disabled, keep Lootbox paused through any restart
 timelock. At confirmed zero, governance may unpause Lootbox and an explicitly
 bound registered RIPE contract caller must perform a zero-rate global
-checkpoint. Verify zero distribution and unchanged budget. Checkpoint affected
-point paths while disabled. Immediately before executing a new nonzero rate,
-perform the final zero-rate checkpoint so the new rate cannot apply
-retroactively. Enable points and Lootbox claims only after config and checkpoint
-verification. Enable Stability claims only after the approved shared-budget
-policy and every operational claim-gate prerequisite are verified.
+checkpoint. Verify zero distribution and unchanged budget. Do not perform
+aggregate deposit-point checkpoints while points are disabled. Immediately
+before executing a new nonzero rate, perform the final zero-rate global
+checkpoint so the new rate cannot apply retroactively. Do not re-enable points
+or Lootbox claims until a separately approved disabled-window accounting remedy
+proves user, asset, and global point state remain consistent. Enable Stability
+claims only after the approved shared-budget policy and every operational
+claim-gate prerequisite is verified.
 
 ## Operational prerequisites still open
 
-- initial global and points checkpoint procedure;
+- owner-approved reward-configuration checkpoint procedure;
+- owner-approved disabled-points recovery and re-enable procedure;
 - exact governance identity, any qualified lite-signer identity, and the
   registered RIPE checkpoint-caller identity;
 - operational acceptance of the emergency runbook;

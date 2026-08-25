@@ -1047,7 +1047,9 @@ def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDe
     # danger boost (longer pool health imbalanced, higher rate keeps getting)
     dangerBoost: uint256 = 0
     if status.numBlocksInDanger != 0 and config.increasePerDangerBlock != 0:
-        dangerBoost = (config.increasePerDangerBlock * status.numBlocksInDanger) * HUNDRED_PERCENT // DANGER_BLOCKS_DENOMINATOR
+        # Both operands are capped at maxBorrowRate * 100 before multiplication.
+        dangerCap: uint256 = config.maxBorrowRate * 100
+        dangerBoost = unsafe_mul(min(config.increasePerDangerBlock, dangerCap), min(status.numBlocksInDanger, dangerCap)) // 100
 
     return min(_baseRate + rateBoost + dangerBoost, config.maxBorrowRate)
 

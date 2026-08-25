@@ -654,7 +654,7 @@ def _swapWithSpecificStabPool(
         return remainingToRepay, collateralValueOut, False, False
 
     # max usd value in stability pool
-    maxUsdValueInStabPool: uint256 = self._getUsdValue(_stabPool.asset, maxAmountInStabPool, _a.greenToken, _a.savingsGreen, _a.priceDesk)  
+    maxUsdValueInStabPool: uint256 = self._getUsdValue(_stabPool.asset, maxAmountInStabPool, _a)
     if maxUsdValueInStabPool == 0:
         return remainingToRepay, collateralValueOut, False, False # can't get price
 
@@ -672,15 +672,13 @@ def _swapWithSpecificStabPool(
 def _getUsdValue(
     _asset: address,
     _amount: uint256,
-    _greenToken: address,
-    _savingsGreen: address,
-    _priceDesk: address,
+    _a: addys.Addys,
 ) -> uint256:
-    if _asset == _greenToken:
+    if _asset == _a.greenToken:
         return _amount
-    if _asset == _savingsGreen:
-        return staticcall IERC4626(_savingsGreen).convertToAssets(_amount)
-    return staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount, True)
+    if _asset == _a.savingsGreen:
+        return staticcall IERC4626(_a.savingsGreen).convertToAssets(_amount)
+    return staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, _amount, True)
 
 
 @internal
@@ -1256,11 +1254,10 @@ def _transferCollateral(
     userAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_fromUser, _asset)
     maxAssetAmount: uint256 = 0
     if userAmount != 0:
-        maxAssetAmount = self._getAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
-    previewAmount: uint256 = min(userAmount, maxAssetAmount)
+        maxAssetAmount = self._getAssetAmount(_asset, _targetUsdValue, _a)
     # Skip when the maximum expected outflow produces zero creditable USD under the current quote.
     # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
-    if maxAssetAmount == 0 or previewAmount <= (maxAssetAmount - 1) // _targetUsdValue:
+    if maxAssetAmount == 0 or min(userAmount, maxAssetAmount) <= (maxAssetAmount - 1) // _targetUsdValue:
         return 0, 0, False, True
 
     amountSent: uint256 = 0
@@ -1270,7 +1267,11 @@ def _transferCollateral(
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _fromUser, _toUser, maxAssetAmount, _a)
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
-    usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
+    assert amountSent <= maxAssetAmount # dev: outflow
+    usdValue: uint256 = min(
+        self._getUsdValue(_asset, amountSent, _a),
+        _targetUsdValue,
+    )
     # Bytecode: range(2)+break beats two unrolled checkpoints. Post-mutation, sender
     # first so lastBalance writes the live share (else stale), then in-vault recipient.
     if amountSent != 0:
@@ -1292,15 +1293,13 @@ def _transferCollateral(
 def _getAssetAmount(
     _asset: address,
     _targetUsdValue: uint256,
-    _greenToken: address,
-    _savingsGreen: address,
-    _priceDesk: address,
+    _a: addys.Addys,
 ) -> uint256:
-    if _asset == _greenToken:
+    if _asset == _a.greenToken:
         return _targetUsdValue
-    if _asset == _savingsGreen:
-        return staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
-    return staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
+    if _asset == _a.savingsGreen:
+        return staticcall IERC4626(_a.savingsGreen).convertToShares(_targetUsdValue)
+    return staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
 
 
 # green handling

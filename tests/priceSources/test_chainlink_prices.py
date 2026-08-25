@@ -66,6 +66,35 @@ MAX_FEED_STALE_TIME = 7 * ONE_DAY_IN_SECS
 MIN_LOCAL_STALE_TIME = 5 * 60
 
 
+GAS_SENSITIVE_CHAINLINK_FEED = """
+# @version 0.4.3
+
+struct ChainlinkRound:
+    roundId: uint80
+    answer: int256
+    startedAt: uint256
+    updatedAt: uint256
+    answeredInRound: uint80
+
+@view
+@external
+def decimals() -> uint8:
+    return 8
+
+@view
+@external
+def latestRoundData() -> ChainlinkRound:
+    assert msg.gas > 250_000
+    return ChainlinkRound(
+        roundId=1,
+        answer=100_000_000,
+        startedAt=block.timestamp,
+        updatedAt=block.timestamp,
+        answeredInRound=1,
+    )
+"""
+
+
 @pytest.fixture(autouse=True)
 def valid_global_stale_time(setGeneralConfig):
     """Local defaults are zero; source tests exercise zero as global inheritance."""
@@ -142,6 +171,151 @@ def test_chainlink_add_price_feed(
     # Test adding feed for existing asset
     with boa.reverts("invalid feed"):
         mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
+
+
+def test_confirm_new_feed_qualifies_under_live_pricedesk_stipend_atomically(
+    mock_chainlink,
+    alpha_token,
+    governance,
+):
+    feed = boa.loads(
+        GAS_SENSITIVE_CHAINLINK_FEED,
+        name="gas_sensitive_chainlink_new_feed",
+    )
+    assert mock_chainlink.addNewPriceFeed(
+        alpha_token,
+        feed,
+        600,
+        sender=governance.address,
+        gas=2_000_000,
+    )
+    pending = mock_chainlink.pendingUpdates(alpha_token)
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+
+    with boa.reverts("price source not executable"):
+        mock_chainlink.confirmNewPriceFeed(
+            alpha_token,
+            sender=governance.address,
+            gas=2_000_000,
+        )
+
+    assert mock_chainlink.pendingUpdates(alpha_token) == pending
+    assert not mock_chainlink.hasPriceFeed(alpha_token)
+    assert mock_chainlink.feedConfig(alpha_token).feed == ZERO_ADDRESS
+
+
+def test_confirm_feed_update_qualifies_under_live_pricedesk_stipend_atomically(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    governance,
+):
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.addNewPriceFeed(
+        alpha_token,
+        mock_chainlink_alpha,
+        600,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_alpha.setMockData(
+        500 * CHAINLINK_DECIMALS,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert mock_chainlink.confirmNewPriceFeed(
+        alpha_token,
+        sender=governance.address,
+    )
+    previous = mock_chainlink.feedConfig(alpha_token)
+
+    feed = boa.loads(
+        GAS_SENSITIVE_CHAINLINK_FEED,
+        name="gas_sensitive_chainlink_update_feed",
+    )
+    assert mock_chainlink.updatePriceFeed(
+        alpha_token,
+        feed,
+        600,
+        sender=governance.address,
+        gas=2_000_000,
+    )
+    pending = mock_chainlink.pendingUpdates(alpha_token)
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+
+    with boa.reverts("price source not executable"):
+        mock_chainlink.confirmPriceFeedUpdate(
+            alpha_token,
+            sender=governance.address,
+            gas=2_000_000,
+        )
+
+    assert mock_chainlink.pendingUpdates(alpha_token) == pending
+    assert mock_chainlink.feedConfig(alpha_token) == previous
+
+
+def test_post_setup_confirmation_rejects_missing_price_desk(
+    mock_chainlink,
+    ripe_hq,
+    alpha_token,
+    mock_chainlink_alpha,
+    governance,
+):
+    with boa.env.anchor():
+        mock_chainlink_alpha.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert mock_chainlink.addNewPriceFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            600,
+            sender=governance.address,
+        )
+        pending = mock_chainlink.pendingUpdates(alpha_token)
+
+        assert ripe_hq.startAddressDisableInRegistry(
+            7,
+            sender=governance.address,
+        )
+        boa.env.time_travel(
+            blocks=max(
+                mock_chainlink.actionTimeLock(),
+                ripe_hq.registryChangeTimeLock(),
+            )
+            + 1,
+        )
+        assert ripe_hq.confirmAddressDisableInRegistry(
+            7,
+            sender=governance.address,
+        )
+        mock_chainlink_alpha.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+
+        with boa.reverts("extcodesize is zero"):
+            mock_chainlink.confirmNewPriceFeed(
+                alpha_token,
+                sender=governance.address,
+            )
+
+        assert mock_chainlink.pendingUpdates(alpha_token) == pending
+        assert mock_chainlink.feedConfig(alpha_token).feed == ZERO_ADDRESS
 
 
 def test_chainlink_add_price_feed_cancel(

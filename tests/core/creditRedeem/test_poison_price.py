@@ -2,7 +2,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import filter_logs, redeem_collateral
+from conf_utils import filter_logs, redeem_collateral, sync_deployed_token
 
 
 UNDER_SEND_VAULT_SOURCE = """
@@ -250,6 +250,73 @@ def test_credit_redeem_price_one_takes_full_token_burns_one_wei(
 
     user_debt, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
     assert user_debt.amount == 100 * EIGHTEEN_DECIMALS - 1
+
+
+def test_credit_redeem_credits_forward_value_of_zero_decimal_delivery(
+    governance,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    bob,
+    alice,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Token",
+        "COARSE",
+        0,
+        10,
+    )
+    sync_deployed_token(coarse_token)
+    _make_bob_redeemable_on_poisoned_bravo(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        credit_engine,
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        coarse_token,
+        governance.address,
+        1,
+    )
+    mock_price_source.setPrice(alpha_token, 62 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+    assert credit_engine.canRedeemUserCollateral(bob)
+
+    _fund_alice(green_token, whale, teller, alice, 5 * EIGHTEEN_DECIMALS)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    green_spent = redeem_collateral(
+        teller,
+        bob,
+        vault_id,
+        coarse_token,
+        5 * EIGHTEEN_DECIMALS,
+        should_refund_savings_green=False,
+        sender=alice,
+    )
+
+    assert green_spent == 3 * EIGHTEEN_DECIMALS
+    log = filter_logs(teller, "CollateralRedeemed")[0]
+    assert log.amount == 1
+    assert log.repayValue == 3 * EIGHTEEN_DECIMALS
+    assert coarse_token.balanceOf(alice) == 1
 
 
 def test_credit_redeem_multi_token_payment_scales_by_whole_tokens(

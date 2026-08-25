@@ -1,6 +1,8 @@
 import pytest
 import boa
 
+from constants import MAX_UINT256
+
 
 @pytest.fixture(scope="module")
 def setupDynamicRate(
@@ -82,6 +84,19 @@ def test_below_danger_trigger_returns_base_rate(
     
     # Must return base rate even with danger blocks present
     assert credit_engine.getDynamicBorrowRate(2000) == 2000
+
+
+def test_healthy_path_preserves_raw_base_rate_above_configured_cap(
+    setupDynamicRate,
+    credit_engine,
+):
+    setupDynamicRate(
+        _weightedRatio=5999,
+        _dangerTrigger=6000,
+        _maxBorrowRate=5000,
+    )
+
+    assert credit_engine.getDynamicBorrowRate(MAX_UINT256) == MAX_UINT256
 
 
 #############################
@@ -443,6 +458,23 @@ def test_zero_base_rate_with_boosts(
     # Danger boost: (50 * 100) * 10000 // 1000000 = 50
     # Total: 0 + 0 + 50 = 50
     assert credit_engine.getDynamicBorrowRate(0) == 50
+
+
+def test_extreme_danger_increase_saturates_without_overflow(
+    setupDynamicRate,
+    credit_engine,
+):
+    setupDynamicRate(
+        _minDynamicRateBoost=0,
+        _maxDynamicRateBoost=0,
+        _increasePerDangerBlock=MAX_UINT256 - 1,
+        _maxBorrowRate=20_000,
+        _weightedRatio=8000,
+        _dangerTrigger=6000,
+        _numBlocksInDanger=2,
+    )
+
+    assert credit_engine.getDynamicBorrowRate(1000) == 20_000
 
 
 def test_calc_dynamic_rate_boost_with_zero_ratio(

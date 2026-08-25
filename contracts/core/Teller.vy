@@ -1026,7 +1026,15 @@ def _performHousekeeping(
     # update green ref pool snapshot
     curvePrices: address = staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID)
     if curvePrices != empty(address):
-        extcall CurvePrices(curvePrices).addGreenRefPoolSnapshot()
+        # Snapshot maintenance is best-effort housekeeping. A broken or
+        # unexpectedly expensive Curve route must not block the user action.
+        success: bool = raw_call(
+            curvePrices,
+            method_id("addGreenRefPoolSnapshot()"),
+            gas=500_000,
+            max_outsize=0,
+            revert_on_failure=False,
+        )
 
     # update debt
     if _shouldUpdateDebt:

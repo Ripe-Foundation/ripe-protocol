@@ -3,7 +3,7 @@ import pytest
 from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import filter_logs, redeem_from_stability_pool
+from conf_utils import filter_logs, redeem_from_stability_pool, sync_deployed_token
 
 
 def _frame_reasons(frame):
@@ -427,6 +427,75 @@ def test_auction_house_one_wei_takes_one_token_from_multi_token_balance(
     assert bravo_token.balanceOf(alice) == EIGHTEEN_DECIMALS
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == 99 * EIGHTEEN_DECIMALS
     assert green_token.balanceOf(alice) == alice_green_before - 1
+
+
+def test_auction_house_credits_forward_value_of_zero_decimal_delivery(
+    governance,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    bob,
+    alice,
+    sally,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Token",
+        "COARSE",
+        0,
+        10,
+    )
+    sync_deployed_token(coarse_token)
+    _make_bob_auctionable_on_bravo(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        credit_engine,
+        bob,
+        sally,
+        alpha_token,
+        alpha_token_whale,
+        coarse_token,
+        governance.address,
+        green_token,
+        10,
+        12 * EIGHTEEN_DECIMALS // 100,
+    )
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+
+    _fund_alice(green_token, whale, teller, alice, 5 * EIGHTEEN_DECIMALS)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    green_spent = teller.buyManyFungibleAuctions(
+        [(bob, vault_id, coarse_token, MAX_UINT256)],
+        5 * EIGHTEEN_DECIMALS,
+        False,
+        False,
+        False,
+        alice,
+        sender=alice,
+    )
+
+    assert green_spent == 3 * EIGHTEEN_DECIMALS
+    log = filter_logs(teller, "FungAuctionPurchased")[0]
+    assert log.collateralAmountSent == 1
+    assert log.collateralUsdValueSent == 3 * EIGHTEEN_DECIMALS
+    assert coarse_token.balanceOf(alice) == 1
 
 
 def test_auction_house_dust_only_purchase_reverts_no_green_spent(

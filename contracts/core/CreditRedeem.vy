@@ -52,6 +52,7 @@ interface Teller:
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool) -> uint256: view
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
 
 interface Ledger:
     def getRepayDataBundle(_user: address) -> RepayDataBundle: view
@@ -257,7 +258,8 @@ def _redeemCollateral(
 
     # Expected zero-credit positions are skipped before transfer.
     # A post-transfer zero repayment means the vault sent less than previewed and must revert atomically.
-    repayValue: uint256 = min(amountSent * maxRedeemValue // maxAssetAmount, userDebt.amount)
+    deliveredValue: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, False)
+    repayValue: uint256 = min(min(deliveredValue, maxRedeemValue), userDebt.amount)
     assert repayValue != 0 # dev: zero repayment value (vault under-send)
     assert extcall GreenToken(_a.greenToken).burn(repayValue) # dev: could not burn green
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, repayValue, newInterest, d.numUserVaults, _a)

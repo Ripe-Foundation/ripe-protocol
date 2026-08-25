@@ -8,7 +8,7 @@ These volatile assets (like WETH, cbBTC) are transferred to Endaoment.
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
 
 SIX_DECIMALS = 10**6
 EIGHT_DECIMALS = 10**8
@@ -809,6 +809,50 @@ def test_emits_endaoment_transfer_event(
     _test(transfer_log.amountSent, vault_decrease)
     _test(transfer_log.usdValue, target_amount)
     assert transfer_log.isDepleted == False  # Not fully depleted
+
+
+def test_deleverage_credits_forward_value_of_zero_decimal_delivery(
+    governance,
+    bob,
+    deleverage,
+    switchboard_alpha,
+    setAssetConfig,
+    setupDeleverage,
+    mock_price_source,
+    credit_engine,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Token",
+        "COARSE",
+        0,
+        100,
+    )
+    sync_deployed_token(coarse_token)
+    setAssetConfig(coarse_token)
+    setupDeleverage(
+        bob,
+        coarse_token,
+        governance.address,
+        deposit_amount=100,
+        borrow_amount=50 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    repaid = deleverage.deleverageWithVolAssets(
+        bob,
+        [(3, coarse_token.address, 5 * EIGHTEEN_DECIMALS)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert repaid == 3 * EIGHTEEN_DECIMALS
+    log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
+    assert log.amountSent == 1
+    assert log.usdValue == 3 * EIGHTEEN_DECIMALS
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - 3 * EIGHTEEN_DECIMALS
 
 
 def test_emits_deleverage_vol_assets_event(

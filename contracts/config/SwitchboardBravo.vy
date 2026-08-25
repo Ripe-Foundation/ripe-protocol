@@ -817,9 +817,9 @@ def executePendingAction(_aid: uint256) -> bool:
     mc: address = self.pendingMissionControl[_aid]
     if mc == empty(address):
         mc = self._getMissionControlAddr()
+    p: AssetUpdate = self.pendingAssetConfig[_aid]
 
     if actionType == ActionType.ASSET_ADD_NEW:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
         assert not staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: must be new asset
         assert self._isValidAssetConfig(p.asset, p.config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, p.config)
@@ -831,7 +831,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log AssetAdded(asset=p.asset)
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.vaultIds = p.config.vaultIds
         config.stakersPointsAlloc = p.config.stakersPointsAlloc
@@ -844,7 +844,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log AssetDepositParamsSet(asset=p.asset, numVaultIds=len(p.config.vaultIds), stakersPointsAlloc=p.config.stakersPointsAlloc, voterPointsAlloc=p.config.voterPointsAlloc, perUserDepositLimit=p.config.perUserDepositLimit, globalDepositLimit=p.config.globalDepositLimit, minDepositBalance=p.config.minDepositBalance)
 
     elif actionType == ActionType.ASSET_LIQ_CONFIG:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.shouldBurnAsPayment = p.config.shouldBurnAsPayment
         config.shouldTransferToEndaoment = p.config.shouldTransferToEndaoment
@@ -857,7 +857,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log AssetLiqConfigSet(asset=p.asset, shouldBurnAsPayment=p.config.shouldBurnAsPayment, shouldTransferToEndaoment=p.config.shouldTransferToEndaoment, shouldSwapInStabPools=p.config.shouldSwapInStabPools, shouldAuctionInstantly=p.config.shouldAuctionInstantly, specialStabPoolId=p.config.specialStabPoolId, auctionStartDiscount=p.config.customAuctionParams.startDiscount, auctionMaxDiscount=p.config.customAuctionParams.maxDiscount, auctionDelay=p.config.customAuctionParams.delay, auctionDuration=p.config.customAuctionParams.duration)
 
     elif actionType == ActionType.ASSET_DEBT_TERMS:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         previousTerms: cs.DebtTerms = config.debtTerms
         pendingTerms: cs.DebtTerms = p.config.debtTerms
@@ -869,7 +869,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log AssetDebtTermsSet(asset=p.asset, ltv=pendingTerms.ltv, redemptionThreshold=pendingTerms.redemptionThreshold, liqThreshold=pendingTerms.liqThreshold, liqFee=pendingTerms.liqFee, borrowRate=pendingTerms.borrowRate, daowry=pendingTerms.daowry)
 
     elif actionType == ActionType.ASSET_WHITELIST:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.whitelist = p.config.whitelist
         assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config

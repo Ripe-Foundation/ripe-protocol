@@ -642,10 +642,11 @@ def _getLockDuration(_minLockDuration: uint256, _maxLockDuration: uint256, _auto
 def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     genConfig: cs.GenConfig = self.genConfig
+    isSupported: bool = self.indexOfAsset[_asset] != 0
     return TellerDepositConfig(
         canDepositGeneral=genConfig.canDeposit,
-        canDepositAsset=assetConfig.canDeposit,
-        doesVaultSupportAsset=_vaultId in assetConfig.vaultIds,
+        canDepositAsset=isSupported and assetConfig.canDeposit,
+        doesVaultSupportAsset=isSupported and _vaultId in assetConfig.vaultIds,
         isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),
         perUserDepositLimit=assetConfig.perUserDepositLimit,
         globalDepositLimit=assetConfig.globalDepositLimit,
