@@ -113,7 +113,7 @@ struct EpochSnapshot:
     maxVestingLength: uint256
     acceptedPayment: uint256
     weightedLateness: uint256
-    timingEligible: bool
+    timingEligible: bool # first epoch is eligible only when opened on its boundary
 
 struct PayoutData:
     baseRipe: uint256
@@ -301,23 +301,27 @@ def buyNow(
     assert self._isPurchaseReady() # dev: mint not ready
 
     config: InstantBondConfig = self.bondConfig
-    prev: EpochSnapshot = self.epochState
-    snap: EpochSnapshot = empty(EpochSnapshot)
+    previousSnapshot: EpochSnapshot = self.epochState
+    candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
-    payout: PayoutData = empty(PayoutData)
-    budgetRemaining: uint256 = 0
-    snap, transition, payout, budgetRemaining = self._quote(_paymentAmount, _requestedVestingLength, prev, config)
+    quote: InstantBondQuote = empty(InstantBondQuote)
+    quote, candidateSnapshot, transition = self._quote(
+        _paymentAmount,
+        _requestedVestingLength,
+        previousSnapshot,
+        config,
+    )
 
-    assert _expectedEpoch == snap.epoch # dev: epoch moved
-    assert payout.vestingLength == _expectedVestingLength # dev: vesting length moved
-    assert payout.totalRipe >= _minRipeOut # dev: slippage
-    assert _paymentAmount >= snap.minPaymentAmount # dev: below minimum payment
-    assert _paymentAmount <= snap.paymentCap - snap.acceptedPayment # dev: exceeds available amount
-    assert payout.totalRipe <= budgetRemaining # dev: allocation budget
+    assert _expectedEpoch == quote.epoch # dev: epoch moved
+    assert quote.vestingLength == _expectedVestingLength # dev: vesting length moved
+    assert quote.totalRipe >= _minRipeOut # dev: slippage
+    assert _paymentAmount >= quote.minPaymentAmount # dev: below minimum payment
+    assert _paymentAmount <= quote.remainingPayment # dev: exceeds available amount
+    assert quote.totalRipe <= quote.budgetRemaining # dev: allocation budget
 
-    self._storeEpochState(prev, snap, transition)
+    self._commitEpochIfNeeded(previousSnapshot, candidateSnapshot, transition)
     self.epochState.acceptedPayment += _paymentAmount
-    self.epochState.weightedLateness += _paymentAmount * self._getLatenessBps(block.number)
+    self.epochState.weightedLateness += _paymentAmount * self._getCurrentLatenessBps()
 
     # collect payment amount, move to endaoment funds
     endaoFunds: address = addys._getEndaomentFundsAddr()
@@ -328,25 +332,99 @@ def buyNow(
     assert paymentBalanceAfter >= paymentBalanceBefore # dev: payment receipt mismatch
     assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount # dev: payment receipt mismatch
 
-    positionIndex: uint256 = extcall InstantBondClaims(addys._getInstantBondClaimsAddr()).createVestingPosition(msg.sender, payout.totalRipe, payout.vestingLength)
+    positionIndex: uint256 = extcall InstantBondClaims(addys._getInstantBondClaimsAddr()).createVestingPosition(msg.sender, quote.totalRipe, quote.vestingLength)
 
     log InstantBondPurchased(
         buyer=msg.sender,
         positionIndex=positionIndex,
         paymentAmount=_paymentAmount,
-        baseRipe=payout.baseRipe,
-        bonusRipe=payout.bonusRipe,
-        bonusRatio=payout.bonusRatio,
-        vestingLength=payout.vestingLength,
-        creationBlock=block.number,
-        maturityBlock=block.number + payout.vestingLength,
-        totalRipe=payout.totalRipe,
-        controllerBasePayoutRate=snap.controllerBasePayoutRate,
-        basePayoutRate=snap.basePayoutRate,
-        rateSource=snap.rateSource,
-        epoch=snap.epoch,
+        baseRipe=quote.baseRipe,
+        bonusRipe=quote.bonusRipe,
+        bonusRatio=quote.bonusRatio,
+        vestingLength=quote.vestingLength,
+        creationBlock=quote.creationBlock,
+        maturityBlock=quote.maturityBlock,
+        totalRipe=quote.totalRipe,
+        controllerBasePayoutRate=quote.controllerBasePayoutRate,
+        basePayoutRate=quote.basePayoutRate,
+        rateSource=quote.rateSource,
+        epoch=quote.epoch,
     )
-    return payout.totalRipe
+    return quote.totalRipe
+
+
+# preview
+
+
+@view
+@external
+def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> InstantBondQuote:
+    quote: InstantBondQuote = empty(InstantBondQuote)
+    if not self.isRunning or block.number < self.genesisBlock:
+        return quote
+
+    candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
+    transition: RateTransition = empty(RateTransition)
+    quote, candidateSnapshot, transition = self._quote(
+        _paymentAmount,
+        _requestedVestingLength,
+        self.epochState,
+        self.bondConfig,
+    )
+
+    if _paymentAmount < quote.minPaymentAmount or _paymentAmount > quote.remainingPayment:
+        return quote
+    if deptBasics.isPaused or not self.canBuyNow:
+        return quote
+    if quote.totalRipe > quote.budgetRemaining:
+        return quote
+    if not self._isPurchaseReady():
+        return quote
+
+    quote.available = True
+    return quote
+
+
+# quote
+
+
+@view
+@internal
+def _quote(
+    _paymentAmount: uint256,
+    _requestedVestingLength: uint256,
+    _previousSnapshot: EpochSnapshot,
+    _config: InstantBondConfig,
+) -> (InstantBondQuote, EpochSnapshot, RateTransition):
+    candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
+    transition: RateTransition = empty(RateTransition)
+    candidateSnapshot, transition = self._getEpochSnapshot(_previousSnapshot, _config)
+    payout: PayoutData = self._calculatePayout(
+        _paymentAmount,
+        _requestedVestingLength,
+        candidateSnapshot,
+    )
+    budgetRemaining: uint256 = 0
+    claims: address = addys._getInstantBondClaimsAddr()
+    if claims != empty(address) and claims.is_contract:
+        budgetRemaining = staticcall InstantBondClaims(claims).remainingAllocationBudget()
+
+    quote: InstantBondQuote = empty(InstantBondQuote)
+    quote.epoch = candidateSnapshot.epoch
+    quote.controllerBasePayoutRate = candidateSnapshot.controllerBasePayoutRate
+    quote.basePayoutRate = candidateSnapshot.basePayoutRate
+    quote.rateSource = candidateSnapshot.rateSource
+    quote.remainingPayment = candidateSnapshot.paymentCap - candidateSnapshot.acceptedPayment
+    quote.minPaymentAmount = candidateSnapshot.minPaymentAmount
+    quote.budgetRemaining = budgetRemaining
+    quote.baseRipe = payout.baseRipe
+    quote.bonusRatio = payout.bonusRatio
+    quote.bonusRipe = payout.bonusRipe
+    quote.vestingLength = payout.vestingLength
+    quote.creationBlock = block.number
+    quote.maturityBlock = block.number + payout.vestingLength
+    quote.totalRipe = payout.totalRipe
+    return quote, candidateSnapshot, transition
 
 
 # calc payout
@@ -356,20 +434,18 @@ def buyNow(
 @internal
 def _calculatePayout(
     _paymentAmount: uint256,
-    _basePayoutRate: uint256,
-    _maxVestingBonus: uint256,
     _requestedVestingLength: uint256,
-    _minVestingLength: uint256,
-    _maxVestingLength: uint256,
+    _snapshot: EpochSnapshot,
 ) -> PayoutData:
-    baseRipe: uint256 = _paymentAmount * _basePayoutRate // self.paymentScale
-    vestingLength: uint256 = _minVestingLength
+    # The epoch snapshot keeps the rate and vesting terms bound to one configuration.
+    baseRipe: uint256 = _paymentAmount * _snapshot.basePayoutRate // self.paymentScale
+    vestingLength: uint256 = _snapshot.minVestingLength
     if _requestedVestingLength != 0:
-        vestingLength = min(max(_requestedVestingLength, _minVestingLength), _maxVestingLength)
+        vestingLength = min(max(_requestedVestingLength, _snapshot.minVestingLength), _snapshot.maxVestingLength)
 
-    bonusRatio: uint256 = _maxVestingBonus
-    if _maxVestingLength != _minVestingLength:
-        bonusRatio = _maxVestingBonus * (vestingLength - _minVestingLength) // (_maxVestingLength - _minVestingLength)
+    bonusRatio: uint256 = _snapshot.maxVestingBonus
+    if _snapshot.maxVestingLength != _snapshot.minVestingLength:
+        bonusRatio = _snapshot.maxVestingBonus * (vestingLength - _snapshot.minVestingLength) // (_snapshot.maxVestingLength - _snapshot.minVestingLength)
 
     bonusRipe: uint256 = baseRipe * bonusRatio // HUNDRED_PERCENT
     return PayoutData(
@@ -531,6 +607,7 @@ def _nextRate(
     else:
         utilizationBps = _prev.acceptedPayment * HUNDRED_PERCENT // _prev.paymentCap
 
+        # Strong demand lowers RIPE per payment unit, increasing RIPE's effective price.
         if utilizationBps >= _config.uHighBps:
             strengthBps: uint256 = (utilizationBps - _config.uHighBps) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.uHighBps)
             earlinessBps: uint256 = 0
@@ -540,11 +617,14 @@ def _nextRate(
             adjustmentBps = _config.minUpBps + (_config.maxUpBps - _config.minUpBps) * demandBps // HUNDRED_PERCENT
             basePayoutRate = max(basePayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + adjustmentBps), MIN_BASE_PAYOUT_RATE)
 
+        # Weak demand raises RIPE per payment unit, decreasing RIPE's effective price.
         elif utilizationBps <= _config.uLowBps:
             weaknessBps: uint256 = (_config.uLowBps - utilizationBps) * HUNDRED_PERCENT // _config.uLowBps
             adjustmentBps = _config.minDownBps + (_config.maxDownBps - _config.minDownBps) * weaknessBps // HUNDRED_PERCENT
             basePayoutRate = min(basePayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT - adjustmentBps), ceiling)
 
+        # The previous filled epoch provides the controller signal; only later
+        # skipped epochs count as idle decay steps.
         decaySteps = min(_elapsed - 1, _config.maxDecayEpochs)
 
     for i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS):
@@ -586,39 +666,39 @@ def _getEpochSnapshot(_prev: EpochSnapshot, _config: InstantBondConfig) -> (Epoc
     epoch: uint256 = (block.number - self.genesisBlock) // _config.epochLength
 
     # already committed this epoch
-    if _prev.basePayoutRate != 0 and epoch <= _prev.epoch:
+    if self._hasCommittedEpoch(_prev) and epoch <= _prev.epoch:
         return _prev, empty(RateTransition)
 
-    # first buy after start
-    if _prev.basePayoutRate == 0:
-        onBoundary: bool = (block.number - self.genesisBlock) % _config.epochLength == 0
-        firstTransition: RateTransition = empty(RateTransition)
-        firstTransition.controllerBasePayoutRate = _config.seedBasePayoutRate
-        firstBasePayoutRate: uint256 = 0
-        rateSource: uint256 = 0
-        firstBasePayoutRate, rateSource = self._withOverride(epoch, _config.seedBasePayoutRate, RATE_SOURCE_SEED)
-        return self._openEpoch(
-            epoch,
-            firstTransition.controllerBasePayoutRate,
-            firstBasePayoutRate,
-            rateSource,
-            _config,
-            onBoundary,
-        ), firstTransition
+    transition: RateTransition = empty(RateTransition)
+    defaultRateSource: uint256 = RATE_SOURCE_SEED
+    timingEligible: bool = True
+    if not self._hasCommittedEpoch(_prev):
+        transition.controllerBasePayoutRate = _config.seedBasePayoutRate
+        timingEligible = (block.number - self.genesisBlock) % _config.epochLength == 0
+    else:
+        # Later epochs roll the controller and always have meaningful timing data.
+        transition = self._nextRate(_prev, epoch - _prev.epoch, _config)
+        defaultRateSource = RATE_SOURCE_CONTROLLER
 
-    # later epoch: roll the controller, then apply only an exact-epoch override
-    transition: RateTransition = self._nextRate(_prev, epoch - _prev.epoch, _config)
+    # Apply an override only after deriving the normal rate for this epoch.
     basePayoutRate: uint256 = 0
     rateSource: uint256 = 0
-    basePayoutRate, rateSource = self._withOverride(epoch, transition.controllerBasePayoutRate, RATE_SOURCE_CONTROLLER)
+    basePayoutRate, rateSource = self._withOverride(epoch, transition.controllerBasePayoutRate, defaultRateSource)
     return self._openEpoch(
         epoch,
         transition.controllerBasePayoutRate,
         basePayoutRate,
         rateSource,
         _config,
-        True,
+        timingEligible,
     ), transition
+
+
+@pure
+@internal
+def _hasCommittedEpoch(_snapshot: EpochSnapshot) -> bool:
+    # A legal base payout rate is always non-zero, so zero denotes no committed epoch.
+    return _snapshot.basePayoutRate != 0
 
 
 @view
@@ -658,43 +738,22 @@ def _openEpoch(
     )
 
 
-# store state
+# commit epoch
 
 
 @internal
-def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: RateTransition):
+def _commitEpochIfNeeded(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: RateTransition):
 
     # already committed this epoch
-    if _prev.basePayoutRate != 0 and _snap.epoch <= _prev.epoch:
+    if self._hasCommittedEpoch(_prev) and _snap.epoch <= _prev.epoch:
         return
 
     # store the new epoch
     self.epochState = _snap
-
-    # consume only an exact target, or clear an override whose target was missed
-    overrideTargetBasePayoutRate: uint256 = self.overrideTargetBasePayoutRate
-    if overrideTargetBasePayoutRate != 0:
-        targetEpoch: uint256 = self.overrideTargetEpoch
-        if targetEpoch <= _snap.epoch:
-            self.overrideTargetBasePayoutRate = 0
-            self.overrideTargetEpoch = 0
-            if targetEpoch == _snap.epoch:
-                log RateOverrideApplied(
-                    fromEpoch=_prev.epoch,
-                    toEpoch=_snap.epoch,
-                    targetBasePayoutRate=overrideTargetBasePayoutRate,
-                    controllerBasePayoutRate=_snap.controllerBasePayoutRate,
-                )
-            else:
-                log RateOverrideMissed(
-                    targetEpoch=targetEpoch,
-                    committedEpoch=_snap.epoch,
-                    targetBasePayoutRate=overrideTargetBasePayoutRate,
-                    controllerBasePayoutRate=_snap.controllerBasePayoutRate,
-                )
+    self._consumeInstalledOverride(_prev, _snap)
 
     # starting over
-    if _prev.basePayoutRate == 0:
+    if not self._hasCommittedEpoch(_prev):
         log EpochInitialized(
             epoch=_snap.epoch,
             controllerBasePayoutRate=_snap.controllerBasePayoutRate,
@@ -732,6 +791,34 @@ def _storeEpochState(_prev: EpochSnapshot, _snap: EpochSnapshot, _transition: Ra
     )
 
 
+@internal
+def _consumeInstalledOverride(_prev: EpochSnapshot, _snap: EpochSnapshot):
+    targetBasePayoutRate: uint256 = self.overrideTargetBasePayoutRate
+    if targetBasePayoutRate == 0:
+        return
+
+    targetEpoch: uint256 = self.overrideTargetEpoch
+    if targetEpoch > _snap.epoch:
+        return
+
+    self.overrideTargetBasePayoutRate = 0
+    self.overrideTargetEpoch = 0
+    if targetEpoch == _snap.epoch:
+        log RateOverrideApplied(
+            fromEpoch=_prev.epoch,
+            toEpoch=_snap.epoch,
+            targetBasePayoutRate=targetBasePayoutRate,
+            controllerBasePayoutRate=_snap.controllerBasePayoutRate,
+        )
+    else:
+        log RateOverrideMissed(
+            targetEpoch=targetEpoch,
+            committedEpoch=_snap.epoch,
+            targetBasePayoutRate=targetBasePayoutRate,
+            controllerBasePayoutRate=_snap.controllerBasePayoutRate,
+        )
+
+
 # epoch length
 
 
@@ -758,11 +845,11 @@ def _isValidEpochLength(_epochLength: uint256) -> bool:
 
 @view
 @internal
-def _getLatenessBps(_blockNumber: uint256) -> uint256:
+def _getCurrentLatenessBps() -> uint256:
     epochLength: uint256 = self.bondConfig.epochLength
     if epochLength == 1:
         return 0
-    offset: uint256 = (_blockNumber - self.genesisBlock) % epochLength
+    offset: uint256 = (block.number - self.genesisBlock) % epochLength
     return offset * HUNDRED_PERCENT // (epochLength - 1)
 
 
@@ -783,8 +870,8 @@ def start(_genesisBlock: uint256, _epochLength: uint256):
 
     config: InstantBondConfig = self.bondConfig
     config.epochLength = _epochLength
+    assert self._isValidConfigValues(config) # dev: not configured
     self.bondConfig = config
-    assert self._isValidConfig(config) # dev: not configured
 
     self.genesisBlock = block.number if _genesisBlock == 0 else _genesisBlock
     self.isRunning = True
@@ -943,17 +1030,17 @@ def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
     if block.number >= self.genesisBlock:
         currentEpoch = (block.number - self.genesisBlock) // epochLength
 
-    prev: EpochSnapshot = self.epochState
-    if _targetEpoch == 0:
-        if prev.basePayoutRate != 0 and prev.epoch == currentEpoch:
-            if currentEpoch == max_value(uint256): # pragma: no branch
-                return False, 0
-            return True, currentEpoch + 1
-        return True, currentEpoch
+    earliestApplicableEpoch: uint256 = currentEpoch
+    previousSnapshot: EpochSnapshot = self.epochState
+    if self._hasCommittedEpoch(previousSnapshot) and previousSnapshot.epoch >= currentEpoch:
+        if previousSnapshot.epoch == max_value(uint256): # pragma: no branch
+            return False, 0
+        earliestApplicableEpoch = previousSnapshot.epoch + 1
 
-    if _targetEpoch < currentEpoch:
-        return False, 0
-    if prev.basePayoutRate != 0 and _targetEpoch <= prev.epoch:
+    # Zero means the earliest epoch that has not already accepted a purchase.
+    if _targetEpoch == 0:
+        return True, earliestApplicableEpoch
+    if _targetEpoch < earliestApplicableEpoch:
         return False, 0
     return True, _targetEpoch
 
@@ -1018,6 +1105,17 @@ def isValidConfig(_config: InstantBondConfig) -> bool:
 @view
 @internal
 def _isValidConfig(_config: InstantBondConfig) -> bool:
+    if not self._isValidConfigValues(_config):
+        return False
+
+    # setConfig cannot change the live clock; only start() can
+    installedLength: uint256 = self.bondConfig.epochLength
+    return installedLength == 0 or _config.epochLength == installedLength
+
+
+@view
+@internal
+def _isValidConfigValues(_config: InstantBondConfig) -> bool:
     # utilization bands must be 0 < low < high < 100%
     if _config.uLowBps == 0 or _config.uLowBps >= _config.uHighBps:
         return False
@@ -1096,11 +1194,6 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
     if not self._isValidEpochLength(_config.epochLength):
         return False
 
-    # setConfig cannot change the live clock; only start() can
-    installedLength: uint256 = self.bondConfig.epochLength
-    if installedLength != 0 and _config.epochLength != installedLength:
-        return False
-
     return True
 
 
@@ -1111,81 +1204,3 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
 @internal
 def _basePayoutRateCeiling(_maxAllInPayoutRate: uint256, _maxVestingBonus: uint256) -> uint256:
     return _maxAllInPayoutRate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _maxVestingBonus)
-
-
-###########
-# Preview #
-###########
-
-
-@view
-@internal
-def _quote(
-    _paymentAmount: uint256,
-    _requestedVestingLength: uint256,
-    _prev: EpochSnapshot,
-    _config: InstantBondConfig,
-) -> (EpochSnapshot, RateTransition, PayoutData, uint256):
-    snap: EpochSnapshot = empty(EpochSnapshot)
-    transition: RateTransition = empty(RateTransition)
-    snap, transition = self._getEpochSnapshot(_prev, _config)
-    payout: PayoutData = self._calculatePayout(
-        _paymentAmount,
-        snap.basePayoutRate,
-        snap.maxVestingBonus,
-        _requestedVestingLength,
-        snap.minVestingLength,
-        snap.maxVestingLength,
-    )
-    budgetRemaining: uint256 = 0
-    claims: address = addys._getInstantBondClaimsAddr()
-    if claims != empty(address) and claims.is_contract:
-        budgetRemaining = staticcall InstantBondClaims(claims).remainingAllocationBudget()
-    return snap, transition, payout, budgetRemaining
-
-
-@view
-@external
-def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> InstantBondQuote:
-    quote: InstantBondQuote = empty(InstantBondQuote)
-    if not self.isRunning or block.number < self.genesisBlock:
-        return quote
-
-    snap: EpochSnapshot = empty(EpochSnapshot)
-    transition: RateTransition = empty(RateTransition)
-    payout: PayoutData = empty(PayoutData)
-    budgetRemaining: uint256 = 0
-    snap, transition, payout, budgetRemaining = self._quote(
-        _paymentAmount,
-        _requestedVestingLength,
-        self.epochState,
-        self.bondConfig,
-    )
-    remainingPayment: uint256 = snap.paymentCap - snap.acceptedPayment
-
-    quote.epoch = snap.epoch
-    quote.controllerBasePayoutRate = snap.controllerBasePayoutRate
-    quote.basePayoutRate = snap.basePayoutRate
-    quote.rateSource = snap.rateSource
-    quote.remainingPayment = remainingPayment
-    quote.minPaymentAmount = snap.minPaymentAmount
-    quote.budgetRemaining = budgetRemaining
-    quote.baseRipe = payout.baseRipe
-    quote.bonusRatio = payout.bonusRatio
-    quote.bonusRipe = payout.bonusRipe
-    quote.vestingLength = payout.vestingLength
-    quote.creationBlock = block.number
-    quote.maturityBlock = block.number + payout.vestingLength
-    quote.totalRipe = payout.totalRipe
-
-    if _paymentAmount < snap.minPaymentAmount or _paymentAmount > remainingPayment:
-        return quote
-    if deptBasics.isPaused or not self.canBuyNow:
-        return quote
-    if payout.totalRipe > budgetRemaining:
-        return quote
-    if not self._isPurchaseReady():
-        return quote
-
-    quote.available = True
-    return quote
