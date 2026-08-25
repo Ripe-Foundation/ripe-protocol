@@ -865,7 +865,8 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
 @external
 def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> bool:
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
-    assert empty(address) not in [_user, _asset] # dev: invalid parameters
+    # An empty user intentionally checkpoints aggregate state without a user row.
+    assert _asset != empty(address) # dev: invalid parameters
 
     # Get vault address from vault book
     vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)

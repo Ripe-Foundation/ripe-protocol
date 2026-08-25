@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import MAX_UINT256, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
@@ -400,9 +400,6 @@ def test_switchboard_three_parameter_validation(
         switchboard_charlie.claimDepositLootForAsset(user_addr, 1, ZERO_ADDRESS, sender=governance.address)
     
     with boa.reverts("invalid parameters"):
-        switchboard_charlie.updateDepositPoints(ZERO_ADDRESS, 1, asset_addr, sender=governance.address)
-    
-    with boa.reverts("invalid parameters"):
         switchboard_charlie.updateDepositPoints(user_addr, 1, ZERO_ADDRESS, sender=governance.address)
 
 
@@ -675,6 +672,221 @@ def test_switchboard_three_deposit_points_vault_lookup(
     # Should succeed with valid vault ID
     result = switchboard_charlie.updateDepositPoints(user_addr, vault_id, asset_addr, sender=governance.address)
     assert result
+
+
+def test_switchboard_three_can_checkpoint_aggregates_without_a_user_row(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+    mission_control,
+    setRipeRewardsConfig,
+    ledger,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _support_asset(mission_control, switchboard_bravo, alpha_token, [vault_id])
+    setRipeRewardsConfig(True)
+
+    assert switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+
+    asset_points = ledger.assetDepositPoints(vault_id, alpha_token)
+    global_points = ledger.globalDepositPoints()
+    user_points = ledger.userDepositPoints(ZERO_ADDRESS, vault_id, alpha_token)
+    assert asset_points.lastUpdate == boa.env.evm.patch.block_number
+    assert global_points.lastUpdate == boa.env.evm.patch.block_number
+    assert asset_points.precision != 0
+    assert user_points.lastUpdate == 0
+    assert user_points.balancePoints == 0
+
+
+def test_pre_change_aggregate_checkpoint_preserves_old_asset_allocation(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+    mission_control,
+    setRipeRewardsConfig,
+    ledger,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    setRipeRewardsConfig(True)
+
+    old_config = list(_asset_config([vault_id]))
+    old_config[1] = 10
+    mission_control.setAssetConfig(alpha_token, tuple(old_config), sender=switchboard_bravo.address)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+
+    boa.env.time_travel(blocks=10)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+
+    new_config = list(old_config)
+    new_config[1] = 30
+    mission_control.setAssetConfig(alpha_token, tuple(new_config), sender=switchboard_bravo.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeStakerPoints == 10 * 10
+
+    boa.env.time_travel(blocks=5)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeStakerPoints == 10 * 10 + 30 * 5
+
+
+def test_pre_change_global_checkpoint_preserves_old_ripe_rate(
+    switchboard_charlie,
+    switchboard_alpha,
+    governance,
+    setRipeRewardsConfig,
+    ledger,
+):
+    old_rate = 10
+    new_rate = 30
+    setRipeRewardsConfig(True, old_rate, 100_00, 0, 0, 0)
+    switchboard_charlie.updateRipeRewards(sender=governance.address)
+    ledger.setRipeAvailForRewards(10_000, sender=switchboard_alpha.address)
+
+    boa.env.time_travel(blocks=10)
+    switchboard_charlie.updateRipeRewards(sender=governance.address)
+    setRipeRewardsConfig(True, new_rate, 100_00, 0, 0, 0)
+    assert ledger.ripeRewards().borrowers == old_rate * 10
+
+    boa.env.time_travel(blocks=5)
+    switchboard_charlie.updateRipeRewards(sender=governance.address)
+    assert ledger.ripeRewards().borrowers == old_rate * 10 + new_rate * 5
+
+
+def test_zero_to_nonzero_staker_alloc_rebases_general_points_after_change(
+    switchboard_charlie,
+    governance,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    simple_erc20_vault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    ledger,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
+    setRipeRewardsConfig(True)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+
+    boa.env.time_travel(blocks=10)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+    gen_points_at_boundary = ledger.assetDepositPoints(
+        vault_id, alpha_token
+    ).ripeGenPoints
+    assert gen_points_at_boundary > 0
+
+    setAssetConfig(alpha_token, _stakersPointsAlloc=30, _voterPointsAlloc=0)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+    after_rebase = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert after_rebase.lastUsdValue == 0
+    assert after_rebase.ripeGenPoints == gen_points_at_boundary
+
+    boa.env.time_travel(blocks=5)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+    assert (
+        ledger.assetDepositPoints(vault_id, alpha_token).ripeGenPoints
+        == gen_points_at_boundary
+    )
+
+
+def test_nonzero_to_zero_staker_alloc_starts_general_points_at_change(
+    switchboard_charlie,
+    governance,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    simple_erc20_vault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    ledger,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=30, _voterPointsAlloc=0)
+    setRipeRewardsConfig(True)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+
+    boa.env.time_travel(blocks=10)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeGenPoints == 0
+
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+    after_rebase = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert after_rebase.lastUsdValue > 0
+    assert after_rebase.ripeGenPoints == 0
+
+    boa.env.time_travel(blocks=5)
+    switchboard_charlie.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        alpha_token,
+        sender=governance.address,
+    )
+    assert (
+        ledger.assetDepositPoints(vault_id, alpha_token).ripeGenPoints
+        == after_rebase.lastUsdValue * 5
+    )
 
 
 def test_switchboard_three_event_emission_immediate_actions(
