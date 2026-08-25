@@ -525,7 +525,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
         @precondition(lambda self: self.override_rate is not None)
         @rule()
         def cancel_rate_override(self):
-            assert self.ctx.lane.canCancelRateOverride()
+            assert self.ctx.lane.overrideTargetBasePayoutRate() != 0
             self.ctx.lane.cancelRateOverride(
                 sender=self.ctx.switchboard.address,
             )

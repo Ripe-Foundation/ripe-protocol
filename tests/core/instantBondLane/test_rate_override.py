@@ -26,7 +26,7 @@ def test_override_is_one_shot_on_next_rollover(lane_env):
     logs = filter_logs(lane_env.lane, "RateOverrideInstalled")
     assert logs[-1].targetRate == target
     assert lane_env.lane.rateOverride() == target
-    assert lane_env.lane.canCancelRateOverride() is True
+    assert lane_env.lane.overrideTargetBasePayoutRate() != 0
 
     same_epoch = lane_env.quote(lane_env.scale)
     assert same_epoch.rate == lane_env.lane.epochState().rate
@@ -44,7 +44,7 @@ def test_override_is_one_shot_on_next_rollover(lane_env):
     assert rolled[-1].newRate == target
     assert lane_env.lane.epochState().rate == target
     assert lane_env.lane.rateOverride() == 0
-    assert lane_env.lane.canCancelRateOverride() is False
+    assert lane_env.lane.overrideTargetBasePayoutRate() == 0
 
 
 def test_override_cancel_and_config_invalidation(lane_env):

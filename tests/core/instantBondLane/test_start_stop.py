@@ -119,7 +119,7 @@ def test_start_requires_valid_installed_config(lane_factory, governance):
 def test_stop_clears_clock_and_epoch_but_keeps_config_and_minted(lane_env):
     payout = lane_env.buy(lane_env.scale)
     lane_env.set_rate_override(9 * 10**17)
-    assert lane_env.lane.canCancelRateOverride() is True
+    assert lane_env.lane.overrideTargetBasePayoutRate() != 0
 
     lane_env.stop()
     logs = filter_logs(lane_env.lane, "InstantBondStopped")

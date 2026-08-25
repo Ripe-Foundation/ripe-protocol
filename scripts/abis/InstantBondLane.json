@@ -829,35 +829,6 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getInstantBondClaimsAddr",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "isClaimsSettlementCompatible",
-    "inputs": [
-      {
-        "name": "_claims",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
     "name": "getEpochSnapshot",
     "inputs": [],
     "outputs": [
@@ -1077,18 +1048,6 @@
       {
         "name": "",
         "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "canCancelRateOverride",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
       }
     ]
   },
