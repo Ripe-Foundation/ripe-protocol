@@ -640,7 +640,7 @@ def test_g11_frozen_after_pre_cliff_cash_refunds_c_minus_p_and_leaves_p(
     assert ledger.ripeAvailForHr() == budget + (orig - p)
 
 
-def test_g11_pre_cliff_cancel_with_empty_vault_still_refunds_full_c(
+def test_g11_pre_cliff_cancel_with_empty_vault_refunds_only_unclaimed(
     contributor_contract,
     setupRipeGovVaultConfig,
     switchboard_delta,
@@ -651,7 +651,7 @@ def test_g11_pre_cliff_cancel_with_empty_vault_still_refunds_full_c(
     ledger,
     human_resources,
 ):
-    """Trusted-clone cancel refunds full C even if the vault was already emptied."""
+    """An earlier withdrawal is not recovered unless cancellation burns it."""
     _prep(setupRipeGovVaultConfig)
     c = contributor_contract
     travel_to_ts(c.startTime() + 1)
@@ -665,4 +665,4 @@ def test_g11_pre_cliff_cancel_with_empty_vault_still_refunds_full_c(
     _, ok = official_delta_cancel(switchboard_delta, governance, c)
     assert ok is True
     assert c.compensation() == 0
-    assert ledger.ripeAvailForHr() == budget + orig
+    assert ledger.ripeAvailForHr() == budget + orig - p
