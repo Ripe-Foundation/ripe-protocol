@@ -197,19 +197,6 @@ def test_replay_does_not_bypass_the_start_point(tmp_path, start):
         )
 
 
-def test_ccip_plan_and_activation_completion_are_separate_migrations():
-    """Safe-pending preparation cannot stand in for activation completion."""
-    root = Path(__file__).resolve().parents[2]
-    stages = {
-        "base-mainnet": ("2026082400_CcipWirePlan.py", "2026082401_CcipActivationFinalized.py"),
-    }
-    for chain, (plan_name, final_name) in stages.items():
-        plan = (root / "migrations" / chain / plan_name).read_text()
-        final = (root / "migrations" / chain / final_name).read_text()
-        assert "records only that the preparation stage ran" in plan
-        assert "require_mainnet_activation_finalized" in final
-
-
 def test_new_mainnet_migrations_are_strictly_after_the_recorded_frontier():
     root = Path(__file__).resolve().parents[2]
     for chain in ("base-mainnet", "robinhood-mainnet"):

@@ -75,6 +75,14 @@ _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _DISTINCT_ACTIVATION_POLICIES = frozenset(
     {
         (
+            "DefaultsBaseLive",
+            "contracts/config/DefaultsBaseLive.vy",
+            "contracts/data/MissionControl.vy",
+            "RipeHq",
+            5,
+            1,
+        ),
+        (
             "DefaultsRobinhoodLive",
             "contracts/config/DefaultsRobinhoodLive.vy",
             "contracts/data/MissionControl.vy",
@@ -123,6 +131,7 @@ class PromotionSpec:
     activation_candidate_label: str | None = None
     activation_dependency_arg_index: int | None = None
     activation_expected_constructor_args: tuple | None = None
+    source_contract_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -986,6 +995,7 @@ class Migration:
         activation_candidate_label=None,
         activation_dependency_arg_index=None,
         activation_expected_constructor_args=None,
+        source_contract_name=None,
     ):
         """Promote one authenticated candidate after authoritative readback."""
         return self.promote_candidates(
@@ -1003,6 +1013,7 @@ class Migration:
                     activation_expected_constructor_args=(
                         activation_expected_constructor_args
                     ),
+                    source_contract_name=source_contract_name,
                 )
             ]
         )[0]
@@ -1072,7 +1083,7 @@ class Migration:
 
             candidate = contracts[candidate_label]
             expected_source_path = self._expected_source_path(
-                canonical_name,
+                spec.source_contract_name or canonical_name,
                 spec.expected_source_path,
             )
             validated_candidate = _validated_promotable_record(

@@ -5,22 +5,22 @@
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py --network base-mainnet --block-number 49896151
+# Regenerate with:  python scripts/prepare_defaults.py --network base-mainnet --block-number 50413043
 #
 # Snapshot provenance:
 #   repository: ripe-foundation/ripe-protocol
 #   generator: scripts/prepare_defaults.py
-#   generator sha256: 2fcce89099dcc4879002a4b7980b3d663185cff274cffb0793d61f7df5457b7f
+#   generator sha256: 8c78d41e99a690947b0baebecb2ee6d46e0aa01f01789d3f77a7deee54ee8226
 #   manifest sha256: 90dc26ec5c854e5c7f46429c4020a997864bbfeeff2ba7f766a541839e791e09
 #   Vyper compiler: 0.4.3+commit.bff19ea2
 #   Vyper compiler identity sha256: 208c7c41102f13ea781980bf0647dd003d334d34fb02b48f043459c8584aafe0
-#   MissionControl compiler-input integrity: 89384a3df18447d313fe3db1e007509adebb3e1a54fed7848cb727f3defb65ff
+#   MissionControl compiler-input integrity: e2289aa22fb374456f4e2c74119ed084180c40d085007db3a414199e940b50b0
 #   MissionControl canonical ABI sha256: 9778661b26a575626b7319a95f81281d39be6d4d081250f27be26f32de138903
-#   Ledger compiler-input integrity: 78cb171dc351031f2addcf08eea17fc10c4e6b2763d92d32208fdc48f0806ef3
+#   Ledger compiler-input integrity: 1f19f2370f430fc10611425f4c4b81cc6f2cd9d87d25cd30843a96adefd57476
 #   Ledger canonical ABI sha256: 2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c
 #   chain id: 8453
-#   snapshot block: 49896151
-#   snapshot block hash: 0x5c2723f65014f29460c81f889e418724772d4247335413a7844c30290889a3be
+#   snapshot block: 50413043
+#   snapshot block hash: 0xb8740bbfc9cae9c88d127951ce66e7348294304a1c8c376281c3f4c58ad52bc4
 #   snapshot finality: verified against the provider finalized tag
 #   MissionControl: 0x559E53F42b68b4995732Dba4aF300796761DBC19
 #   MissionControl code sha256: 32432e24dd701d80430d70b59408d156d9a1a6b9d537224354b9f97dc22db008
@@ -31,14 +31,17 @@
 # already exists. DefaultsBase.vy remains the launch config for a
 # brand-new chain; the two are not interchangeable.
 #
-# Every value below was read off the live Base deployment, so this is a
-# snapshot of what governance has configured rather than a set of launch
-# decisions. MissionControl and Ledger copy these into storage at
-# construction, which is the only reason a replacement for either can come up
-# matching what is already running.
+# Every policy and asset value below was read off the live Base
+# deployment, so this is a snapshot of governance configuration rather than a
+# set of launch decisions. The Contributor blueprint is the sole deploy-time
+# override, allowing future clones to use the replacement generation.
+# MissionControl and Ledger copy these values into storage at construction.
 #
-# MissionControl state that Defaults has no slot for -- userConfig and
+# MissionControl per-user state that Defaults has no slot for -- userConfig and
 # userDelegation -- does NOT survive the redeploy and is not represented here.
+# Vault pointers and historical vault classifications are also not carried;
+# verify_defaults.py must exact-match their observable live state before this
+# contract is used for a replacement.
 #
 # Percentages are basis points (100_00 == 100%). Durations are in
 # `block.number`, which on this OP-stack L2 advances every 2s, so a day is
@@ -48,8 +51,9 @@ implements: Defaults
 from interfaces import Defaults
 import interfaces.ConfigStructs as cs
 
-# addresses -- all read from the live deployment, so there is no
-# constructor and nothing to bind at deploy time
+# addresses -- snapshotted from the live deployment. The Contributor
+# blueprint is supplied by the replacement migration so future
+# contributors use the newly deployed implementation.
 UNDY_USD: constant(address) = 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf
 USDC: constant(address) = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
 SUSDE: constant(address) = 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2
@@ -78,7 +82,13 @@ RIPE_WETH_LP: constant(address) = 0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9
 GREEN_TOKEN: constant(address) = 0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707
 UNDY_USDC: constant(address) = 0x99e65176F7FA8743E3fbaEF277d1Da448e361367
 TRAINING_WHEELS: constant(address) = 0x2255b0006A3DA38AA184E0F9d5e056C2d0448065
-CONTRIB_TEMPLATE: constant(address) = 0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1
+CONTRIB_TEMPLATE: immutable(address)
+
+
+@deploy
+def __init__(_contribTemplate: address):
+    assert _contribTemplate != empty(address) # dev: invalid contributor template
+    CONTRIB_TEMPLATE = _contribTemplate
 
 
 @view
@@ -106,7 +116,7 @@ def genConfig() -> cs.GenConfig:
 def genDebtConfig() -> cs.GenDebtConfig:
     return cs.GenDebtConfig(
         perUserDebtLimit=1000000000000000000000,
-        globalDebtLimit=40000000000000000000000,
+        globalDebtLimit=24000000000000000000000,
         minDebtAmount=1000000000000000000,
         numAllowedBorrowers=1000,
         maxBorrowPerInterval=10000000000000000000000,
@@ -134,7 +144,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
 @view
 @external
 def ripeAvailForRewards() -> uint256:
-    return 879095205175239069433051
+    return 873127440175239069433051
 
 
 @view
@@ -1285,7 +1295,7 @@ def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
 @view
 @external
 def priorityPriceSourceIds() -> DynArray[uint256, 10]:
-    return [1, 8, 2, 4, 5]
+    return [1, 8, 2, 9, 4, 5]
 
 
 @view

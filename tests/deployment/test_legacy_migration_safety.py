@@ -838,10 +838,17 @@ def test_candidate_promotion_rejects_incomplete_record_before_readback(
     assert not (tmp_path / "2-pending-manifest.json").exists()
 
 
-def test_candidate_promotion_accepts_distinct_activation_witness(tmp_path):
+@pytest.mark.parametrize(
+    "defaults_name",
+    ("DefaultsBaseLive", "DefaultsRobinhoodLive"),
+)
+def test_candidate_promotion_accepts_distinct_activation_witness(
+    tmp_path,
+    defaults_name,
+):
     defaults = _promotable_record(
         tmp_path,
-        "contracts/config/DefaultsRobinhoodLive.vy",
+        f"contracts/config/{defaults_name}.vy",
         "0x" + "2" * 40,
     )
     hq = "0x" + "4" * 40
@@ -857,7 +864,7 @@ def test_candidate_promotion_accepts_distinct_activation_witness(tmp_path):
     )
     active = {
         "contracts": {
-            "DefaultsRobinhoodLive": {
+            defaults_name: {
                 "address": "0x" + "1" * 40,
                 "file": "old.vy",
             },
@@ -870,10 +877,10 @@ def test_candidate_promotion_accepts_distinct_activation_witness(tmp_path):
 
     migration = _migration(tmp_path)
     registry = _Registry(mission_control["address"], 5)
-    migration._files["DefaultsRobinhoodLive"] = defaults["file"]
+    migration._files[defaults_name] = defaults["file"]
     migration._previous_manifest["contracts"]["RipeHq"] = {"address": registry.address}
     migration.promote_candidate(
-        "DefaultsRobinhoodLive",
+        defaults_name,
         "DefaultsCandidate",
         registry,
         5,
@@ -886,7 +893,7 @@ def test_candidate_promotion_accepts_distinct_activation_witness(tmp_path):
     )
 
     pending = json.loads((tmp_path / "2-pending-manifest.json").read_text())
-    assert pending["contracts"]["DefaultsRobinhoodLive"] == defaults
+    assert pending["contracts"][defaults_name] == defaults
     assert pending["contracts"]["DefaultsCandidate"] == defaults
     assert pending["contracts"]["MissionControlCandidate"] == mission_control
 
@@ -1079,6 +1086,38 @@ def test_candidate_promotion_rejects_wrong_source_even_when_mapping_agrees(
             registry_name="RipeHq",
             expected_constructor_args=(),
         )
+
+
+def test_candidate_promotion_supports_an_explicit_contract_alias(tmp_path):
+    source_path = "contracts/vaults/SimpleErc20.vy"
+    candidate = _promotable_record(
+        tmp_path,
+        source_path,
+        "0x" + "2" * 40,
+    )
+    active = {"contracts": {"UnderscoreCandidate": candidate}}
+    _write_json(tmp_path / "current-manifest.json", active)
+    _write_json(tmp_path / "1-manifest.json", active)
+
+    migration = _migration(tmp_path, files={"SimpleErc20": source_path})
+    registry = _Registry(candidate["address"])
+    migration._previous_manifest["contracts"]["VaultBook"] = {
+        "address": registry.address
+    }
+
+    migration.promote_candidate(
+        "Underscore Vault",
+        "UnderscoreCandidate",
+        registry,
+        7,
+        expected_source_path=source_path,
+        registry_name="VaultBook",
+        expected_constructor_args=(),
+        source_contract_name="SimpleErc20",
+    )
+
+    pending = json.loads((tmp_path / "2-pending-manifest.json").read_text())
+    assert pending["contracts"]["Underscore Vault"] == candidate
 
 
 def test_candidate_promotion_binds_approved_compiler_settings(tmp_path):

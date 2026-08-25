@@ -38,12 +38,16 @@ interface RipeGovVault:
     def totalUserGovPoints(_user: address) -> uint256: view
     def totalGovPoints() -> uint256: view
 
+interface RipeHq:
+    def governance() -> address: view
+
 interface Teller:
     def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _migration: RipeGovMigrationData, _ledger: address) -> uint256: nonpayable
     def depositOnVaultMigration(_user: address, _asset: address, _amount: uint256, _targetVaultId: uint256, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForLegacyRipeGovMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
     def withdrawOnVaultMigration(_user: address, _asset: address, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool): nonpayable
+    def claimManyFromStabilityPool(_vaultId: uint256, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _user: address = msg.sender, _shouldAutoDeposit: bool = False) -> uint256: nonpayable
     def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface MissionControl:
@@ -52,6 +56,10 @@ interface MissionControl:
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
+    def userConfig(_user: address) -> cs.UserConfig: view
+    def userDelegation(_user: address, _delegate: address) -> cs.ActionDelegation: view
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
 
 interface AddressRegistry:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -87,6 +95,11 @@ struct RipeGovMigrationData:
     unlock: uint256
     lastTerms: cs.LockTerms
 
+struct StabPoolClaim:
+    stabAsset: address
+    claimAsset: address
+    maxUsdValue: uint256
+
 event RipeGovPositionMigrationExecuted:
     user: indexed(address)
     asset: indexed(address)
@@ -120,15 +133,33 @@ event RipeGovUserPointAccrualDisableInherited:
     targetVault: indexed(address)
     disabledBlock: uint256
 
+event StabilityPoolClaimsSettledForMigration:
+    user: indexed(address)
+    sourceVaultId: uint256
+    usdValue: uint256
+
+event StabilityPoolClaimSkippedForMigration:
+    user: indexed(address)
+    sourceVaultId: uint256
+
+event MissionControlUserConfigMigrated:
+    user: indexed(address)
+
+event MissionControlUserDelegationMigrated:
+    user: indexed(address)
+    delegate: indexed(address)
+
 MAX_MIGRATION_USERS: constant(uint256) = 25
 MAX_USER_ASSETS: constant(uint256) = 20
 MAX_GOV_USER_ASSETS: constant(uint256) = 20
 MAX_MIGRATION_ASSETS: constant(uint256) = 20
 MAX_GOV_BATCH_ASSET_SLOTS: constant(uint256) = 20
+MAX_STAB_CLAIMS: constant(uint256) = 10
 
 BASE_CHAIN_ID: constant(uint256) = 8453
 LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
 LEGACY_RIPE_GOV_VAULT: immutable(address)
+LEGACY_MISSION_CONTROL: immutable(address)
 
 
 @deploy
@@ -136,6 +167,146 @@ def __init__(_ripeHq: address, _shouldPause: bool, _legacyRipeGovVault: address)
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
     LEGACY_RIPE_GOV_VAULT = _legacyRipeGovVault
+    legacyMissionControl: address = empty(address)
+    if _legacyRipeGovVault != empty(address):
+        legacyMissionControl = staticcall AddressRegistry(_ripeHq).getAddr(5)
+        assert legacyMissionControl != empty(address) # dev: no legacy mission control
+    LEGACY_MISSION_CONTROL = legacyMissionControl
+
+
+#########################
+# Non-enumerable State  #
+#########################
+
+
+@external
+def migrateMissionControlUserConfigs(
+    _users: DynArray[address, MAX_MIGRATION_USERS],
+) -> uint256:
+    assert msg.sender == staticcall RipeHq(addys._getRipeHq()).governance() # dev: only governance allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert len(_users) != 0 # dev: no migrations
+    assert chain.id == BASE_CHAIN_ID and LEGACY_MISSION_CONTROL != empty(address) # dev: legacy migration disabled
+
+    a: addys.Addys = addys._getAddys()
+    assert a.missionControl != LEGACY_MISSION_CONTROL # dev: mission control not replaced
+
+    count: uint256 = 0
+    for user: address in _users:
+        if user == empty(address):
+            continue
+        config: cs.UserConfig = staticcall MissionControl(LEGACY_MISSION_CONTROL).userConfig(user)
+        extcall MissionControl(a.missionControl).setUserConfig(user, config)
+        imported: cs.UserConfig = staticcall MissionControl(a.missionControl).userConfig(user)
+        assert imported.canAnyoneDeposit == config.canAnyoneDeposit # dev: user config mismatch
+        assert imported.canAnyoneRepayDebt == config.canAnyoneRepayDebt # dev: user config mismatch
+        assert imported.canAnyoneBondForUser == config.canAnyoneBondForUser # dev: user config mismatch
+        count += 1
+        log MissionControlUserConfigMigrated(user=user)
+    return count
+
+
+@external
+def migrateMissionControlUserDelegations(
+    _users: DynArray[address, MAX_MIGRATION_USERS],
+    _delegates: DynArray[address, MAX_MIGRATION_USERS],
+) -> uint256:
+    assert msg.sender == staticcall RipeHq(addys._getRipeHq()).governance() # dev: only governance allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert len(_users) != 0 and len(_users) == len(_delegates) # dev: invalid migrations
+    assert chain.id == BASE_CHAIN_ID and LEGACY_MISSION_CONTROL != empty(address) # dev: legacy migration disabled
+
+    a: addys.Addys = addys._getAddys()
+    assert a.missionControl != LEGACY_MISSION_CONTROL # dev: mission control not replaced
+
+    count: uint256 = 0
+    for i: uint256 in range(len(_users), bound=MAX_MIGRATION_USERS):
+        user: address = _users[i]
+        delegate: address = _delegates[i]
+        if user == empty(address) and delegate == empty(address):
+            continue
+        assert user != empty(address) and delegate != empty(address) # dev: invalid delegation
+        config: cs.ActionDelegation = staticcall MissionControl(LEGACY_MISSION_CONTROL).userDelegation(user, delegate)
+        extcall MissionControl(a.missionControl).setUserDelegation(user, delegate, config)
+        imported: cs.ActionDelegation = staticcall MissionControl(a.missionControl).userDelegation(user, delegate)
+        assert imported.canWithdraw == config.canWithdraw # dev: user delegation mismatch
+        assert imported.canBorrow == config.canBorrow # dev: user delegation mismatch
+        assert imported.canClaimFromStabPool == config.canClaimFromStabPool # dev: user delegation mismatch
+        assert imported.canClaimLoot == config.canClaimLoot # dev: user delegation mismatch
+        count += 1
+        log MissionControlUserDelegationMigrated(user=user, delegate=delegate)
+    return count
+
+
+##########################
+# Stability Pool Claims  #
+##########################
+
+
+@external
+def settleStabilityPoolClaims(
+    _users: DynArray[address, MAX_MIGRATION_USERS],
+    _sourceVaultId: uint256,
+    _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
+) -> uint256:
+    assert msg.sender == staticcall RipeHq(addys._getRipeHq()).governance() # dev: only governance allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert len(_users) != 0 and len(_claims) != 0 # dev: no claims
+
+    a: addys.Addys = addys._getAddys()
+    assert not staticcall Department(a.teller).isPaused() # dev: teller paused
+    assert staticcall MissionControl(a.missionControl).isStabVaultId(_sourceVaultId) # dev: source is not stability pool
+    assert staticcall AddressRegistry(a.vaultBook).isValidRegId(_sourceVaultId) # dev: invalid source vault id
+    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(_sourceVaultId)
+    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
+    assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
+
+    totalUsdValue: uint256 = 0
+    for user: address in _users:
+        if user == empty(address):
+            continue
+        previousDelegation: cs.ActionDelegation = staticcall MissionControl(a.missionControl).userDelegation(user, self)
+        extcall MissionControl(a.missionControl).setUserDelegation(
+            user,
+            self,
+            cs.ActionDelegation(
+                canWithdraw=False,
+                canBorrow=False,
+                canClaimFromStabPool=True,
+                canClaimLoot=False,
+            ),
+        )
+        success: bool = False
+        response: Bytes[32] = b""
+        success, response = raw_call(
+            a.teller,
+            abi_encode(
+                _sourceVaultId,
+                _claims,
+                user,
+                False,
+                method_id=method_id("claimManyFromStabilityPool(uint256,(address,address,uint256)[],address,bool)"),
+            ),
+            max_outsize=32,
+            revert_on_failure=False,
+        )
+        extcall MissionControl(a.missionControl).setUserDelegation(user, self, previousDelegation)
+        if not success:
+            log StabilityPoolClaimSkippedForMigration(
+                user=user,
+                sourceVaultId=_sourceVaultId,
+            )
+            continue
+        assert len(response) == 32 # dev: invalid claim response
+        usdValue: uint256 = abi_decode(response, uint256)
+        assert usdValue != 0 # dev: empty claim response
+        totalUsdValue += usdValue
+        log StabilityPoolClaimsSettledForMigration(
+            user=user,
+            sourceVaultId=_sourceVaultId,
+            usdValue=usdValue,
+        )
+    return totalUsdValue
 
 
 ##########################

@@ -62,14 +62,10 @@ CCIP_RUNNER_CONSUMERS = {
         "migrations/robinhood-testnet/0001_CcipPool.py",
     },
     "get_address_on_chain": {
-        "migrations/base-mainnet/2026082400_CcipWirePlan.py",
-        "migrations/base-mainnet/2026082401_CcipActivationFinalized.py",
         "migrations/base-sepolia/0002_CcipWire.py",
         "migrations/robinhood-testnet/0002_CcipWire.py",
     },
     "get_solidity_contract": {
-        "migrations/base-mainnet/2026082400_CcipWirePlan.py",
-        "migrations/base-mainnet/2026082401_CcipActivationFinalized.py",
         "migrations/base-sepolia/0002_CcipWire.py",
         "migrations/robinhood-testnet/0002_CcipWire.py",
     },

@@ -364,13 +364,13 @@ def deregisterAsset(_asset: address) -> bool:
 
 @external
 def setUserConfig(_user: address, _config: cs.UserConfig):
-    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() or msg.sender == addys._getVaultMigratorAddr() # dev: no perms
     self.userConfig[_user] = _config
 
 
 @external
 def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation):
-    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() or msg.sender == addys._getVaultMigratorAddr() # dev: no perms
     self.userDelegation[_user][_delegate] = _config
 
 

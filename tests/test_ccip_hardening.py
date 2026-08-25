@@ -20,12 +20,8 @@ from scripts.utils import ccip
 
 ROOT = Path(__file__).resolve().parents[1]
 WIRE_MIGRATIONS = (
-    "migrations/base-mainnet/2026082400_CcipWirePlan.py",
     "migrations/base-sepolia/0002_CcipWire.py",
     "migrations/robinhood-testnet/0002_CcipWire.py",
-)
-MAINNET_SAFE_PLAN_MIGRATIONS = (
-    "migrations/base-mainnet/2026082400_CcipWirePlan.py",
 )
 POOL_MIGRATIONS = (
     "migrations/base-mainnet/2026080700_CcipPools.py",
@@ -495,21 +491,6 @@ def test_selected_policy_values_drive_wiring_and_revalidation(relative_path):
     assert "policy.rate_limit_admin" in source
     assert "NO_RATE_LIMIT" not in source
     assert "CURRENT_RATE_LIMIT_ADMIN" not in source
-
-
-@pytest.mark.parametrize("relative_path", MAINNET_SAFE_PLAN_MIGRATIONS)
-def test_mainnet_safe_plan_binds_live_ccip_append_order(relative_path):
-    source = (ROOT / relative_path).read_text()
-    assert 'POOLS = (\n    ("RIPE"' in source
-    preflight = source.index("ccip.require_mainnet_hq_append_preflight(")
-    first_mutation = source.index("ccip.execute_activation_mutation(")
-    assert preflight < first_mutation
-    assert "expected_plan_sha256=hq_append_plan_sha256" in source
-    assert "initiateHqConfigChange(uint256,bool,bool,bool)" in source
-    assert "confirmHqConfigChange(uint256)" in source
-    assert "AFTER registryChangeTimeLock" in source
-    assert "AFTER a second registryChangeTimeLock" in source
-    assert "must assign RipeHq id" not in source
 
 
 def test_hq_append_preflight_requires_exact_empty_exclusive_window(monkeypatch):

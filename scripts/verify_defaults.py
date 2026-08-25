@@ -44,6 +44,7 @@ from scripts.prepare_defaults import NETWORKS, DEFAULT_NETWORK, Network
 
 MISSION_CONTROL_SOURCE = "contracts/data/MissionControl.vy"
 LEDGER_SOURCE = "contracts/data/Ledger.vy"
+CONTRIBUTOR_SOURCE = "contracts/modules/Contributor.vy"
 
 # Ledger is the second consumer of a generated defaults contract. Its
 # constructor copies exactly these three, and nothing else in the repo reads
@@ -198,7 +199,8 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
         file=sys.stderr,
     )
     boa.fork(rpc, block_identifier=block)
-    defaults = boa.load(str(defaults_path))
+    contributor = boa.load_partial(CONTRIBUTOR_SOURCE).deploy_as_blueprint()
+    defaults = boa.load(str(defaults_path), contributor.address)
     replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, defaults.address)
 
     mismatches: list[tuple[str, object, object]] = []
@@ -211,7 +213,14 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
             mismatches.append((label, _normalize(got), _normalize(want)))
 
     for name in SCALAR_GETTERS:
-        compare(name, getattr(replacement, name)(), live_call(name))
+        expected = live_call(name)
+        if name == "hrConfig":
+            # The replacement intentionally points new contributors at the
+            # freshly deployed blueprint. Every other HR value must still
+            # match the live snapshot exactly.
+            expected = list(expected)
+            expected[0] = contributor.address
+        compare(name, getattr(replacement, name)(), expected)
 
     # Defaults cannot carry these pointers. Compare them whenever the deployed
     # MissionControl ABI makes the live value observable. This keeps the
@@ -306,7 +315,8 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
         return 1
     print(
         f"a replacement MissionControl built from {defaults_path.name} comes up "
-        f"matching live {network.display_name} at block {block}"
+        f"matching live {network.display_name} at block {block}, with the "
+        "expected fresh Contributor blueprint"
     )
     return 0
 
