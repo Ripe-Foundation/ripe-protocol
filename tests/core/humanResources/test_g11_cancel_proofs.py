@@ -90,7 +90,7 @@ def test_g11_spoof_switchboard_cancel_is_not_production_path(
     assert ledger.ripeAvailForHr() == budget + orig
 
 
-def test_g11_residue_b_plus_p_burns_only_comp_refunds(
+def test_g11_same_vault_claimed_plus_residue_burn_caps_refund_at_compensation(
     contributor_contract,
     setupRipeGovVaultConfig,
     switchboard_delta,
@@ -113,12 +113,16 @@ def test_g11_residue_b_plus_p_burns_only_comp_refunds(
     seed_ripe_gov_position(ripe_gov_vault, ripe_token, whale, teller, c.address, b)
     travel_to_ts(c.startTime() + (c.cliffTime() - c.startTime()) // 2)
     p = c.cashRipeCheck(sender=owner_address)
+    assert p == c.totalClaimed()
+    assert b + p > p
     assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == b + p
     orig = c.compensation()
     supply = ripe_token.totalSupply()
     budget = ledger.ripeAvailForHr()
     _, ok = official_delta_cancel(switchboard_delta, governance, c)
     assert ok is True
+    assert c.compensation() == 0
+    assert c.totalClaimed() == p
     assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == 0
     assert ledger.ripeAvailForHr() == budget + orig
     assert ripe_token.totalSupply() == supply - (b + p)

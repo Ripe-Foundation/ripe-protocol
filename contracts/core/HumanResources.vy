@@ -530,7 +530,7 @@ def refundAfterCancelPaycheck(
             assert extcall RipeToken(a.ripeToken).burn(actualBurnAmount)  # dev: ripe burn failed
 
         # RIPE is fungible here, but claimed compensation capacity is recovered
-        # only to the extent that RIPE was actually burned from the selected position.
+        # only to the extent that RIPE was actually burned during this cancellation.
         claimedAmount: uint256 = min(_amount, staticcall HrContributor(msg.sender).totalClaimed())
         recoveredClaimedAmount: uint256 = min(claimedAmount, actualBurnAmount)
         refundAmount = _amount - claimedAmount + recoveredClaimedAmount

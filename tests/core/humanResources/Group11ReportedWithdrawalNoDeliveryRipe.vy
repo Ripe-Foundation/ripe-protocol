@@ -49,4 +49,5 @@ def transfer(_recipient: address, _amount: uint256) -> bool:
 
 @external
 def burn(_amount: uint256) -> bool:
+    # Backstop: the successful test path proves a zero actual burn skips this call.
     return False

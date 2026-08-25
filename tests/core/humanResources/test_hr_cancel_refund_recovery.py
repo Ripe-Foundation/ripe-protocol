@@ -94,6 +94,7 @@ def test_burn_path_formula_zero_keeps_budget_when_claimed_position_is_elsewhere(
 ):
     setupRipeGovVaultConfig()
     contributor = contributor_contract
+    compensation_before = contributor.compensation()
     claimed = _cash_pre_cliff(contributor)
     _rotate_core(
         alternate_ripe_gov_vault,
@@ -110,6 +111,7 @@ def test_burn_path_formula_zero_keeps_budget_when_claimed_position_is_elsewhere(
         sender=contributor.address,
     )
 
+    assert contributor.compensation() == compensation_before
     assert contributor.totalClaimed() == claimed
     assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == claimed
     assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
@@ -193,7 +195,10 @@ def test_explicit_historical_vault_burn_does_not_clear_legacy_selection(
         sender=contributor.address,
     )
 
+    assert contributor.compensation() == compensation
+    assert contributor.totalClaimed() == claimed
     assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
     assert ripe_token.totalSupply() == supply_before - claimed
     assert ledger.ripeAvailForHr() == budget_before + compensation
     assert (

@@ -27,8 +27,8 @@ Approved 2026-08-19:
    reserve.
 4. **Partially superseded 2026-08-25.** Contributor cash, cancellation
    state, and event reporting stay unchanged. Official pre-cliff cancel
-   after an early cash still reports **full original C**. The former
-   implication that Ledger must also credit the full `C` is superseded
+   after an early cash still reports **full original C**. The former explicit,
+   test-proven guarantee that Ledger also credits the full `C` is superseded
    by the burn-coupled rule below.
 5. Cancellation credit saturates at the uint256 ceiling. The original
    rule used `forfeitedAmount` directly:
@@ -73,7 +73,7 @@ credit. The `_shouldBurnPosition == False` path is unchanged. On the burn path,
 Human Resources first withdraws the selected Contributor position, checkpoints
 Lootbox, calculates
 `actualBurnAmount = min(withdrawalAmount, RIPE.balanceOf(HumanResources))`, and
-burns `actualBurnAmount`. It then calculates:
+burns `actualBurnAmount` when it is nonzero. It then calculates:
 
 `claimedAmount = min(_amount, Contributor(msg.sender).totalClaimed())`
 
@@ -91,6 +91,10 @@ selected Contributor position, including unrelated residue, offsets claimed
 compensation up to `claimedAmount`. Claimed compensation capacity is never
 restored by more than the amount actually burned. The candidate adds no
 storage, signatures, return values, or events and leaves Ledger unchanged.
+
+This supersession intentionally inverts the earlier empty-position proof:
+`test_g11_pre_cliff_cancel_with_empty_vault_still_refunds_full_c` is replaced
+by `test_g11_pre_cliff_cancel_with_empty_vault_refunds_only_unclaimed`.
 
 ## What this ticket implements
 
@@ -134,7 +138,8 @@ if not _shouldBurnPosition:
 else:
     # Existing withdrawal and Lootbox checkpoint happen first.
     actualBurnAmount = min(withdrawalAmount, RIPE.balanceOf(HumanResources))
-    burn(actualBurnAmount)
+    if actualBurnAmount != 0:
+        burn(actualBurnAmount)
     claimedAmount = min(_amount, Contributor(msg.sender).totalClaimed())
     recoveredClaimedAmount = min(claimedAmount, actualBurnAmount)
     refundAmount = _amount - claimedAmount + recoveredClaimedAmount
