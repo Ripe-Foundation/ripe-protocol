@@ -6,6 +6,24 @@ from conf_utils import filter_logs, get_boa_dev_reasons
 from tests.core.ripeReserveEngine.conftest import controller_rate
 
 
+def test_fractional_token_minimum_is_valid_and_enforced(lane_env):
+    cap = 10 * lane_env.scale
+    minimum = lane_env.scale // 10
+    lane_env.set_config(paymentCapPerEpoch=cap, minPaymentAmount=minimum)
+
+    quote = lane_env.quote(minimum)
+    assert quote.available is True
+    assert quote.minPaymentAmount == minimum
+    assert quote.totalRipe > 0
+    assert lane_env.buy(minimum) == quote.totalRipe
+
+    below_minimum = minimum - 1
+    assert lane_env.quote(below_minimum).available is False
+    with pytest.raises(boa.BoaError) as err:
+        lane_env.buy(below_minimum)
+    assert "below minimum payment" in get_boa_dev_reasons(err.value)
+
+
 def test_remainder_below_min_payment_is_unbuyable(lane_env):
     cap = 100 * lane_env.scale
     minimum = 10 * lane_env.scale

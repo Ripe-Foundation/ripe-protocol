@@ -46,19 +46,19 @@ def test_stop_new_seed_restart_uses_new_seed_without_rewriting_claims(lane_env):
     assert lane_env.claims.getNumUserPositions(lane_env.bob) == 2
 
 
-def test_payment_token_swap_requires_matching_config_units(lane_env, governance):
+def test_payment_token_swap_requires_valid_cap_units(lane_env, governance):
     other = boa.load(
         "contracts/mock/MockErc20.vy",
         governance,
         "Other",
         "OTH",
-        8,
+        10,
         1_000_000,
     )
     old_funds = lane_env.payment_token.balanceOf(lane_env.endaoment_funds)
     lane_env.stop()
     lane_env.lane.setPaymentToken(other.address, sender=lane_env.switchboard.address)
-    assert lane_env.lane.paymentScale() == 10**8
+    assert lane_env.lane.paymentScale() == 10**10
     assert lane_env.lane.isValidConfig(lane_env.lane.engineConfig()) is False
     with boa.reverts("not configured"):
         lane_env.lane.start(
@@ -67,7 +67,7 @@ def test_payment_token_swap_requires_matching_config_units(lane_env, governance)
             sender=lane_env.switchboard.address,
         )
 
-    new_scale = 10**8
+    new_scale = 10**10
     config = make_config(new_scale, epoch_length=lane_env.epoch_length)
     lane_env.lane.setConfig(config, sender=lane_env.switchboard.address)
     lane_env.lane.start(0, lane_env.epoch_length, sender=lane_env.switchboard.address)

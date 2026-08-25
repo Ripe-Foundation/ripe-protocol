@@ -1198,8 +1198,8 @@ def _isValidConfigValues(_config: ReserveEngineConfig) -> bool:
     if _config.paymentCapPerEpoch < paymentScale or _config.paymentCapPerEpoch > max_value(uint256) // HUNDRED_PERCENT:
         return False
 
-    # min payment is at least one unit and cannot exceed the cap
-    if _config.minPaymentAmount < paymentScale or _config.minPaymentAmount > _config.paymentCapPerEpoch:
+    # min payment must be nonzero and cannot exceed the cap
+    if _config.minPaymentAmount == 0 or _config.minPaymentAmount > _config.paymentCapPerEpoch:
         return False
 
     # live ceiling must be safe against both the new cap and a committed epoch's cap
