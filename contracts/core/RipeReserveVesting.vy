@@ -26,17 +26,19 @@ from interfaces import Department
 
 struct VestingPosition:
     id: uint256
-    ripePayout: uint256
+    ripeAllocation: uint256
     ripeClaimed: uint256
     creationBlock: uint256
+    claimStartBlock: uint256
     maturityBlock: uint256
 
 event VestingPositionCreated:
     user: indexed(address)
     positionId: indexed(uint256)
-    sourceLane: indexed(address)
-    ripePayout: uint256
+    sourceEngine: indexed(address)
+    ripeAllocation: uint256
     creationBlock: uint256
+    claimStartBlock: uint256
     maturityBlock: uint256
 
 event ClaimRecorded:
@@ -44,7 +46,7 @@ event ClaimRecorded:
     positionId: indexed(uint256)
     amountClaimed: uint256
     totalClaimedForPosition: uint256
-    ripePayout: uint256
+    ripeAllocation: uint256
     fullyClaimed: bool
 
 event RemainingAllocationBudgetSet:
@@ -79,42 +81,49 @@ def __init__(_ripeHq: address):
 @external
 def createVestingPosition(
     _user: address,
-    _ripePayout: uint256,
+    _ripeAllocation: uint256,
     _vestingLength: uint256,
+    _minVestingLength: uint256,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: paused
-    assert msg.sender == addys._getInstantBondLaneAddr() # dev: invalid lane
+    assert msg.sender == addys._getRipeReserveEngineAddr() # dev: invalid engine
 
     # basic validation
     assert _user != empty(address) # dev: invalid user
-    assert _ripePayout != 0 # dev: invalid payout
-    assert _ripePayout <= self.remainingAllocationBudget # dev: allocation budget
+    assert _ripeAllocation != 0 # dev: invalid allocation
+    assert _ripeAllocation <= self.remainingAllocationBudget # dev: allocation budget
+    assert _minVestingLength != 0 # dev: invalid minimum vesting
+    assert _vestingLength >= _minVestingLength # dev: invalid vesting length
 
     # create position
     creationBlock: uint256 = block.number
+    assert _minVestingLength <= max_value(uint256) - creationBlock # dev: claim start overflow
     assert _vestingLength <= max_value(uint256) - creationBlock # dev: maturity overflow
+    claimStartBlock: uint256 = creationBlock + _minVestingLength
     maturityBlock: uint256 = creationBlock + _vestingLength
     nextPositionId: uint256 = self.nextPositionId
     position: VestingPosition = VestingPosition(
         id=nextPositionId,
-        ripePayout=_ripePayout,
+        ripeAllocation=_ripeAllocation,
         ripeClaimed=0,
         creationBlock=creationBlock,
+        claimStartBlock=claimStartBlock,
         maturityBlock=maturityBlock,
     )
     self._addPositionToUser(_user, position)
 
     # global state
-    self.remainingAllocationBudget -= _ripePayout
-    self.totalAllocatedRipe += _ripePayout
+    self.remainingAllocationBudget -= _ripeAllocation
+    self.totalAllocatedRipe += _ripeAllocation
     self.nextPositionId = nextPositionId + 1
 
     log VestingPositionCreated(
         user=_user,
         positionId=position.id,
-        sourceLane=msg.sender,
-        ripePayout=_ripePayout,
+        sourceEngine=msg.sender,
+        ripeAllocation=_ripeAllocation,
         creationBlock=creationBlock,
+        claimStartBlock=claimStartBlock,
         maturityBlock=maturityBlock,
     )
     return position.id
@@ -168,7 +177,7 @@ def _removePositionFromUser(_user: address, _positionId: uint256):
 @external
 def recordClaim(_user: address, _positionId: uint256) -> (uint256, uint256, uint256):
     assert not deptBasics.isPaused # dev: paused
-    assert msg.sender == addys._getInstantBondLaneAddr() # dev: invalid lane
+    assert msg.sender == addys._getRipeReserveEngineAddr() # dev: invalid engine
     assert _user != empty(address) # dev: invalid user
 
     # validate position exists
@@ -185,7 +194,7 @@ def recordClaim(_user: address, _positionId: uint256) -> (uint256, uint256, uint
     self.positions[_user][index] = position
 
     # remove position if fully claimed
-    fullyClaimed: bool = position.ripeClaimed == position.ripePayout
+    fullyClaimed: bool = position.ripeClaimed == position.ripeAllocation
     if fullyClaimed:
         self._removePositionFromUser(_user, position.id)
 
@@ -196,10 +205,10 @@ def recordClaim(_user: address, _positionId: uint256) -> (uint256, uint256, uint
         positionId=position.id,
         amountClaimed=claimableRipe,
         totalClaimedForPosition=position.ripeClaimed,
-        ripePayout=position.ripePayout,
+        ripeAllocation=position.ripeAllocation,
         fullyClaimed=fullyClaimed,
     )
-    return claimableRipe, position.ripeClaimed, position.ripePayout
+    return claimableRipe, position.ripeClaimed, position.ripeAllocation
 
 
 #################
@@ -247,14 +256,14 @@ def getVestedRipe(_user: address, _positionId: uint256) -> uint256:
 @view
 @internal
 def _getVestedRipe(_position: VestingPosition) -> uint256:
-    if block.number <= _position.creationBlock:
+    if block.number < _position.claimStartBlock:
         return 0
     if block.number >= _position.maturityBlock:
-        return _position.ripePayout
+        return _position.ripeAllocation
 
     elapsed: uint256 = block.number - _position.creationBlock
     duration: uint256 = _position.maturityBlock - _position.creationBlock
-    return self._mulDivFloor(_position.ripePayout, elapsed, duration)
+    return self._mulDivFloor(_position.ripeAllocation, elapsed, duration)
 
 
 # safe math

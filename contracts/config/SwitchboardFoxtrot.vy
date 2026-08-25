@@ -21,36 +21,36 @@ initializes: timeLock[gov := gov]
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 
-interface InstantBondLane:
+interface RipeReserveEngine:
     def start(_genesisBlock: uint256, _epochLength: uint256): nonpayable
     def genesisBlock() -> uint256: view
     def isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> bool: view
-    def isValidConfig(_config: InstantBondConfig) -> bool: view
+    def isValidConfig(_config: ReserveEngineConfig) -> bool: view
     def isValidEpochLength(_epochLength: uint256) -> bool: view
-    def setConfig(_newConfig: InstantBondConfig): nonpayable
+    def setConfig(_newConfig: ReserveEngineConfig): nonpayable
     def isValidPaymentToken(_token: address) -> bool: view
     def setRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
     def setPaymentToken(_token: address): nonpayable
-    def setCanBuyNow(_canBuyNow: bool): nonpayable
-    def canBuyNow() -> bool: view
-    def bondConfig() -> InstantBondConfig: view
+    def setCanAcquireRipe(_canAcquireRipe: bool): nonpayable
+    def canAcquireRipe() -> bool: view
+    def engineConfig() -> ReserveEngineConfig: view
     def overrideTargetBasePayoutRate() -> uint256: view
     def overrideTargetEpoch() -> uint256: view
     def cancelRateOverride(): nonpayable
     def isRunning() -> bool: view
     def stop(): nonpayable
 
-interface InstantBondClaims:
+interface RipeReserveVesting:
     def setRemainingAllocationBudget(_amount: uint256): nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
-    INSTANT_BOND_CONFIG
-    REMAINING_ALLOCATION_BUDGET_SET
+    RESERVE_ENGINE_CONFIG
+    RESERVE_VESTING_ALLOCATION_BUDGET_SET
 
-struct InstantBondConfig:
+struct ReserveEngineConfig:
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
     maxAllInPayoutRate: uint256
@@ -68,7 +68,7 @@ struct InstantBondConfig:
     maxVestingLength: uint256
     epochLength: uint256
 
-event PendingInstantBondConfigSet:
+event PendingReserveEngineConfigSet:
     actionId: uint256
     confirmationBlock: uint256
     paymentCapPerEpoch: uint256
@@ -88,42 +88,42 @@ event PendingInstantBondConfigSet:
     maxVestingLength: uint256
     epochLength: uint256
 
-event InstantBondConfigExecuted:
+event ReserveEngineConfigExecuted:
     actionId: uint256
 
-event PendingInstantBondRemainingAllocationBudgetSet:
+event PendingReserveVestingAllocationBudgetSet:
     actionId: uint256
     confirmationBlock: uint256
     amount: uint256
 
-event InstantBondRemainingAllocationBudgetExecuted:
+event ReserveVestingAllocationBudgetExecuted:
     actionId: uint256
 
-event InstantBondRateOverrideSet:
+event ReserveEngineRateOverrideSet:
     targetEpoch: indexed(uint256)
     targetBasePayoutRate: uint256
 
-event InstantBondRateOverrideCancelled:
+event ReserveEngineRateOverrideCancelled:
     targetEpoch: indexed(uint256)
     targetBasePayoutRate: uint256
 
-event InstantBondStarted:
+event ReserveEngineStarted:
     genesisBlock: uint256
     epochLength: uint256
 
-event InstantBondPaymentTokenSet:
+event ReserveEnginePaymentTokenSet:
     token: indexed(address)
 
-event InstantBondCanBuyNowSet:
-    canBuyNow: bool
+event ReserveEngineCanAcquireRipeSet:
+    canAcquireRipe: bool
 
 # pending actions
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
-pendingConfig: public(HashMap[uint256, InstantBondConfig]) # aid -> config
-pendingRemainingAllocationBudget: public(HashMap[uint256, uint256]) # aid -> amount
+pendingEngineConfig: public(HashMap[uint256, ReserveEngineConfig]) # aid -> config
+pendingVestingAllocationBudget: public(HashMap[uint256, uint256]) # aid -> amount
 
-INSTANT_BOND_LANE_ID: constant(uint256) = 26
-INSTANT_BOND_CLAIMS_ID: constant(uint256) = 27
+RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
+RIPE_RESERVE_VESTING_ID: constant(uint256) = 27
 
 
 @deploy
@@ -142,38 +142,38 @@ def __init__(
 
 @view
 @internal
-def _getInstantBondLaneAddr() -> address:
-    lane: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(INSTANT_BOND_LANE_ID)
-    assert lane != empty(address) # dev: invalid lane
-    return lane
+def _getRipeReserveEngineAddr() -> address:
+    engine: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_RESERVE_ENGINE_ID)
+    assert engine != empty(address) # dev: invalid engine
+    return engine
 
 
 @view
 @internal
-def _getInstantBondClaimsAddr() -> address:
-    claims: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(INSTANT_BOND_CLAIMS_ID)
-    assert claims != empty(address) and claims.is_contract # dev: invalid claims
-    return claims
+def _getRipeReserveVestingAddr() -> address:
+    vesting: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_RESERVE_VESTING_ID)
+    assert vesting != empty(address) and vesting.is_contract # dev: invalid vesting
+    return vesting
 
 
-#######################
-# Instant Bond Config #
-#######################
+#########################
+# reserve engine config #
+#########################
 
 
 @external
-def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
+def setReserveEngineConfig(_config: ReserveEngineConfig) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isValidConfig(_config) # dev: invalid config
+    engine: address = self._getRipeReserveEngineAddr()
+    assert staticcall RipeReserveEngine(engine).isValidConfig(_config) # dev: invalid config
 
     aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.INSTANT_BOND_CONFIG
-    self.pendingConfig[aid] = _config
+    self.actionType[aid] = ActionType.RESERVE_ENGINE_CONFIG
+    self.pendingEngineConfig[aid] = _config
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingInstantBondConfigSet(
+    log PendingReserveEngineConfigSet(
         actionId=aid,
         confirmationBlock=confirmationBlock,
         paymentCapPerEpoch=_config.paymentCapPerEpoch,
@@ -196,17 +196,17 @@ def setInstantBondConfig(_config: InstantBondConfig) -> uint256:
     return aid
 
 
-# can buy now
+# can acquire ripe
 
 
 @external
-def setCanBuyNow(_canBuyNow: bool):
+def setCanAcquireRipe(_canAcquireRipe: bool):
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).canBuyNow() != _canBuyNow # dev: no change
-    extcall InstantBondLane(lane).setCanBuyNow(_canBuyNow)
-    log InstantBondCanBuyNowSet(canBuyNow=_canBuyNow)
+    engine: address = self._getRipeReserveEngineAddr()
+    assert staticcall RipeReserveEngine(engine).canAcquireRipe() != _canAcquireRipe # dev: no change
+    extcall RipeReserveEngine(engine).setCanAcquireRipe(_canAcquireRipe)
+    log ReserveEngineCanAcquireRipeSet(canAcquireRipe=_canAcquireRipe)
 
 
 #################
@@ -215,13 +215,13 @@ def setCanBuyNow(_canBuyNow: bool):
 
 
 @external
-def setInstantBondRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256:
+def setReserveEngineRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isValidRateOverride(_targetBasePayoutRate, _targetEpoch) # dev: invalid rate override
-    resolvedEpoch: uint256 = extcall InstantBondLane(lane).setRateOverride(_targetBasePayoutRate, _targetEpoch)
-    log InstantBondRateOverrideSet(
+    engine: address = self._getRipeReserveEngineAddr()
+    assert staticcall RipeReserveEngine(engine).isValidRateOverride(_targetBasePayoutRate, _targetEpoch) # dev: invalid rate override
+    resolvedEpoch: uint256 = extcall RipeReserveEngine(engine).setRateOverride(_targetBasePayoutRate, _targetEpoch)
+    log ReserveEngineRateOverrideSet(
         targetEpoch=resolvedEpoch,
         targetBasePayoutRate=_targetBasePayoutRate,
     )
@@ -229,15 +229,15 @@ def setInstantBondRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uin
 
 
 @external
-def cancelInstantBondRateOverride():
+def cancelReserveEngineRateOverride():
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    targetBasePayoutRate: uint256 = staticcall InstantBondLane(lane).overrideTargetBasePayoutRate()
+    engine: address = self._getRipeReserveEngineAddr()
+    targetBasePayoutRate: uint256 = staticcall RipeReserveEngine(engine).overrideTargetBasePayoutRate()
     assert targetBasePayoutRate != 0 # dev: no rate override
-    targetEpoch: uint256 = staticcall InstantBondLane(lane).overrideTargetEpoch()
-    extcall InstantBondLane(lane).cancelRateOverride()
-    log InstantBondRateOverrideCancelled(targetEpoch=targetEpoch, targetBasePayoutRate=targetBasePayoutRate)
+    targetEpoch: uint256 = staticcall RipeReserveEngine(engine).overrideTargetEpoch()
+    extcall RipeReserveEngine(engine).cancelRateOverride()
+    log ReserveEngineRateOverrideCancelled(targetEpoch=targetEpoch, targetBasePayoutRate=targetBasePayoutRate)
 
 
 #########
@@ -246,25 +246,25 @@ def cancelInstantBondRateOverride():
 
 
 @external
-def startInstantBond(_genesisBlock: uint256, _epochLength: uint256):
+def startReserveEngine(_genesisBlock: uint256, _epochLength: uint256):
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    assert not staticcall InstantBondLane(lane).isRunning() # dev: already running
-    assert staticcall InstantBondLane(lane).isValidEpochLength(_epochLength) # dev: invalid epoch length
-    assert staticcall InstantBondLane(lane).isValidConfig(staticcall InstantBondLane(lane).bondConfig()) # dev: not configured
-    extcall InstantBondLane(lane).start(_genesisBlock, _epochLength)
-    resolvedGenesisBlock: uint256 = staticcall InstantBondLane(lane).genesisBlock()
-    log InstantBondStarted(genesisBlock=resolvedGenesisBlock, epochLength=_epochLength)
+    engine: address = self._getRipeReserveEngineAddr()
+    assert not staticcall RipeReserveEngine(engine).isRunning() # dev: already running
+    assert staticcall RipeReserveEngine(engine).isValidEpochLength(_epochLength) # dev: invalid epoch length
+    assert staticcall RipeReserveEngine(engine).isValidConfig(staticcall RipeReserveEngine(engine).engineConfig()) # dev: not configured
+    extcall RipeReserveEngine(engine).start(_genesisBlock, _epochLength)
+    resolvedGenesisBlock: uint256 = staticcall RipeReserveEngine(engine).genesisBlock()
+    log ReserveEngineStarted(genesisBlock=resolvedGenesisBlock, epochLength=_epochLength)
 
 
 @external
-def stopInstantBond():
+def stopReserveEngine():
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isRunning() # dev: not running
-    extcall InstantBondLane(lane).stop()
+    engine: address = self._getRipeReserveEngineAddr()
+    assert staticcall RipeReserveEngine(engine).isRunning() # dev: not running
+    extcall RipeReserveEngine(engine).stop()
 
 
 #################
@@ -273,13 +273,13 @@ def stopInstantBond():
 
 
 @external
-def setInstantBondPaymentToken(_token: address):
+def setReserveEnginePaymentToken(_token: address):
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    lane: address = self._getInstantBondLaneAddr()
-    assert staticcall InstantBondLane(lane).isValidPaymentToken(_token) # dev: invalid payment token
-    extcall InstantBondLane(lane).setPaymentToken(_token)
-    log InstantBondPaymentTokenSet(token=_token)
+    engine: address = self._getRipeReserveEngineAddr()
+    assert staticcall RipeReserveEngine(engine).isValidPaymentToken(_token) # dev: invalid payment token
+    extcall RipeReserveEngine(engine).setPaymentToken(_token)
+    log ReserveEnginePaymentTokenSet(token=_token)
 
 
 #####################
@@ -288,17 +288,17 @@ def setInstantBondPaymentToken(_token: address):
 
 
 @external
-def setInstantBondRemainingAllocationBudget(_amount: uint256) -> uint256:
+def setReserveVestingRemainingAllocationBudget(_amount: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    self._getInstantBondClaimsAddr()
+    self._getRipeReserveVestingAddr()
 
     aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.REMAINING_ALLOCATION_BUDGET_SET
-    self.pendingRemainingAllocationBudget[aid] = _amount
+    self.actionType[aid] = ActionType.RESERVE_VESTING_ALLOCATION_BUDGET_SET
+    self.pendingVestingAllocationBudget[aid] = _amount
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingInstantBondRemainingAllocationBudgetSet(
+    log PendingReserveVestingAllocationBudgetSet(
         actionId=aid,
         confirmationBlock=confirmationBlock,
         amount=_amount,
@@ -324,20 +324,20 @@ def executePendingAction(_aid: uint256) -> bool:
     actionType: ActionType = self.actionType[_aid]
     assert actionType != empty(ActionType) # dev: invalid action
 
-    if actionType == ActionType.INSTANT_BOND_CONFIG:
-        lane: address = self._getInstantBondLaneAddr()
-        config: InstantBondConfig = self.pendingConfig[_aid]
-        assert staticcall InstantBondLane(lane).isValidConfig(config) # dev: invalid config
-        extcall InstantBondLane(lane).setConfig(config)
-        self.pendingConfig[_aid] = empty(InstantBondConfig)
-        log InstantBondConfigExecuted(actionId=_aid)
+    if actionType == ActionType.RESERVE_ENGINE_CONFIG:
+        engine: address = self._getRipeReserveEngineAddr()
+        config: ReserveEngineConfig = self.pendingEngineConfig[_aid]
+        assert staticcall RipeReserveEngine(engine).isValidConfig(config) # dev: invalid config
+        extcall RipeReserveEngine(engine).setConfig(config)
+        self.pendingEngineConfig[_aid] = empty(ReserveEngineConfig)
+        log ReserveEngineConfigExecuted(actionId=_aid)
 
-    elif actionType == ActionType.REMAINING_ALLOCATION_BUDGET_SET:
-        claims: address = self._getInstantBondClaimsAddr()
-        amount: uint256 = self.pendingRemainingAllocationBudget[_aid]
-        extcall InstantBondClaims(claims).setRemainingAllocationBudget(amount)
-        self.pendingRemainingAllocationBudget[_aid] = 0
-        log InstantBondRemainingAllocationBudgetExecuted(actionId=_aid)
+    elif actionType == ActionType.RESERVE_VESTING_ALLOCATION_BUDGET_SET:
+        vesting: address = self._getRipeReserveVestingAddr()
+        amount: uint256 = self.pendingVestingAllocationBudget[_aid]
+        extcall RipeReserveVesting(vesting).setRemainingAllocationBudget(amount)
+        self.pendingVestingAllocationBudget[_aid] = 0
+        log ReserveVestingAllocationBudgetExecuted(actionId=_aid)
 
     else:
         raise "invalid action"
@@ -364,10 +364,10 @@ def _cancelPendingAction(_aid: uint256):
     assert actionType != empty(ActionType) # dev: invalid action
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
 
-    if actionType == ActionType.INSTANT_BOND_CONFIG:
-        self.pendingConfig[_aid] = empty(InstantBondConfig)
-    elif actionType == ActionType.REMAINING_ALLOCATION_BUDGET_SET:
-        self.pendingRemainingAllocationBudget[_aid] = 0
+    if actionType == ActionType.RESERVE_ENGINE_CONFIG:
+        self.pendingEngineConfig[_aid] = empty(ReserveEngineConfig)
+    elif actionType == ActionType.RESERVE_VESTING_ALLOCATION_BUDGET_SET:
+        self.pendingVestingAllocationBudget[_aid] = 0
     else:
         raise "invalid action"
 

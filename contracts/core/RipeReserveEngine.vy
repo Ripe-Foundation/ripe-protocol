@@ -8,8 +8,8 @@
 #                      \|_________|                                                                                        \|_________|
 #                                                                                                                                   
 #     ╔════════════════════════════════════════╗
-#     ║  ** Instant Bonds **                   ║
-#     ║  Fixed-price direct RIPE purchases     ║
+#     ║  ** ripe reserve engine **             ║
+#     ║  fixed-price direct RIPE allocations   ║
 #     ╚════════════════════════════════════════╝
 #
 #     ripe protocol license: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
@@ -39,8 +39,8 @@ from interfaces import Department
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
-interface InstantBondClaims:
-    def createVestingPosition(_beneficiary: address, _ripePayout: uint256, _vestingLength: uint256) -> uint256: nonpayable
+interface RipeReserveVesting:
+    def createVestingPosition(_beneficiary: address, _ripeAllocation: uint256, _vestingLength: uint256, _minVestingLength: uint256) -> uint256: nonpayable
     def recordClaim(_beneficiary: address, _positionId: uint256) -> (uint256, uint256, uint256): nonpayable
     def remainingAllocationBudget() -> uint256: view
     def getRipeHq() -> address: view
@@ -64,7 +64,7 @@ interface Teller:
 # idle decay also increases RIPE per payment unit toward the configured ceiling.
 # the vesting bonus is applied after the epoch's base payout rate.
 # one-shot rate overrides replace a derived epoch rate without changing these terms.
-struct InstantBondConfig:
+struct ReserveEngineConfig:
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
     maxAllInPayoutRate: uint256
@@ -82,7 +82,7 @@ struct InstantBondConfig:
     maxVestingLength: uint256
     epochLength: uint256
 
-struct InstantBondQuote:
+struct ReserveEngineQuote:
     available: bool
     epoch: uint256
     controllerBasePayoutRate: uint256
@@ -96,6 +96,7 @@ struct InstantBondQuote:
     bonusRipe: uint256
     vestingLength: uint256
     creationBlock: uint256
+    claimStartBlock: uint256
     maturityBlock: uint256
     totalRipe: uint256
 
@@ -158,15 +159,16 @@ event EpochRolled:
     effectiveAdjustmentBps: uint256
     decaySteps: uint256
 
-event InstantBondPurchased:
-    buyer: indexed(address)
-    positionIndex: indexed(uint256)
+event RipeAllocated:
+    acquirer: indexed(address)
+    positionId: indexed(uint256)
     paymentAmount: uint256
     baseRipe: uint256
     bonusRipe: uint256
     bonusRatio: uint256
     vestingLength: uint256
     creationBlock: uint256
+    claimStartBlock: uint256
     maturityBlock: uint256
     totalRipe: uint256
     controllerBasePayoutRate: uint256
@@ -174,16 +176,16 @@ event InstantBondPurchased:
     rateSource: uint256
     epoch: indexed(uint256)
 
-event InstantBondClaimed:
+event VestedRipeClaimed:
     beneficiary: indexed(address)
-    positionIndex: indexed(uint256)
+    positionId: indexed(uint256)
     amountClaimed: uint256
     totalClaimedForPosition: uint256
-    ripePayout: uint256
+    ripeAllocation: uint256
     autoDeposited: bool
     lockDuration: uint256
 
-event InstantBondConfigSet:
+event ReserveEngineConfigSet:
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
     maxAllInPayoutRate: uint256
@@ -201,14 +203,14 @@ event InstantBondConfigSet:
     maxVestingLength: uint256
     epochLength: uint256
 
-event CanBuyNowSet:
-    canBuyNow: bool
+event CanAcquireRipeSet:
+    canAcquireRipe: bool
 
-event InstantBondStarted:
+event ReserveEngineStarted:
     genesisBlock: uint256
     epochLength: uint256
 
-event InstantBondStopped:
+event ReserveEngineStopped:
     epochLength: uint256
 
 event PaymentTokenSet:
@@ -241,10 +243,10 @@ event RateOverrideInvalidated:
     targetBasePayoutRate: uint256
 
 # config
-bondConfig: public(InstantBondConfig)
+engineConfig: public(ReserveEngineConfig)
 overrideTargetBasePayoutRate: public(uint256)
 overrideTargetEpoch: public(uint256)
-canBuyNow: public(bool)
+canAcquireRipe: public(bool)
 
 # state
 isRunning: public(bool)
@@ -273,7 +275,7 @@ RATE_SOURCE_OVERRIDE: public(constant(uint256)) = 3
 def __init__(
     _ripeHq: address,
     _paymentToken: address,
-    _config: InstantBondConfig,
+    _config: ReserveEngineConfig,
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(True, False, True) # starts paused, can mint ripe only
@@ -281,17 +283,17 @@ def __init__(
     paymentDecimals: uint8 = self._getValidatedPaymentDecimals(_paymentToken)
     self._storePaymentToken(_paymentToken, paymentDecimals)
     assert self._isValidConfig(_config) # dev: invalid config
-    self.bondConfig = _config
+    self.engineConfig = _config
 
 
-#################
-# purchase bond #
-#################
+################
+# acquire ripe #
+################
 
 
 @nonreentrant
 @external
-def buyNow(
+def acquireRipe(
     _paymentAmount: uint256,
     _requestedVestingLength: uint256,
     _expectedVestingLength: uint256,
@@ -302,15 +304,15 @@ def buyNow(
     assert block.number >= self.genesisBlock # dev: before genesis
     assert not deptBasics.isPaused # dev: paused
     assert self.isRunning # dev: not running
-    assert self.canBuyNow # dev: disabled
+    assert self.canAcquireRipe # dev: disabled
     assert block.number <= _deadlineBlock # dev: expired
-    assert self._isPurchaseReady() # dev: mint not ready
+    assert self._isAcquisitionReady() # dev: mint not ready
 
-    config: InstantBondConfig = self.bondConfig
+    config: ReserveEngineConfig = self.engineConfig
     previousSnapshot: EpochSnapshot = self.epochState
     candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
-    quote: InstantBondQuote = empty(InstantBondQuote)
+    quote: ReserveEngineQuote = empty(ReserveEngineQuote)
     quote, candidateSnapshot, transition = self._quote(
         _paymentAmount,
         _requestedVestingLength,
@@ -329,7 +331,7 @@ def buyNow(
     self.epochState.acceptedPayment += _paymentAmount
     self.epochState.weightedLateness += _paymentAmount * self._getCurrentLatenessBps()
 
-    # collect payment amount, move to endaoment funds
+    # collect payment and move it to endowment funds
     endaoFunds: address = addys._getEndaomentFundsAddr()
     paymentToken: address = self.paymentToken
     paymentBalanceBefore: uint256 = staticcall IERC20(paymentToken).balanceOf(endaoFunds)
@@ -338,17 +340,23 @@ def buyNow(
     assert paymentBalanceAfter >= paymentBalanceBefore # dev: payment receipt mismatch
     assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount # dev: payment receipt mismatch
 
-    positionIndex: uint256 = extcall InstantBondClaims(addys._getInstantBondClaimsAddr()).createVestingPosition(msg.sender, quote.totalRipe, quote.vestingLength)
+    positionId: uint256 = extcall RipeReserveVesting(addys._getRipeReserveVestingAddr()).createVestingPosition(
+        msg.sender,
+        quote.totalRipe,
+        quote.vestingLength,
+        candidateSnapshot.minVestingLength,
+    )
 
-    log InstantBondPurchased(
-        buyer=msg.sender,
-        positionIndex=positionIndex,
+    log RipeAllocated(
+        acquirer=msg.sender,
+        positionId=positionId,
         paymentAmount=_paymentAmount,
         baseRipe=quote.baseRipe,
         bonusRipe=quote.bonusRipe,
         bonusRatio=quote.bonusRatio,
         vestingLength=quote.vestingLength,
         creationBlock=quote.creationBlock,
+        claimStartBlock=quote.claimStartBlock,
         maturityBlock=quote.maturityBlock,
         totalRipe=quote.totalRipe,
         controllerBasePayoutRate=quote.controllerBasePayoutRate,
@@ -364,8 +372,8 @@ def buyNow(
 
 @view
 @external
-def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> InstantBondQuote:
-    quote: InstantBondQuote = empty(InstantBondQuote)
+def previewAcquireRipe(_paymentAmount: uint256, _requestedVestingLength: uint256) -> ReserveEngineQuote:
+    quote: ReserveEngineQuote = empty(ReserveEngineQuote)
     if not self.isRunning or block.number < self.genesisBlock:
         return quote
 
@@ -376,16 +384,16 @@ def previewBuyNow(_paymentAmount: uint256, _requestedVestingLength: uint256) -> 
         _paymentAmount,
         _requestedVestingLength,
         self.epochState,
-        self.bondConfig,
+        self.engineConfig,
     )
 
     if _paymentAmount < quote.minPaymentAmount or _paymentAmount > quote.remainingPayment:
         return quote
-    if deptBasics.isPaused or not self.canBuyNow:
+    if deptBasics.isPaused or not self.canAcquireRipe:
         return quote
     if quote.totalRipe > quote.budgetRemaining:
         return quote
-    if not self._isPurchaseReady():
+    if not self._isAcquisitionReady():
         return quote
 
     quote.available = True
@@ -401,8 +409,8 @@ def _quote(
     _paymentAmount: uint256,
     _requestedVestingLength: uint256,
     _previousSnapshot: EpochSnapshot,
-    _config: InstantBondConfig,
-) -> (InstantBondQuote, EpochSnapshot, RateTransition):
+    _config: ReserveEngineConfig,
+) -> (ReserveEngineQuote, EpochSnapshot, RateTransition):
     candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
     candidateSnapshot, transition = self._deriveEpochSnapshot(_previousSnapshot, _config)
@@ -412,11 +420,11 @@ def _quote(
         candidateSnapshot,
     )
     budgetRemaining: uint256 = 0
-    claims: address = addys._getInstantBondClaimsAddr()
-    if claims != empty(address) and claims.is_contract:
-        budgetRemaining = staticcall InstantBondClaims(claims).remainingAllocationBudget()
+    vesting: address = addys._getRipeReserveVestingAddr()
+    if vesting != empty(address) and vesting.is_contract:
+        budgetRemaining = staticcall RipeReserveVesting(vesting).remainingAllocationBudget()
 
-    quote: InstantBondQuote = empty(InstantBondQuote)
+    quote: ReserveEngineQuote = empty(ReserveEngineQuote)
     quote.epoch = candidateSnapshot.epoch
     quote.controllerBasePayoutRate = candidateSnapshot.controllerBasePayoutRate
     quote.basePayoutRate = candidateSnapshot.basePayoutRate
@@ -429,6 +437,7 @@ def _quote(
     quote.bonusRipe = payout.bonusRipe
     quote.vestingLength = payout.vestingLength
     quote.creationBlock = block.number
+    quote.claimStartBlock = block.number + candidateSnapshot.minVestingLength
     quote.maturityBlock = block.number + payout.vestingLength
     quote.totalRipe = payout.totalRipe
     return quote, candidateSnapshot, transition
@@ -498,20 +507,20 @@ def _claimVestedRipe(
     assert len(_positionIds) != 0 # dev: empty positions
     assert self._isMintReady() # dev: claim not ready
 
-    claims: address = addys._getInstantBondClaimsAddr()
+    vesting: address = addys._getRipeReserveVestingAddr()
     totalClaimedRipe: uint256 = 0
     for i: uint256 in range(len(_positionIds), bound=MAX_BATCH_CLAIMS):
         amountClaimed: uint256 = 0
         totalClaimedForPosition: uint256 = 0
-        ripePayout: uint256 = 0
-        amountClaimed, totalClaimedForPosition, ripePayout = extcall InstantBondClaims(claims).recordClaim(msg.sender, _positionIds[i])
+        ripeAllocation: uint256 = 0
+        amountClaimed, totalClaimedForPosition, ripeAllocation = extcall RipeReserveVesting(vesting).recordClaim(msg.sender, _positionIds[i])
         totalClaimedRipe += amountClaimed
-        log InstantBondClaimed(
+        log VestedRipeClaimed(
             beneficiary=msg.sender,
-            positionIndex=_positionIds[i],
+            positionId=_positionIds[i],
             amountClaimed=amountClaimed,
             totalClaimedForPosition=totalClaimedForPosition,
-            ripePayout=ripePayout,
+            ripeAllocation=ripeAllocation,
             autoDeposited=_autoDeposit,
             lockDuration=_lockDuration,
         )
@@ -556,17 +565,17 @@ def _settleVestedRipe(
 @view
 @internal
 def _isMintReady() -> bool:
-    if addys._getInstantBondLaneAddr() != self:
+    if addys._getRipeReserveEngineAddr() != self:
         return False
 
-    claims: address = addys._getInstantBondClaimsAddr()
-    if claims == empty(address) or not claims.is_contract:
+    vesting: address = addys._getRipeReserveVestingAddr()
+    if vesting == empty(address) or not vesting.is_contract:
         return False
-    if staticcall InstantBondClaims(claims).isPaused():
+    if staticcall RipeReserveVesting(vesting).isPaused():
         return False
 
     ripeHq: address = addys._getRipeHq()
-    if staticcall InstantBondClaims(claims).getRipeHq() != ripeHq:
+    if staticcall RipeReserveVesting(vesting).getRipeHq() != ripeHq:
         return False
     if not staticcall RipeHq(ripeHq).canMintRipe(self):
         return False
@@ -583,7 +592,7 @@ def _isMintReady() -> bool:
 
 @view
 @internal
-def _isPurchaseReady() -> bool:
+def _isAcquisitionReady() -> bool:
     endaoFunds: address = addys._getEndaomentFundsAddr()
     if endaoFunds == empty(address) or not endaoFunds.is_contract:
         return False
@@ -603,7 +612,7 @@ def _isPurchaseReady() -> bool:
 def _calculateControllerTransition(
     _previousSnapshot: EpochSnapshot,
     _elapsed: uint256,
-    _config: InstantBondConfig,
+    _config: ReserveEngineConfig,
 ) -> RateTransition:
     ceiling: uint256 = self._basePayoutRateCeiling(_config.maxAllInPayoutRate, _config.maxVestingBonus)
     basePayoutRate: uint256 = min(_previousSnapshot.basePayoutRate, ceiling)
@@ -612,7 +621,7 @@ def _calculateControllerTransition(
     decaySteps: uint256 = 0
 
     # stored empty epochs have no fill signal; decay the whole gap.
-    # a committed buy always records a positive payment, so this is defensive.
+    # a committed acquisition always records a positive payment, so this is defensive.
     if _previousSnapshot.acceptedPayment == 0: # pragma: no branch
         decaySteps = min(_elapsed, _config.maxDecayEpochs)
 
@@ -659,13 +668,13 @@ def getEpochSnapshot() -> EpochSnapshot:
     # vyper requires binding every returned value; only the snapshot is used here.
     candidateSnapshot: EpochSnapshot = empty(EpochSnapshot)
     transition: RateTransition = empty(RateTransition)
-    candidateSnapshot, transition = self._deriveEpochSnapshot(self.epochState, self.bondConfig)
+    candidateSnapshot, transition = self._deriveEpochSnapshot(self.epochState, self.engineConfig)
     return candidateSnapshot
 
 
 @view
 @internal
-def _deriveEpochSnapshot(_previousSnapshot: EpochSnapshot, _config: InstantBondConfig) -> (EpochSnapshot, RateTransition):
+def _deriveEpochSnapshot(_previousSnapshot: EpochSnapshot, _config: ReserveEngineConfig) -> (EpochSnapshot, RateTransition):
     if block.number < self.genesisBlock:
         return empty(EpochSnapshot), empty(RateTransition)
 
@@ -735,7 +744,7 @@ def _buildEpochSnapshot(
     _controllerBasePayoutRate: uint256,
     _basePayoutRate: uint256,
     _rateSource: uint256,
-    _config: InstantBondConfig,
+    _config: ReserveEngineConfig,
     _timingEligible: bool,
 ) -> EpochSnapshot:
     return EpochSnapshot(
@@ -844,7 +853,7 @@ def _consumeInstalledOverride(_previousSnapshot: EpochSnapshot, _candidateSnapsh
 @view
 @external
 def epochLength() -> uint256:
-    return self.bondConfig.epochLength
+    return self.engineConfig.epochLength
 
 
 @view
@@ -865,7 +874,7 @@ def _isValidEpochLength(_epochLength: uint256) -> bool:
 @view
 @internal
 def _getCurrentLatenessBps() -> uint256:
-    epochLength: uint256 = self.bondConfig.epochLength
+    epochLength: uint256 = self.engineConfig.epochLength
     if epochLength == 1:
         return 0
     offset: uint256 = (block.number - self.genesisBlock) % epochLength
@@ -887,15 +896,15 @@ def start(_genesisBlock: uint256, _epochLength: uint256):
     assert not self.isRunning # dev: already running
     assert self._isValidEpochLength(_epochLength) # dev: invalid epoch length
 
-    config: InstantBondConfig = self.bondConfig
+    config: ReserveEngineConfig = self.engineConfig
     config.epochLength = _epochLength
     assert self._isValidConfigValues(config) # dev: not configured
-    self.bondConfig = config
+    self.engineConfig = config
 
     self.genesisBlock = block.number if _genesisBlock == 0 else _genesisBlock
     self.isRunning = True
     self._resetEpoch()
-    log InstantBondStarted(genesisBlock=self.genesisBlock, epochLength=_epochLength)
+    log ReserveEngineStarted(genesisBlock=self.genesisBlock, epochLength=_epochLength)
 
 
 # stop
@@ -909,7 +918,7 @@ def stop():
     self.isRunning = False
     self.genesisBlock = 0
     self._resetEpoch()
-    log InstantBondStopped(epochLength=self.bondConfig.epochLength)
+    log ReserveEngineStopped(epochLength=self.engineConfig.epochLength)
 
 
 # set config
@@ -917,14 +926,14 @@ def stop():
 
 @nonreentrant
 @external
-def setConfig(_newConfig: InstantBondConfig):
+def setConfig(_newConfig: ReserveEngineConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert self._isValidConfig(_newConfig) # dev: invalid config
 
-    self.bondConfig = _newConfig
+    self.engineConfig = _newConfig
     self._invalidateInstalledOverride()
 
-    log InstantBondConfigSet(
+    log ReserveEngineConfigSet(
         paymentCapPerEpoch=_newConfig.paymentCapPerEpoch,
         minPaymentAmount=_newConfig.minPaymentAmount,
         maxAllInPayoutRate=_newConfig.maxAllInPayoutRate,
@@ -944,16 +953,16 @@ def setConfig(_newConfig: InstantBondConfig):
     )
 
 
-# can buy now
+# can acquire ripe
 
 
 @nonreentrant
 @external
-def setCanBuyNow(_canBuyNow: bool):
+def setCanAcquireRipe(_canAcquireRipe: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert self.canBuyNow != _canBuyNow # dev: no change
-    self.canBuyNow = _canBuyNow
-    log CanBuyNowSet(canBuyNow=_canBuyNow)
+    assert self.canAcquireRipe != _canAcquireRipe # dev: no change
+    self.canAcquireRipe = _canAcquireRipe
+    log CanAcquireRipeSet(canAcquireRipe=_canAcquireRipe)
 
 
 # lifecycle helpers
@@ -1034,7 +1043,7 @@ def _isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) 
     if not self.isRunning or self.overrideTargetBasePayoutRate != 0:
         return False, 0
 
-    config: InstantBondConfig = self.bondConfig
+    config: ReserveEngineConfig = self.engineConfig
     ceiling: uint256 = self._basePayoutRateCeiling(config.maxAllInPayoutRate, config.maxVestingBonus)
     if _targetBasePayoutRate < MIN_BASE_PAYOUT_RATE or _targetBasePayoutRate > ceiling:
         return False, 0
@@ -1045,7 +1054,7 @@ def _isValidRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) 
 @view
 @internal
 def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
-    epochLength: uint256 = self.bondConfig.epochLength
+    epochLength: uint256 = self.engineConfig.epochLength
     if epochLength == 0:
         return False, 0
 
@@ -1060,7 +1069,7 @@ def _resolveRateOverrideEpoch(_targetEpoch: uint256) -> (bool, uint256):
             return False, 0
         earliestApplicableEpoch = previousSnapshot.epoch + 1
 
-    # zero means the earliest epoch that has not already accepted a purchase.
+    # zero means the earliest epoch that has not already accepted an acquisition.
     if _targetEpoch == 0:
         return True, earliestApplicableEpoch
     if _targetEpoch < earliestApplicableEpoch:
@@ -1126,24 +1135,24 @@ def _isValidPaymentToken(_token: address) -> bool:
 
 @view
 @external
-def isValidConfig(_config: InstantBondConfig) -> bool:
+def isValidConfig(_config: ReserveEngineConfig) -> bool:
     return self._isValidConfig(_config)
 
 
 @view
 @internal
-def _isValidConfig(_config: InstantBondConfig) -> bool:
+def _isValidConfig(_config: ReserveEngineConfig) -> bool:
     if not self._isValidConfigValues(_config):
         return False
 
     # setConfig cannot change the live clock; only start() can
-    installedLength: uint256 = self.bondConfig.epochLength
+    installedLength: uint256 = self.engineConfig.epochLength
     return installedLength == 0 or _config.epochLength == installedLength
 
 
 @view
 @internal
-def _isValidConfigValues(_config: InstantBondConfig) -> bool:
+def _isValidConfigValues(_config: ReserveEngineConfig) -> bool:
     # utilization bands must be 0 < low < high < 100%
     if _config.uLowBps == 0 or _config.uLowBps >= _config.uHighBps:
         return False
@@ -1198,11 +1207,16 @@ def _isValidConfigValues(_config: InstantBondConfig) -> bool:
     if _config.maxVestingBonus > MAX_VESTING_BONUS:
         return False
 
-    # every purchase has a positive, bounded vesting duration
+    # every acquisition has a positive, bounded vesting duration
     if _config.minVestingLength == 0 or _config.maxVestingLength < _config.minVestingLength:
         return False
     if _config.maxVestingLength > MAX_VESTING_LENGTH:
         return False
+
+    if _config.minVestingLength != _config.maxVestingLength:
+        # prevent the maximum-duration bonus from matching or exceeding the minimum-duration average release rate.
+        if _config.maxVestingBonus * _config.minVestingLength >= HUNDRED_PERCENT * (_config.maxVestingLength - _config.minVestingLength):
+            return False
 
     # implied max base rate must still be a legal rate
     basePayoutRateCeiling: uint256 = self._basePayoutRateCeiling(_config.maxAllInPayoutRate, _config.maxVestingBonus)
