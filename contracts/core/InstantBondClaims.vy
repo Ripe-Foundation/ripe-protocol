@@ -33,11 +33,19 @@ struct VestingPosition:
 
 event VestingPositionCreated:
     user: indexed(address)
-    positionIndex: indexed(uint256)
+    positionId: indexed(uint256)
     sourceLane: indexed(address)
     ripePayout: uint256
     creationBlock: uint256
     maturityBlock: uint256
+
+event ClaimRecorded:
+    user: indexed(address)
+    positionId: indexed(uint256)
+    amountClaimed: uint256
+    totalClaimedForPosition: uint256
+    ripePayout: uint256
+    fullyClaimed: bool
 
 event RemainingAllocationBudgetSet:
     amount: uint256
@@ -45,7 +53,7 @@ event RemainingAllocationBudgetSet:
 # claim positions
 positions: public(HashMap[address, HashMap[uint256, VestingPosition]]) # user -> index -> position
 indexOfPosition: public(HashMap[address, HashMap[uint256, uint256]]) # user -> position id -> index
-numUserPositions: public(HashMap[address, uint256]) # user -> num positions
+numUserPositions: public(HashMap[address, uint256]) # user -> active position count
 nextPositionId: public(uint256)
 
 # global state
@@ -84,6 +92,7 @@ def createVestingPosition(
 
     # create position
     creationBlock: uint256 = block.number
+    assert _vestingLength <= max_value(uint256) - creationBlock # dev: maturity overflow
     maturityBlock: uint256 = creationBlock + _vestingLength
     nextPositionId: uint256 = self.nextPositionId
     position: VestingPosition = VestingPosition(
@@ -102,7 +111,7 @@ def createVestingPosition(
 
     log VestingPositionCreated(
         user=_user,
-        positionIndex=position.id,
+        positionId=position.id,
         sourceLane=msg.sender,
         ripePayout=_ripePayout,
         creationBlock=creationBlock,
@@ -116,16 +125,14 @@ def createVestingPosition(
 
 @internal
 def _addPositionToUser(_user: address, _position: VestingPosition):
-    if self.indexOfPosition[_user][_position.id] != 0:
-        return
+    assert self.indexOfPosition[_user][_position.id] == 0 # dev: duplicate position
 
-    pid: uint256 = self.numUserPositions[_user]
-    if pid == 0:
-        pid = 1 # not using 0 index
+    positionIndex: uint256 = self.numUserPositions[_user] + 1 # not using 0 index
+    assert self.positions[_user][positionIndex].id == 0 # dev: occupied position
 
-    self.positions[_user][pid] = _position
-    self.indexOfPosition[_user][_position.id] = pid
-    self.numUserPositions[_user] = pid + 1
+    self.positions[_user][positionIndex] = _position
+    self.indexOfPosition[_user][_position.id] = positionIndex
+    self.numUserPositions[_user] = positionIndex
 
 
 # remove position
@@ -134,21 +141,22 @@ def _addPositionToUser(_user: address, _position: VestingPosition):
 @internal
 def _removePositionFromUser(_user: address, _positionId: uint256):
     numUserPositions: uint256 = self.numUserPositions[_user]
-    if numUserPositions == 0:
-        return
+    assert numUserPositions != 0 # dev: no positions
 
     targetIndex: uint256 = self.indexOfPosition[_user][_positionId]
-    if targetIndex == 0:
-        return
+    assert targetIndex != 0 and targetIndex <= numUserPositions # dev: invalid position
 
-    lastIndex: uint256 = numUserPositions - 1
-    self.numUserPositions[_user] = lastIndex
-    self.indexOfPosition[_user][_positionId] = 0
+    lastIndex: uint256 = numUserPositions
 
     if targetIndex != lastIndex:
         lastPosition: VestingPosition = self.positions[_user][lastIndex]
+        assert lastPosition.id != 0 # dev: invalid last position
         self.positions[_user][targetIndex] = lastPosition
         self.indexOfPosition[_user][lastPosition.id] = targetIndex
+
+    self.positions[_user][lastIndex] = empty(VestingPosition)
+    self.indexOfPosition[_user][_positionId] = 0
+    self.numUserPositions[_user] = numUserPositions - 1
 
 
 #################
@@ -177,11 +185,20 @@ def recordClaim(_user: address, _positionId: uint256) -> (uint256, uint256, uint
     self.positions[_user][index] = position
 
     # remove position if fully claimed
-    if position.ripeClaimed == position.ripePayout:
+    fullyClaimed: bool = position.ripeClaimed == position.ripePayout
+    if fullyClaimed:
         self._removePositionFromUser(_user, position.id)
 
     # global state
     self.totalClaimedRipe += claimableRipe
+    log ClaimRecorded(
+        user=_user,
+        positionId=position.id,
+        amountClaimed=claimableRipe,
+        totalClaimedForPosition=position.ripeClaimed,
+        ripePayout=position.ripePayout,
+        fullyClaimed=fullyClaimed,
+    )
     return claimableRipe, position.ripeClaimed, position.ripePayout
 
 
@@ -193,10 +210,7 @@ def recordClaim(_user: address, _positionId: uint256) -> (uint256, uint256, uint
 @view
 @external
 def getNumUserPositions(_user: address) -> uint256:
-    numPositions: uint256 = self.numUserPositions[_user]
-    if numPositions == 0:
-        return 0
-    return numPositions - 1
+    return self.numUserPositions[_user]
 
 
 @view
@@ -213,6 +227,12 @@ def getClaimableRipe(_user: address, _positionId: uint256) -> uint256:
 @external
 def totalOutstandingRipe() -> uint256:
     return self.totalAllocatedRipe - self.totalClaimedRipe
+
+
+@view
+@external
+def canRetire() -> bool:
+    return deptBasics.isPaused and self.totalAllocatedRipe - self.totalClaimedRipe == 0
 
 
 @view
@@ -234,9 +254,58 @@ def _getVestedRipe(_position: VestingPosition) -> uint256:
 
     elapsed: uint256 = block.number - _position.creationBlock
     duration: uint256 = _position.maturityBlock - _position.creationBlock
-    quotient: uint256 = _position.ripePayout // duration
-    remainder: uint256 = _position.ripePayout % duration
-    return quotient * elapsed + remainder * elapsed // duration
+    return self._mulDivFloor(_position.ripePayout, elapsed, duration)
+
+
+# safe math
+
+
+@pure
+@internal
+def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
+    assert _d != 0 # dev: zero denominator
+
+    lo: uint256 = unsafe_mul(_x, _y)
+    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))
+    hi: uint256 = unsafe_sub(
+        unsafe_sub(mm, lo),
+        convert(mm < lo, uint256),
+    )
+
+    # Fast path: the product fits in 256 bits.
+    if hi == 0:
+        return lo // _d
+
+    # The full-precision result must fit in uint256.
+    assert _d > hi # dev: result overflows
+
+    # Make the 512-bit product exactly divisible by the denominator.
+    rem: uint256 = uint256_mulmod(_x, _y, _d)
+    hi = unsafe_sub(hi, convert(rem > lo, uint256))
+    lo = unsafe_sub(lo, rem)
+
+    # Factor powers of two out of the denominator and shift the
+    # high product bits into the low product word.
+    tz: uint256 = unsafe_sub(0, _d) & _d
+    d2: uint256 = _d // tz
+    lo = lo // tz
+    lo |= unsafe_mul(
+        hi,
+        unsafe_add(
+            unsafe_div(unsafe_sub(0, tz), tz),
+            1,
+        ),
+    )
+
+    # Compute the modular inverse of the now-odd denominator.
+    inv: uint256 = unsafe_mul(3, d2) ^ 2
+    for i: uint256 in range(6):
+        inv = unsafe_mul(
+            inv,
+            unsafe_sub(2, unsafe_mul(d2, inv)),
+        )
+
+    return unsafe_mul(lo, inv)
 
 
 #####################
