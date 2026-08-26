@@ -400,6 +400,23 @@ reverts `invalid vault asset`, emits no `VaultAssetDeregistered`, and leaves the
 action available for retry, cancellation, or expiry. Verify the vault balance
 is zero immediately before execution and verify vault support state afterward.
 
+Zero an asset's staker and voter allocations through Bravo before disabling
+any current vault ID in VaultBook. Bravo fail-closes on a dead current
+VaultBook row; Charlie can still checkpoint that ID with an explicit address,
+but that does not let Bravo write. Restore or repoint the book, then Bravo.
+
+On a live allocation change, MultiSend Charlie-pre → Bravo → Charlie-post
+for every initialized historical row. Charlie-post is required on a staker
+`0 ↔ nonzero` crossing. Same block is not enough if Bravo and Charlie are
+separate transactions and something else hits Lootbox in between. If there
+is no current initialized row, Charlie-init that row, then Bravo.
+
+Before repointing HQ `MISSION_CONTROL_ID`, either verify the incoming
+MissionControl's `totalPointsAllocs` and every asset allocation match the
+outgoing MissionControl, or checkpoint every initialized row in the same
+transaction as the swap. Otherwise the next touch accrues the new allocations
+across the entire pre-swap window.
+
 ## Historical inputs
 
 PR #66, the former `migrations/robinhood/` declarative package, its custom
