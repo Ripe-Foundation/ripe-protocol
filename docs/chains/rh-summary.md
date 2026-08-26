@@ -436,7 +436,7 @@ Robinhood tests pass.
 - [ ] Confirm through tests that `ChainlinkPrices` and `PriceDesk` normalize token/feed decimals correctly and do not apply `uiMultiplier()` or any equivalent multiplier a second time.
 - [ ] Define and test the chosen staleness configuration across regular, extended, overnight, weekend, holiday, halt, and reopening-gap scenarios.
 - [ ] Configure conservative per-user deposit limits, global deposit limits, LTVs, liquidation thresholds, debt ceilings, fees, and auction parameters.
-- [ ] Set `AssetConfig.canRedeemCollateral = false` for every Stock Token, then verify `MissionControl.getRedeemCollateralConfig()` returns `canRedeemCollateralAsset == false` so CreditRedeem cannot extract it.
+- [ ] Set `AssetConfig.canRedeemCollateral = false` for every Stock Token, verify the stored asset config retains that value, and confirm `MissionControl.getEffectiveRedeemCollateralConfig()` returns `canRedeemCollateral == false` so CreditRedeem cannot extract it.
 - [ ] Ensure Stock Token configuration does not route assets into Base treasury, Endaoment partner-liquidity, Curve, Aerodrome, Underscore, or yield integrations; keep `shouldSwapInStabPools = false` unless governance deliberately accepts Stability Pool custody of pausable, blocklistable, and administratively burnable Stock Tokens.
 - [ ] Add issuer-control mocks and adversarial tests for token pause, account/vault/liquidator blocklist, administrative burn, forced transfer/redeem behavior, oracle pause, and implementation upgrade.
 - [ ] Verify that deposits, withdrawals, borrowing, repayment, auctions, and liquidations either succeed or fail exactly as the selected risk posture documents; do not silently add special recovery behavior.

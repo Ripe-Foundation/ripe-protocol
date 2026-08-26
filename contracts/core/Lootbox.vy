@@ -51,7 +51,7 @@ interface Ledger:
 
 interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
-    def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
+    def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def getRewardsConfig() -> RewardsConfig: view
@@ -145,6 +145,7 @@ struct DepositPointsConfig:
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
     isNft: bool
+    shouldFundGenPoints: bool
 
 struct ClaimLootConfig:
     canClaimLoot: bool
@@ -871,7 +872,7 @@ def _getLatestDepositPoints(
     globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.arePointsEnabled, _c.stakersPointsAllocTotal, _c.voterPointsAllocTotal)
 
     # latest asset points
-    assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset) 
+    assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset, _vaultId)
     assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
@@ -892,10 +893,11 @@ def _getLatestDepositPoints(
         assetPoints.lastBalance += userLootShare
         userPoints.lastBalance = userLootShare
 
-    # Fund general-depositor USD only when stakersPointsAlloc == 0. Value is aggregate (`lastBalance * precision`), never the caller rate.
+    # General-depositor funding follows the asset-level staker allocation, independent of this row's membership.
+    # Value is aggregate (`lastBalance * precision`), never the caller rate.
     # Round down, cap at custody. Exact-32-byte sharesToAmount is SharesVault-compatible even if 0; failed matching probe is only nominal.
     newAssetUsdValue: uint256 = 0
-    if assetConfig.stakersPointsAlloc == 0:
+    if assetConfig.shouldFundGenPoints:
         if isRipeGovVault:
             newAssetUsdValue = self._getUsdValueForAmount(_asset, staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset), _a.priceDesk)
         elif assetPoints.lastBalance != 0:
@@ -1261,7 +1263,9 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
         return rewards
 
     # new Ripe rewards
-    newRipeDistro: uint256 = min(elapsedBlocks * _config.ripePerBlock, b.ripeAvailForRewards)
+    newRipeDistro: uint256 = b.ripeAvailForRewards
+    if _config.ripePerBlock <= b.ripeAvailForRewards // elapsedBlocks:
+        newRipeDistro = elapsedBlocks * _config.ripePerBlock
 
     # allocate ripe rewards to global buckets
     total: uint256 = _config.borrowersAlloc + _config.stakersAlloc + _config.votersAlloc + _config.genDepositorsAlloc

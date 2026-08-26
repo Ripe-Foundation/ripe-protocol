@@ -26,14 +26,14 @@ interface ChainlinkFeed:
     def latestRoundData() -> ChainlinkRound: view
     def decimals() -> uint8: view 
 
+interface PriceDesk:
+    def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
+
 interface MissionControl:
     def getPriceStaleTime() -> uint256: view
 
 interface RipeHq:
     def numAddrs() -> uint256: view
-
-interface PriceDesk:
-    def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
 
 struct ChainlinkRound:
     roundId: uint80
@@ -125,6 +125,7 @@ NORMALIZED_DECIMALS: constant(uint256) = 18
 MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
 MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
 PRICE_DESK_ID: constant(uint256) = 7
+MAX_PRICED_ASSETS: constant(uint256) = 50
 
 
 @deploy
@@ -389,6 +390,45 @@ def _hasExpectedFeedDecimals(_feed: address, _expectedDecimals: uint256) -> bool
     liveDecimals: uint256 = 0
     hasDecimals, liveDecimals = self._readFeedDecimals(_feed)
     return hasDecimals and liveDecimals == _expectedDecimals
+
+
+
+# qualify price source
+
+
+@view
+@internal
+def _qualifyPriceSource(_asset: address):
+    priceDesk: address = addys._getPriceDeskAddr()
+    if priceDesk == empty(address):
+        # fresh deployments seed feeds before ripe hq reaches the price desk slot.
+        # Once that slot has existed, a disabled/missing PriceDesk must fail closed.
+        assert staticcall RipeHq(addys._getRipeHq()).numAddrs() <= PRICE_DESK_ID # dev: missing price desk
+        return
+
+    self._assertPriceSourceIsExecutable(priceDesk, _asset)
+
+    if _asset not in [ETH, BTC]:
+        return
+
+    numAssets: uint256 = priceData.numAssets
+    if numAssets == 0:
+        return
+
+    for i: uint256 in range(1, numAssets, bound=MAX_PRICED_ASSETS):
+        dependent: address = priceData.assets[i]
+        config: ChainlinkConfig = self.feedConfig[dependent]
+        if (_asset == ETH and config.needsEthToUsd) or (_asset == BTC and config.needsBtcToUsd):
+            self._assertPriceSourceIsExecutable(priceDesk, dependent)
+
+
+@view
+@internal
+def _assertPriceSourceIsExecutable(_priceDesk: address, _asset: address):
+    qualifiedPrice: uint256 = 0
+    sourceStatus: uint256 = 0
+    qualifiedPrice, sourceStatus = staticcall PriceDesk(_priceDesk).qualifyCallerPriceSource(_asset)
+    assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
 
 
 ##################
@@ -658,22 +698,6 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 
     log ChainlinkFeedUpdated(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, staleTime=d.config.staleTime, oldFeed=oldFeed)
     return True
-
-
-@view
-@internal
-def _qualifyPriceSource(_asset: address):
-    priceDesk: address = addys._getPriceDeskAddr()
-    if priceDesk == empty(address):
-        # Fresh deployments seed feeds before RipeHq reaches the PriceDesk slot.
-        # Once that slot has existed, a disabled/missing PriceDesk must fail closed.
-        assert staticcall RipeHq(addys._getRipeHq()).numAddrs() <= PRICE_DESK_ID # dev: missing price desk
-        return
-
-    qualifiedPrice: uint256 = 0
-    sourceStatus: uint256 = 0
-    qualifiedPrice, sourceStatus = staticcall PriceDesk(priceDesk).qualifyCallerPriceSource(_asset)
-    assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
 
 
 # cancel update feed

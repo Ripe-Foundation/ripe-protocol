@@ -198,7 +198,7 @@ def test_g10_prune_hysteresis_boundaries_and_source_zero_skip(
     g10_pool, stability_pool, governance, alice, bob, teller, mock_price_source,
     switchboard_alpha, alpha_token_whale,
 ):
-    """exact $0.02 stays; mid-band stays; >= $0.10 stays; source-zero stays
+    """exact $0.05 stays; mid-band stays; >= $0.10 stays; source-zero stays
     and the rest of the batch still runs (PriceDesk fail-soft)."""
     pool = stability_pool
     stab = g10_pool["stab"]
@@ -611,7 +611,7 @@ def test_g10_activate_capacity_last_slot_first_come_first_served(
     candidates, one slot left. Caller order inside ONE batch decides which
     candidate takes it; the loser stays dormant even though it quoted high.
     Two separate txs: the second caller finds the slot gone. Once the slot
-    is freed by a dust prune (an occupying row falls below $0.02), the loser
+    is freed by a dust prune (an occupying row falls below $0.05), the loser
     can activate. `configuration / post-liquidation inventory-dependent`."""
     pool = stability_pool
     stab = alpha_token

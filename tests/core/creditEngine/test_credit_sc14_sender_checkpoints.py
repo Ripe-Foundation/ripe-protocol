@@ -271,7 +271,7 @@ def test_sc14_redeem_withdrawal_does_not_credit_external_recipient(
     assert ledger.assetDepositPoints(vault_id, alpha_token).lastBalance < asset_before
 
 
-def test_deregistered_redeem_forces_external_delivery(
+def test_deregistered_redeem_forces_external_delivery_even_if_withdrawals_disabled(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -317,6 +317,11 @@ def test_deregistered_redeem_forces_external_delivery(
         sender=switchboard_alpha.address,
     )
     assert mission_control.indexOfAsset(alpha_token) == 0
+    # Model a legacy retired config. New retirements cannot enter this posture,
+    # but canWithdraw still must not disable the redemption path.
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canWithdraw = False"
+    )
     assert not ledger.isParticipatingInVault(alice, vault_id)
 
     payment = 10 * EIGHTEEN_DECIMALS
@@ -347,6 +352,72 @@ def test_deregistered_redeem_forces_external_delivery(
     recipient_points = ledger.userDepositPoints(alice, vault_id, alpha_token)
     assert recipient_points.lastBalance == 0
     assert recipient_points.balancePoints == 0
+
+
+def test_deregistered_redeem_fails_closed_when_redemption_is_disabled(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    setRipeRewardsConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    vault_book,
+    simple_erc20_vault,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+):
+    _make_redeemable(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        setRipeRewardsConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        70 * EIGHTEEN_DECIMALS // 100,
+        enable_rewards=False,
+    )
+    assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+    # Model a legacy retired config with its dedicated redemption lever disabled.
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canRedeemCollateral = False"
+    )
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    payment = 10 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    before = (
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        green_token.balanceOf(alice),
+    )
+
+    with boa.reverts("no redemptions occurred"):
+        _redeem(teller, bob, vault_id, alpha_token, payment, alice, True)
+
+    assert (
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        green_token.balanceOf(alice),
+    ) == before
 
 
 def test_sc14_redeem_same_block_repeated_operations(

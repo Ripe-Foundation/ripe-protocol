@@ -140,7 +140,7 @@ def test_stab_claim_coarse_asset_can_empty_cohort(
         teller, vault_id, alpha_token, claim_token, sender=bob
     )
     bob_amount = claim_token.balanceOf(bob)
-    assert 10**12 <= bob_value_before - bob_claimed < 2 * 10**16
+    assert 10**12 <= bob_value_before - bob_claimed < FULL_EXIT_TOLERANCE_USD
     assert bob_claimed == price_desk.getUsdValue(claim_token, bob_amount)
     assert stability_pool.userBalances(bob, alpha_token) == 0
 
@@ -157,7 +157,7 @@ def test_stab_claim_coarse_asset_can_empty_cohort(
     assert stability_pool.totalClaimableBalances(claim_token) == residual
     assert claim_token.balanceOf(stability_pool) == residual
     if residual != 0:
-        assert price_desk.getUsdValue(claim_token, residual) < 2 * 10**16
+        assert price_desk.getUsdValue(claim_token, residual) < FULL_EXIT_TOLERANCE_USD
 
 
 def test_stab_claim_covering_finite_max_does_not_overflow(
@@ -211,6 +211,63 @@ def test_stab_claim_covering_finite_max_does_not_overflow(
     assert bravo_token.balanceOf(bob) == amount
     assert stability_pool.userBalances(bob, alpha_token) == 0
     assert stability_pool.totalBalances(alpha_token) == 0
+
+
+def test_stab_claim_partial_large_values_does_not_overflow(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    governance,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1)
+
+    deposit_amount = 10**30
+    alpha_token.mint(alpha_token_whale, deposit_amount, sender=governance.address)
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+
+    claim_amount = deposit_amount * EIGHTEEN_DECIMALS
+    bravo_token.mint(bravo_token_whale, claim_amount, sender=governance.address)
+    bravo_token.transfer(stability_pool, claim_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claim_amount,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    partial_usd_value = deposit_amount // 2
+    claimed = claim_from_stability_pool(
+        teller,
+        vault_book.getRegId(stability_pool),
+        alpha_token,
+        bravo_token,
+        partial_usd_value,
+        sender=bob,
+    )
+    assert claimed == partial_usd_value
+    assert bravo_token.balanceOf(bob) == partial_usd_value * EIGHTEEN_DECIMALS
+    assert stability_pool.userBalances(bob, alpha_token) != 0
 
 
 def test_stab_vault_claims_full(
@@ -4331,7 +4388,7 @@ def test_stab_vault_claims_meaningful_live_residual_stays_listed(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Live-share partial claim below $0.02 stays listed unless the leftover is microscopic."""
+    """Live-share partial claim below $0.05 stays listed unless the leftover is microscopic."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4391,7 +4448,7 @@ def test_stab_vault_claims_no_dust_removal_above_threshold(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that claimable asset stays active at or above $0.02."""
+    """Test that claimable asset stays active at or above the $0.05 retention floor."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4447,7 +4504,7 @@ def test_stab_vault_claims_dust_balance_preserved(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Claim and total balances stay intact after a live-share sub-$0.02 residual."""
+    """Claim and total balances stay intact after a live-share sub-$0.05 residual."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4472,7 +4529,7 @@ def test_stab_vault_claims_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.29, leaving a $0.01 residual that stays ACTIVE: below $0.02 but not microscopic.
+    # Claim $0.29, leaving a $0.01 residual that stays ACTIVE: below $0.05 but not microscopic.
     claim_usd_value = 29 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
@@ -4506,7 +4563,7 @@ def test_stab_vault_claims_receipt_accumulates_on_listed_live_residual(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """A later receipt adds onto a live-share sub-$0.02 residual that stayed listed."""
+    """A later receipt adds onto a live-share sub-$0.05 residual that stayed listed."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4633,7 +4690,7 @@ def test_stab_vault_claims_dust_different_price_levels(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """A live-share residual below $0.02 stays listed at a high unit price."""
+    """A live-share residual below $0.05 stays listed at a high unit price."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 

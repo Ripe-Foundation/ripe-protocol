@@ -504,7 +504,7 @@ def test_mission_control_deregister_asset(mission_control, switchboard_alpha, al
     "stakers_points_alloc,voter_points_alloc",
     [(77, 0), (0, 91)],
 )
-def test_mission_control_deregister_asset_rejects_active_points_alloc(
+def test_mission_control_deregister_asset_is_policy_neutral(
     mission_control,
     switchboard_alpha,
     alpha_token,
@@ -521,29 +521,68 @@ def test_mission_control_deregister_asset_rejects_active_points_alloc(
         sender=switchboard_alpha.address,
     )
 
-    supported_before = mission_control.isSupportedAsset(alpha_token.address)
-    index_before = mission_control.indexOfAsset(alpha_token.address)
     num_assets_before = mission_control.numAssets()
-    enumeration_before = [
-        mission_control.assets(i) for i in range(1, mission_control.getNumAssets() + 1)
-    ]
     config_before = mission_control.assetConfig(alpha_token.address)
     totals_before = mission_control.totalPointsAllocs()
 
-    with boa.reverts("active points alloc"):
-        mission_control.deregisterAsset(
-            alpha_token.address,
-            sender=switchboard_alpha.address,
-        )
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
 
-    assert mission_control.isSupportedAsset(alpha_token.address) == supported_before
-    assert mission_control.indexOfAsset(alpha_token.address) == index_before
-    assert mission_control.numAssets() == num_assets_before
-    assert [
-        mission_control.assets(i) for i in range(1, mission_control.getNumAssets() + 1)
-    ] == enumeration_before
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.indexOfAsset(alpha_token.address) == 0
+    assert mission_control.numAssets() == num_assets_before - 1
     assert mission_control.assetConfig(alpha_token.address) == config_before
     assert mission_control.totalPointsAllocs() == totals_before
+
+
+def test_asset_retirement_config_reports_whitelist_posture(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    mock_whitelist,
+    sample_asset_config,
+):
+    config = list(sample_asset_config)
+    config[19] = mock_whitelist.address
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.getAssetRetirementConfig(alpha_token).hasWhitelist
+
+    config[19] = ZERO_ADDRESS
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.getAssetRetirementConfig(alpha_token).hasWhitelist
+
+
+def test_asset_retirement_config_reports_stability_claim_posture(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+):
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        sample_asset_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.getAssetRetirementConfig(alpha_token).canClaimInStabPool
+
+    config = list(sample_asset_config)
+    config[16] = False
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.getAssetRetirementConfig(alpha_token).canClaimInStabPool
 
 
 def test_mission_control_deregister_asset_nonexistent(
@@ -747,50 +786,25 @@ def test_mission_control_deregister_asset_points_allocs_conservation(
         sender=switchboard_alpha.address,
     )
 
-    retired_before = mission_control.assetConfig(alpha_token.address)
     active_before = mission_control.assetConfig(bravo_token.address)
     totals_before = mission_control.totalPointsAllocs()
-    with boa.reverts("active points alloc"):
-        mission_control.deregisterAsset(
-            alpha_token.address,
-            sender=switchboard_alpha.address,
-        )
-    assert mission_control.assetConfig(alpha_token.address) == retired_before
-    assert mission_control.totalPointsAllocs() == totals_before
-
-    zeroed_config = list(retired_before)
-    zeroed_config[1] = 0
-    zeroed_config[2] = 0
-    mission_control.setAssetConfig(
-        alpha_token.address,
-        tuple(zeroed_config),
-        sender=switchboard_alpha.address,
-    )
-
-    retired_zeroed = mission_control.assetConfig(alpha_token.address)
-    totals_after_zeroing = mission_control.totalPointsAllocs()
-    assert list(retired_zeroed.vaultIds) == list(retired_before.vaultIds)
-    assert retired_zeroed.perUserDepositLimit == retired_before.perUserDepositLimit
-    assert retired_zeroed.globalDepositLimit == retired_before.globalDepositLimit
-    assert retired_zeroed.minDepositBalance == retired_before.minDepositBalance
-    assert totals_after_zeroing.stakersPointsAllocTotal == (
-        totals_before.stakersPointsAllocTotal - retired_before.stakersPointsAlloc
-    )
-    assert totals_after_zeroing.voterPointsAllocTotal == (
-        totals_before.voterPointsAllocTotal - retired_before.voterPointsAlloc
-    )
+    retired_before = mission_control.assetConfig(alpha_token.address)
 
     assert mission_control.deregisterAsset(
         alpha_token.address,
         sender=switchboard_alpha.address,
     )
     totals_after_deregister = mission_control.totalPointsAllocs()
-    assert totals_after_deregister == totals_after_zeroing
-    assert mission_control.assetConfig(alpha_token.address) == retired_zeroed
+    assert totals_after_deregister == totals_before
+    assert mission_control.assetConfig(alpha_token.address) == retired_before
     assert not mission_control.isSupportedAsset(alpha_token.address)
     assert mission_control.isSupportedAsset(bravo_token.address)
-    assert totals_after_deregister.stakersPointsAllocTotal == active_before.stakersPointsAlloc
-    assert totals_after_deregister.voterPointsAllocTotal == active_before.voterPointsAlloc
+    assert totals_after_deregister.stakersPointsAllocTotal == (
+        retired_before.stakersPointsAlloc + active_before.stakersPointsAlloc
+    )
+    assert totals_after_deregister.voterPointsAllocTotal == (
+        retired_before.voterPointsAlloc + active_before.voterPointsAlloc
+    )
 
 
 ######################
@@ -836,6 +850,113 @@ def test_mission_control_get_teller_withdraw_config(mission_control, switchboard
     mission_control.setUserDelegation(alice, bob, sample_action_delegation, sender=switchboard_alpha.address)
     config = mission_control.getTellerWithdrawConfig(alpha_token.address, alice, bob)
     assert config.canWithdrawForUser
+
+
+def test_mission_control_effective_external_delivery_policy(
+    mission_control,
+    setGeneralConfig,
+    setAssetConfig,
+    switchboard_alpha,
+    alpha_token,
+    alice,
+):
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+
+    # Supported collateral honors the caller's requested delivery mode.
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True)
+    assert redeem.canRedeemCollateral and redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and auction.shouldTransferBalance
+
+    # External delivery is governed by the dedicated redemption/auction flags,
+    # not the user-withdrawal flag.
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, False)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, False)
+    assert redeem.canRedeemCollateral and not redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and not auction.shouldTransferBalance
+
+    # Disabling voluntary Teller withdrawals does not disable either solvency
+    # path, regardless of requested delivery mode.
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _canWithdraw=False,
+    )
+    assert mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, False).canRedeemCollateral
+    assert mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, False).canBuyInAuction
+    assert mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True).canRedeemCollateral
+    assert mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True).canBuyInAuction
+
+    # The new lifecycle guard prevents retiring the asset while an exit path is
+    # disabled. Restore the flag, retire it, then model a legacy retained config
+    # to pin the decoupled canWithdraw policy for already-retired assets.
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canWithdraw = False"
+    )
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True)
+    assert redeem.canRedeemCollateral and not redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and not auction.shouldTransferBalance
+
+
+@pytest.mark.parametrize(
+    "scope,path",
+    [
+        ("general", "redeem"),
+        ("asset", "redeem"),
+        ("general", "auction"),
+        ("asset", "auction"),
+    ],
+)
+def test_mission_control_effective_delivery_uses_dedicated_path_flags(
+    scope,
+    path,
+    mission_control,
+    setGeneralConfig,
+    setAssetConfig,
+    alpha_token,
+    alice,
+):
+    gen_kwargs = {}
+    asset_kwargs = {
+        "_stakersPointsAlloc": 0,
+        "_voterPointsAlloc": 0,
+    }
+    if path == "redeem":
+        if scope == "general":
+            gen_kwargs["_canRedeemCollateral"] = False
+        else:
+            asset_kwargs["_canRedeemCollateral"] = False
+    else:
+        if scope == "general":
+            gen_kwargs["_canBuyInAuction"] = False
+        else:
+            asset_kwargs["_canBuyInAuction"] = False
+
+    setGeneralConfig(**gen_kwargs)
+    setAssetConfig(alpha_token, **asset_kwargs)
+    if path == "redeem":
+        config = mission_control.getEffectiveRedeemCollateralConfig(
+            alpha_token, alice, False
+        )
+        assert not config.canRedeemCollateral
+    else:
+        config = mission_control.getEffectiveAuctionBuyConfig(
+            alpha_token, alice, False
+        )
+        assert not config.canBuyInAuction
 
 def test_mission_control_get_borrow_config(mission_control, switchboard_alpha, alice, bob, sample_gen_config, sample_gen_debt_config, sample_action_delegation):
     """Test getting borrow configuration."""
@@ -1398,13 +1519,34 @@ def test_mission_control_get_rewards_config(mission_control, switchboard_alpha, 
     assert config.voterPointsAllocTotal == 400
 
 def test_mission_control_get_deposit_points_config(mission_control, switchboard_alpha, alpha_token, sample_asset_config):
-    """Test getting deposit points configuration."""
+    """Deposit-point allocs are vault-aware while gen funding stays asset-wide."""
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
-    
-    config = mission_control.getDepositPointsConfig(alpha_token.address)
-    assert config.stakersPointsAlloc == sample_asset_config[1]
-    assert config.voterPointsAlloc == sample_asset_config[2]
-    assert config.isNft == sample_asset_config[20]
+
+    member = mission_control.getDepositPointsConfig(alpha_token.address, 1)
+    assert member.stakersPointsAlloc == sample_asset_config[1]
+    assert member.voterPointsAlloc == sample_asset_config[2]
+    assert member.isNft == sample_asset_config[20]
+    assert not member.shouldFundGenPoints
+
+    non_member = mission_control.getDepositPointsConfig(alpha_token.address, 3)
+    assert non_member.stakersPointsAlloc == 0
+    assert non_member.voterPointsAlloc == 0
+    assert non_member.isNft == sample_asset_config[20]
+    # Membership must not turn a real nonzero staker allocation into a signal
+    # that this historical row should fund general-depositor USD.
+    assert not non_member.shouldFundGenPoints
+
+    zero_staker_config = list(sample_asset_config)
+    zero_staker_config[1] = 0
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(zero_staker_config),
+        sender=switchboard_alpha.address,
+    )
+    non_member = mission_control.getDepositPointsConfig(alpha_token.address, 3)
+    assert non_member.stakersPointsAlloc == 0
+    assert non_member.voterPointsAlloc == 0
+    assert non_member.shouldFundGenPoints
 
 def test_mission_control_get_price_config(mission_control, switchboard_alpha, sample_gen_config):
     """Test getting price configuration."""

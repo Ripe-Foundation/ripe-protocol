@@ -578,6 +578,33 @@
     "type": "event"
   },
   {
+    "name": "AssetDepositPointsCheckpointedAt",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "vaultAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "TrainingWheelsSet",
     "inputs": [
       {
@@ -2203,6 +2230,31 @@
       },
       {
         "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "checkpointAssetDepositPointsAt",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultAddr",
         "type": "address"
       }
     ],

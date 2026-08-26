@@ -1011,6 +1011,7 @@ def test_distribute_respects_pending_allocations(
     setup_underscore_rewards,
     setRipeRewardsConfig,
     ledger,
+    teller,
 ):
     """Doesn't double-count pending rewards"""
     limited_ripe = 500 * EIGHTEEN_DECIMALS
@@ -1019,6 +1020,10 @@ def test_distribute_respects_pending_allocations(
     # ~0.005 RIPE/block over a one-day window is ~216 RIPE pending against
     # the 500 RIPE budget, leaving room for the 200 RIPE underscore send.
     ripe_per_block = 5 * 10**15
+    # Operator sequence: settle the old configuration, then apply the new
+    # configuration in the same block so no interval straddles both rates.
+    lootbox.updateRipeRewards(sender=teller.address)
+    checkpoint_block = boa.env.evm.patch.block_number
     setRipeRewardsConfig(
         _arePointsEnabled=True,
         _ripePerBlock=ripe_per_block,
@@ -1029,7 +1034,7 @@ def test_distribute_respects_pending_allocations(
     )
     avail_after_config = ledger.ripeAvailForRewards()
     rewards_before = ledger.ripeRewards()
-    assert rewards_before.lastUpdate == boa.env.evm.patch.block_number
+    assert rewards_before.lastUpdate == checkpoint_block
 
     elapsed = ONE_DAY_BLOCKS + 1
     boa.env.time_travel(blocks=elapsed)

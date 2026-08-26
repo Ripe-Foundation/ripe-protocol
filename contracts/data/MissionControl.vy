@@ -75,18 +75,16 @@ struct RepayConfig:
     canRepay: bool
     canAnyoneRepayDebt: bool
 
-struct RedeemCollateralConfig:
-    canRedeemCollateralGeneral: bool
-    canRedeemCollateralAsset: bool
-    isUserAllowed: bool
+struct EffectiveRedeemCollateralConfig:
+    canRedeemCollateral: bool
     ltvPaybackBuffer: uint256
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
-struct AuctionBuyConfig:
-    canBuyInAuctionGeneral: bool
-    canBuyInAuctionAsset: bool
-    isUserAllowed: bool
+struct EffectiveAuctionBuyConfig:
+    canBuyInAuction: bool
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct GenLiqConfig:
     canLiquidate: bool
@@ -145,6 +143,19 @@ struct RewardsConfig:
 struct DepositPointsConfig:
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
+    isNft: bool
+    shouldFundGenPoints: bool
+
+struct AssetRetirementConfig:
+    isSupported: bool
+    hasPointsAlloc: bool
+    hasWhitelist: bool
+    ltv: uint256
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
+    shouldTransferToEndaoment: bool
     isNft: bool
 
 struct PriceConfig:
@@ -341,8 +352,6 @@ def deregisterAsset(_asset: address) -> bool:
     if targetIndex == 0:
         return False
 
-    assert self.assetConfig[_asset].stakersPointsAlloc == 0 and self.assetConfig[_asset].voterPointsAlloc == 0 # dev: active points alloc
-
     # update data
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
@@ -355,6 +364,24 @@ def deregisterAsset(_asset: address) -> bool:
         self.indexOfAsset[lastItem] = targetIndex
 
     return True
+
+
+@view
+@external
+def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    return AssetRetirementConfig(
+        isSupported=self.indexOfAsset[_asset] != 0,
+        hasPointsAlloc=assetConfig.stakersPointsAlloc != 0 or assetConfig.voterPointsAlloc != 0,
+        hasWhitelist=assetConfig.whitelist != empty(address),
+        ltv=assetConfig.debtTerms.ltv,
+        canWithdraw=assetConfig.canWithdraw,
+        canRedeemCollateral=assetConfig.canRedeemCollateral,
+        canBuyInAuction=assetConfig.canBuyInAuction,
+        canClaimInStabPool=assetConfig.canClaimInStabPool,
+        shouldTransferToEndaoment=assetConfig.shouldTransferToEndaoment,
+        isNft=assetConfig.isNft,
+    )
 
 
 ###############
@@ -734,14 +761,20 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 @view
 @external
-def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
+def getEffectiveRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveRedeemCollateralConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    return RedeemCollateralConfig(
-        canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
-        canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+    shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
+
+    # canWithdraw gates voluntary teller withdrawals only. Redemptions use their dedicated general/asset flags and remain available for solvency.
+    return EffectiveRedeemCollateralConfig(
+        canRedeemCollateral=(
+            self.genConfig.canRedeemCollateral
+            and assetConfig.canRedeemCollateral
+            and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
+        ),
         ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+        shouldTransferBalance=shouldTransferBalance,
     )
 
 
@@ -756,13 +789,19 @@ def getLtvPaybackBuffer() -> uint256:
 
 @view
 @external
-def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
+def getEffectiveAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveAuctionBuyConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    return AuctionBuyConfig(
-        canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,
-        canBuyInAuctionAsset=assetConfig.canBuyInAuction,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+    shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
+
+    # canWithdraw gates voluntary teller withdrawals only. Auctions use their dedicated general/asset flags and remain available for liquidation.
+    return EffectiveAuctionBuyConfig(
+        canBuyInAuction=(
+            self.genConfig.canBuyInAuction
+            and assetConfig.canBuyInAuction
+            and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
+        ),
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+        shouldTransferBalance=shouldTransferBalance,
     )
 
 
@@ -930,12 +969,22 @@ def getRewardsConfig() -> RewardsConfig:
 
 @view
 @external
-def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
+def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    shouldFundGenPoints: bool = assetConfig.stakersPointsAlloc == 0
+    # Membership gates staker and voter allocations; gen funding remains asset-level.
+    if _vaultId not in assetConfig.vaultIds:
+        return DepositPointsConfig(
+            stakersPointsAlloc=0,
+            voterPointsAlloc=0,
+            isNft=assetConfig.isNft,
+            shouldFundGenPoints=shouldFundGenPoints,
+        )
     return DepositPointsConfig(
         stakersPointsAlloc=assetConfig.stakersPointsAlloc,
         voterPointsAlloc=assetConfig.voterPointsAlloc,
         isNft=assetConfig.isNft,
+        shouldFundGenPoints=shouldFundGenPoints,
     )
 
 

@@ -2247,8 +2247,8 @@ def test_flag_setter_on_new_mission_control(
     action_id = switchboard_bravo.addAsset(
         bravo_token.address,   # _asset
         [1],                   # _vaultIds
-        50_00,                 # _stakersPointsAlloc
-        30_00,                 # _voterPointsAlloc
+        0,                     # _stakersPointsAlloc
+        0,                     # _voterPointsAlloc
         1000,                  # _perUserDepositLimit
         10000,                 # _globalDepositLimit
         0,                     # _minDepositBalance
@@ -2311,8 +2311,8 @@ def test_multiple_flag_operations_on_new_mission_control(
     action_id = switchboard_bravo.addAsset(
         bravo_token.address,   # _asset
         [1],                   # _vaultIds
-        50_00,                 # _stakersPointsAlloc
-        30_00,                 # _voterPointsAlloc
+        0,                     # _stakersPointsAlloc
+        0,                     # _voterPointsAlloc
         1000,                  # _perUserDepositLimit
         10000,                 # _globalDepositLimit
         0,                     # _minDepositBalance
@@ -2396,8 +2396,8 @@ def test_flag_setter_new_mc_does_not_affect_registered_mc(
     action_id = switchboard_bravo.addAsset(
         bravo_token.address,   # _asset
         [1],                   # _vaultIds
-        50_00,                 # _stakersPointsAlloc
-        30_00,                 # _voterPointsAlloc
+        0,                     # _stakersPointsAlloc
+        0,                     # _voterPointsAlloc
         1000,                  # _perUserDepositLimit
         10000,                 # _globalDepositLimit
         0,                     # _minDepositBalance
@@ -2563,8 +2563,8 @@ def test_deregister_asset_execute_success(
     # First add the asset
     action_id = switchboard_bravo.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
-        (0, 0, 0, 0, 0, 0),
-        False, False, False, True, True, True, False, True, True, True, 0,
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
+        False, False, False, True, True, True, True, True, True, True, 0,
         sender=governance.address
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
@@ -2595,6 +2595,209 @@ def test_deregister_asset_execute_success(
     assert switchboard_charlie.actionType(aid) == 0
 
 
+@pytest.mark.parametrize(
+    "field_index",
+    [
+        pytest.param(12, id="withdrawal"),
+        pytest.param(13, id="redemption"),
+        pytest.param(15, id="auction"),
+        pytest.param(16, id="stability-claims"),
+    ],
+)
+def test_deregister_asset_execute_rechecks_applicable_exit_paths(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    field_index,
+):
+    config = list(_asset_config([1]))
+    config[6] = (50_00, 60_00, 70_00, 10_00, 5_00, 0)
+    config[13] = True
+    config[15] = True
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+
+    config[field_index] = False
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+    assert switchboard_charlie.hasPendingAction(action)
+
+
+@pytest.mark.parametrize(
+    "ltv,should_transfer_to_endaoment,is_nft,can_buy_in_auction",
+    [
+        pytest.param(0, False, False, False, id="zero-ltv"),
+        pytest.param(50_00, True, False, True, id="endaoment"),
+    ],
+)
+def test_deregister_asset_execute_allows_only_applicable_debt_exits(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    ltv,
+    should_transfer_to_endaoment,
+    is_nft,
+    can_buy_in_auction,
+):
+    config = list(_asset_config([1]))
+    config[6] = (ltv, 60_00, 70_00, 10_00, 5_00, 0)
+    config[8] = should_transfer_to_endaoment
+    config[13] = False
+    config[15] = can_buy_in_auction
+    config[20] = is_nft
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    assert switchboard_charlie.executePendingAction(
+        action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
+def test_deregister_positive_ltv_nft_requires_a_functional_debt_exit(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+):
+    config = list(_asset_config([1]))
+    config[6] = (50_00, 60_00, 70_00, 10_00, 5_00, 0)
+    config[13] = False
+    config[15] = True
+    config[20] = True
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+
+
+@pytest.mark.parametrize(
+    "field_index",
+    [
+        pytest.param(12, id="withdrawal"),
+        pytest.param(16, id="stability-claims"),
+    ],
+)
+def test_deregister_zero_ltv_asset_still_requires_operational_exits(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    field_index,
+):
+    config = list(_asset_config([1]))
+    config[field_index] = False
+    config[13] = False
+    config[15] = False
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+
+
+def test_deregister_asset_requires_whitelist_cleared_at_execution(
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+    mission_control,
+    alpha_token,
+    mock_whitelist,
+):
+    config = list(_asset_config([1]))
+    config[19] = mock_whitelist.address
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    retire_action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, retire_action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            retire_action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+    assert switchboard_charlie.hasPendingAction(retire_action)
+
+    config[19] = ZERO_ADDRESS
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    assert mission_control.assetConfig(alpha_token).whitelist == ZERO_ADDRESS
+
+    assert switchboard_charlie.executePendingAction(
+        retire_action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
 def test_deregister_asset_execute_rejects_already_unregistered(
     switchboard_bravo,
     switchboard_charlie,
@@ -2610,14 +2813,14 @@ def test_deregister_asset_execute_rejects_already_unregistered(
         1_000,
         10_000,
         0,
-        (0, 0, 0, 0, 0, 0),
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
         False,
         False,
         False,
         True,
         True,
         True,
-        False,
+        True,
         True,
         True,
         True,
@@ -2692,8 +2895,8 @@ def test_deregister_asset_on_new_mission_control(
     # Add asset to new MC
     action_id = switchboard_bravo.addAsset(
         bravo_token.address, [1], 0, 0, 1000, 10000, 0,
-        (0, 0, 0, 0, 0, 0),
-        False, False, False, True, True, True, False, True, True, True, 0,
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
+        False, False, False, True, True, True, True, True, True, True, 0,
         (False, 0, 0, 0, 0), ZERO_ADDRESS, False,
         new_mission_control.address,  # _missionControl
         sender=governance.address
@@ -2724,11 +2927,12 @@ def test_deregister_asset_on_new_mission_control(
     assert not new_mission_control.isSupportedAsset(bravo_token.address)
 
 
-def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
+def test_live_allocations_can_be_zeroed_then_retired(
     switchboard_bravo,
     switchboard_charlie,
     governance,
     mission_control,
+    vault_book,
     alpha_token,
 ):
     add_action = switchboard_bravo.addAsset(
@@ -2739,14 +2943,14 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
         1_000,
         10_000,
         0,
-        (0, 0, 0, 0, 0, 0),
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
         False,
         False,
         False,
         True,
         True,
         True,
-        False,
+        True,
         True,
         True,
         True,
@@ -2759,14 +2963,31 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
         sender=governance.address,
     )
 
-    nonzero_config = list(mission_control.assetConfig(alpha_token.address))
-    nonzero_config[1] = 25_00
-    nonzero_config[2] = 15_00
-    mission_control.setAssetConfig(
+    vault_addr = vault_book.getAddr(1)
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
         alpha_token.address,
-        nonzero_config,
-        sender=switchboard_bravo.address,
+        1,
+        vault_addr,
+        sender=governance.address,
     )
+
+    live = mission_control.assetConfig(alpha_token.address)
+    enable_action = switchboard_bravo.setAssetDepositParams(
+        alpha_token.address,
+        list(live.vaultIds),
+        25_00,
+        15_00,
+        live.perUserDepositLimit,
+        live.globalDepositLimit,
+        live.minDepositBalance,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_bravo, enable_action)
+    assert switchboard_bravo.executePendingAction(
+        enable_action,
+        sender=governance.address,
+    )
+
     live_before = mission_control.assetConfig(alpha_token.address)
     totals_before = mission_control.totalPointsAllocs()
     deregister_action = switchboard_charlie.deregisterAsset(
@@ -2774,20 +2995,26 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
         sender=governance.address,
     )
 
-    with boa.reverts("invalid asset deposit params"):
-        switchboard_bravo.setAssetDepositParams(
-            alpha_token.address,
-            list(live_before.vaultIds),
-            0,
-            0,
-            live_before.perUserDepositLimit,
-            live_before.globalDepositLimit,
-            live_before.minDepositBalance,
-            sender=governance.address,
-        )
+    zero_action = switchboard_bravo.setAssetDepositParams(
+        alpha_token.address,
+        list(live_before.vaultIds),
+        0,
+        0,
+        live_before.perUserDepositLimit,
+        live_before.globalDepositLimit,
+        live_before.minDepositBalance,
+        sender=governance.address,
+    )
 
-    _advance_to_confirmation(switchboard_charlie, deregister_action)
-    with boa.reverts("active points alloc"):
+    confirmation_block = max(
+        switchboard_charlie.getActionConfirmationBlock(deregister_action),
+        switchboard_bravo.getActionConfirmationBlock(zero_action),
+    )
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+
+    with boa.reverts("invalid retirement config"):
         switchboard_charlie.executePendingAction(
             deregister_action,
             sender=governance.address,
@@ -2796,6 +3023,76 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
     assert mission_control.assetConfig(alpha_token.address) == live_before
     assert mission_control.totalPointsAllocs() == totals_before
     assert switchboard_charlie.hasPendingAction(deregister_action)
+
+    assert switchboard_bravo.executePendingAction(
+        zero_action,
+        sender=governance.address,
+    )
+    zeroed = mission_control.assetConfig(alpha_token.address)
+    assert zeroed.stakersPointsAlloc == 0
+    assert zeroed.voterPointsAlloc == 0
+
+    assert switchboard_charlie.executePendingAction(
+        deregister_action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    with boa.reverts("invalid asset"):
+        switchboard_charlie.setCanWithdrawAsset(
+            alpha_token.address,
+            False,
+            sender=governance.address,
+        )
+
+    with boa.reverts("invalid asset"):
+        switchboard_bravo.setAssetDepositParams(
+            alpha_token.address,
+            list(zeroed.vaultIds),
+            0,
+            0,
+            zeroed.perUserDepositLimit,
+            zeroed.globalDepositLimit,
+            zeroed.minDepositBalance,
+            sender=governance.address,
+        )
+
+    readd_action = switchboard_bravo.addAsset(
+        alpha_token.address,
+        [1],
+        0,
+        0,
+        2_000,
+        20_000,
+        100,
+        (40_00, 50_00, 60_00, 10_00, 5_00, 0),
+        False,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+        False,
+        True,
+        False,
+        0,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_bravo, readd_action)
+    assert switchboard_bravo.executePendingAction(
+        readd_action,
+        sender=governance.address,
+    )
+    assert mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.getNumAssets() == 1
+    assert mission_control.assets(1) == alpha_token.address
+    readded = mission_control.assetConfig(alpha_token.address)
+    assert list(readded.vaultIds) == [1]
+    assert tuple(readded.debtTerms) == (40_00, 50_00, 60_00, 10_00, 5_00, 0)
+    assert readded.perUserDepositLimit == 2_000
+    assert readded.globalDepositLimit == 20_000
+    assert readded.minDepositBalance == 100
 
 
 def test_deregister_asset_rechecks_points_allocs_at_execution(
@@ -2849,7 +3146,7 @@ def test_deregister_asset_rechecks_points_allocs_at_execution(
     totals_before = mission_control.totalPointsAllocs()
 
     _advance_to_confirmation(switchboard_charlie, deregister_action)
-    with boa.reverts("active points alloc"):
+    with boa.reverts("invalid retirement config"):
         switchboard_charlie.executePendingAction(
             deregister_action,
             sender=governance.address,
@@ -4021,6 +4318,218 @@ def test_pointer_execution_rejects_disabled_vault_binding(
     assert pending_view(action_id) == vault_id
     assert switchboard_charlie.actionType(action_id) != 0
     assert switchboard_charlie.hasPendingAction(action_id)
+
+
+def test_checkpoint_asset_deposit_points_at_is_governor_only(
+    switchboard_charlie,
+    switchboard_alpha,
+    governance,
+    bob,
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lite_id = switchboard_alpha.setCanPerformLiteAction(bob, True, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(lite_id, sender=governance.address)
+
+    with boa.reverts("no perms"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            simple_erc20_vault.address,
+            sender=bob,
+        )
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_id,
+        simple_erc20_vault.address,
+        sender=governance.address,
+    )
+    logs = filter_logs(switchboard_charlie, "AssetDepositPointsCheckpointedAt")
+    assert logs[0].asset == alpha_token.address
+    assert logs[0].vaultId == vault_id
+    assert logs[0].vaultAddr == simple_erc20_vault.address
+
+
+def test_checkpoint_asset_deposit_points_at_vault_book_matching(
+    switchboard_charlie,
+    governance,
+    alpha_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    with boa.reverts("invalid parameters"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            ZERO_ADDRESS,
+            vault_id,
+            simple_erc20_vault.address,
+            sender=governance.address,
+        )
+    with boa.reverts("invalid parameters"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            ZERO_ADDRESS,
+            sender=governance.address,
+        )
+    with boa.reverts("vault addr mismatch"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            rebase_erc20_vault.address,
+            sender=governance.address,
+        )
+    with boa.reverts("invalid vault id"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            0,
+            simple_erc20_vault.address,
+            sender=governance.address,
+        )
+    with boa.reverts("invalid vault id"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            999,
+            simple_erc20_vault.address,
+            sender=governance.address,
+        )
+    with boa.reverts("invalid vault"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            boa.env.generate_address(),
+            sender=governance.address,
+        )
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_id,
+        simple_erc20_vault.address,
+        sender=governance.address,
+    )
+
+    historical = boa.loads(
+        """
+# pragma version ~=0.4.3
+@external
+def ping() -> bool:
+    return True
+
+@external
+@view
+def doesVaultHaveAnyFunds() -> bool:
+    return False
+""",
+        name="charlie_historical_disabled_vault",
+    )
+    historical_id = _register_vault(
+        vault_book,
+        governance,
+        historical,
+        "Charlie historical disabled vault",
+    )
+    assert vault_book.startAddressDisableInRegistry(
+        historical_id,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        historical_id,
+        sender=governance.address,
+    )
+    assert vault_book.getAddr(historical_id) == ZERO_ADDRESS
+    assert vault_book.isValidRegId(historical_id)
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        historical_id,
+        historical.address,
+        sender=governance.address,
+    )
+
+
+def test_checkpoint_asset_deposit_points_at_requires_points_enabled(
+    switchboard_charlie,
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    switchboard_alpha.setRewardsPointsEnabled(False, sender=governance.address)
+    with boa.reverts("points disabled"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            simple_erc20_vault.address,
+            sender=governance.address,
+        )
+    switchboard_alpha.setRewardsPointsEnabled(True, sender=governance.address)
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_id,
+        simple_erc20_vault.address,
+        sender=governance.address,
+    )
+
+
+def test_flag_setters_preserve_allocation_totals(
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+    mission_control,
+    alpha_token,
+):
+    add_action = switchboard_bravo.addAsset(
+        alpha_token.address,
+        [1],
+        0,
+        0,
+        1_000,
+        10_000,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    assert switchboard_bravo.executePendingAction(add_action, sender=governance.address)
+
+    seeded = list(mission_control.assetConfig(alpha_token.address))
+    seeded[1] = 25_00
+    seeded[2] = 15_00
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        seeded,
+        sender=switchboard_bravo.address,
+    )
+    totals_before = mission_control.totalPointsAllocs()
+    allocs_before = (
+        mission_control.assetConfig(alpha_token.address).stakersPointsAlloc,
+        mission_control.assetConfig(alpha_token.address).voterPointsAlloc,
+    )
+    assert switchboard_charlie.setCanDepositAsset(
+        alpha_token,
+        False,
+        sender=governance.address,
+    )
+    assert mission_control.totalPointsAllocs() == totals_before
+    config = mission_control.assetConfig(alpha_token.address)
+    assert (config.stakersPointsAlloc, config.voterPointsAlloc) == allocs_before
+    assert not config.canDeposit
 
 
 # Run the tests

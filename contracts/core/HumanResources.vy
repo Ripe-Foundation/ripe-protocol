@@ -520,6 +520,7 @@ def refundAfterCancelPaycheck(
 
     refundAmount: uint256 = _amount
     if _shouldBurnPosition:
+    
         # withdraw and burn position
         vaultId: uint256 = self._getContributorRipeGovVaultId(a.missionControl, msg.sender, _vaultId)
         ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
@@ -529,7 +530,7 @@ def refundAfterCancelPaycheck(
         if actualBurnAmount != 0:
             assert extcall RipeToken(a.ripeToken).burn(actualBurnAmount)  # dev: ripe burn failed
 
-        # RIPE is fungible here, but claimed compensation capacity is recovered
+        # ripe is fungible here, but claimed compensation capacity is recovered
         # only to the extent that RIPE was actually burned during this cancellation.
         claimedAmount: uint256 = min(_amount, staticcall HrContributor(msg.sender).totalClaimed())
         recoveredClaimedAmount: uint256 = min(claimedAmount, actualBurnAmount)

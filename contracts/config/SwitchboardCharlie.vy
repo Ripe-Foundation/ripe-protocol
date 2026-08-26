@@ -11,6 +11,7 @@
 #      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
+# pragma optimize codesize
 
 exports: gov.__interface__
 exports: timeLock.__interface__
@@ -22,6 +23,18 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import contracts.modules.Addys as addys
 import interfaces.ConfigStructs as cs
+
+struct AssetRetirementConfig:
+    isSupported: bool
+    hasPointsAlloc: bool
+    hasWhitelist: bool
+    ltv: uint256
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
+    shouldTransferToEndaoment: bool
+    isNft: bool
 
 interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -39,6 +52,7 @@ interface MissionControl:
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
+    def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def setTrainingWheels(_trainingWheels: address): nonpayable
     def setPreferredStabVaultId(_vaultId: uint256): nonpayable
@@ -49,6 +63,10 @@ interface MissionControl:
     def isSupportedAsset(_asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
+
+# Word 0 of RipeRewardsConfig is arePointsEnabled.
+interface MissionControlRewardsHead:
+    def rewardsConfig() -> bool: view
 
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -69,9 +87,6 @@ interface RipeEcoContract:
     def recoverFunds(_recipient: address, _asset: address): nonpayable
     def pause(_shouldPause: bool): nonpayable
 
-interface CreditEngine:
-    def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_vaultId: uint256) -> address: view
@@ -82,6 +97,9 @@ interface RipeGovVault:
 
 interface Switchboard:
     def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
+
+interface CreditEngine:
+    def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface Ledger:
     def setLockedAccount(_wallet: address, _shouldLock: bool): nonpayable
@@ -281,6 +299,12 @@ event DepositPointsUpdatedMany:
     numUsers: uint256
     vaultId: uint256
     asset: indexed(address)
+    caller: indexed(address)
+
+event AssetDepositPointsCheckpointedAt:
+    asset: indexed(address)
+    vaultId: uint256
+    vaultAddr: indexed(address)
     caller: indexed(address)
 
 event TrainingWheelsSet:
@@ -876,6 +900,27 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
     return True
 
 
+# Governor-only historical checkpoint. No other contract calls this. Bravo
+# only settles current VaultBook rows; a removed or disabled vault needs an
+# explicit address in the same tx as Bravo.executePendingAction (Charlie-pre,
+# and Charlie-post on a staker 0 <-> nonzero crossing).
+@external
+def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert empty(address) not in [_asset, _vaultAddr] # dev: invalid parameters
+    assert _vaultAddr.is_contract # dev: invalid vault
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    bookAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert bookAddr == empty(address) or bookAddr == _vaultAddr # dev: vault addr mismatch
+    assert staticcall MissionControlRewardsHead(self._getMissionControlAddr()).rewardsConfig() # dev: points disabled
+
+    extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
+    log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)
+    return True
+
+
 @external
 def updateManyDepositPoints(_users: DynArray[address, MAX_CLAIM_USERS], _vaultId: uint256, _asset: address) -> bool:
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
@@ -1060,6 +1105,33 @@ def deregisterAsset(_asset: address, _missionControl: address = empty(address)) 
     return aid
 
 
+# validate
+
+
+@view
+@internal
+def _validateAssetDeregistration(_asset: address, _missionControl: address):
+    config: AssetRetirementConfig = staticcall MissionControl(_missionControl).getAssetRetirementConfig(_asset)
+    assert config.isSupported # dev: invalid asset
+    assert (
+        not config.hasPointsAlloc
+        and not config.hasWhitelist
+        and config.canWithdraw
+        and config.canClaimInStabPool
+        and (
+            config.ltv == 0
+            or (
+                not config.isNft
+                and config.canBuyInAuction
+                and (
+                    config.shouldTransferToEndaoment
+                    or config.canRedeemCollateral
+                )
+            )
+        )
+    ) # dev: invalid retirement config
+
+
 # deregister vault asset
 
 
@@ -1212,6 +1284,7 @@ def executePendingAction(_aid: uint256) -> bool:
         mc: address = self.pendingMissionControl[_aid]
         if mc == empty(address):
             mc = self._getMissionControlAddr()
+        self._validateAssetDeregistration(asset, mc)
         success: bool = extcall MissionControl(mc).deregisterAsset(asset)
         assert success # dev: invalid asset
         log AssetDeregistered(asset=asset)

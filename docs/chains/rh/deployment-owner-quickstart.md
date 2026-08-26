@@ -340,10 +340,10 @@ deployment, migration, configuration, or activation authority.
 ## Conditional post-deployment asset retirement
 
 This procedure applies only after a separately reviewed MissionControl runtime
-containing the `active points alloc` guard and a hardened SwitchboardCharlie
-runtime that checks MissionControl's boolean return have both been deployed and
-made authoritative. A source merge, passing suite, or artifact update does not
-change either deployed runtime or authorize either transition.
+and a hardened SwitchboardCharlie runtime containing the retirement-policy
+checks and MissionControl boolean-return check have both been deployed and made
+authoritative. A source merge, passing suite, or artifact update does not change
+either deployed runtime or authorize either transition.
 
 The rollout therefore contains two contract deployments. Bind and review each
 runtime and deployed address separately. For SwitchboardCharlie, also verify
@@ -354,6 +354,18 @@ Charlie behavior. The reviewed Charlie candidate has 703 bytes of EIP-170
 deployed-runtime headroom; recompile and recheck that gate after every further
 Charlie change rather than carrying this measurement forward by assumption.
 
+Asset retirement is terminal unless governance later completes a full
+`addAsset` re-registration. Ordinary Bravo and Charlie asset mutations require
+the asset to remain supported, so deregistration permanently retains the
+asset-level exit posture present at execution. Before starting either timelock
+action, verify `canWithdraw` is enabled. For an asset with nonzero LTV, also
+verify `canBuyInAuction` is enabled. Verify `canRedeemCollateral` as well unless
+redemption is inapplicable because the asset is an NFT or transfers to
+Endaoment. If an applicable flag is disabled, repair and confirm it through the
+supported asset's normal governance path before continuing; do not retire first
+and plan to repair afterward. Zero-LTV assets do not require either debt-exit
+flag.
+
 Asset retirement is then two governed timelock actions, not one:
 
 1. Read the complete live `AssetConfig`. Through
@@ -361,7 +373,11 @@ Asset retirement is then two governed timelock actions, not one:
    deposit limits while setting both fixed reward allocations to zero.
 2. Execute the Bravo action and verify both fields are zero and the global
    staker/voter totals decreased by exactly the former allocations.
-3. Execute the existing `SwitchboardCharlie.deregisterAsset` action and verify
+3. Immediately before Charlie execution, read the complete `AssetConfig` again
+   and confirm both allocations are zero and every applicable asset-level exit
+   flag remains enabled. SwitchboardCharlie rejects retirement if any condition
+   fails.
+4. Execute the existing `SwitchboardCharlie.deregisterAsset` action and verify
    the asset is unsupported and the totals did not decrease a second time.
 
 Do not reconstruct the deposit tuple from defaults. If Bravo rejects the live
@@ -383,6 +399,23 @@ for the asset, or the asset is already unregistered from that vault, execution
 reverts `invalid vault asset`, emits no `VaultAssetDeregistered`, and leaves the
 action available for retry, cancellation, or expiry. Verify the vault balance
 is zero immediately before execution and verify vault support state afterward.
+
+Zero an asset's staker and voter allocations through Bravo before disabling
+any current vault ID in VaultBook. Bravo fail-closes on a dead current
+VaultBook row; Charlie can still checkpoint that ID with an explicit address,
+but that does not let Bravo write. Restore or repoint the book, then Bravo.
+
+On a live allocation change, MultiSend Charlie-pre → Bravo → Charlie-post
+for every initialized historical row. Charlie-post is required on a staker
+`0 ↔ nonzero` crossing. Same block is not enough if Bravo and Charlie are
+separate transactions and something else hits Lootbox in between. If there
+is no current initialized row, Charlie-init that row, then Bravo.
+
+Before repointing HQ `MISSION_CONTROL_ID`, either verify the incoming
+MissionControl's `totalPointsAllocs` and every asset allocation match the
+outgoing MissionControl, or checkpoint every initialized row in the same
+transaction as the swap. Otherwise the next touch accrues the new allocations
+across the entire pre-swap window.
 
 ## Historical inputs
 

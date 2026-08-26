@@ -4178,3 +4178,220 @@ def test_set_can_withdraw_on_new_mission_control(
 
     # Verify registered MC unchanged
     assert mission_control.genConfig().canWithdraw == original_can_withdraw
+
+
+def _reward_buckets(rewards):
+    return (
+        rewards.borrowers,
+        rewards.stakers,
+        rewards.voters,
+        rewards.genDepositors,
+    )
+
+
+def _expected_bucket_delta(distro, allocs):
+    total = sum(allocs)
+    return tuple(distro * alloc // total for alloc in allocs)
+
+
+def test_alpha_live_ripe_per_block_and_allocs_checkpoint_lootbox(
+    switchboard_alpha,
+    mission_control,
+    governance,
+    ledger,
+    lootbox,
+    teller,
+    setRipeRewardsConfig,
+):
+    old_rate = 10
+    new_rate = 1_000
+    old_allocs = (10_00, 20_00, 30_00, 40_00)
+    new_allocs = (40_00, 20_00, 20_00, 20_00)
+    setRipeRewardsConfig(True, old_rate, *old_allocs)
+
+    lootbox.updateRipeRewards(sender=teller.address)
+    rewards_before = ledger.ripeRewards()
+    global_before = ledger.globalDepositPoints()
+    points_before = (
+        global_before.lastUsdValue,
+        global_before.ripeStakerPoints,
+        global_before.ripeVotePoints,
+        global_before.ripeGenPoints,
+        global_before.lastUpdate,
+    )
+    buckets_before = _reward_buckets(rewards_before)
+
+    action_id = switchboard_alpha.setRipePerBlock(new_rate, sender=governance.address)
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    settled = ledger.ripeRewards()
+    assert settled.lastUpdate == boa.env.evm.patch.block_number
+    assert settled.lastUpdate > rewards_before.lastUpdate
+    elapsed = settled.lastUpdate - rewards_before.lastUpdate
+    assert _reward_buckets(settled) == tuple(
+        before + delta
+        for before, delta in zip(buckets_before, _expected_bucket_delta(elapsed * old_rate, old_allocs))
+    )
+    assert filter_logs(switchboard_alpha, "RipeRewardsPerBlockSet")[0].ripePerBlock == new_rate
+
+    later = 5
+    boa.env.time_travel(blocks=later)
+    lootbox.updateRipeRewards(sender=teller.address)
+    later_rewards = ledger.ripeRewards()
+    assert later_rewards.lastUpdate == boa.env.evm.patch.block_number
+    assert _reward_buckets(later_rewards) == tuple(
+        before + delta
+        for before, delta in zip(
+            _reward_buckets(settled),
+            _expected_bucket_delta(later * new_rate, old_allocs),
+        )
+    )
+
+    rewards_mid = later_rewards
+    action_id = switchboard_alpha.setRipeRewardsAllocs(
+        *new_allocs, sender=governance.address
+    )
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    alloc_settled = ledger.ripeRewards()
+    assert alloc_settled.lastUpdate == boa.env.evm.patch.block_number
+    assert alloc_settled.lastUpdate > rewards_mid.lastUpdate
+    alloc_elapsed = alloc_settled.lastUpdate - rewards_mid.lastUpdate
+    assert _reward_buckets(alloc_settled) == tuple(
+        before + delta
+        for before, delta in zip(
+            _reward_buckets(rewards_mid),
+            _expected_bucket_delta(alloc_elapsed * new_rate, old_allocs),
+        )
+    )
+    assert mission_control.rewardsConfig().borrowersAlloc == new_allocs[0]
+
+    later = 4
+    boa.env.time_travel(blocks=later)
+    lootbox.updateRipeRewards(sender=teller.address)
+    newest = ledger.ripeRewards()
+    assert _reward_buckets(newest) == tuple(
+        before + delta
+        for before, delta in zip(
+            _reward_buckets(alloc_settled),
+            _expected_bucket_delta(later * new_rate, new_allocs),
+        )
+    )
+    global_after = ledger.globalDepositPoints()
+    assert (
+        global_after.lastUsdValue,
+        global_after.ripeStakerPoints,
+        global_after.ripeVotePoints,
+        global_after.ripeGenPoints,
+        global_after.lastUpdate,
+    ) == points_before
+
+
+def test_alpha_points_and_autostake_writes_do_not_checkpoint(
+    switchboard_alpha,
+    mission_control,
+    governance,
+    ledger,
+    lootbox,
+    teller,
+):
+    lootbox.updateRipeRewards(sender=teller.address)
+    rewards_before = ledger.ripeRewards().lastUpdate
+
+    boa.env.time_travel(blocks=4)
+    assert switchboard_alpha.setRewardsPointsEnabled(False, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+    assert not mission_control.rewardsConfig().arePointsEnabled
+    assert switchboard_alpha.setRewardsPointsEnabled(True, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+
+    action_id = switchboard_alpha.setAutoStakeParams(
+        10_00, 20_00, 3, sender=governance.address
+    )
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+    config = mission_control.rewardsConfig()
+    assert config.autoStakeRatio == 10_00
+    assert config.autoStakeDurationRatio == 20_00
+    assert config.stabPoolRipePerDollarClaimed == 3
+
+
+def test_alpha_staged_target_does_not_checkpoint_ripe_rewards(
+    switchboard_alpha,
+    new_mission_control,
+    governance,
+    ledger,
+    lootbox,
+    teller,
+):
+    lootbox.updateRipeRewards(sender=teller.address)
+    rewards_before = ledger.ripeRewards().lastUpdate
+    action_id = switchboard_alpha.setRipePerBlock(
+        2_500,
+        new_mission_control.address,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+    assert new_mission_control.rewardsConfig().ripePerBlock == 2_500
+
+
+def test_alpha_live_ripe_per_block_fails_closed_when_lootbox_paused(
+    switchboard_alpha,
+    governance,
+    lootbox,
+):
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    action_id = switchboard_alpha.setRipePerBlock(750, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("contract paused"):
+        switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    lootbox.pause(False, sender=switchboard_alpha.address)
+
+
+def test_alpha_paused_zero_ripe_per_block_skips_settle_and_forfeits(
+    switchboard_alpha,
+    governance,
+    lootbox,
+    ledger,
+    teller,
+    mission_control,
+    setRipeRewardsConfig,
+):
+    rate = 9
+    setRipeRewardsConfig(True, rate, 10_00, 90_00, 0, 0)
+    lootbox.updateRipeRewards(sender=teller.address)
+    before = ledger.ripeRewards()
+    boa.env.time_travel(blocks=7)
+    lootbox.pause(True, sender=switchboard_alpha.address)
+
+    action_id = switchboard_alpha.setRipePerBlock(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert lootbox.isPaused()
+    assert mission_control.rewardsConfig().ripePerBlock == 0
+    assert ledger.ripeRewards().lastUpdate == before.lastUpdate
+
+    lootbox.pause(False, sender=switchboard_alpha.address)
+    checkpoint = lootbox.updateRipeRewards(sender=teller.address)
+    assert checkpoint.newRipeRewards == 0
+    assert ledger.ripeRewards().lastUpdate == boa.env.evm.patch.block_number
+
+
+def test_alpha_live_allocs_fail_closed_when_lootbox_paused(
+    switchboard_alpha,
+    governance,
+    lootbox,
+    setRipeRewardsConfig,
+):
+    setRipeRewardsConfig(True, 9, 10_00, 90_00, 0, 0)
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    action_id = switchboard_alpha.setRipeRewardsAllocs(
+        40_00, 20_00, 20_00, 20_00, sender=governance.address
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("contract paused"):
+        switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    lootbox.pause(False, sender=switchboard_alpha.address)

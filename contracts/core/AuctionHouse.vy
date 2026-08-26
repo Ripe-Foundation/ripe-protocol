@@ -49,7 +49,7 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
 
 interface MissionControl:
-    def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig: view
+    def getEffectiveAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> AuctionBuyConfig: view
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getGenAuctionParams() -> cs.AuctionParams: view
     def getGenLiqConfig() -> GenLiqConfig: view
@@ -71,9 +71,6 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
-interface GreenToken:
-    def mint(_to: address, _amount: uint256): nonpayable
-
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
@@ -83,6 +80,9 @@ interface Teller:
 interface UnderscoreVault:
     def convertToAssetsSafe(_shares: uint256) -> uint256: view
 
+interface GreenToken:
+    def mint(_to: address, _amount: uint256): nonpayable
+
 interface VaultRegistry:
     def isEarnVault(_vaultAddr: address) -> bool: view
 
@@ -90,10 +90,9 @@ interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
 
 struct AuctionBuyConfig:
-    canBuyInAuctionGeneral: bool
-    canBuyInAuctionAsset: bool
-    isUserAllowed: bool
+    canBuyInAuction: bool
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct UserBorrowTerms:
     collateralVal: uint256
@@ -1132,8 +1131,8 @@ def _buyFungibleAuction(
         return 0
 
     # check auction config
-    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getAuctionBuyConfig(_liqAsset, _recipient)
-    if not config.canBuyInAuctionGeneral or not config.canBuyInAuctionAsset or not config.isUserAllowed:
+    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getEffectiveAuctionBuyConfig(_liqAsset, _recipient, _shouldTransferBalance)
+    if not config.canBuyInAuction:
         return 0
 
     # make sure caller can deposit to recipient
@@ -1173,7 +1172,7 @@ def _buyFungibleAuction(
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _recipient, _liqVaultId, liqVaultAddr, _liqAsset, _shouldTransferBalance, maxCollateralUsdValue, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _recipient, _liqVaultId, liqVaultAddr, _liqAsset, config.shouldTransferBalance, maxCollateralUsdValue, _a)
     if collateralUsdValueSent == 0:
         return 0
 
@@ -1224,16 +1223,19 @@ def withdrawTokensFromVault(
     assert msg.sender == addys._getDeleverageAddr() # dev: only deleverage allowed
     totalAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset)
     withdrawableAmount: uint256 = min(_amount, totalAmount)
-    # Compare the capped request, not the whole position: a one-unit residual
+
+    # compare the capped request, not the whole position: a one-unit residual
     # quote can be zero-value even when the user owns a larger balance.
     if withdrawableAmount <= _maxZeroValueAmount:
         return 0, False
+
     if _preflightSafeConversion:
-        # Mirror BasicVault's user-ledger and token-balance clamps up front; Deleverage
+        # mirror basic vault's user-ledger and token-balance clamps up front; deleverage
         # still asserts post-withdraw consistency for anything outside these bounds.
         withdrawableAmount = min(withdrawableAmount, staticcall IERC20(_asset).balanceOf(_vaultAddr))
         if withdrawableAmount <= _maxZeroValueAmount or staticcall UnderscoreVault(_asset).convertToAssetsSafe(withdrawableAmount) == 0:
             return 0, False
+
     return extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
 
 
@@ -1260,7 +1262,8 @@ def _transferCollateral(
             maxAssetAmount = staticcall IERC4626(_a.savingsGreen).convertToShares(_targetUsdValue)
         elif _asset != _a.greenToken:
             maxAssetAmount = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
-    # Skip when the maximum expected outflow produces zero creditable USD under the current quote.
+
+    # skip when the maximum expected outflow produces zero creditable USD under the current quote.
     # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
     if maxAssetAmount == 0 or userAmount <= unsafe_sub(maxAssetAmount, 1) // _targetUsdValue:
         return 0, 0, False, True
@@ -1274,15 +1277,18 @@ def _transferCollateral(
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
     assert amountSent <= maxAssetAmount # dev: outflow
     usdValue: uint256 = self._getUsdValue(_asset, amountSent, _a)
-    # Bytecode: range(2)+break beats two unrolled checkpoints. Post-mutation, sender
+
+    # bytecode: range(2)+break beats two unrolled checkpoints. post-mutation, sender
     # first so lastBalance writes the live share (else stale), then in-vault recipient.
     if amountSent != 0:
-        # PriceDesk deliberately floors nonzero dust to one USD wei, so bind the
+
+        # price desk deliberately floors nonzero dust to one USD wei, so bind the
         # post-transfer amount to the inverse quote instead of trusting that floor.
         assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: amounts do not match up
         assert usdValue != 0 # dev: amounts do not match up
         assert usdValue <= _targetUsdValue # dev: amounts do not match up
-        # Preserve full-quote semantics for the exact one-wei inverse/forward
+
+        # preserve full-quote semantics for the exact one-wei inverse/forward
         # rounding loss. A short delivery always keeps its actual forward value.
         if usdValue == unsafe_sub(_targetUsdValue, convert(amountSent == maxAssetAmount, uint256)):
             usdValue = _targetUsdValue

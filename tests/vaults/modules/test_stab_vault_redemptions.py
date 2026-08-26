@@ -2253,7 +2253,7 @@ def test_stab_vault_redemptions_meaningful_live_residual_stays_listed(
     green_token,
     whale,
 ):
-    """A live-share leftover below $0.02 stays listed when it is not microscopic."""
+    """A live-share leftover below $0.05 stays listed when it is not microscopic."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -2282,7 +2282,7 @@ def test_stab_vault_redemptions_meaningful_live_residual_stays_listed(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Redeem $0.29, leaving $0.01 — below $0.02, but well above P // 10**10.
+    # Redeem $0.29, leaving $0.01 — below $0.05, but well above P // 10**10.
     redeem_amount = 29 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
@@ -2313,7 +2313,7 @@ def test_stab_vault_redemptions_no_dust_removal_above_threshold(
     green_token,
     whale,
 ):
-    """Test that claimable asset stays active at or above $0.02."""
+    """Test that claimable asset stays active at or above the $0.05 retention floor."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -2368,7 +2368,7 @@ def test_stab_vault_redemptions_dust_balance_preserved(
     green_token,
     whale,
 ):
-    """Claim and total balances stay intact after a live-share sub-$0.02 residual."""
+    """Claim and total balances stay intact after a live-share sub-$0.05 residual."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 

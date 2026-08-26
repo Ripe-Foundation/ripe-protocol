@@ -537,9 +537,9 @@ def test_ah_auction_buy_config_restrictions(
     """Test auction buy config restrictions
     
     This tests:
-    - canBuyInAuctionGeneral restrictions (via setGeneralConfig)
-    - canBuyInAuctionAsset restrictions (via setAssetConfig)
-    - isUserAllowed restrictions (via whitelist)
+    - general auction restrictions (via setGeneralConfig)
+    - asset auction restrictions (via setAssetConfig)
+    - recipient whitelist restrictions
     - Graceful failure when restrictions are violated
     """
     

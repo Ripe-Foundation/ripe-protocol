@@ -334,7 +334,7 @@ def test_g10_prune_identity_unpaused_and_paused(
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
     assert stability_pool.getClaimAssetState(alpha_token, charlie_token) == CLAIM_ASSET_ACTIVE
 
-    # Exact $0.02 stays; band below $0.10 stays; below $0.02 dust-prunes (reason 2).
+    # Exact $0.05 stays; band below $0.10 stays; below $0.05 dust-prunes (reason 2).
     retention_px = (RETENTION_THRESHOLD * EIGHTEEN_DECIMALS + bravo_amt - 1) // bravo_amt
     band_px = ((RETENTION_THRESHOLD + 10**16) * EIGHTEEN_DECIMALS + bravo_amt - 1) // bravo_amt
     dust_px = (RETENTION_THRESHOLD - 1) * EIGHTEEN_DECIMALS // bravo_amt
@@ -1479,7 +1479,7 @@ def test_g10_partial_claim_then_deposit_does_not_capture(
 
     Attack claims at a wrong-low quote so implied remaining USD is dust
     (old `_claimFromStabilityPool` would unlist). Control claims the same
-    token sliver at a non-unlisting quote (remaining USD at or above $0.02).
+    token sliver at a non-unlisting quote (remaining USD at or above $0.05).
     A pre-claim stab donation on the control arm (no shares minted) equalizes
     valueToShares. After the claim, the attack arm receives the same
     25-stab top-up so pool stab custody matches. Alice then deposits,
@@ -1493,8 +1493,8 @@ def test_g10_partial_claim_then_deposit_does_not_capture(
 
     claim_tokens = 10**16
     pile = 11 * EIGHTEEN_DECIMALS + claim_tokens
-    attack_price = 16 * 10**14
-    control_price = 2 * 10**15
+    attack_price = 4 * 10**15
+    control_price = 5 * 10**15
     seed = 100 * EIGHTEEN_DECIMALS
     control_donate = 25 * EIGHTEEN_DECIMALS
     target_tokens = 9999999999950000
@@ -1730,7 +1730,7 @@ def test_g10_swap_with_claimable_green_meaningful_residual_stays_listed(
     green_token,
     savings_green,
 ):
-    """A leftover just under $0.02 is meaningful, not microscopic, while shares remain."""
+    """A leftover just under $0.05 is meaningful, not microscopic, while shares remain."""
     pair_amount = _seed_green_claim(
         stability_pool, alpha_token, alpha_token_whale, bob, teller,
         mock_price_source, green_token, savings_green, whale, auction_house,

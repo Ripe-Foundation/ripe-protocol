@@ -1210,7 +1210,7 @@ def test_activate_capacity_ordering_decides_who_takes_the_last_slot(
         assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 20
 
-    # Freeing a slot: one occupier falls below $0.02 and is pruned unpaused.
+    # Freeing a slot: one occupier falls below $0.05 and is pruned unpaused.
     mock_price_source.setPrice(occupiers[0], 10**15)
     stability_pool.pruneClaimableAssets(alpha_token, [occupiers[0]],
                                         sender=sally)
