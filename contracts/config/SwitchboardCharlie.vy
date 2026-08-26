@@ -11,6 +11,7 @@
 #      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
+# pragma optimize codesize
 
 exports: gov.__interface__
 exports: timeLock.__interface__
@@ -898,7 +899,6 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
 def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert empty(address) not in [_asset, _vaultAddr] # dev: invalid parameters
-    assert _vaultId != 0 # dev: invalid vault id
     assert _vaultAddr.is_contract # dev: invalid vault
 
     vaultBook: address = self._getVaultBookAddr()
