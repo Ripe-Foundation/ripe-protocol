@@ -241,7 +241,7 @@ def _redeemCollateral(
     # max asset amount to take from user
     maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, False)
 
-    # Skip expected zero-credit positions before vault mutation. A later
+    # skip expected zero-credit positions before vault mutation. a later
     # post-transfer zero repayment is an unexpected under-send and reverts.
     # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
     if maxAssetAmount == 0 or userAmount <= unsafe_sub(maxAssetAmount, 1) // maxRedeemValue:
@@ -252,16 +252,19 @@ def _redeemCollateral(
     assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
     if amountSent == 0:
         return 0
-    # PriceDesk floors nonzero dust to one USD wei; enforce the inverse quote's
+
+    # price desk floors nonzero dust to one USD wei; enforce the inverse quote's
     # minimum creditable delivery so a vault under-send still reverts atomically.
     assert amountSent > unsafe_sub(maxAssetAmount, 1) // maxRedeemValue # dev: zero repayment value (vault under-send)
 
     deliveredValue: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, False)
     assert deliveredValue != 0 # dev: zero repayment value (vault under-send)
-    # A one-wei inverse/forward loss is exact only when the complete quote was
+
+    # a one-wei inverse/forward loss is exact only when the complete quote was
     # delivered. A genuinely short vault delivery keeps its actual value.
     if amountSent == maxAssetAmount and deliveredValue == unsafe_sub(maxRedeemValue, 1):
         deliveredValue = maxRedeemValue
+
     repayValue: uint256 = min(min(deliveredValue, maxRedeemValue), userDebt.amount)
     assert repayValue != 0 # dev: zero repayment value (vault under-send)
     assert extcall GreenToken(_a.greenToken).burn(repayValue) # dev: could not burn green
