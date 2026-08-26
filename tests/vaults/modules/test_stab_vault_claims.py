@@ -14,6 +14,7 @@ from conf_utils import (
 
 ARB_SYS = to_checksum_address("0x0000000000000000000000000000000000000064")
 LEDGER_ID = 4
+FULL_EXIT_TOLERANCE_USD = 2 * 10**16
 
 
 def _replace_ledger_with_arb_source(
@@ -401,7 +402,7 @@ def test_stab_claim_coarse_full_quote_preserves_unpaid_share_value(
     assert not log.isDepleted
 
 
-def test_stab_claim_retains_three_cent_shortfall_above_retention(
+def test_stab_claim_retains_three_cent_shortfall_above_full_exit_tolerance(
     governance,
     stability_pool,
     alpha_token,
@@ -468,6 +469,92 @@ def test_stab_claim_retains_three_cent_shortfall_above_retention(
     assert stability_pool.getTotalUserValue(bob, alpha_token) == 3 * 10**16
     log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
     assert not log.isDepleted
+
+
+@pytest.mark.parametrize(
+    ("shortfall", "expect_full_exit"),
+    (
+        (FULL_EXIT_TOLERANCE_USD - 1, True),
+        (FULL_EXIT_TOLERANCE_USD, False),
+    ),
+    ids=("one-wei-below-tolerance", "at-tolerance"),
+)
+def test_stab_claim_full_exit_tolerance_boundary(
+    shortfall,
+    expect_full_exit,
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Full Exit Tolerance Boundary",
+        "FETB",
+        2,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    claim_unit_usd = 4 * 10**16
+    mock_price_source.setPrice(coarse_token, 4 * EIGHTEEN_DECIMALS)
+
+    bob_deposit = claim_unit_usd + shortfall
+    total_deposit = 3 * claim_unit_usd
+    alice_deposit = total_deposit - bob_deposit
+    alpha_token.transfer(stability_pool, bob_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        bob_deposit,
+        sender=teller.address,
+    )
+    alpha_token.transfer(stability_pool, alice_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        alice,
+        alpha_token,
+        alice_deposit,
+        sender=teller.address,
+    )
+    coarse_token.transfer(stability_pool, 3, sender=governance.address)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        total_deposit,
+        coarse_token,
+        3,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    claimed_value = claim_from_stability_pool(
+        teller,
+        vault_book.getRegId(stability_pool),
+        alpha_token,
+        coarse_token,
+        sender=bob,
+    )
+
+    assert claimed_value == claim_unit_usd
+    assert (stability_pool.userBalances(bob, alpha_token) == 0) is expect_full_exit
+    log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
+    assert log.isDepleted is expect_full_exit
+    if not expect_full_exit:
+        assert stability_pool.getTotalUserValue(bob, alpha_token) == shortfall
 
 
 def test_stability_claim_checkpoints_deposit_points_after_share_burn(
@@ -4223,7 +4310,7 @@ def test_stab_vault_claims_auto_deposit_with_delegation(
 #################################
 
 
-DUST_USD_THRESHOLD = 2 * 10 ** 16  # $0.02 in 18-decimal USD
+DUST_USD_THRESHOLD = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 CLAIM_ASSET_ACTIVE = 2
 
 

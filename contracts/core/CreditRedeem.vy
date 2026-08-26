@@ -42,6 +42,7 @@ interface CreditEngine:
 
 interface MissionControl:
     def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
+    def indexOfAsset(_asset: address) -> uint256: view
     def preferredStabVaultId() -> uint256: view
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
@@ -247,6 +248,10 @@ def _redeemCollateral(
     # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
     if maxAssetAmount == 0 or userAmount <= unsafe_sub(maxAssetAmount, 1) // maxRedeemValue:
         return 0
+
+    # Unsupported collateral is exit-only: never open a recipient vault row.
+    if staticcall MissionControl(_a.missionControl).indexOfAsset(_asset) == 0:
+        _shouldTransferBalance = False
 
     # withdraw or transfer balance to redeemer
     amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(_shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)

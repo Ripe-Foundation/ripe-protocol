@@ -21,7 +21,7 @@ from test_stab_vault_hardening import (
 pytestmark = pytest.mark.fuzz
 
 
-RETENTION_THRESHOLD = 2 * 10**16
+RETENTION_THRESHOLD = 5 * 10**16
 LIVE_RESIDUAL_DIVISOR = 10**10
 NUM_FUZZ_CLAIM_ASSETS = 4
 PROLOGUE_TOKEN_INDEX = NUM_FUZZ_CLAIM_ASSETS

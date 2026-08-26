@@ -44,6 +44,9 @@ interface MissionControl:
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
 
+interface MissionControlAssetConfigHead:
+    def assetConfig(_asset: address) -> (uint256, uint256, uint256, uint256): view
+
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
@@ -434,6 +437,9 @@ def _isValidAssetDepositParams(
         if not hasStakerVault:
             return False
 
+    if _missionControl == self._getMissionControlAddr():
+        storedConfigHead: (uint256, uint256, uint256, uint256) = staticcall MissionControlAssetConfigHead(_missionControl).assetConfig(_asset)
+        return _stakersPointsAlloc == storedConfigHead[2] and _voterPointsAlloc == storedConfigHead[3]
     return True
 
 

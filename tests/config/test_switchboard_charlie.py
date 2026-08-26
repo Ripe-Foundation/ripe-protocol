@@ -2048,7 +2048,7 @@ def test_flag_setter_enable_disable_permissions(switchboard_bravo, switchboard_c
     """Test enable/disable permissions for asset flags"""
     # Add an asset first (need to execute it) - use valid config
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False,  # shouldBurnAsPayment
         False,  # shouldTransferToEndaoment
@@ -2086,7 +2086,7 @@ def test_flag_setter_asset_enable_disable_flags(switchboard_bravo, switchboard_c
     """Test asset enable/disable flag functions"""
     # First add the asset with canDeposit=False to test enabling
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False, False, False, True, False, True, False, True, True, True, 0,  # canDeposit=False
         sender=governance.address
@@ -2115,7 +2115,7 @@ def test_flag_setter_all_asset_enable_disable_functions(switchboard_bravo, switc
     """Test all asset enable/disable functions"""
     # First add the asset with varied initial states to avoid "already set" errors
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False, False, False, True, True, False, False, False, False, False, 0,  # varied states
         sender=governance.address
@@ -2143,7 +2143,7 @@ def test_flag_setter_validation_redeem_collateral(switchboard_bravo, switchboard
     """Test special validation for redeem collateral flag"""
     # Add asset with no LTV (cannot redeem collateral)
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 80_00, 0, 0, 0),  # zero LTV
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
@@ -2160,7 +2160,7 @@ def test_flag_setter_permission_can_disable_logic(switchboard_bravo, switchboard
     """Test permission logic for users with canDisable permission"""
     # First add the asset
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
@@ -2184,7 +2184,7 @@ def test_flag_setter_enable_redeem_collateral_validation(switchboard_bravo, swit
     """Test special validation for enabling redeem collateral flag"""
     # Add asset with LTV so we can test enabling redeem collateral
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),  # with LTV
         False, False, True, True, True, True, False, True, True, True, 0,  # canRedeemCollateral=False
         sender=governance.address
@@ -2200,7 +2200,7 @@ def test_flag_setter_endaoment_transfer_restrictions(switchboard_bravo, switchbo
     """Test endaoment transfer restrictions for stable assets"""
     # Add asset with shouldTransferToEndaoment=True
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),  # with LTV
         False,  # shouldBurnAsPayment
         True,   # shouldTransferToEndaoment
@@ -2365,7 +2365,7 @@ def test_resolve_mission_control_validation_charlie(
     """Test that passing current MC address reverts with proper message on flag setters"""
     # First add asset to the registered MC (using default/empty _missionControl)
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
@@ -2528,7 +2528,7 @@ def test_deregister_asset_creates_timelock(
     """Test deregisterAsset creates timelock action correctly"""
     # First add the asset
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
@@ -2724,7 +2724,7 @@ def test_deregister_asset_on_new_mission_control(
     assert not new_mission_control.isSupportedAsset(bravo_token.address)
 
 
-def test_deregister_asset_two_step_retry_and_reregistration(
+def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
     switchboard_bravo,
     switchboard_charlie,
     governance,
@@ -2734,11 +2734,11 @@ def test_deregister_asset_two_step_retry_and_reregistration(
     add_action = switchboard_bravo.addAsset(
         alpha_token.address,
         [1],
-        50_00,
-        30_00,
+        0,
+        0,
         1_000,
         10_000,
-        100,
+        0,
         (0, 0, 0, 0, 0, 0),
         False,
         False,
@@ -2751,9 +2751,6 @@ def test_deregister_asset_two_step_retry_and_reregistration(
         True,
         True,
         0,
-        (False, 0, 0, 0, 0),
-        ZERO_ADDRESS,
-        False,
         sender=governance.address,
     )
     _advance_to_confirmation(switchboard_bravo, add_action)
@@ -2762,166 +2759,43 @@ def test_deregister_asset_two_step_retry_and_reregistration(
         sender=governance.address,
     )
 
-    config_before = mission_control.assetConfig(alpha_token.address)
+    nonzero_config = list(mission_control.assetConfig(alpha_token.address))
+    nonzero_config[1] = 25_00
+    nonzero_config[2] = 15_00
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        nonzero_config,
+        sender=switchboard_bravo.address,
+    )
+    live_before = mission_control.assetConfig(alpha_token.address)
     totals_before = mission_control.totalPointsAllocs()
     deregister_action = switchboard_charlie.deregisterAsset(
         alpha_token.address,
         sender=governance.address,
     )
-    zero_action = switchboard_bravo.setAssetDepositParams(
-        alpha_token.address,
-        list(config_before.vaultIds),
-        0,
-        0,
-        config_before.perUserDepositLimit,
-        config_before.globalDepositLimit,
-        config_before.minDepositBalance,
-        sender=governance.address,
-    )
 
-    assert switchboard_charlie.actionType(deregister_action) == 1024  # ActionType.DEREGISTER_ASSET
-    assert switchboard_charlie.pendingDeregisterAsset(deregister_action) == alpha_token.address
-    assert switchboard_charlie.pendingMissionControl(
-        deregister_action
-    ) == mission_control.address
-    assert switchboard_charlie.hasPendingAction(deregister_action)
-    confirmation_before = switchboard_charlie.getActionConfirmationBlock(
-        deregister_action
-    )
+    with boa.reverts("invalid asset deposit params"):
+        switchboard_bravo.setAssetDepositParams(
+            alpha_token.address,
+            list(live_before.vaultIds),
+            0,
+            0,
+            live_before.perUserDepositLimit,
+            live_before.globalDepositLimit,
+            live_before.minDepositBalance,
+            sender=governance.address,
+        )
 
-    confirmation_block = max(
-        confirmation_before,
-        switchboard_bravo.getActionConfirmationBlock(zero_action),
-    )
-    current_block = boa.env.evm.patch.block_number
-    if current_block < confirmation_block:
-        boa.env.time_travel(blocks=confirmation_block - current_block)
-    assert boa.env.evm.patch.block_number < (
-        confirmation_before + switchboard_charlie.expiration()
-    )
-
-    deregistered_logs_before = filter_logs(
-        switchboard_charlie,
-        "AssetDeregistered",
-    )
-    assert deregistered_logs_before == []
+    _advance_to_confirmation(switchboard_charlie, deregister_action)
     with boa.reverts("active points alloc"):
         switchboard_charlie.executePendingAction(
             deregister_action,
             sender=governance.address,
         )
-
     assert mission_control.isSupportedAsset(alpha_token.address)
-    assert mission_control.assetConfig(alpha_token.address) == config_before
+    assert mission_control.assetConfig(alpha_token.address) == live_before
     assert mission_control.totalPointsAllocs() == totals_before
-    assert filter_logs(
-        switchboard_charlie,
-        "AssetDeregistered",
-    ) == deregistered_logs_before
     assert switchboard_charlie.hasPendingAction(deregister_action)
-    assert switchboard_charlie.getActionConfirmationBlock(
-        deregister_action
-    ) == confirmation_before
-    assert switchboard_charlie.actionType(deregister_action) == 1024  # ActionType.DEREGISTER_ASSET
-    assert switchboard_charlie.pendingDeregisterAsset(deregister_action) == alpha_token.address
-    assert switchboard_charlie.pendingMissionControl(
-        deregister_action
-    ) == mission_control.address
-
-    assert switchboard_bravo.executePendingAction(
-        zero_action,
-        sender=governance.address,
-    )
-    zeroed_config = mission_control.assetConfig(alpha_token.address)
-    totals_after_zeroing = mission_control.totalPointsAllocs()
-    assert list(zeroed_config.vaultIds) == list(config_before.vaultIds)
-    assert zeroed_config.perUserDepositLimit == config_before.perUserDepositLimit
-    assert zeroed_config.globalDepositLimit == config_before.globalDepositLimit
-    assert zeroed_config.minDepositBalance == config_before.minDepositBalance
-    assert zeroed_config.stakersPointsAlloc == 0
-    assert zeroed_config.voterPointsAlloc == 0
-    for index in [0] + list(range(3, 21)):
-        assert zeroed_config[index] == config_before[index]
-    assert totals_after_zeroing.stakersPointsAllocTotal == (
-        totals_before.stakersPointsAllocTotal - config_before.stakersPointsAlloc
-    )
-    assert totals_after_zeroing.voterPointsAllocTotal == (
-        totals_before.voterPointsAllocTotal - config_before.voterPointsAlloc
-    )
-
-    assert switchboard_charlie.executePendingAction(
-        deregister_action,
-        sender=governance.address,
-    )
-    assert not mission_control.isSupportedAsset(alpha_token.address)
-    assert mission_control.assetConfig(alpha_token.address) == zeroed_config
-    assert mission_control.totalPointsAllocs() == totals_after_zeroing
-
-    with boa.reverts("invalid asset"):
-        switchboard_bravo.setAssetDepositParams(
-            alpha_token.address,
-            list(zeroed_config.vaultIds),
-            0,
-            0,
-            zeroed_config.perUserDepositLimit,
-            zeroed_config.globalDepositLimit,
-            zeroed_config.minDepositBalance,
-            sender=governance.address,
-        )
-
-    reregistered_config = (
-        [1],
-        25_00,
-        15_00,
-        2_000,
-        20_000,
-        100,
-        (40_00, 50_00, 60_00, 10_00, 5_00, 1_00),
-        False,
-        False,
-        True,
-        True,
-        True,
-        False,
-        True,
-        False,
-        True,
-        False,
-        0,
-        (True, 10_00, 50_00, 10, 1_000),
-        ZERO_ADDRESS,
-        False,
-    )
-    readd_action = switchboard_bravo.addAsset(
-        alpha_token.address,
-        *reregistered_config,
-        sender=governance.address,
-    )
-    _advance_to_confirmation(switchboard_bravo, readd_action)
-    assert switchboard_bravo.executePendingAction(
-        readd_action,
-        sender=governance.address,
-    )
-
-    config_after_readd = mission_control.assetConfig(alpha_token.address)
-    totals_after_readd = mission_control.totalPointsAllocs()
-    assert mission_control.isSupportedAsset(alpha_token.address)
-    assert config_after_readd != zeroed_config
-    assert mission_control.getNumAssets() == 1
-    assert mission_control.assets(1) == alpha_token.address
-    assert list(config_after_readd.vaultIds) == reregistered_config[0]
-    assert tuple(config_after_readd.debtTerms) == reregistered_config[6]
-    assert tuple(config_after_readd.customAuctionParams) == reregistered_config[18]
-    for index in list(range(1, 6)) + list(range(7, 18)) + [19, 20]:
-        assert config_after_readd[index] == reregistered_config[index]
-    assert totals_after_readd.stakersPointsAllocTotal == (
-        totals_after_zeroing.stakersPointsAllocTotal
-        + config_after_readd.stakersPointsAlloc
-    )
-    assert totals_after_readd.voterPointsAllocTotal == (
-        totals_after_zeroing.voterPointsAllocTotal
-        + config_after_readd.voterPointsAlloc
-    )
 
 
 def test_deregister_asset_rechecks_points_allocs_at_execution(
@@ -2959,45 +2833,30 @@ def test_deregister_asset_rechecks_points_allocs_at_execution(
         sender=governance.address,
     )
 
-    config_before = mission_control.assetConfig(bravo_token.address)
     deregister_action = switchboard_charlie.deregisterAsset(
         bravo_token.address,
         sender=governance.address,
     )
-    drift_action = switchboard_bravo.setAssetDepositParams(
+    drifted_config = list(mission_control.assetConfig(bravo_token.address))
+    drifted_config[1] = 40_00
+    drifted_config[2] = 10_00
+    mission_control.setAssetConfig(
         bravo_token.address,
-        list(config_before.vaultIds),
-        40_00,
-        10_00,
-        config_before.perUserDepositLimit,
-        config_before.globalDepositLimit,
-        config_before.minDepositBalance,
-        sender=governance.address,
+        drifted_config,
+        sender=switchboard_bravo.address,
     )
-    confirmation_block = max(
-        switchboard_charlie.getActionConfirmationBlock(deregister_action),
-        switchboard_bravo.getActionConfirmationBlock(drift_action),
-    )
-    current_block = boa.env.evm.patch.block_number
-    if current_block < confirmation_block:
-        boa.env.time_travel(blocks=confirmation_block - current_block)
+    live_before = mission_control.assetConfig(bravo_token.address)
+    totals_before = mission_control.totalPointsAllocs()
 
-    assert switchboard_bravo.executePendingAction(
-        drift_action,
-        sender=governance.address,
-    )
-    drifted_config = mission_control.assetConfig(bravo_token.address)
-    totals_after_drift = mission_control.totalPointsAllocs()
-    assert drifted_config.stakersPointsAlloc == 40_00
-    assert drifted_config.voterPointsAlloc == 10_00
+    _advance_to_confirmation(switchboard_charlie, deregister_action)
     with boa.reverts("active points alloc"):
         switchboard_charlie.executePendingAction(
             deregister_action,
             sender=governance.address,
         )
     assert mission_control.isSupportedAsset(bravo_token.address)
-    assert mission_control.assetConfig(bravo_token.address) == drifted_config
-    assert mission_control.totalPointsAllocs() == totals_after_drift
+    assert mission_control.assetConfig(bravo_token.address) == live_before
+    assert mission_control.totalPointsAllocs() == totals_before
     assert switchboard_charlie.hasPendingAction(deregister_action)
 
 

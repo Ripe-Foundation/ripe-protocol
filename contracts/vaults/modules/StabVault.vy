@@ -122,7 +122,8 @@ MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
-RETENTION_USD_THRESHOLD: constant(uint256) = 2 * 10 ** 16  # $0.02 in 18-decimal USD
+FULL_EXIT_TOLERANCE_USD: constant(uint256) = 2 * 10 ** 16  # $0.02 in 18-decimal USD
+RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 # Live residual delisting is bounded to R <= P // 10**10. This caps omitted
 # membership to one ten-billionth of the prior per-cohort pair. A correctly
 # priced $100M pair implies at most approximately $0.01 of omitted residual.
@@ -888,12 +889,12 @@ def _calcClaimSharesAndAmount(
         claimUsdValue = min(claimUsdValue, _maxUsdValue)
 
     # Preserve the full-position exit when inverse/forward rounding leaves a
-    # sub-retention residual. Larger coarse-asset gaps must leave the
+    # sub-tolerance residual. Larger coarse-asset gaps must leave the
     # corresponding shares intact.
     if (
         _maxUsdValue >= maxClaimUsdValue
         and maxClaimAmount <= totalClaimAsset
-        and maxClaimUsdValue - claimUsdValue < RETENTION_USD_THRESHOLD
+        and maxClaimUsdValue - claimUsdValue < FULL_EXIT_TOLERANCE_USD
     ):
         return maxUserShares, claimAmount, claimUsdValue
 
@@ -1490,7 +1491,7 @@ def _reduceClaimableBalances(
         return
 
     # Dust-delist only when remaining USD is a priced value below RETENTION
-    # $0.02. Zero/unavailable USD is never dust. An empty cohort may
+    # $0.05. Zero/unavailable USD is never dust. An empty cohort may
     # dust-deactivate any such residual; a live cohort may only when the
     # leftover is microscopic: R <= P // LIVE_RESIDUAL_DIVISOR.
     if (

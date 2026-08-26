@@ -10,34 +10,36 @@ EIP170_LIMIT = 24_576
 # RipeGov headroom is 460 bytes after the migration, SharesVault, and
 # governance-remediation changes. Any RipeGov edit must remeasure this pin.
 # Composed SwitchboardAlpha headroom is 14 bytes after binding its chain-local
-# Pyth source ID. Teller and CreditEngine retain 24 and 16 bytes respectively at
+# Pyth source ID. Teller and CreditEngine retain 24 and 15 bytes respectively at
 # this head. Endaoment retains 1,190 bytes after binding its chain-local Curve
 # source ID. These pins include the deployed immutable data.
-# Lootbox headroom is 41 bytes at the pinned 24,535-byte deployed runtime
-# after the dedicated Ledger global-deposit settle selector. Any Lootbox
+# Lootbox headroom is 120 bytes at the pinned 24,456-byte deployed runtime
+# after removing the non-shippable global-deposit settle selector. Any Lootbox
 # edit, however small, must recompile and remeasure this pin before merge;
 # its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
-# MissionControl 17,862 / Ledger 13,862 after dropping the vault-identity
-# guard and narrowing the paused-Lootbox exemption. DefaultsLocal is
+# MissionControl 16,222 / Ledger 13,306 after removing reward-settle
+# orchestration and restoring Ledger to its deployable interface. DefaultsLocal is
 # 1,200 bytes (points enabled to match production).
 # StabilityPool headroom is 242 bytes after the actual-delivery claim,
-# retention-threshold final-exit tolerance, and
+# separate $0.02 full-exit tolerance and $0.05 retention threshold, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
 # and partial-reservation admission remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
-# SwitchboardBravo retains 399 bytes of headroom after the dedicated GREEN
-# reference-pool keeper wrapper. AuctionHouse and Deleverage retain 5 and
-# 39 bytes respectively. CurvePrices retains 1,170 bytes after switching
+# SwitchboardBravo retains 269 bytes of headroom after the live-allocation
+# freeze. CreditRedeem retains 15,983 bytes after forcing external delivery for
+# unsupported redemptions. AuctionHouse and Deleverage retain 5 and 39 bytes
+# respectively; the attempted AuctionBuyConfig guard reached the EIP-170 ceiling
+# and was not retained. CurvePrices retains 1,170 bytes after switching
 # to codesize optimization for confirmation-time registry snapshot checks.
 # UndyVaultPrices retains 6,270 bytes after confirmation-time metadata
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 17862,
+    "MissionControl": 16222,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24562,
-    "SwitchboardBravo": 24177,
+    "SwitchboardBravo": 24307,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
@@ -45,8 +47,8 @@ EXPECTED_RUNTIME_BYTES = {
     "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,
-    "Ledger": 13862,
-    "Lootbox": 24535,
+    "Ledger": 13306,
+    "Lootbox": 24456,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
     "RipeToken": 8760,
@@ -54,8 +56,8 @@ EXPECTED_RUNTIME_BYTES = {
     "RipeGov": 24116,
     "HumanResources": 14932,
     "AuctionHouse": 24571,
-    "CreditEngine": 24560,
-    "CreditRedeem": 8523,
+    "CreditEngine": 24561,
+    "CreditRedeem": 8593,
     "Endaoment": 23386,
     "PriceDesk": 17742,
     "Deleverage": 24537,

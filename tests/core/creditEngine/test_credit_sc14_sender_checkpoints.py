@@ -271,6 +271,84 @@ def test_sc14_redeem_withdrawal_does_not_credit_external_recipient(
     assert ledger.assetDepositPoints(vault_id, alpha_token).lastBalance < asset_before
 
 
+def test_deregistered_redeem_forces_external_delivery(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    setRipeRewardsConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+):
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    _make_redeemable(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        setRipeRewardsConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        deposit_amount,
+        100 * EIGHTEEN_DECIMALS,
+        70 * EIGHTEEN_DECIMALS // 100,
+        enable_rewards=False,
+    )
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    assert mission_control.deregisterAsset(
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.indexOfAsset(alpha_token) == 0
+    assert not ledger.isParticipatingInVault(alice, vault_id)
+
+    payment = 10 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    before = (
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        ledger.isParticipatingInVault(alice, vault_id),
+        ledger.userDepositPoints(alice, vault_id, alpha_token),
+        green_token.balanceOf(alice),
+    )
+
+    assert _redeem(
+        teller,
+        bob,
+        vault_id,
+        alpha_token,
+        payment,
+        alice,
+        True,
+    ) > 0
+    assert alpha_token.balanceOf(alice) > before[0]
+    assert simple_erc20_vault.userBalances(bob, alpha_token) < before[1]
+    assert simple_erc20_vault.userBalances(alice, alpha_token) == 0
+    assert not ledger.isParticipatingInVault(alice, vault_id)
+    recipient_points = ledger.userDepositPoints(alice, vault_id, alpha_token)
+    assert recipient_points.lastBalance == 0
+    assert recipient_points.balancePoints == 0
+
+
 def test_sc14_redeem_same_block_repeated_operations(
     setGeneralConfig,
     setAssetConfig,

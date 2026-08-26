@@ -16,7 +16,7 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
 ACTIVATION_THRESHOLD = 10 * 10**16   # $0.10
-RETENTION_THRESHOLD = 2 * 10**16     # $0.02
+RETENTION_THRESHOLD = 5 * 10**16     # $0.05
 CLAIM_ASSET_ABSENT = 0
 CLAIM_ASSET_DORMANT = 1
 CLAIM_ASSET_ACTIVE = 2
@@ -133,7 +133,7 @@ def test_prune_does_not_reenable_share_actions_while_claim_custody_is_still_shor
     ledger_before = _claim_ledger(stability_pool, alpha_token, bravo_token)
     bob_shares_before = stability_pool.userBalances(bob, alpha_token)
 
-    # Ordinary EOA prunes at a valid nonzero quote below $0.02.
+    # Ordinary EOA prunes at a valid nonzero quote below $0.05.
     # 10e18 bravo * $0.001 = $0.01 < RETENTION.
     mock_price_source.setPrice(bravo_token, 10**15)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token],
@@ -1245,7 +1245,7 @@ def test_prune_retention_band_and_paused_call_are_independent_of_pause(
     green_token, savings_green, switchboard_alpha,
 ):
     """Prune has no pause check. Independently priced bands:
-    `>= $0.10` stays, `$0.02 <= x < $0.10` stays, `< $0.02` goes -- and the
+    `>= $0.10` stays, `$0.05 <= x < $0.10` stays, `< $0.05` goes -- and the
     outcome is identical paused and unpaused.
     """
     _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller,
@@ -1269,7 +1269,7 @@ def test_prune_retention_band_and_paused_call_are_independent_of_pause(
                                         sender=alice)
     assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
 
-    # $0.02 <= x < $0.10 -- retained, both paused and unpaused
+    # $0.05 <= x < $0.10 -- retained, both paused and unpaused
     for price in (_exact_floor_usd(pile, RETENTION_THRESHOLD),
                   _exact_floor_usd(pile, ACTIVATION_THRESHOLD - 1)):
         mock_price_source.setPrice(bravo_token, price)

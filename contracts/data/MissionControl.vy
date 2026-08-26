@@ -37,15 +37,6 @@ interface Vault:
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
 
-interface Lootbox:
-    def updateRipeRewards(): nonpayable
-    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
-    def isPaused() -> bool: view
-
-interface Ledger:
-    def isDepositPointsRowInitialized(_vaultId: uint256, _asset: address) -> bool: view
-    def depositPointsLastBalance(_vaultId: uint256, _asset: address) -> uint256: view
-
 struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
     voterPointsAllocTotal: uint256
@@ -222,14 +213,6 @@ shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
-# Discovery bound for deposit-points rows on asset-allocation changes.
-# HashMap rows are not enumerable; the scan is IDs 1..this constant.
-# IDs above the bound may register and initialize; those rows are not
-# checkpointed and do not freeze other assets. Current production:
-# RH = 3, Base ≈ 4. Read back via maxRewardVaultIds() before registering
-# a vault. Mixed-version activation: Ledger → Lootbox → MissionControl,
-# or one atomic Safe confirmation.
-MAX_REWARD_VAULT_IDS: constant(uint256) = 64
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -323,27 +306,8 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 
 @internal
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
-    prevStakers: uint256 = self.assetConfig[_asset].stakersPointsAlloc
-    prevVoters: uint256 = self.assetConfig[_asset].voterPointsAlloc
-    stakersChanged: bool = prevStakers != _config.stakersPointsAlloc
-    votersChanged: bool = prevVoters != _config.voterPointsAlloc
-    checkpointVaultIds: DynArray[uint256, MAX_REWARD_VAULT_IDS] = []
-
-    if (stakersChanged or votersChanged) and self._isActiveHqMissionControl():
-        # No paused-Lootbox exemption: a paused Lootbox reverts this write.
-        # Points disabled also reverts. Containment therefore freezes asset
-        # allocations for two independent reasons.
-        assert self.rewardsConfig.arePointsEnabled # dev: points disabled
-        checkpointVaultIds = self._collectInitializedRewardVaults(_asset)
-        self._settleRewardAllocCheckpoint(_asset, checkpointVaultIds, prevStakers)
-
-    # do first! _updatePointsAllocs re-reads self.assetConfig[_asset] for old allocs.
-    self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc)
+    self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
-
-    # Refresh lastUsdValue only when staker eligibility crosses zero.
-    if ((prevStakers == 0) != (_config.stakersPointsAlloc == 0)) and len(checkpointVaultIds) != 0:
-        self._settleRewardAllocCheckpoint(_asset, checkpointVaultIds, _config.stakersPointsAlloc)
 
     # monotonic because retired stability pools can still hold user balances.
     if _config.specialStabPoolId != 0:
@@ -418,22 +382,6 @@ def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDele
 @external
 def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    if self._isActiveHqMissionControl():
-        prev: cs.RipeRewardsConfig = self.rewardsConfig
-        if (
-            prev.ripePerBlock != _config.ripePerBlock
-            or prev.borrowersAlloc != _config.borrowersAlloc
-            or prev.stakersAlloc != _config.stakersAlloc
-            or prev.votersAlloc != _config.votersAlloc
-            or prev.genDepositorsAlloc != _config.genDepositorsAlloc
-        ):
-            lootbox: address = addys._getLootboxAddr()
-            # Containment: skip settle only when zeroing the rate while
-            # Lootbox is paused. Any other RIPE-field change must settle
-            # (and revert if paused). A zero write forfeits every block
-            # since lastUpdate, including pre-pause active blocks.
-            if not staticcall Lootbox(lootbox).isPaused() or _config.ripePerBlock != 0:
-                extcall Lootbox(lootbox).updateRipeRewards()
     self.rewardsConfig = _config
 
 
@@ -453,59 +401,6 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
     totalPointsAllocs.stakersPointsAllocTotal += _newStakersPointsAlloc
     totalPointsAllocs.voterPointsAllocTotal += _newVoterPointsAlloc
     self.totalPointsAllocs = totalPointsAllocs
-
-
-@view
-@internal
-def _isActiveHqMissionControl() -> bool:
-    return addys._getMissionControlAddr() == self
-
-
-@view
-@external
-def maxRewardVaultIds() -> uint256:
-    return MAX_REWARD_VAULT_IDS
-
-
-# HashMap rows are not enumerable. Scan IDs 1..MAX_REWARD_VAULT_IDS.
-# Rows above the bound are not discovered and do not freeze other assets.
-@internal
-def _collectInitializedRewardVaults(_asset: address) -> DynArray[uint256, MAX_REWARD_VAULT_IDS]:
-    ids: DynArray[uint256, MAX_REWARD_VAULT_IDS] = []
-    ledger: address = addys._getLedgerAddr()
-
-    for i: uint256 in range(MAX_REWARD_VAULT_IDS):
-        vaultId: uint256 = i + 1
-        if staticcall Ledger(ledger).isDepositPointsRowInitialized(vaultId, _asset):
-            ids.append(vaultId)
-    return ids
-
-
-@internal
-def _settleRewardAllocCheckpoint(
-    _asset: address,
-    _vaultIds: DynArray[uint256, MAX_REWARD_VAULT_IDS],
-    _stakersPointsAlloc: uint256,
-):
-    lootbox: address = addys._getLootboxAddr()
-    # Empty list: no initialized asset rows. Still commit the global
-    # RIPE + deposit-points clocks once via updateRipeRewards.
-    if len(_vaultIds) == 0:
-        extcall Lootbox(lootbox).updateRipeRewards()
-        return
-
-    vaultBook: address = addys._getVaultBookAddr()
-    ledger: address = addys._getLedgerAddr()
-    for vaultId: uint256 in _vaultIds:
-        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vaultId)
-        # Lootbox touches the vault only when stakersPointsAlloc == 0
-        # and (RipeGov or lastBalance != 0). Skip the empty-addr assert
-        # whenever that call will not happen so empty disabled vaults
-        # can still be zeroed or stay in gen mode.
-        if vaultAddr == empty(address) and _stakersPointsAlloc == 0:
-            if self.isRipeGovVaultId[vaultId] or staticcall Ledger(ledger).depositPointsLastBalance(vaultId, _asset) != 0:
-                raise # dev: unresolvable reward row
-        extcall Lootbox(lootbox).updateDepositPoints(empty(address), vaultId, vaultAddr, _asset)
 
 
 ################

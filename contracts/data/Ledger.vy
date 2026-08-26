@@ -515,40 +515,11 @@ def setRipeRewards(_ripeRewards: RipeRewards):
     self._setRipeRewards(_ripeRewards)
 
 
-@external
-def setRipeRewardsAndGlobalDepositPoints(
-    _ripeRewards: RipeRewards,
-    _stakersTotalAlloc: uint256,
-    _voteTotalAlloc: uint256,
-):
-    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
-    assert not deptBasics.isPaused # dev: not activated
-    self._setRipeRewards(_ripeRewards)
-    self.globalDepositPoints = self._checkpointGlobalDepositPoints(_stakersTotalAlloc, _voteTotalAlloc)
-
-
 @internal
 def _setRipeRewards(_ripeRewards: RipeRewards):
     self.ripeRewards = _ripeRewards
     if _ripeRewards.newRipeRewards != 0:
         self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)
-
-
-# Keep in sync with Lootbox._getLatestGlobalDepositPoints. Ledger owns this
-# copy so updateRipeRewards can settle the empty-row path without growing
-# Lootbox past EIP-170. A parity test pins the two formulas together.
-@internal
-def _checkpointGlobalDepositPoints(_stakersTotalAlloc: uint256, _voteTotalAlloc: uint256) -> GlobalDepositPoints:
-    globalPoints: GlobalDepositPoints = self.globalDepositPoints
-    elapsedBlocks: uint256 = 0
-    if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
-        elapsedBlocks = block.number - globalPoints.lastUpdate
-    globalPoints.lastUpdate = block.number
-    if elapsedBlocks != 0:
-        globalPoints.ripeStakerPoints += _stakersTotalAlloc * elapsedBlocks
-        globalPoints.ripeVotePoints += _voteTotalAlloc * elapsedBlocks
-        globalPoints.ripeGenPoints += globalPoints.lastUsdValue * elapsedBlocks
-    return globalPoints
 
 
 @external
@@ -640,18 +611,6 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
         assetPoints=self.assetDepositPoints[_vaultId][_asset],
         globalPoints=self.globalDepositPoints,
     )
-
-
-@view
-@external
-def isDepositPointsRowInitialized(_vaultId: uint256, _asset: address) -> bool:
-    return self.assetDepositPoints[_vaultId][_asset].lastUpdate != 0
-
-
-@view
-@external
-def depositPointsLastBalance(_vaultId: uint256, _asset: address) -> uint256:
-    return self.assetDepositPoints[_vaultId][_asset].lastBalance
 
 
 ############

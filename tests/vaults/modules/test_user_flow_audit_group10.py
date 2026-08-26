@@ -23,7 +23,7 @@ from constants import MAX_UINT256
 
 EIGHTEEN = 10**18
 ACTIVATION = 10**17          # $0.10
-RETENTION = 2 * 10**16       # $0.02
+RETENTION = 5 * 10**16       # $0.05
 MAX_ACTIVE = 20
 MAX_MAINT = 15
 ROOT = Path(__file__).resolve().parents[3]
@@ -371,7 +371,7 @@ def test_g10_dust_prune_of_undercustodied_row_must_keep_nav_actions_blocked(
         pool.withdrawTokensFromVault(bob, stab, EIGHTEEN, bob,
                                      sender=teller.address)
 
-    # ordinary EOA prunes the row at a valid dust quote (< $0.02, nonzero)
+    # ordinary EOA prunes the row at a valid dust quote (< $0.05, nonzero)
     mock_price_source.setPrice(claim, RETENTION - 1)
     pool.pruneClaimableAssets(stab, [claim], sender=alice)
     assert filter_logs(pool, "ClaimAssetDeactivated") == []
@@ -453,7 +453,7 @@ def test_g10_high_quote_live_activation_does_not_inflate_dormant_pile_into_nav(
 
     _seed_stab(pool, stab, alpha_token_whale, bob, teller, mock_price_source)
 
-    # dormant pile: honest pair USD $0.02 (below the $0.10 receipt floor)
+    # dormant pile: honest pair USD $0.05 (below the $0.10 receipt floor)
     mock_price_source.setPrice(claim, EIGHTEEN)
     _record_claim(pool, stab, claim, bravo_token_whale, RETENTION, bob,
                   auction_house, green_token, savings_green)
@@ -588,7 +588,7 @@ def test_g10_can_activate_helper_not_exported_and_source_semantics(
     active = pool.getNumActiveClaimAssets(stab)
     usd = mock_price_source.getPrice(bravo_token) * pair // EIGHTEEN
     assert (state == CLAIM_DORMANT and usd >= ACTIVATION
-            and active < MAX_ACTIVE) is False  # usd is $0.02 here
+            and active < MAX_ACTIVE) is False  # usd is $0.05 here
     mock_price_source.setPrice(
         bravo_token, ACTIVATION * EIGHTEEN // RETENTION,
     )

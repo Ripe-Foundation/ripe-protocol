@@ -2232,7 +2232,7 @@ def test_stab_vault_redeem_fragmented_claims_round_up_for_protocol(
 #################################
 
 
-DUST_USD_THRESHOLD = 2 * 10 ** 16  # $0.02 in 18-decimal USD
+DUST_USD_THRESHOLD = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 
 
 def test_stab_vault_redemptions_meaningful_live_residual_stays_listed(

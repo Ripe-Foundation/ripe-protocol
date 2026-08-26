@@ -22,7 +22,7 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
 ACTIVATION_THRESHOLD = 10 * 10**16
-RETENTION_THRESHOLD = 2 * 10**16
+RETENTION_THRESHOLD = 5 * 10**16
 LIVE_RESIDUAL_DIVISOR = 10**10
 CLAIM_ASSET_ABSENT = 0
 CLAIM_ASSET_DORMANT = 1
@@ -187,6 +187,74 @@ def _seed_dormant_then_empty_activate(
     for token in tokens:
         assert stability_pool.getClaimAssetState(stab, token) == CLAIM_ASSET_ACTIVE
     return tokens
+
+
+@pytest.mark.parametrize(
+    ("remaining_usd", "expected_state"),
+    (
+        (RETENTION_THRESHOLD - 1, CLAIM_ASSET_DORMANT),
+        (RETENTION_THRESHOLD, CLAIM_ASSET_ACTIVE),
+    ),
+    ids=("one-wei-below-retention", "at-retention"),
+)
+def test_g10_prune_retention_threshold_boundary(
+    remaining_usd,
+    expected_state,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    switchboard_alpha,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    claim_amount = RETENTION_THRESHOLD
+    _seed_dormant_then_empty_activate(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        ((bravo_token, bravo_token_whale, claim_amount),),
+        auction_house,
+        green_token,
+        savings_green,
+        switchboard_alpha,
+        alice,
+    )
+    stability_pool.pause(False, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(
+        bravo_token,
+        remaining_usd * EIGHTEEN_DECIMALS // claim_amount,
+    )
+
+    stability_pool.pruneClaimableAssets(
+        alpha_token,
+        [bravo_token],
+        sender=alice,
+    )
+
+    logs = _dust_logs(stability_pool, bravo_token)
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == expected_state
+    if expected_state == CLAIM_ASSET_DORMANT:
+        assert len(logs) == 1
+        assert logs[0].reason == DEACTIVATION_DUST
+    else:
+        assert logs == []
 
 
 def test_g10_can_activate_is_not_exported_on_stability_pool(stability_pool):
