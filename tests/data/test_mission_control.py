@@ -1496,13 +1496,34 @@ def test_mission_control_get_rewards_config(mission_control, switchboard_alpha, 
     assert config.voterPointsAllocTotal == 400
 
 def test_mission_control_get_deposit_points_config(mission_control, switchboard_alpha, alpha_token, sample_asset_config):
-    """Test getting deposit points configuration."""
+    """Deposit-point allocs are vault-aware while gen funding stays asset-wide."""
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
-    
-    config = mission_control.getDepositPointsConfig(alpha_token.address)
-    assert config.stakersPointsAlloc == sample_asset_config[1]
-    assert config.voterPointsAlloc == sample_asset_config[2]
-    assert config.isNft == sample_asset_config[20]
+
+    member = mission_control.getDepositPointsConfig(alpha_token.address, 1)
+    assert member.stakersPointsAlloc == sample_asset_config[1]
+    assert member.voterPointsAlloc == sample_asset_config[2]
+    assert member.isNft == sample_asset_config[20]
+    assert not member.shouldFundGenPoints
+
+    non_member = mission_control.getDepositPointsConfig(alpha_token.address, 3)
+    assert non_member.stakersPointsAlloc == 0
+    assert non_member.voterPointsAlloc == 0
+    assert non_member.isNft == sample_asset_config[20]
+    # Membership must not turn a real nonzero staker allocation into a signal
+    # that this historical row should fund general-depositor USD.
+    assert not non_member.shouldFundGenPoints
+
+    zero_staker_config = list(sample_asset_config)
+    zero_staker_config[1] = 0
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(zero_staker_config),
+        sender=switchboard_alpha.address,
+    )
+    non_member = mission_control.getDepositPointsConfig(alpha_token.address, 3)
+    assert non_member.stakersPointsAlloc == 0
+    assert non_member.voterPointsAlloc == 0
+    assert non_member.shouldFundGenPoints
 
 def test_mission_control_get_price_config(mission_control, switchboard_alpha, sample_gen_config):
     """Test getting price configuration."""

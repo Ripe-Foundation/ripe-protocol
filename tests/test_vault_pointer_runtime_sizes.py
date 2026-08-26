@@ -13,15 +13,13 @@ EIP170_LIMIT = 24_576
 # Pyth source ID. Teller and CreditEngine retain 24 and 33 bytes respectively at
 # this head. Endaoment retains 1,190 bytes after binding its chain-local Curve
 # source ID. These pins include the deployed immutable data.
-# Lootbox headroom is 120 bytes at the pinned 24,456-byte deployed runtime
-# after removing the non-shippable global-deposit settle selector. Any Lootbox
-# edit, however small, must recompile and remeasure this pin before merge;
-# its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
-# MissionControl 16,752 / Ledger 13,306 after removing reward-settle
-# orchestration and the legacy delivery-config getters, adding compact
-# effective-delivery getters and the whitelist-aware retirement-config getter,
-# and restoring Ledger to its deployable interface. DefaultsLocal is 1,200 bytes
-# (points enabled to match production).
+# Lootbox headroom is 74 bytes at the pinned 24,502-byte deployed runtime after
+# adding vault-aware deposit-point lookup and overflow-safe RIPE distribution.
+# Any Lootbox edit, however small, must recompile and remeasure this pin before
+# merge; its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
+# MissionControl is 16,856 bytes after adding vault-aware deposit-point allocs;
+# Ledger remains 13,306 after restoring its deployable interface. DefaultsLocal
+# is 1,200 bytes (points enabled to match production).
 # StabilityPool headroom is 242 bytes after the actual-delivery claim,
 # separate $0.02 full-exit tolerance and $0.05 retention threshold, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
@@ -32,8 +30,8 @@ EIP170_LIMIT = 24_576
 # A dead current VaultBook row fail-closes; restore the book, then Bravo.
 # SwitchboardAlpha retains 230 bytes after restoring live RIPE reward
 # settlement and emitting config logs after the MissionControl write.
-# SwitchboardCharlie retains 1,181 bytes after the points-enabled guard on
-# the governor-only historical checkpoint. CreditRedeem retains 16,094 bytes after consuming MissionControl's
+# SwitchboardCharlie retains 1,151 bytes after the governor-only historical
+# checkpoint wrapper. CreditRedeem retains 16,094 bytes after consuming MissionControl's
 # effective redemption-delivery flag. AuctionHouse retains 46 bytes after the
 # compact effective auction-delivery config; unsupported collateral is delivered
 # externally, while the dedicated auction/redemption flags govern those paths.
@@ -45,11 +43,11 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16752,
+    "MissionControl": 16856,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24346,
     "SwitchboardBravo": 24529,
-    "SwitchboardCharlie": 23395,
+    "SwitchboardCharlie": 23425,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
@@ -57,7 +55,7 @@ EXPECTED_RUNTIME_BYTES = {
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
-    "Lootbox": 24456,
+    "Lootbox": 24502,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
     "RipeToken": 8760,
