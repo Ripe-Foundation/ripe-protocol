@@ -1589,20 +1589,23 @@ def executePendingAction(_aid: uint256) -> bool:
         if actionType == ActionType.RIPE_REWARDS_BLOCK:
             config.ripePerBlock = p.ripePerBlock
             settle = True
-            log RipeRewardsPerBlockSet(ripePerBlock=config.ripePerBlock)
         elif actionType == ActionType.RIPE_REWARDS_ALLOCS:
             config.borrowersAlloc = p.borrowersAlloc
             config.stakersAlloc = p.stakersAlloc
             config.votersAlloc = p.votersAlloc
             config.genDepositorsAlloc = p.genDepositorsAlloc
             settle = True
-            log RipeRewardsAllocsSet(borrowersAlloc=p.borrowersAlloc, stakersAlloc=p.stakersAlloc, votersAlloc=p.votersAlloc, genDepositorsAlloc=p.genDepositorsAlloc)
         else:
             config.autoStakeRatio = p.autoStakeRatio
             config.autoStakeDurationRatio = p.autoStakeDurationRatio
             config.stabPoolRipePerDollarClaimed = p.stabPoolRipePerDollarClaimed
-            log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio, stabPoolRipePerDollarClaimed=p.stabPoolRipePerDollarClaimed)
         self._writeRipeRewardsConfig(mc, config, settle)
+        if actionType == ActionType.RIPE_REWARDS_BLOCK:
+            log RipeRewardsPerBlockSet(ripePerBlock=config.ripePerBlock)
+        elif actionType == ActionType.RIPE_REWARDS_ALLOCS:
+            log RipeRewardsAllocsSet(borrowersAlloc=p.borrowersAlloc, stakersAlloc=p.stakersAlloc, votersAlloc=p.votersAlloc, genDepositorsAlloc=p.genDepositorsAlloc)
+        else:
+            log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio, stabPoolRipePerDollarClaimed=p.stabPoolRipePerDollarClaimed)
 
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]
