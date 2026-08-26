@@ -560,7 +560,7 @@ def _repayDebt(
         isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
         bt = self._getUserBorrowTerms(_user, _numUserVaults, _repayType != RepayType.STANDARD, 0, empty(address), isUndyVault, _repayType == RepayType.STANDARD, _a)
 
-        # Preserve stored terms only for no eligible collateral (0) or an
+        # preserve stored terms only for no eligible collateral (0) or an
         # unavailable-price sentinel (maxuint). Priced unsupported collateral
         # remains exit-only, but repayment must still refresh its debt terms.
         if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT + 1:
@@ -741,7 +741,7 @@ def _getUserBorrowTerms(
             hasBalance: bool = amount != 0
             if amount == 0:
                 hasBalance = staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset)
-                # Quarantine only when a remaining nominal balance has no vault-wide usable amount.
+                # quarantine only when a remaining nominal balance has no vault-wide usable amount.
                 # Share-rounding dust keeps a nominal balance in a non-empty vault and is not quarantined.
                 if hasBalance:
                     if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
@@ -751,7 +751,7 @@ def _getUserBorrowTerms(
                     if bt.highestLtv < HUNDRED_PERCENT + 1:
                         bt.highestLtv = HUNDRED_PERCENT + 1
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
-                # A positive debt-bearing balance without a usable price
+                # a positive debt-bearing balance without a usable price
                 # cannot safely contribute to account health decisions.
                 if collateralVal == 0:
                     bt.hasQuarantinedAsset = True
@@ -771,7 +771,7 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # Meaningful capacity sets the unwind target. amount == 0 with no remaining balance is withdrawn-to-zero and keeps the conservative floor (BasicVault-only: SharesVault returns empty(address) at 0 shares, so a fully withdrawn rebase registration is skipped and never floors).
+            # meaningful capacity sets the unwind target. amount == 0 with no remaining balance is withdrawn-to-zero and keeps the conservative floor (basic vault-only: shares vault returns empty(address) at 0 shares, so a fully withdrawn rebase registration is skipped and never floors).
             # amount == 0 with a remaining balance is share-rounding dust and must not drag lowestLtv. Positive-amount dust with maxDebt == 0 also does not participate.
             if maxDebt != 0 or (amount == 0 and not hasBalance):
                 bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
@@ -1049,7 +1049,7 @@ def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDe
         rateBoost = _baseRate * rateMultiplier // HUNDRED_PERCENT
 
     # danger boost (longer pool health imbalanced, higher rate keeps getting)
-    # Both operands are capped at maxBorrowRate * 100 before multiplication.
+    # both operands are capped at maxBorrowRate * 100 before multiplication.
     return min(
         _baseRate + rateBoost + unsafe_mul(
             min(config.increasePerDangerBlock, unsafe_mul(config.maxBorrowRate, 100)),
