@@ -660,6 +660,10 @@
             "type": "bool"
           },
           {
+            "name": "hasWhitelist",
+            "type": "bool"
+          },
+          {
             "name": "ltv",
             "type": "uint256"
           },

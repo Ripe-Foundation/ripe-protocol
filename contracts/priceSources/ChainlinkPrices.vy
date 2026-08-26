@@ -125,6 +125,7 @@ NORMALIZED_DECIMALS: constant(uint256) = 18
 MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
 MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 7 * 24 * 60 * 60
 PRICE_DESK_ID: constant(uint256) = 7
+MAX_PRICED_ASSETS: constant(uint256) = 50
 
 
 @deploy
@@ -405,9 +406,28 @@ def _qualifyPriceSource(_asset: address):
         assert staticcall RipeHq(addys._getRipeHq()).numAddrs() <= PRICE_DESK_ID # dev: missing price desk
         return
 
+    self._assertPriceSourceIsExecutable(priceDesk, _asset)
+
+    if _asset not in [ETH, BTC]:
+        return
+
+    numAssets: uint256 = priceData.numAssets
+    if numAssets == 0:
+        return
+
+    for i: uint256 in range(1, numAssets, bound=MAX_PRICED_ASSETS):
+        dependent: address = priceData.assets[i]
+        config: ChainlinkConfig = self.feedConfig[dependent]
+        if (_asset == ETH and config.needsEthToUsd) or (_asset == BTC and config.needsBtcToUsd):
+            self._assertPriceSourceIsExecutable(priceDesk, dependent)
+
+
+@view
+@internal
+def _assertPriceSourceIsExecutable(_priceDesk: address, _asset: address):
     qualifiedPrice: uint256 = 0
     sourceStatus: uint256 = 0
-    qualifiedPrice, sourceStatus = staticcall PriceDesk(priceDesk).qualifyCallerPriceSource(_asset)
+    qualifiedPrice, sourceStatus = staticcall PriceDesk(_priceDesk).qualifyCallerPriceSource(_asset)
     assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
 
 

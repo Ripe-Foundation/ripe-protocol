@@ -26,6 +26,7 @@ import interfaces.ConfigStructs as cs
 struct AssetRetirementConfig:
     isSupported: bool
     hasPointsAlloc: bool
+    hasWhitelist: bool
     ltv: uint256
     canWithdraw: bool
     canRedeemCollateral: bool
@@ -1081,6 +1082,7 @@ def _validateAssetDeregistration(_asset: address, _missionControl: address):
     assert config.isSupported # dev: invalid asset
     assert (
         not config.hasPointsAlloc
+        and not config.hasWhitelist
         and config.canWithdraw
         and (
             config.ltv == 0

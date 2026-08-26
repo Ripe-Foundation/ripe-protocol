@@ -537,6 +537,31 @@ def test_mission_control_deregister_asset_is_policy_neutral(
     assert mission_control.totalPointsAllocs() == totals_before
 
 
+def test_asset_retirement_config_reports_whitelist_posture(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    mock_whitelist,
+    sample_asset_config,
+):
+    config = list(sample_asset_config)
+    config[19] = mock_whitelist.address
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.getAssetRetirementConfig(alpha_token).hasWhitelist
+
+    config[19] = ZERO_ADDRESS
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.getAssetRetirementConfig(alpha_token).hasWhitelist
+
+
 def test_mission_control_deregister_asset_nonexistent(
     mission_control,
     switchboard_alpha,

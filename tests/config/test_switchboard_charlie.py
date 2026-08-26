@@ -2715,6 +2715,50 @@ def test_deregister_zero_ltv_asset_still_requires_withdrawal_exit(
     assert mission_control.isSupportedAsset(alpha_token)
 
 
+def test_deregister_asset_requires_whitelist_cleared_at_execution(
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+    mission_control,
+    alpha_token,
+    mock_whitelist,
+):
+    config = list(_asset_config([1]))
+    config[19] = mock_whitelist.address
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    retire_action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, retire_action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            retire_action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+    assert switchboard_charlie.hasPendingAction(retire_action)
+
+    config[19] = ZERO_ADDRESS
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    assert mission_control.assetConfig(alpha_token).whitelist == ZERO_ADDRESS
+
+    assert switchboard_charlie.executePendingAction(
+        retire_action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
 def test_deregister_asset_execute_rejects_already_unregistered(
     switchboard_bravo,
     switchboard_charlie,

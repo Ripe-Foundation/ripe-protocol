@@ -262,6 +262,114 @@ def test_confirm_feed_update_qualifies_under_live_pricedesk_stipend_atomically(
     assert mock_chainlink.feedConfig(alpha_token) == previous
 
 
+@pytest.mark.parametrize("anchor_kind", ["eth", "btc"])
+def test_anchor_feed_update_requalifies_active_dependents_atomically(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    mock_chainlink_charlie,
+    mock_chainlink_delta,
+    governance,
+    anchor_kind,
+):
+    is_eth = anchor_kind == "eth"
+    anchor_asset = mock_chainlink.ETH() if is_eth else mock_chainlink.BTC()
+    old_anchor_feed = mock_chainlink_bravo if is_eth else mock_chainlink_delta
+
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        anchor_asset,
+        old_anchor_feed,
+        governance,
+        3_600,
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        3_600,
+        needs_eth=is_eth,
+        needs_btc=not is_eth,
+        refresh_feeds=((old_anchor_feed, 500 * CHAINLINK_DECIMALS),),
+    )
+
+    dependent_price = 1 << 120
+    mock_chainlink_alpha.setMockData(dependent_price)
+    old_anchor_feed.setMockData(CHAINLINK_DECIMALS)
+    assert mock_chainlink.getPrice(alpha_token) != 0
+
+    breaking_anchor_price = 1 << 130
+    mock_chainlink_charlie.setMockData(breaking_anchor_price)
+    assert mock_chainlink.updatePriceFeed(
+        anchor_asset,
+        mock_chainlink_charlie,
+        3_600,
+        sender=governance.address,
+    )
+    previous = mock_chainlink.feedConfig(anchor_asset)
+    pending = mock_chainlink.pendingUpdates(anchor_asset)
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_alpha.setMockData(dependent_price)
+    mock_chainlink_charlie.setMockData(breaking_anchor_price)
+
+    with boa.reverts("price source not executable"):
+        mock_chainlink.confirmPriceFeedUpdate(
+            anchor_asset,
+            sender=governance.address,
+        )
+
+    assert mock_chainlink.feedConfig(anchor_asset) == previous
+    assert mock_chainlink.pendingUpdates(anchor_asset) == pending
+    old_anchor_feed.setMockData(CHAINLINK_DECIMALS)
+    assert mock_chainlink.getPrice(alpha_token) != 0
+
+
+def test_anchor_stale_time_update_requalifies_active_dependents_atomically(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,
+    governance,
+):
+    anchor_asset = mock_chainlink.ETH()
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        anchor_asset,
+        mock_chainlink_bravo,
+        governance,
+        3_600,
+    )
+    _add_sc20_chainlink_feed(
+        mock_chainlink,
+        alpha_token,
+        mock_chainlink_alpha,
+        governance,
+        MIN_LOCAL_STALE_TIME,
+        needs_eth=True,
+        refresh_feeds=((mock_chainlink_bravo, 500 * CHAINLINK_DECIMALS),),
+    )
+    assert mock_chainlink.updateStaleTime(
+        anchor_asset,
+        7_200,
+        sender=governance.address,
+    )
+    previous = mock_chainlink.feedConfig(anchor_asset)
+    pending = mock_chainlink.pendingUpdates(anchor_asset)
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_bravo.setMockData(500 * CHAINLINK_DECIMALS)
+
+    with boa.reverts("price source not executable"):
+        mock_chainlink.confirmPriceFeedUpdate(
+            anchor_asset,
+            sender=governance.address,
+        )
+
+    assert mock_chainlink.feedConfig(anchor_asset) == previous
+    assert mock_chainlink.pendingUpdates(anchor_asset) == pending
+
+
 def test_zero_timelock_live_confirmation_still_qualifies_atomically(
     mock_chainlink,
     ripe_hq,

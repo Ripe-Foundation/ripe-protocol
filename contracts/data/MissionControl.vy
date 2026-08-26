@@ -148,6 +148,7 @@ struct DepositPointsConfig:
 struct AssetRetirementConfig:
     isSupported: bool
     hasPointsAlloc: bool
+    hasWhitelist: bool
     ltv: uint256
     canWithdraw: bool
     canRedeemCollateral: bool
@@ -370,6 +371,7 @@ def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig:
     return AssetRetirementConfig(
         isSupported=self.indexOfAsset[_asset] != 0,
         hasPointsAlloc=assetConfig.stakersPointsAlloc != 0 or assetConfig.voterPointsAlloc != 0,
+        hasWhitelist=assetConfig.whitelist != empty(address),
         ltv=assetConfig.debtTerms.ltv,
         canWithdraw=assetConfig.canWithdraw,
         canRedeemCollateral=assetConfig.canRedeemCollateral,

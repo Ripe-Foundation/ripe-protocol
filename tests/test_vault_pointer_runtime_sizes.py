@@ -17,10 +17,10 @@ EIP170_LIMIT = 24_576
 # after removing the non-shippable global-deposit settle selector. Any Lootbox
 # edit, however small, must recompile and remeasure this pin before merge;
 # its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
-# MissionControl 16,742 / Ledger 13,306 after removing reward-settle
-# orchestration, preserving the legacy delivery-config getters, adding compact
-# effective-delivery getters and the compact retirement-config getter, and
-# restoring Ledger to its deployable interface. DefaultsLocal is 1,200 bytes
+# MissionControl 16,752 / Ledger 13,306 after removing reward-settle
+# orchestration and the legacy delivery-config getters, adding compact
+# effective-delivery getters and the whitelist-aware retirement-config getter,
+# and restoring Ledger to its deployable interface. DefaultsLocal is 1,200 bytes
 # (points enabled to match production).
 # StabilityPool headroom is 242 bytes after the actual-delivery claim,
 # separate $0.02 full-exit tolerance and $0.05 retention threshold, and
@@ -35,15 +35,17 @@ EIP170_LIMIT = 24_576
 # externally, while the dedicated auction/redemption flags govern those paths.
 # Deleverage retains 39 bytes. CurvePrices retains 1,170 bytes after switching
 # to codesize optimization for confirmation-time registry snapshot checks.
+# ChainlinkPrices retains 7,588 bytes after qualifying every active dependent
+# route when an ETH/USD or BTC/USD anchor changes.
 # UndyVaultPrices retains 6,270 bytes after confirmation-time metadata
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16742,
+    "MissionControl": 16752,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24562,
     "SwitchboardBravo": 24177,
-    "SwitchboardCharlie": 24211,
+    "SwitchboardCharlie": 24241,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
@@ -66,7 +68,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Deleverage": 24537,
     "StabilityPool": 24334,
     "BlueChipYieldPrices": 20857,
-    "ChainlinkPrices": 16672,
+    "ChainlinkPrices": 16988,
     "CurvePrices": 23406,
     "PythPrices": 16055,
     "RedStone": 15325,
