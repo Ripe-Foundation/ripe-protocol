@@ -308,6 +308,87 @@ def test_zero_timelock_live_confirmation_still_qualifies_atomically(
         assert source.feedConfig(alpha_token).feed == ZERO_ADDRESS
 
 
+def test_pre_price_desk_bootstrap_confirmation_succeeds_at_registry_boundary(
+    mock_chainlink,
+    ripe_hq,
+    green_token,
+    savings_green,
+    ripe_token,
+    alpha_token,
+    mock_chainlink_alpha,
+    governance,
+):
+    with boa.env.anchor():
+        bootstrap_hq = boa.load(
+            "contracts/registries/RipeHq.vy",
+            green_token,
+            savings_green,
+            ripe_token,
+            governance.address,
+            ripe_hq.minGovChangeTimeLock(),
+            ripe_hq.maxGovChangeTimeLock(),
+            ripe_hq.minRegistryTimeLock(),
+            ripe_hq.maxRegistryTimeLock(),
+            name="pre_price_desk_bootstrap_hq",
+        )
+
+        # Fill ids 4 through 6. numAddrs points to the next id, so 7 is the
+        # exact bootstrap boundary while the PriceDesk slot is still absent.
+        for reg_id, contract, description in (
+            (4, alpha_token, "Bootstrap Four"),
+            (5, mock_chainlink_alpha, "Bootstrap Five"),
+            (6, mock_chainlink, "Bootstrap Six"),
+        ):
+            assert bootstrap_hq.startAddNewAddressToRegistry(
+                contract,
+                description,
+                sender=governance.address,
+            )
+            assert bootstrap_hq.confirmNewAddressToRegistry(
+                contract,
+                sender=governance.address,
+            ) == reg_id
+
+        assert bootstrap_hq.numAddrs() == 7
+        assert bootstrap_hq.getAddr(7) == ZERO_ADDRESS
+
+        source = boa.load(
+            "contracts/priceSources/ChainlinkPrices.vy",
+            bootstrap_hq,
+            ZERO_ADDRESS,
+            mock_chainlink.minActionTimeLock(),
+            mock_chainlink.maxActionTimeLock(),
+            mock_chainlink.WETH(),
+            mock_chainlink.ETH(),
+            mock_chainlink.BTC(),
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ONE_DAY_IN_SECS,
+            name="pre_price_desk_bootstrap_chainlink",
+        )
+        mock_chainlink_alpha.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert source.addNewPriceFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            600,
+            sender=governance.address,
+        )
+
+        assert source.confirmNewPriceFeed(
+            alpha_token,
+            sender=governance.address,
+        )
+        assert not source.hasPendingPriceFeedUpdate(alpha_token)
+        assert source.feedConfig(alpha_token).feed == mock_chainlink_alpha.address
+        assert source.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
+
+
 def test_post_setup_confirmation_rejects_missing_price_desk(
     mock_chainlink,
     ripe_hq,

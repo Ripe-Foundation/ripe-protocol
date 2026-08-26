@@ -37,6 +37,23 @@ def addGreenRefPoolSnapshot() -> bool:
 """
 
 
+GAS_BURNING_CURVE_SNAPSHOT_TARGET_SOURCE = """
+# @version 0.4.3
+
+successfulCalls: public(uint256)
+lastSum: public(uint256)
+
+@external
+def addGreenRefPoolSnapshot() -> bool:
+    total: uint256 = 0
+    for i: uint256 in range(50_000):
+        total = unsafe_add(total, i)
+    self.lastSum = total
+    self.successfulCalls += 1
+    return True
+"""
+
+
 REVERTING_STABILIZER_SOURCE = """
 # @version 0.4.3
 
@@ -333,5 +350,78 @@ def test_teller_curve_snapshot_is_bounded_best_effort_housekeeping(
             gas=1_500_000,
         )
         assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+        logs = filter_logs(candidate, "CurveSnapshotFailed")
+        assert len(logs) == 1
+
+
+def test_teller_curve_snapshot_gas_exhaustion_is_bounded_best_effort_housekeeping(
+    ripe_hq,
+    governance,
+    price_desk,
+    credit_engine,
+    ledger,
+    alice,
+):
+    with boa.env.anchor():
+        target = boa.loads(
+            GAS_BURNING_CURVE_SNAPSHOT_TARGET_SOURCE,
+            name="gas_burning_chain_local_teller_curve_target",
+        )
+
+        # The target succeeds when it has enough gas, proving the Teller failure
+        # below comes from exhausting the bounded stipend rather than a revert.
+        assert target.addGreenRefPoolSnapshot(gas=5_000_000)
+        assert target.successfulCalls() == 1
+        assert target.lastSum() == 49_999 * 50_000 // 2
+
+        source_id = _register_price_source(
+            price_desk,
+            governance,
+            target,
+            "Gas-burning chain-local Curve snapshot target",
+        )
+        candidate = boa.load(
+            "contracts/core/Teller.vy",
+            ripe_hq,
+            False,
+            source_id,
+            name="teller_gas_bounded_curve_snapshot",
+        )
+
+        assert ripe_hq.startAddressUpdateToRegistry(
+            17,
+            candidate,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
+        assert ripe_hq.confirmAddressUpdateToRegistry(17, sender=governance.address)
+
+        initial_debt = 100 * 10**18
+        prior_timestamp = boa.env.evm.patch.timestamp - 24 * 60 * 60
+        ledger.setUserDebt(
+            alice,
+            (
+                initial_debt,
+                initial_debt,
+                (0, 0, 0, 0, 100_00, 0),
+                prior_timestamp,
+                False,
+            ),
+            0,
+            (0, 0),
+            sender=credit_engine.address,
+        )
+
+        candidate.performHousekeeping(
+            False,
+            alice,
+            True,
+            sender=credit_engine.address,
+            gas=2_000_000,
+        )
+
+        assert target.successfulCalls() == 1
+        assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+        assert ledger.userDebt(alice).amount > initial_debt
         logs = filter_logs(candidate, "CurveSnapshotFailed")
         assert len(logs) == 1
