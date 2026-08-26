@@ -52,14 +52,14 @@ interface MissionControl:
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
 
-interface CreditEngine:
-    def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-    def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
-
 interface Ledger:
     def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def numUserVaults(_user: address) -> uint256: view
+
+interface CreditEngine:
+    def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -841,8 +841,7 @@ def _performDeleveragePhases(
         if not staticcall Ledger(_a.ledger).isParticipatingInVault(_user, stabPool.vaultId):
             continue
 
-        # Phase 1 vaults are Stability Pool cohorts by construction, so apply
-        # the fail-soft availability gate.
+        # phase 1 vaults are stability pool cohorts by construction, so apply the fail-soft availability gate.
         remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, True, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
         if self.vaultAddrs[stabPool.vaultId] == empty(address):
             self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
@@ -853,7 +852,7 @@ def _performDeleveragePhases(
         if remainingToRepay == 0:
             break
 
-        # Never process Stability Pool cohorts as ordinary priority liq assets here — that would use strict NAV and re-open a broad-Deleverage revert if a stab vault is listed.
+        # never process stability pool cohorts as ordinary priority liq assets here — that would use strict NAV and re-open a broad-deleverage revert if a stab vault is listed.
         # Executable exclusion; the cohort is still reachable via phase 1 / phase 3 with fail-soft handling.
         if staticcall MissionControl(_a.missionControl).isStabVaultId(pData.vaultId):
             continue
@@ -907,7 +906,7 @@ def _iterateThruAllUserVaults(
         if not isVaultAddrCached:
             self.vaultAddrs[vaultId] = vaultAddr
 
-        # The full user-vault sweep can re-encounter a Stability Pool cohort (whether or not it was in the priority list); classify it so the same fail-soft availability gate applies.
+        # the full user-vault sweep can re-encounter a stability pool cohort (whether or not it was in the priority list); classify it so the same fail-soft availability gate applies.
         # The didHandleVaultId transient guard inside _iterateThruAssetsWithinVault prevents a second probe of a cohort already handled in phase 1.
         isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(vaultId)
         remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, isStabVault, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
@@ -1157,8 +1156,8 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
 
             # get asset LTV for weighted calculation
             debtTerms: cs.DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(asset)
-            # Zero-LTV assets remain repayment liquidity even though they do not
-            # contribute borrowing capacity in CreditEngine collateral value.
+    
+            # zero-LTV assets remain repayment liquidity even though they do not contribute borrowing capacity in creditEngine collateral value.
             ltvSum += usdValue * debtTerms.ltv
 
     # calculate effective weighted LTV
@@ -1233,8 +1232,8 @@ def _checkpointSender(
     _asset: address,
     _lootbox: address,
 ):
-    # Post-mutation only: the wrapper has no vaultId, so checkpoint the sender against the live share after withdrawTokensFromVault.
-    # Callers omit Addys so Lootbox resolves protocol addresses itself.
+    # post-mutation only: the wrapper has no vaultId, so checkpoint the sender against the live share after withdrawTokensFromVault.
+    # callers omit addys so lootbox resolves protocol addresses itself.
     extcall LootBox(_lootbox).updateDepositPoints(_user, _vaultId, _vaultAddr, _asset)
 
 
@@ -1264,7 +1263,7 @@ def _transferCollateral(
         underlyingAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(underlyingAsset, _targetUsdValue, True)
         adjustedUnderlyingAmount: uint256 = underlyingAmount
 
-        # Scale the inverse quote when the vault's safe conversion is below its
+        # scale the inverse quote when the vault's safe conversion is below its
         # nominal conversion, using one whole share to avoid dust noise.
         sampleShareUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
         maxSampleUnderlying: uint256 = 0
@@ -1297,29 +1296,35 @@ def _transferCollateral(
     # GREEN is worth one USD per unit; specialized branches overwrite this.
     usdValue: uint256 = amountSent
     if amountSent != 0:
-        # PriceDesk floors nonzero dust to one USD wei; enforce the inverse
+
+        # price desk floors nonzero dust to one USD wei; enforce the inverse
         # quote's minimum creditable delivery before collateral can leave.
         assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: zero collateral value (vault under-send)
         self._checkpointSender(_fromUser, _vaultId, _vaultAddr, _asset, _a.lootbox)
+
         if isUnderscoreBasicEarnVault:
-            # Cap max conversion at convertToAssetsSafe + configured spread so
+            # cap max conversion at convertToAssetsSafe + configured spread so
             # crediting remains bounded for Underscore basic earn vault assets.
             na: uint256 = 0
             cappedUnderlying: uint256 = 0
             na, cappedUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, amountSent)
-            # AuctionHouse preflights BasicVault's known amount clamps; retain
+
+            # auction house preflights basic vault's known amount clamps; retain
             # this as a consistency invariant for divergent vault behavior.
             assert cappedUnderlying != 0 # dev: zero safe underlying
             usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
+
         elif _asset == _a.savingsGreen:
             usdValue = staticcall IERC4626(_a.savingsGreen).convertToAssets(amountSent)
         elif _asset != _a.greenToken:
             usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, True)
-        # Safe-conversion rounding may slightly overshoot the requested USD;
+
+        # safe-conversion rounding may slightly overshoot the requested USD;
         # never consume more debt than the deleverage target.
         usdValue = min(usdValue, _targetUsdValue)
         assert usdValue != 0 # dev: zero collateral value (vault under-send)
-        # Preserve full-quote semantics for the exact one-wei inverse/forward
+
+        # preserve full-quote semantics for the exact one-wei inverse/forward
         # rounding loss. A short delivery always keeps its actual forward value.
         if usdValue == unsafe_sub(_targetUsdValue, convert(amountSent == maxAssetAmount, uint256)):
             usdValue = _targetUsdValue
@@ -1332,11 +1337,11 @@ def _transferCollateral(
 
 @internal
 def _getUnderscoreAddrType(_addr: address, _mc: address, _basicEarnVaultOnly: bool) -> uint256:
-    # Normal mode: 0 = not Underscore, 1 = lego or other trusted caller, 2 = earn vault. Basic-vault-only classifies an asset and returns only 0 or 2 (skips lego-book lookup).
-    # Writes the underscore vault registry to transient cache — do not use from @view paths.
+    # normal mode: 0 = not underscore, 1 = lego or other trusted caller, 2 = earn vault. basic-vault-only classifies an asset and returns only 0 or 2 (skips lego-book lookup).
+    # writes the underscore vault registry to transient cache — do not use from @view paths.
     underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
     if underscore == empty(address):
-        # The zero-registry escape hatch cannot identify earn-vault owners, so
+        # the zero-registry escape hatch cannot identify earn-vault owners, so
         # governance must keep full-payoff extras disabled while using it.
         return 0
 
@@ -1400,8 +1405,8 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
 
 # deleverage params
 
-# Constructor args are validated above. The four legacy setters remain Switchboard-enforced to preserve runtime bytecode.
-# The new full-payoff params also enforce their unsafe-math ceilings here as defense in depth.
+# constructor args are validated above. the four legacy setters remain switchboard-enforced to preserve runtime bytecode.
+# the new full-payoff params also enforce their unsafe-math ceilings here as defense in depth.
 
 
 @external
@@ -1440,6 +1445,7 @@ def setUnderscoreSafeSpreadBps(_bps: uint256):
 def setDeleverageFullPayoffParam(_param: uint256, _amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     assert not deptBasics.isPaused # dev: contract paused
+
     # _param values: 1=fullPayoffBuffer, 2=overageBps, 3=dustThreshold, 4=dustBps
     if _param == 1:
         assert _amount <= MAX_DELEVERAGE_FULL_PAYOFF_BUFFER # dev: exceeds hard ceiling
