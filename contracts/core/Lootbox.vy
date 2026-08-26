@@ -877,11 +877,11 @@ def _getLatestDepositPoints(
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
-    # One MissionControl call serves both the share-normalize and funding branches. RipeGov shares are already normalized.
+    # one mission control call serves both the share-normalize and funding branches. RipeGov shares are already normalized.
     # MissionControl retains every historical core id because old positions can remain claimable.
     isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
 
-    # Update holder lastBalance before lastUsdValue so gen-reward funding only
+    # update holder lastBalance before lastUsdValue so gen-reward funding only
     # includes value represented by normalized holder points.
     userPoints: UserDepositPoints = empty(UserDepositPoints)
     if _user != empty(address):
@@ -893,9 +893,9 @@ def _getLatestDepositPoints(
         assetPoints.lastBalance += userLootShare
         userPoints.lastBalance = userLootShare
 
-    # General-depositor funding follows the asset-level staker allocation, independent of this row's membership.
-    # Value is aggregate (`lastBalance * precision`), never the caller rate.
-    # Round down, cap at custody. Exact-32-byte sharesToAmount is SharesVault-compatible even if 0; failed matching probe is only nominal.
+    # general-depositor funding follows the asset-level staker allocation, independent of this row's membership.
+    # value is aggregate (`lastBalance * precision`), never the caller rate.
+    # round down, cap at custody. exact-32-byte sharesToAmount is sharesvault-compatible even if 0; failed matching probe is only nominal.
     newAssetUsdValue: uint256 = 0
     if assetConfig.shouldFundGenPoints:
         if isRipeGovVault:
@@ -939,7 +939,7 @@ def _getEligibleUnderlying(
     _precision: uint256,
     _missionControl: address,
 ) -> uint256:
-    # Required vault interface. A revert here is a broken vault, not an
+    # required vault interface. A revert here is a broken vault, not an
     # optional-selector miss; fail-closed probing is the fallback below.
     usable: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
     if usable == 0 or _lastBalance > max_value(uint256) // _precision:
@@ -949,8 +949,8 @@ def _getEligibleUnderlying(
         return 0
     eligibleShares: uint256 = eligibleNominal * SHARE_DECIMAL_OFFSET
     if staticcall MissionControl(_missionControl).isStabVaultId(_vaultId):
-        # Protocol-controlled stab vaults must implement totalBalances.
-        # Mirrors StabVault._getTotalAmountForUserWithTotalBal (no dead-share +1).
+        # protocol-controlled stab vaults must implement totalBalances.
+        # mirrors StabVault._getTotalAmountForUserWithTotalBal (no dead-share +1).
         totalShares: uint256 = staticcall VaultShareTotals(_vaultAddr).totalBalances(_asset)
         if totalShares == 0 or eligibleShares > max_value(uint256) // usable:
             return 0
@@ -973,7 +973,7 @@ def _getEligibleUnderlying(
         if len(response) != 32:
             return 0
         return min(abi_decode(response, uint256), usable)
-    # Fail closed: missing, reverting, short, or overlong totalBalances
+    # fail closed: missing, reverting, short, or overlong totalBalances
     # must fund zero. Do not use a typed staticcall here.
     totalsOk: bool = False
     totalsResponse: Bytes[33] = b""
