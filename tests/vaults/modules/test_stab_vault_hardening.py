@@ -990,7 +990,7 @@ def test_prune_skips_unpriced_pair_and_continues_batch_while_paused_or_unpaused(
     charlie_balance = stability_pool.claimableBalances(alpha_token, charlie_token)
     bravo_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
     mock_price_source.setPrice(bravo_token, 0)
-    mock_price_source.setPrice(charlie_token, 4 * 10**17)
+    mock_price_source.setPrice(charlie_token, 2 * 10**17)
 
     stability_pool.pruneClaimableAssets(
         alpha_token,
@@ -1068,8 +1068,8 @@ def test_dormant_thresholds_have_exact_hysteresis_boundaries(
         bravo_token,
     ) == CLAIM_ASSET_ACTIVE
 
-    # Exact $0.05 remains active; immediately below it prunes. The band from
-    # $0.05 through $0.099... therefore preserves the existing state.
+    # Exact $0.02 remains active; immediately below it prunes. The band from
+    # $0.02 through $0.099... therefore preserves the existing state.
     mock_price_source.setPrice(
         bravo_token, _price_at_least_usd(pair_amount, RETENTION_THRESHOLD),
     )
@@ -4595,7 +4595,10 @@ def test_der02_appreciated_post_exit_dormant_pair_uses_paused_activation(
             alpha_token, bravo_token
         ) == CLAIM_ASSET_DORMANT
 
-        mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
+        mock_price_source.setPrice(
+            bravo_token,
+            ACTIVATION_THRESHOLD * EIGHTEEN_DECIMALS // RETENTION_THRESHOLD,
+        )
         assert stability_pool.getTotalValue(alpha_token) == 0
         stability_pool.activateClaimAssets(
             alpha_token, [bravo_token], sender=alice
@@ -4993,13 +4996,16 @@ def test_der02_dormant_price_sensitivity_and_replenishment_reactivation(
 
         # Appreciation through the activation value does not auto-enumerate a
         # dormant pair; depreciation likewise leaves its raw liability intact.
-        mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
+        activation_price = (
+            ACTIVATION_THRESHOLD * EIGHTEEN_DECIMALS // RETENTION_THRESHOLD
+        )
+        mock_price_source.setPrice(bravo_token, activation_price)
         assert stability_pool.getClaimAssetState(
             alpha_token, bravo_token
         ) == CLAIM_ASSET_DORMANT
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
         assert (
-            RETENTION_THRESHOLD * 2 * EIGHTEEN_DECIMALS
+            RETENTION_THRESHOLD * activation_price
             // EIGHTEEN_DECIMALS
             == ACTIVATION_THRESHOLD
         )

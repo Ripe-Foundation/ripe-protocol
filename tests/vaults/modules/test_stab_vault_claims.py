@@ -4419,7 +4419,7 @@ def test_stab_vault_claims_receipt_accumulates_on_listed_live_residual(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """A later receipt adds onto a live-share sub-$0.05 residual that stayed listed."""
+    """A later receipt adds onto a live-share sub-$0.02 residual that stayed listed."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4445,7 +4445,7 @@ def test_stab_vault_claims_receipt_accumulates_on_listed_live_residual(
     vault_id = vault_book.getRegId(stability_pool)
 
     # Claim to leave dust
-    claim_usd_value = 11 * 10 ** 16
+    claim_usd_value = 14 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)

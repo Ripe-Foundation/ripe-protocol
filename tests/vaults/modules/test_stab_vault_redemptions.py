@@ -2313,7 +2313,7 @@ def test_stab_vault_redemptions_no_dust_removal_above_threshold(
     green_token,
     whale,
 ):
-    """Test that claimable asset stays active at or above $0.05."""
+    """Test that claimable asset stays active at or above $0.02."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -2528,7 +2528,7 @@ def test_stab_vault_redemptions_dust_precision_loss_triggers_removal(
     whale,
     switchboard_alpha,
 ):
-    """A one-wei leftover with remainingUsdValue=1 dust-unlists on an empty cohort."""
+    """A one-atom leftover worth $0.01 dust-unlists on an empty cohort."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -2553,7 +2553,7 @@ def test_stab_vault_redemptions_dust_precision_loss_triggers_removal(
     )
     assert stability_pool.totalBalances(alpha_token) == 0
 
-    mock_price_source.setPrice(bravo_token, 3 * 10 ** 34)
+    mock_price_source.setPrice(bravo_token, 10 ** 34)
     stability_pool.pause(True, sender=switchboard_alpha.address)
     stability_pool.activateClaimAssets(alpha_token, [bravo_token], sender=alice)
     stability_pool.pause(False, sender=switchboard_alpha.address)
@@ -2561,7 +2561,7 @@ def test_stab_vault_redemptions_dust_precision_loss_triggers_removal(
     assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) != 0
 
     vault_id = vault_book.getRegId(stability_pool)
-    redeem_amount = 27 * 10 ** 16
+    redeem_amount = 9 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)

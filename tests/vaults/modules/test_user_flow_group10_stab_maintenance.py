@@ -133,7 +133,7 @@ def test_prune_does_not_reenable_share_actions_while_claim_custody_is_still_shor
     ledger_before = _claim_ledger(stability_pool, alpha_token, bravo_token)
     bob_shares_before = stability_pool.userBalances(bob, alpha_token)
 
-    # Ordinary EOA prunes at a valid nonzero quote below $0.05.
+    # Ordinary EOA prunes at a valid nonzero quote below $0.02.
     # 10e18 bravo * $0.001 = $0.01 < RETENTION.
     mock_price_source.setPrice(bravo_token, 10**15)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token],
@@ -1210,7 +1210,7 @@ def test_activate_capacity_ordering_decides_who_takes_the_last_slot(
         assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 20
 
-    # Freeing a slot: one occupier falls below $0.05 and is pruned unpaused.
+    # Freeing a slot: one occupier falls below $0.02 and is pruned unpaused.
     mock_price_source.setPrice(occupiers[0], 10**15)
     stability_pool.pruneClaimableAssets(alpha_token, [occupiers[0]],
                                         sender=sally)
@@ -1245,7 +1245,7 @@ def test_prune_retention_band_and_paused_call_are_independent_of_pause(
     green_token, savings_green, switchboard_alpha,
 ):
     """Prune has no pause check. Independently priced bands:
-    `>= $0.10` stays, `$0.05 <= x < $0.10` stays, `< $0.05` goes -- and the
+    `>= $0.10` stays, `$0.02 <= x < $0.10` stays, `< $0.02` goes -- and the
     outcome is identical paused and unpaused.
     """
     _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller,
@@ -1269,7 +1269,7 @@ def test_prune_retention_band_and_paused_call_are_independent_of_pause(
                                         sender=alice)
     assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
 
-    # $0.05 <= x < $0.10 -- retained, both paused and unpaused
+    # $0.02 <= x < $0.10 -- retained, both paused and unpaused
     for price in (_exact_floor_usd(pile, RETENTION_THRESHOLD),
                   _exact_floor_usd(pile, ACTIVATION_THRESHOLD - 1)):
         mock_price_source.setPrice(bravo_token, price)
