@@ -819,16 +819,12 @@ def test_mission_control_effective_external_delivery_policy(
         _voterPointsAlloc=0,
     )
 
-    # The deployed two-argument getters retain their original selector and
-    # return layout for compatibility with existing callers.
+    # The retained two-argument redemption getter preserves its original
+    # selector and return layout for compatibility with existing callers.
     legacy_redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice)
-    legacy_auction = mission_control.getAuctionBuyConfig(alpha_token, alice)
     assert legacy_redeem.canRedeemCollateralGeneral
     assert legacy_redeem.canRedeemCollateralAsset
     assert legacy_redeem.isUserAllowed
-    assert legacy_auction.canBuyInAuctionGeneral
-    assert legacy_auction.canBuyInAuctionAsset
-    assert legacy_auction.isUserAllowed
 
     # Supported collateral honors the caller's requested delivery mode.
     redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True)

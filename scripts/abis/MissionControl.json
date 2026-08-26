@@ -1423,45 +1423,6 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getAuctionBuyConfig",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "canBuyInAuctionGeneral",
-            "type": "bool"
-          },
-          {
-            "name": "canBuyInAuctionAsset",
-            "type": "bool"
-          },
-          {
-            "name": "isUserAllowed",
-            "type": "bool"
-          },
-          {
-            "name": "canAnyoneDeposit",
-            "type": "bool"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
     "name": "getEffectiveAuctionBuyConfig",
     "inputs": [
       {

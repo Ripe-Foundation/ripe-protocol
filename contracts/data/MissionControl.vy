@@ -88,12 +88,6 @@ struct EffectiveRedeemCollateralConfig:
     canAnyoneDeposit: bool
     shouldTransferBalance: bool
 
-struct AuctionBuyConfig:
-    canBuyInAuctionGeneral: bool
-    canBuyInAuctionAsset: bool
-    isUserAllowed: bool
-    canAnyoneDeposit: bool
-
 struct EffectiveAuctionBuyConfig:
     canBuyInAuction: bool
     canAnyoneDeposit: bool
@@ -807,19 +801,6 @@ def getLtvPaybackBuffer() -> uint256:
 
 
 # auction purchases
-
-
-@view
-@external
-def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
-    # Legacy ABI-compatible view; protocol delivery uses getEffectiveAuctionBuyConfig.
-    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    return AuctionBuyConfig(
-        canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,
-        canBuyInAuctionAsset=assetConfig.canBuyInAuction,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
-        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
-    )
 
 
 @view
