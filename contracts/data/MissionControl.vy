@@ -75,13 +75,6 @@ struct RepayConfig:
     canRepay: bool
     canAnyoneRepayDebt: bool
 
-struct RedeemCollateralConfig:
-    canRedeemCollateralGeneral: bool
-    canRedeemCollateralAsset: bool
-    isUserAllowed: bool
-    ltvPaybackBuffer: uint256
-    canAnyoneDeposit: bool
-
 struct EffectiveRedeemCollateralConfig:
     canRedeemCollateral: bool
     ltvPaybackBuffer: uint256
@@ -759,19 +752,6 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 
 # redeem collateral
-
-
-@view
-@external
-def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
-    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    return RedeemCollateralConfig(
-        canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
-        canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
-        ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
-        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
-    )
 
 
 @view

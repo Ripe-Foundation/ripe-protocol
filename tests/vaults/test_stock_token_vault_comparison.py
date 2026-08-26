@@ -1425,9 +1425,13 @@ def test_registry_and_required_asset_flags(
     )
     assert vault_book.getRegId(vault) == vault_id
     assert mission_control.getFirstVaultIdForAsset(stock_token) == vault_id
-    redeem_config = mission_control.getRedeemCollateralConfig(stock_token, bob)
+    redeem_config = mission_control.getEffectiveRedeemCollateralConfig(
+        stock_token,
+        bob,
+        False,
+    )
     liq_config = mission_control.getAssetLiqConfig(stock_token)
-    assert not redeem_config.canRedeemCollateralAsset
+    assert not redeem_config.canRedeemCollateral
     assert not liq_config.shouldSwapInStabPools
 
 

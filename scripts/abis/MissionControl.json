@@ -1325,49 +1325,6 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getRedeemCollateralConfig",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "canRedeemCollateralGeneral",
-            "type": "bool"
-          },
-          {
-            "name": "canRedeemCollateralAsset",
-            "type": "bool"
-          },
-          {
-            "name": "isUserAllowed",
-            "type": "bool"
-          },
-          {
-            "name": "ltvPaybackBuffer",
-            "type": "uint256"
-          },
-          {
-            "name": "canAnyoneDeposit",
-            "type": "bool"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
     "name": "getEffectiveRedeemCollateralConfig",
     "inputs": [
       {
