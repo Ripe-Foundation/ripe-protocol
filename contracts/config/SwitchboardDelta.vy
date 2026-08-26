@@ -1485,8 +1485,6 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.RIPE_AVAIL_REWARDS:
         amount: uint256 = self.pendingRipeAvailable[_aid]
-        # Settle the open RIPE interval against the current budget before
-        # replacing it. A paused Lootbox must revert; do not skip.
         extcall Lootbox(self._getLootboxAddr()).updateRipeRewards()
         extcall Ledger(self._getLedgerAddr()).setRipeAvailForRewards(amount)
         log RipeAvailableForRewardsSet(amount=amount)

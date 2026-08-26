@@ -891,7 +891,6 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
     assert empty(address) not in [_user, _asset] # dev: invalid parameters
 
-    # Get vault address from vault book
     vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
     assert vaultAddr != empty(address) # dev: invalid vault
 
@@ -900,10 +899,6 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
     return True
 
 
-# Governor-only historical checkpoint. No other contract calls this. Bravo
-# only settles current VaultBook rows; a removed or disabled vault needs an
-# explicit address in the same tx as Bravo.executePendingAction (Charlie-pre,
-# and Charlie-post on a staker 0 <-> nonzero crossing).
 @external
 def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -925,7 +920,6 @@ def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAdd
 def updateManyDepositPoints(_users: DynArray[address, MAX_CLAIM_USERS], _vaultId: uint256, _asset: address) -> bool:
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
 
-    # Get vault address from vault book
     vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
     assert vaultAddr != empty(address) # dev: invalid vault
 
