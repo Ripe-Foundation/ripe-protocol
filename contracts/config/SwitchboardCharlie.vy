@@ -11,7 +11,6 @@
 #      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
-# pragma optimize codesize
 
 exports: gov.__interface__
 exports: timeLock.__interface__
@@ -62,10 +61,6 @@ interface MissionControl:
     def isSupportedAsset(_asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
-
-# Word 0 of RipeRewardsConfig is arePointsEnabled.
-interface MissionControlRewardsHead:
-    def rewardsConfig() -> bool: view
 
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -298,12 +293,6 @@ event DepositPointsUpdatedMany:
     numUsers: uint256
     vaultId: uint256
     asset: indexed(address)
-    caller: indexed(address)
-
-event AssetDepositPointsCheckpointedAt:
-    asset: indexed(address)
-    vaultId: uint256
-    vaultAddr: indexed(address)
     caller: indexed(address)
 
 event TrainingWheelsSet:
@@ -896,27 +885,6 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
 
     extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(_user, _vaultId, vaultAddr, _asset)
     log DepositPointsUpdated(user=_user, vaultId=_vaultId, asset=_asset, caller=msg.sender)
-    return True
-
-
-# Governor-only historical checkpoint. No other contract calls this. Bravo
-# only settles current VaultBook rows; a removed or disabled vault needs an
-# explicit address in the same tx as Bravo.executePendingAction (Charlie-pre,
-# and Charlie-post on a staker 0 <-> nonzero crossing).
-@external
-def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert empty(address) not in [_asset, _vaultAddr] # dev: invalid parameters
-    assert _vaultAddr.is_contract # dev: invalid vault
-
-    vaultBook: address = self._getVaultBookAddr()
-    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
-    bookAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
-    assert bookAddr == empty(address) or bookAddr == _vaultAddr # dev: vault addr mismatch
-    assert staticcall MissionControlRewardsHead(self._getMissionControlAddr()).rewardsConfig() # dev: points disabled
-
-    extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
-    log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)
     return True
 
 
