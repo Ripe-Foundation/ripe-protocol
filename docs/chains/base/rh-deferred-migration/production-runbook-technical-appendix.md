@@ -916,10 +916,12 @@ setup write receives its own deterministic child ID and manifest row.
 - [ ] Start and confirm the exact live VaultBook rows in live ID order 1→5.
   Require each typed confirmation result to equal its expected ID and read
   back that ID/address before advancing.
-- [ ] Before building the clone, read every live ID-1–5 version and require it
-  to be exactly 1. A fresh append initializes version 1 and has no explicit
-  version input; if any live row is above 1, exact version cloning by append is
-  impossible and the architecture must be replanned.
+- [ ] Before building the clone, read every live ID-1–5 version as provenance.
+  A fresh append initializes version 1 and does not copy the source registry's
+  update-history counter. Protocol contracts do not consume that counter, so a
+  source version above 1 is not by itself a redesign condition. Address,
+  description, order, enabled state, and pending-state drift still require a
+  fresh bind and review.
 - [ ] IDs 1–5 map to the exact current legacy vault addresses and names in the
   same order, and every candidate row reads back version 1.
 - [ ] Immediately after cloning IDs 1–5, read both counters:
@@ -947,8 +949,10 @@ repair the clone with address updates or carry it into a payload.
 Read-only feasibility observation: at Base block `50,460,701`, hash
 `0xb52810cead12b2734deaa91f1b00b898de448d7af5a68f212bf3f9276a3f5d15`,
 active VaultBook `0xb758e30c14825519b895Fd9928d5d8748A71a944` reported version 1 for IDs
-1–5. This makes exact append cloning feasible at that historical pin; it is
-not Gate-0 production evidence, and any later version drift is a stop.
+1–5. That is provenance, not the reason append cloning is feasible; feasibility
+depends on binding the exact current address/description/order. This is not
+Gate-0 production evidence. Later version drift is recorded as provenance;
+later address/order/enabled/pending-state drift is a stop until rebound.
 
 ### 6.2 Replacement MissionControl and Switchboards
 
@@ -1259,7 +1263,8 @@ addresses, runtimes, pause states, or authorities can satisfy this phase.
 - [ ] Rehearse the pre-activation candidate pauses through the still-active
   legacy Charlie, then prove candidate AuctionHouse and RipeGov 7 are paused
   before the one HQ-ID-6 Switchboard-registry replacement removes legacy-board
-  authority.
+  authority. Pause calls are state-conditional: an already-paused candidate is
+  asserted, not sent a no-op `pause(True)` call that would revert.
 - [ ] In one assertion-capable atomic child, confirm HQ 5 MissionControl first
   and exactly one replacement HQ 6 Switchboard registry second, then read both
   back before the closed department allowlist. Do not update Alpha–Echo
@@ -1500,6 +1505,19 @@ authorization.
   candidate generations blocked through their handoff; for each, separately
   prove the exact Lootbox/CreditEngine/price/housekeeping calls that must remain
   callable.
+- [ ] Freeze every producer capable of refilling old department custody before
+  the terminal custody sweep. Keep only the exact old Endaoment/EndaomentPSM
+  disposition helpers callable; ordinary user mint/redeem/deposit/withdraw
+  entrypoints remain blocked.
+- [ ] In the rehearsed bounded disposition batch, move or unwind old PSM
+  custody and then pause PSM if still open (otherwise assert it is paused);
+  convert old EndaomentFunds native ETH to WETH, sweep every old
+  Endaoment/EndaomentFunds asset, fund the approved candidate addresses, and
+  then pause old Endaoment if still open (otherwise assert it is paused).
+- [ ] After the complete producer freeze and final helper pause, re-read every
+  old department's native/ERC-20 balance, allowance, custody position, and
+  pending local action. Require zero or the exact approved residual manifest
+  before `OP-CORE-04`; a pre-freeze balance snapshot does not pass.
 - [ ] Wait for the required later action-block boundary.
 - [ ] Prove source position counts and balances stop changing before the first
   confirmation and after each generation handoff.
@@ -1566,6 +1584,12 @@ dated child ID.
   it is already expired or permanently non-executable and its exact target is
   fork-proven harmless. Mere intent not to call it is not cancellation.
 - [ ] Read back every replayed row.
+- [ ] Before `OP-CORE-09`, leave the active CreditEngine and Lootbox unpaused
+  in the approved housekeeping-only posture. Keep every upstream
+  borrow/redeem/claim/auto-stake/trusted-deposit producer blocked, and prove
+  `CreditEngine.updateDebtForUser` plus Lootbox deposit-point accounting are
+  callable. Do not re-pause either dependency after configuration replay or
+  the Pool-6 seed deposit will revert.
 - [ ] Under `OP-CORE-07`, verify Pool 6 is unpaused immediately before Charlie
   initiation and again immediately before execution.
 - [ ] Initiate and execute Charlie `preferredStabVaultId = 6` while
@@ -2092,6 +2116,8 @@ from an earlier block.
   frozen terminal-claim state; no migration child starts before it passes.
 - [ ] Unpause VaultMigrator for the controlled window.
 - [ ] Confirm Teller remains paused.
+- [ ] Immediately before the canary and again before every later batch, require
+  `Ledger.badDebt() == 0`; a nonzero value is a hard stop.
 - [ ] Confirm source and target classification both report Stability.
 - [ ] Execute through the approved SwitchboardEcho route; do not call
   VaultMigrator directly from an EOA.
@@ -2492,6 +2518,10 @@ child per measured batch.
   canary: Teller paused; VaultMigrator unpaused; source ID 2 unpaused; target
   ID 7 paused; Ledger, CreditEngine, Lootbox, pricing, and housekeeping
   dependencies callable; all trusted producers frozen.
+- [ ] Immediately before the canary and again before every later batch, require
+  `Ledger.badDebt() == 0`. Both active legacy RipeGov assets have
+  `shouldFreezeWhenBadDebt = True`; a nonzero value makes the source withdrawal
+  revert and is a hard stop, not a skippable user condition.
 - [ ] Execute a canary batch through the approved SwitchboardEcho legacy route.
 - [ ] Do not call VaultMigrator directly from an EOA.
 - [ ] Reconcile exact source debit and target receipt for each asset.
@@ -2666,7 +2696,8 @@ Stop and obtain a newly approved disposition if any of the following occurs:
   not match the approved manifest.
 - Ledger address or semantics differ from the bound original.
 - RipeHQ or VaultBook ID topology differs from the approved sequence.
-- Any live VaultBook ID 1–5 version is not exactly 1 at the clone pin.
+- Any live VaultBook ID 1–5 address, description, order, enabled state, or
+  pending registry state differs from the approved clone pin.
 - A sequentially assigned candidate VaultBook or Switchboard child receives an
   unexpected ID, typed return, event, counter, or address binding.
 - VaultMigrator is not registered at exactly RipeHQ ID 25.
