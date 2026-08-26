@@ -28,11 +28,12 @@ EIP170_LIMIT = 24_576
 # and partial-reservation admission remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
-# SwitchboardBravo retains 9 bytes of headroom after automatic live-allocation
-# checkpoints consume the freeze-removal margin. SwitchboardAlpha retains 230
-# bytes after restoring live RIPE reward settlement and emitting config logs
-# after the MissionControl write. SwitchboardCharlie retains 1,282 bytes after
-# codesize optimization plus the governor-only historical checkpoint. CreditRedeem retains 16,094 bytes after consuming MissionControl's
+# SwitchboardBravo retains 47 bytes after head-decoding rewardsConfig.
+# A dead current VaultBook row fail-closes; restore the book, then Bravo.
+# SwitchboardAlpha retains 230 bytes after restoring live RIPE reward
+# settlement and emitting config logs after the MissionControl write.
+# SwitchboardCharlie retains 1,181 bytes after the points-enabled guard on
+# the governor-only historical checkpoint. CreditRedeem retains 16,094 bytes after consuming MissionControl's
 # effective redemption-delivery flag. AuctionHouse retains 46 bytes after the
 # compact effective auction-delivery config; unsupported collateral is delivered
 # externally, while the dedicated auction/redemption flags govern those paths.
@@ -47,8 +48,8 @@ EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16752,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24346,
-    "SwitchboardBravo": 24567,
-    "SwitchboardCharlie": 23294,
+    "SwitchboardBravo": 24529,
+    "SwitchboardCharlie": 23395,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,

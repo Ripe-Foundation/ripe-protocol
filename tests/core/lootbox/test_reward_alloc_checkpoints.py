@@ -29,6 +29,30 @@ def run(
     extcall Bravo(_bravo).executePendingAction(_actionId)
 """
 
+_CHARLIE_BRAVO_CHARLIE_BATCH = """
+# pragma version ~=0.4.3
+
+interface Charlie:
+    def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool: nonpayable
+
+interface Bravo:
+    def executePendingAction(_actionId: uint256) -> bool: nonpayable
+
+@external
+def run(
+    _charlie: address,
+    _bravo: address,
+    _asset: address,
+    _vaultId: uint256,
+    _preVaultAddr: address,
+    _actionId: uint256,
+    _postVaultAddr: address,
+):
+    extcall Charlie(_charlie).checkpointAssetDepositPointsAt(_asset, _vaultId, _preVaultAddr)
+    extcall Bravo(_bravo).executePendingAction(_actionId)
+    extcall Charlie(_charlie).checkpointAssetDepositPointsAt(_asset, _vaultId, _postVaultAddr)
+"""
+
 _COMPAT_VAULT = """
 # pragma version ~=0.4.3
 
@@ -46,6 +70,11 @@ def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
 @view
 def totalBalances(_asset: address) -> uint256:
     return 100 * 10**18
+
+@external
+@view
+def doesVaultHaveAnyFunds() -> bool:
+    return False
 """
 
 
@@ -69,6 +98,33 @@ def _charlie_bravo_batch(
             vault_id,
             vault_addr,
             action_id,
+        )
+    finally:
+        boa.env.set_code(governance.address, prev)
+
+
+def _charlie_bravo_charlie_batch(
+    governance,
+    charlie,
+    bravo,
+    asset,
+    vault_id,
+    pre_vault_addr,
+    action_id,
+    post_vault_addr,
+):
+    impl = boa.loads(_CHARLIE_BRAVO_CHARLIE_BATCH, name="charlie_bravo_charlie_batch")
+    prev = boa.env.get_code(governance.address)
+    boa.env.set_code(governance.address, impl.env.get_code(impl.address))
+    try:
+        return impl.deployer.at(governance.address).run(
+            charlie.address,
+            bravo.address,
+            asset,
+            vault_id,
+            pre_vault_addr,
+            action_id,
+            post_vault_addr,
         )
     finally:
         boa.env.set_code(governance.address, prev)
@@ -556,19 +612,26 @@ def test_historical_charlie_pre_bravo_post_settles_old_then_new_rate(
         rebase_erc20_vault.address,
         sender=governance.address,
     )
+
+    hist_gap_before = ledger.assetDepositPoints(vault_a, alpha_token)
     enable_id = _queue_deposit_params(
         switchboard_bravo, governance, alpha_token, [vault_b], 0, 20
     )
-    _execute(switchboard_bravo, governance, enable_id)
-
-    # Close the untested window after the first post-move alloc change.
-    switchboard_charlie.checkpointAssetDepositPointsAt(
+    boa.env.time_travel(blocks=max(switchboard_bravo.actionTimeLock(), 8))
+    _charlie_bravo_batch(
+        governance,
+        switchboard_charlie,
+        switchboard_bravo,
         alpha_token,
         vault_a,
         simple_erc20_vault.address,
-        sender=governance.address,
+        enable_id,
     )
-    hist_before = ledger.assetDepositPoints(vault_a, alpha_token)
+    hist_after_gap = ledger.assetDepositPoints(vault_a, alpha_token)
+    assert hist_after_gap.ripeVotePoints == hist_gap_before.ripeVotePoints
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 20
+
+    hist_before = hist_after_gap
     action_id = _queue_deposit_params(
         switchboard_bravo,
         governance,
@@ -603,6 +666,278 @@ def test_historical_charlie_pre_bravo_post_settles_old_then_new_rate(
     )
     hist_after = ledger.assetDepositPoints(vault_a, alpha_token)
     assert hist_after.ripeVotePoints == hist_mid.ripeVotePoints + 5 * later
+
+
+def _prepare_historical_row_with_current_ripe_gov(
+    alpha_token,
+    simple_erc20_vault,
+    ripe_gov_vault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    lootbox,
+    teller,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_alpha,
+    mission_control,
+    governance,
+    bob,
+):
+    vault_a = vault_book.getRegId(simple_erc20_vault)
+    _seed_live_asset(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        alpha_token,
+        [vault_a],
+        0,
+        0,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 80 * EIGHTEEN_DECIMALS, alpha_token)
+    lootbox.updateDepositPoints(
+        bob, vault_a, simple_erc20_vault, alpha_token, sender=teller.address
+    )
+    mission_control.setRipeGovVaultConfig(
+        alpha_token,
+        100_00,
+        False,
+        (100, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    move_id = _queue_deposit_params(
+        switchboard_bravo, governance, alpha_token, [2], 0, 0
+    )
+    _execute(switchboard_bravo, governance, move_id)
+    switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        2,
+        ripe_gov_vault.address,
+        sender=governance.address,
+    )
+    return vault_a
+
+
+@pytest.mark.parametrize("to_nonzero", [True, False])
+def test_historical_staker_zero_crossing_uses_charlie_post_pass(
+    to_nonzero,
+    alpha_token,
+    simple_erc20_vault,
+    ripe_gov_vault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_alpha,
+    mission_control,
+    governance,
+    bob,
+):
+    vault_a = _prepare_historical_row_with_current_ripe_gov(
+        alpha_token,
+        simple_erc20_vault,
+        ripe_gov_vault,
+        vault_book,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        mock_price_source,
+        lootbox,
+        teller,
+        switchboard_bravo,
+        switchboard_charlie,
+        switchboard_alpha,
+        mission_control,
+        governance,
+        bob,
+    )
+    if not to_nonzero:
+        enable_id = _queue_deposit_params(
+            switchboard_bravo, governance, alpha_token, [2], 15, 0
+        )
+        boa.env.time_travel(blocks=max(switchboard_bravo.actionTimeLock(), 1))
+        _charlie_bravo_charlie_batch(
+            governance,
+            switchboard_charlie,
+            switchboard_bravo,
+            alpha_token,
+            vault_a,
+            simple_erc20_vault.address,
+            enable_id,
+            simple_erc20_vault.address,
+        )
+        assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == 15
+
+    hist_before = ledger.assetDepositPoints(vault_a, alpha_token)
+    old_stakers = 0 if to_nonzero else 15
+    new_stakers = 15 if to_nonzero else 0
+    action_id = _queue_deposit_params(
+        switchboard_bravo, governance, alpha_token, [2], new_stakers, 0
+    )
+    boa.env.time_travel(blocks=max(switchboard_bravo.actionTimeLock(), 7))
+    _charlie_bravo_charlie_batch(
+        governance,
+        switchboard_charlie,
+        switchboard_bravo,
+        alpha_token,
+        vault_a,
+        simple_erc20_vault.address,
+        action_id,
+        simple_erc20_vault.address,
+    )
+    hist_after = ledger.assetDepositPoints(vault_a, alpha_token)
+    elapsed = hist_after.lastUpdate - hist_before.lastUpdate
+    assert hist_after.lastUpdate == boa.env.evm.patch.block_number
+    assert hist_after.ripeStakerPoints == hist_before.ripeStakerPoints + old_stakers * elapsed
+    assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == new_stakers
+    if to_nonzero:
+        assert hist_before.lastUsdValue != 0
+        assert hist_after.lastUsdValue == 0
+    else:
+        assert hist_after.lastUsdValue != 0
+
+
+def test_historical_post_pass_failure_rolls_back_bravo_write(
+    alpha_token,
+    simple_erc20_vault,
+    ripe_gov_vault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_alpha,
+    mission_control,
+    governance,
+    bob,
+):
+    vault_a = _prepare_historical_row_with_current_ripe_gov(
+        alpha_token,
+        simple_erc20_vault,
+        ripe_gov_vault,
+        vault_book,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        mock_price_source,
+        lootbox,
+        teller,
+        switchboard_bravo,
+        switchboard_charlie,
+        switchboard_alpha,
+        mission_control,
+        governance,
+        bob,
+    )
+    hist_before = ledger.assetDepositPoints(vault_a, alpha_token)
+    current_before = ledger.assetDepositPoints(2, alpha_token)
+    action_id = _queue_deposit_params(
+        switchboard_bravo, governance, alpha_token, [2], 15, 0
+    )
+    boa.env.time_travel(blocks=max(switchboard_bravo.actionTimeLock(), 1))
+    with boa.reverts("invalid parameters"):
+        _charlie_bravo_charlie_batch(
+            governance,
+            switchboard_charlie,
+            switchboard_bravo,
+            alpha_token,
+            vault_a,
+            simple_erc20_vault.address,
+            action_id,
+            ZERO_ADDRESS,
+        )
+    assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == 0
+    assert _points_tuple(ledger.assetDepositPoints(vault_a, alpha_token)) == _points_tuple(
+        hist_before
+    )
+    assert _points_tuple(ledger.assetDepositPoints(2, alpha_token)) == _points_tuple(
+        current_before
+    )
+    assert switchboard_bravo.hasPendingAction(action_id)
+
+
+def test_disabled_current_vault_requires_vaultbook_restore(
+    alpha_token,
+    registerVault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    ledger,
+    switchboard_bravo,
+    switchboard_charlie,
+    mission_control,
+    governance,
+):
+    dummy = boa.loads(_COMPAT_VAULT, name="alloc_disableable_current_vault")
+    vault_id = registerVault(dummy, "Alloc disableable current vault")
+    _seed_live_asset(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        alpha_token,
+        [vault_id],
+        0,
+        20,
+    )
+    switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_id,
+        dummy.address,
+        sender=governance.address,
+    )
+    assert vault_book.startAddressDisableInRegistry(vault_id, sender=governance.address)
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(vault_id, sender=governance.address)
+    assert vault_book.getAddr(vault_id) == ZERO_ADDRESS
+
+    action_id = _queue_deposit_params(
+        switchboard_bravo, governance, alpha_token, [vault_id], 0, 0
+    )
+    boa.env.time_travel(blocks=max(switchboard_bravo.actionTimeLock(), 1))
+    with boa.reverts("invalid vault"):
+        switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    with boa.reverts("invalid vault"):
+        _charlie_bravo_batch(
+            governance,
+            switchboard_charlie,
+            switchboard_bravo,
+            alpha_token,
+            vault_id,
+            dummy.address,
+            action_id,
+        )
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 20
+    assert switchboard_bravo.hasPendingAction(action_id)
+
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id, dummy.address, sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(vault_id, sender=governance.address)
+    assert vault_book.getAddr(vault_id) == dummy.address
+    assert switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUpdate == boa.env.evm.patch.block_number
 
 
 def test_points_disabled_live_alloc_change_does_not_move_last_update(
@@ -658,6 +993,100 @@ def test_points_disabled_live_alloc_change_does_not_move_last_update(
     assert ledger.assetDepositPoints(vault_id, alpha_token).lastUpdate == row_before
     assert ledger.globalDepositPoints().lastUpdate == global_before
     assert ledger.ripeRewards().lastUpdate == rewards_before
+
+
+def test_live_alloc_change_fails_closed_when_lootbox_paused(
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_bravo,
+    switchboard_alpha,
+    mission_control,
+    governance,
+    bob,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _seed_live_asset(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        alpha_token,
+        [vault_id],
+        0,
+        20,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 20 * EIGHTEEN_DECIMALS, alpha_token)
+    lootbox.updateDepositPoints(
+        bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address
+    )
+    before = ledger.assetDepositPoints(vault_id, alpha_token)
+    action_id = _queue_deposit_params(
+        switchboard_bravo, governance, alpha_token, [vault_id], 0, 8
+    )
+    boa.env.time_travel(blocks=max(switchboard_bravo.actionTimeLock(), 1))
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("contract paused"):
+        switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 20
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUpdate == before.lastUpdate
+    assert switchboard_bravo.hasPendingAction(action_id)
+    lootbox.pause(False, sender=switchboard_alpha.address)
+
+
+def test_live_alloc_change_fails_closed_when_ledger_paused(
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_bravo,
+    switchboard_alpha,
+    mission_control,
+    governance,
+    bob,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _seed_live_asset(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        alpha_token,
+        [vault_id],
+        0,
+        20,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 20 * EIGHTEEN_DECIMALS, alpha_token)
+    lootbox.updateDepositPoints(
+        bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address
+    )
+    before = ledger.assetDepositPoints(vault_id, alpha_token)
+    action_id = _queue_deposit_params(
+        switchboard_bravo, governance, alpha_token, [vault_id], 0, 8
+    )
+    boa.env.time_travel(blocks=max(switchboard_bravo.actionTimeLock(), 1))
+    ledger.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("not activated"):
+        switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 20
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUpdate == before.lastUpdate
+    assert switchboard_bravo.hasPendingAction(action_id)
+    ledger.pause(False, sender=switchboard_alpha.address)
 
 
 def test_staged_target_becomes_live_and_is_checkpointed(
@@ -802,6 +1231,7 @@ def test_legacy_unwind_gas_ten_initialized_rows(
     lootbox,
     teller,
     switchboard_bravo,
+    mission_control,
     governance,
 ):
     vault_ids = []
@@ -826,6 +1256,9 @@ def test_legacy_unwind_gas_ten_initialized_rows(
         ledger.eval(
             f"self.assetDepositPoints[{vault_id}][{alpha_token.address}].lastBalance = {10**9}"
         )
+    ledger.eval("self.globalDepositPoints.lastUpdate = 1")
+    global_before = ledger.globalDepositPoints()
+    totals_before = mission_control.getRewardsConfig()
 
     lootbox.updateRipeRewards(sender=teller.address)
     avail_before = ledger.ripeAvailForRewards()
@@ -853,8 +1286,17 @@ def test_legacy_unwind_gas_ten_initialized_rows(
         f"LEGACY_UNWIND_GAS gas={gas_used} lootbox_calls={lootbox_calls}"
     )
     assert lootbox_calls == 20
-    assert gas_used < 8_000_000
+    assert gas_used < 4_400_000
     _assert_ripe_delta(ledger, avail_before, rewards_last_update_before, ripe_per_block)
+    for vault_id in vault_ids:
+        assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue != 0
+    global_after = ledger.globalDepositPoints()
+    global_elapsed = global_after.lastUpdate - global_before.lastUpdate
+    assert global_after.lastUpdate == boa.env.evm.patch.block_number
+    assert (
+        global_after.ripeStakerPoints
+        == global_before.ripeStakerPoints + totals_before.stakersPointsAllocTotal * global_elapsed
+    )
 
 
 def test_bravo_selects_rows_by_last_update_field_order(

@@ -63,6 +63,10 @@ interface MissionControl:
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
 
+# Word 0 of RipeRewardsConfig is arePointsEnabled.
+interface MissionControlRewardsHead:
+    def rewardsConfig() -> bool: view
+
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -895,6 +899,10 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
     return True
 
 
+# Governor-only historical checkpoint. No other contract calls this. Bravo
+# only settles current VaultBook rows; a removed or disabled vault needs an
+# explicit address in the same tx as Bravo.executePendingAction (Charlie-pre,
+# and Charlie-post on a staker 0 <-> nonzero crossing).
 @external
 def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -905,6 +913,7 @@ def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAdd
     assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
     bookAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
     assert bookAddr == empty(address) or bookAddr == _vaultAddr # dev: vault addr mismatch
+    assert staticcall MissionControlRewardsHead(self._getMissionControlAddr()).rewardsConfig() # dev: points disabled
 
     extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
     log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)

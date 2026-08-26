@@ -1199,6 +1199,8 @@ def setRewardsPointsEnabled(_shouldEnable: bool, _missionControl: address = empt
     rewardsConfig: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
     assert rewardsConfig.arePointsEnabled != _shouldEnable # dev: already set
     rewardsConfig.arePointsEnabled = _shouldEnable
+    # updateRipeRewards ignores arePointsEnabled, so this write does not settle.
+    # Accepted residual: re-enable can still span a disabled interval.
     self._writeRipeRewardsConfig(mc, rewardsConfig, False)
 
     log RewardsPointsEnabledModified(arePointsEnabled=_shouldEnable, caller=msg.sender)

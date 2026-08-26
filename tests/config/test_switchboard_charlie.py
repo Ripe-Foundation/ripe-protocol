@@ -4411,6 +4411,32 @@ def doesVaultHaveAnyFunds() -> bool:
     )
 
 
+def test_checkpoint_asset_deposit_points_at_requires_points_enabled(
+    switchboard_charlie,
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    switchboard_alpha.setRewardsPointsEnabled(False, sender=governance.address)
+    with boa.reverts("points disabled"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            simple_erc20_vault.address,
+            sender=governance.address,
+        )
+    switchboard_alpha.setRewardsPointsEnabled(True, sender=governance.address)
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_id,
+        simple_erc20_vault.address,
+        sender=governance.address,
+    )
+
+
 def test_flag_setters_preserve_allocation_totals(
     switchboard_bravo,
     switchboard_charlie,

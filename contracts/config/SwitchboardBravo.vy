@@ -40,7 +40,6 @@ interface MissionControl:
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
-    def rewardsConfig() -> cs.RipeRewardsConfig: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
@@ -61,6 +60,11 @@ interface Ledger:
 
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
+
+# Word 0 of RipeRewardsConfig is arePointsEnabled. Same head-decode idiom as
+# the retired MissionControlAssetConfigHead interface.
+interface MissionControlRewardsHead:
+    def rewardsConfig() -> bool: view
 
 interface PriceDesk:
     def tokenScale(_asset: address) -> uint256: view
@@ -834,6 +838,8 @@ def _isValidRedeemCollateralConfig(
 
 @view
 @internal
+# Order-sensitive: [1, 2] vs [2, 1] is a membership change. Do not spend
+# Bravo headroom on a set-compare.
 def _vaultIdsEqual(
     _a: DynArray[uint256, MAX_VAULTS_PER_ASSET],
     _b: DynArray[uint256, MAX_VAULTS_PER_ASSET],
@@ -902,8 +908,7 @@ def _writeAssetConfig(
     selectedAddrs: DynArray[address, MAX_VAULTS_PER_ASSET] = []
     lootbox: address = empty(address)
     if needCkpt:
-        rewards: cs.RipeRewardsConfig = staticcall MissionControl(_mc).rewardsConfig()
-        assert rewards.arePointsEnabled # dev: points disabled
+        assert staticcall MissionControlRewardsHead(_mc).rewardsConfig() # dev: points disabled
         ripeHq: address = gov._getRipeHqFromGov()
         ledger: address = staticcall RipeHq(ripeHq).getAddr(LEDGER_ID)
         vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
@@ -947,6 +952,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     if actionType == ActionType.ASSET_ADD_NEW:
         assert not staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: must be new asset
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
         self._writeAssetConfig(p.asset, p.config, mc, ActionType.ASSET_ADD_NEW, [], 0, 0)
         if not p.config.isNft:
             priceDesk: address = staticcall RipeHq(staticcall MissionControl(mc).getRipeHq()).getAddr(PRICE_DESK_ID)
@@ -979,6 +985,7 @@ def executePendingAction(_aid: uint256) -> bool:
         config.shouldAuctionInstantly = p.config.shouldAuctionInstantly
         config.specialStabPoolId = p.config.specialStabPoolId
         config.customAuctionParams = p.config.customAuctionParams
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
         self._writeAssetConfig(p.asset, config, mc, ActionType.ASSET_LIQ_CONFIG, [], 0, 0)
         log AssetLiqConfigSet(asset=p.asset, shouldBurnAsPayment=p.config.shouldBurnAsPayment, shouldTransferToEndaoment=p.config.shouldTransferToEndaoment, shouldSwapInStabPools=p.config.shouldSwapInStabPools, shouldAuctionInstantly=p.config.shouldAuctionInstantly, specialStabPoolId=p.config.specialStabPoolId, auctionStartDiscount=p.config.customAuctionParams.startDiscount, auctionMaxDiscount=p.config.customAuctionParams.maxDiscount, auctionDelay=p.config.customAuctionParams.delay, auctionDuration=p.config.customAuctionParams.duration)
 
@@ -990,6 +997,7 @@ def executePendingAction(_aid: uint256) -> bool:
         maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
         self._assertDebtTermsWithinMaxStep(pendingTerms, previousTerms, maxDeviation)
         config.debtTerms = pendingTerms
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
         self._writeAssetConfig(p.asset, config, mc, ActionType.ASSET_DEBT_TERMS, [], 0, 0)
         log AssetDebtTermsSet(asset=p.asset, ltv=pendingTerms.ltv, redemptionThreshold=pendingTerms.redemptionThreshold, liqThreshold=pendingTerms.liqThreshold, liqFee=pendingTerms.liqFee, borrowRate=pendingTerms.borrowRate, daowry=pendingTerms.daowry)
 
@@ -997,6 +1005,7 @@ def executePendingAction(_aid: uint256) -> bool:
         assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.whitelist = p.config.whitelist
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
         self._writeAssetConfig(p.asset, config, mc, ActionType.ASSET_WHITELIST, [], 0, 0)
         log WhitelistAssetSet(asset=p.asset, whitelist=p.config.whitelist)
 
