@@ -144,6 +144,7 @@ struct DepositPointsConfig:
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
     isNft: bool
+    shouldFundGenPoints: bool
 
 struct AssetRetirementConfig:
     isSupported: bool
@@ -974,11 +975,13 @@ def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsC
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
             isNft=assetConfig.isNft,
+            shouldFundGenPoints=assetConfig.stakersPointsAlloc == 0,
         )
     return DepositPointsConfig(
         stakersPointsAlloc=assetConfig.stakersPointsAlloc,
         voterPointsAlloc=assetConfig.voterPointsAlloc,
         isNft=assetConfig.isNft,
+        shouldFundGenPoints=assetConfig.stakersPointsAlloc == 0,
     )
 
 

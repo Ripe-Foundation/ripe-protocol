@@ -145,6 +145,7 @@ struct DepositPointsConfig:
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
     isNft: bool
+    shouldFundGenPoints: bool
 
 struct ClaimLootConfig:
     canClaimLoot: bool
@@ -892,10 +893,11 @@ def _getLatestDepositPoints(
         assetPoints.lastBalance += userLootShare
         userPoints.lastBalance = userLootShare
 
-    # Fund general-depositor USD only when stakersPointsAlloc == 0. Value is aggregate (`lastBalance * precision`), never the caller rate.
+    # General-depositor funding follows the asset-level staker allocation, independent of this row's membership.
+    # Value is aggregate (`lastBalance * precision`), never the caller rate.
     # Round down, cap at custody. Exact-32-byte sharesToAmount is SharesVault-compatible even if 0; failed matching probe is only nominal.
     newAssetUsdValue: uint256 = 0
-    if assetConfig.stakersPointsAlloc == 0:
+    if assetConfig.shouldFundGenPoints:
         if isRipeGovVault:
             newAssetUsdValue = self._getUsdValueForAmount(_asset, staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset), _a.priceDesk)
         elif assetPoints.lastBalance != 0:
