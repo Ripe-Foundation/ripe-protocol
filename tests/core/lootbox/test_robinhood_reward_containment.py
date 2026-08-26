@@ -61,7 +61,7 @@ def test_lootbox_unpause_before_zero_backfills_paused_interval(
     assert backfilled.newRipeRewards == rate * 16
 
 
-def test_ordered_pause_to_zero_keeps_lootbox_paused_until_both_actions_confirm(
+def test_ordered_zero_then_pause_keeps_disabled_interval_reward_free(
     setRipeRewardsConfig,
     setGeneralConfig,
     lootbox,
@@ -94,18 +94,7 @@ def test_ordered_pause_to_zero_keeps_lootbox_paused_until_both_actions_confirm(
         sender=switchboard_charlie.address,
     )
 
-    # Immediate containment is ordered: pause first, then three independent flags.
-    assert switchboard_charlie.pause(lootbox, True, sender=bob)
-    assert lootbox.isPaused()
-    assert rh_alpha.setCanClaimLoot(False, sender=bob)
-    assert rh_alpha.setCanClaimInStabPool(False, sender=bob)
-    assert rh_alpha.setRewardsPointsEnabled(False, sender=bob)
-    gen = mission_control.genConfig()
     rewards = mission_control.rewardsConfig()
-    assert not gen.canClaimLoot
-    assert not gen.canClaimInStabPool
-    assert not rewards.arePointsEnabled
-
     with boa.reverts("no perms"):
         rh_alpha.setRipePerBlock(0, sender=bob)
     with boa.reverts("no perms"):
@@ -129,14 +118,14 @@ def test_ordered_pause_to_zero_keeps_lootbox_paused_until_both_actions_confirm(
     boa.env.time_travel(blocks=599)
     assert not rh_alpha.executePendingAction(ripe_action, sender=governance.address)
     assert not rh_alpha.executePendingAction(stability_action, sender=governance.address)
-    assert lootbox.isPaused()
+    assert not lootbox.isPaused()
     assert rh_alpha.hasPendingAction(ripe_action)
     assert rh_alpha.hasPendingAction(stability_action)
 
     boa.env.time_travel(blocks=1)
     assert rh_alpha.executePendingAction(ripe_action, sender=governance.address)
     assert rh_alpha.executePendingAction(stability_action, sender=governance.address)
-    assert lootbox.isPaused()
+    assert not lootbox.isPaused()
     assert not rh_alpha.hasPendingAction(ripe_action)
     assert not rh_alpha.hasPendingAction(stability_action)
     zeroed = mission_control.rewardsConfig()
@@ -144,11 +133,27 @@ def test_ordered_pause_to_zero_keeps_lootbox_paused_until_both_actions_confirm(
     assert zeroed.stabPoolRipePerDollarClaimed == 0
     assert (zeroed.autoStakeRatio, zeroed.autoStakeDurationRatio) == initial_ratios
 
+    # Alpha must settle the old rate while Lootbox is live. Only after both
+    # reward sources are independently zeroed may the lite signer disable the
+    # user-facing paths and pause Lootbox without trapping either zero action.
+    assert rh_alpha.setCanClaimLoot(False, sender=bob)
+    assert rh_alpha.setCanClaimInStabPool(False, sender=bob)
+    assert rh_alpha.setRewardsPointsEnabled(False, sender=bob)
+    assert switchboard_charlie.pause(lootbox, True, sender=bob)
+    assert lootbox.isPaused()
+    gen = mission_control.genConfig()
+    rewards = mission_control.rewardsConfig()
+    assert not gen.canClaimLoot
+    assert not gen.canClaimInStabPool
+    assert not rewards.arePointsEnabled
+
     # A qualified lite signer can pause but cannot unpause.
     with boa.reverts("no perms"):
         switchboard_charlie.pause(lootbox, False, sender=bob)
 
-    # The safe checkpoint is only after both zeros are independently verified.
+    # A paused interval after zeroing cannot backfill RIPE when governance
+    # unpauses and checkpoints.
+    boa.env.time_travel(blocks=11)
     budget_before = ledger.ripeAvailForRewards()
     assert switchboard_charlie.pause(lootbox, False, sender=governance.address)
     checkpoint = lootbox.updateRipeRewards(sender=teller.address)

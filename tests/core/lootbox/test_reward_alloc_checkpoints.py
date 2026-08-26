@@ -562,7 +562,7 @@ def test_charlie_current_row_activation_then_bravo_zero_crossing_post_pass(
     assert mission_control.assetConfig(ripe_token).stakersPointsAlloc == 18
 
 
-def test_historical_charlie_pre_bravo_post_settles_old_then_new_rate(
+def test_member_gets_voter_alloc_historical_row_does_not_and_global_counts_once(
     alpha_token,
     simple_erc20_vault,
     rebase_erc20_vault,
@@ -598,6 +598,9 @@ def test_historical_charlie_pre_bravo_post_settles_old_then_new_rate(
         bob, vault_a, simple_erc20_vault, alpha_token, sender=teller.address
     )
 
+    # Activation policy: checkpoint a row under the old Lootbox while it is
+    # still a member. Otherwise the membership gate intentionally applies from
+    # that row's stale lastUpdate and the pre-removal interval is under-credited.
     zero_id = _queue_deposit_params(
         switchboard_bravo, governance, alpha_token, [vault_a], 0, 0
     )
@@ -632,6 +635,8 @@ def test_historical_charlie_pre_bravo_post_settles_old_then_new_rate(
     assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 20
 
     hist_before = hist_after_gap
+    current_before = ledger.assetDepositPoints(vault_b, alpha_token)
+    global_before = ledger.globalDepositPoints()
     action_id = _queue_deposit_params(
         switchboard_bravo,
         governance,
@@ -651,8 +656,16 @@ def test_historical_charlie_pre_bravo_post_settles_old_then_new_rate(
         action_id,
     )
     hist_mid = ledger.assetDepositPoints(vault_a, alpha_token)
-    assert hist_mid.ripeVotePoints == hist_before.ripeVotePoints + 20 * (
-        hist_mid.lastUpdate - hist_before.lastUpdate
+    current_mid = ledger.assetDepositPoints(vault_b, alpha_token)
+    global_mid = ledger.globalDepositPoints()
+    assert hist_mid.ripeVotePoints == hist_before.ripeVotePoints
+    current_elapsed = current_mid.lastUpdate - current_before.lastUpdate
+    assert current_mid.ripeVotePoints == (
+        current_before.ripeVotePoints + 20 * current_elapsed
+    )
+    global_elapsed = global_mid.lastUpdate - global_before.lastUpdate
+    assert global_mid.ripeVotePoints == (
+        global_before.ripeVotePoints + 20 * global_elapsed
     )
     assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 5
 
@@ -664,8 +677,22 @@ def test_historical_charlie_pre_bravo_post_settles_old_then_new_rate(
         simple_erc20_vault.address,
         sender=governance.address,
     )
+    global_after_historical_touch = ledger.globalDepositPoints()
+    switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_b,
+        rebase_erc20_vault.address,
+        sender=governance.address,
+    )
     hist_after = ledger.assetDepositPoints(vault_a, alpha_token)
-    assert hist_after.ripeVotePoints == hist_mid.ripeVotePoints + 5 * later
+    current_after = ledger.assetDepositPoints(vault_b, alpha_token)
+    global_after = ledger.globalDepositPoints()
+    assert hist_after.ripeVotePoints == hist_mid.ripeVotePoints
+    assert current_after.ripeVotePoints == current_mid.ripeVotePoints + 5 * later
+    assert global_after.ripeVotePoints == global_mid.ripeVotePoints + 5 * later
+    # The historical touch advances global totals; the member touch in the
+    # same block must not add the asset-wide allocation a second time.
+    assert global_after == global_after_historical_touch
 
 
 def _prepare_historical_row_with_current_ripe_gov(
@@ -781,7 +808,6 @@ def test_historical_staker_zero_crossing_uses_charlie_post_pass(
         assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == 15
 
     hist_before = ledger.assetDepositPoints(vault_a, alpha_token)
-    old_stakers = 0 if to_nonzero else 15
     new_stakers = 15 if to_nonzero else 0
     action_id = _queue_deposit_params(
         switchboard_bravo, governance, alpha_token, [2], new_stakers, 0
@@ -798,15 +824,57 @@ def test_historical_staker_zero_crossing_uses_charlie_post_pass(
         simple_erc20_vault.address,
     )
     hist_after = ledger.assetDepositPoints(vault_a, alpha_token)
-    elapsed = hist_after.lastUpdate - hist_before.lastUpdate
     assert hist_after.lastUpdate == boa.env.evm.patch.block_number
-    assert hist_after.ripeStakerPoints == hist_before.ripeStakerPoints + old_stakers * elapsed
+    assert hist_after.ripeStakerPoints == hist_before.ripeStakerPoints
     assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == new_stakers
     if to_nonzero:
         assert hist_before.lastUsdValue != 0
         assert hist_after.lastUsdValue == 0
     else:
         assert hist_after.lastUsdValue != 0
+
+    current_after = ledger.assetDepositPoints(2, alpha_token)
+    gen_before = hist_after.ripeGenPoints
+    global_before = ledger.globalDepositPoints()
+    boa.env.time_travel(blocks=3)
+    switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_a,
+        simple_erc20_vault.address,
+        sender=governance.address,
+    )
+    global_after_historical_touch = ledger.globalDepositPoints()
+    switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        2,
+        ripe_gov_vault.address,
+        sender=governance.address,
+    )
+    hist_later = ledger.assetDepositPoints(vault_a, alpha_token)
+    current_later = ledger.assetDepositPoints(2, alpha_token)
+    global_later = ledger.globalDepositPoints()
+    assert hist_later.ripeStakerPoints == hist_after.ripeStakerPoints
+    assert current_later.ripeStakerPoints == (
+        current_after.ripeStakerPoints + new_stakers * 3
+    )
+    assert global_later.ripeStakerPoints == (
+        global_before.ripeStakerPoints + new_stakers * 3
+    )
+    assert global_later == global_after_historical_touch
+    if to_nonzero:
+        # A historical row's gated staker allocation is zero, but that must
+        # not be confused with the asset-level decision to fund gen USD.
+        assert hist_later.lastUsdValue == 0
+        assert hist_later.ripeGenPoints == gen_before
+        assert global_later.lastUsdValue == 0
+        assert global_later.ripeGenPoints == global_before.ripeGenPoints
+    else:
+        # First-cut residual: with a real zero staker allocation, a historical
+        # row still carries and accrues its asset-level USD value on touch.
+        assert hist_later.lastUsdValue != 0
+        assert hist_later.ripeGenPoints > gen_before
+        assert global_later.lastUsdValue != 0
+        assert global_later.ripeGenPoints > global_before.ripeGenPoints
 
 
 def test_historical_post_pass_failure_rolls_back_bravo_write(

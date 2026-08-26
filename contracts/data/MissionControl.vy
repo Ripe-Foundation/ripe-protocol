@@ -144,6 +144,7 @@ struct DepositPointsConfig:
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
     isNft: bool
+    shouldFundGenPoints: bool
 
 struct AssetRetirementConfig:
     isSupported: bool
@@ -966,12 +967,22 @@ def getRewardsConfig() -> RewardsConfig:
 
 @view
 @external
-def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
+def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    shouldFundGenPoints: bool = assetConfig.stakersPointsAlloc == 0
+    # Membership gates staker and voter allocations; gen funding remains asset-level.
+    if _vaultId not in assetConfig.vaultIds:
+        return DepositPointsConfig(
+            stakersPointsAlloc=0,
+            voterPointsAlloc=0,
+            isNft=assetConfig.isNft,
+            shouldFundGenPoints=shouldFundGenPoints,
+        )
     return DepositPointsConfig(
         stakersPointsAlloc=assetConfig.stakersPointsAlloc,
         voterPointsAlloc=assetConfig.voterPointsAlloc,
         isNft=assetConfig.isNft,
+        shouldFundGenPoints=shouldFundGenPoints,
     )
 
 
