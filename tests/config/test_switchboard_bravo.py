@@ -2962,7 +2962,7 @@ def test_cannot_set_zero_thresholds_with_positive_ltv(
     action_id = switchboard_bravo.addAsset(
         alpha_token,
         [1],  # vaultIds
-        0,  # stakersPointsAlloc (50%)
+        0,  # stakersPointsAlloc
         0,  # voterPointsAlloc (30%) - total 80% < 100%
         10000 * 10**18,  # perUserDepositLimit
         1000000 * 10**18,  # globalDepositLimit

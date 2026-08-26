@@ -49,7 +49,7 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
 
 interface MissionControl:
-    def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig: view
+    def getAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> AuctionBuyConfig: view
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getGenAuctionParams() -> cs.AuctionParams: view
     def getGenLiqConfig() -> GenLiqConfig: view
@@ -90,10 +90,9 @@ interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
 
 struct AuctionBuyConfig:
-    canBuyInAuctionGeneral: bool
-    canBuyInAuctionAsset: bool
-    isUserAllowed: bool
+    canBuyInAuction: bool
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct UserBorrowTerms:
     collateralVal: uint256
@@ -1132,8 +1131,8 @@ def _buyFungibleAuction(
         return 0
 
     # check auction config
-    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getAuctionBuyConfig(_liqAsset, _recipient)
-    if not config.canBuyInAuctionGeneral or not config.canBuyInAuctionAsset or not config.isUserAllowed:
+    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getAuctionBuyConfig(_liqAsset, _recipient, _shouldTransferBalance)
+    if not config.canBuyInAuction:
         return 0
 
     # make sure caller can deposit to recipient
@@ -1173,7 +1172,7 @@ def _buyFungibleAuction(
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _recipient, _liqVaultId, liqVaultAddr, _liqAsset, _shouldTransferBalance, maxCollateralUsdValue, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _recipient, _liqVaultId, liqVaultAddr, _liqAsset, config.shouldTransferBalance, maxCollateralUsdValue, _a)
     if collateralUsdValueSent == 0:
         return 0
 

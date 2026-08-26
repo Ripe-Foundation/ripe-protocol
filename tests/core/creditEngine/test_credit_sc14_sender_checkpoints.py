@@ -349,6 +349,82 @@ def test_deregistered_redeem_forces_external_delivery(
     assert recipient_points.balancePoints == 0
 
 
+def test_deregistered_redeem_fails_closed_when_withdrawals_disabled(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    setRipeRewardsConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    vault_book,
+    simple_erc20_vault,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+):
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    _make_redeemable(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        setRipeRewardsConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        70 * EIGHTEEN_DECIMALS // 100,
+        enable_rewards=False,
+    )
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _debtTerms=debt_terms,
+        _canWithdraw=False,
+    )
+    assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    payment = 10 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    before = (
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        green_token.balanceOf(alice),
+    )
+
+    with boa.reverts("no redemptions occurred"):
+        _redeem(teller, bob, vault_id, alpha_token, payment, alice, True)
+
+    assert (
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        green_token.balanceOf(alice),
+    ) == before
+
+
 def test_sc14_redeem_same_block_repeated_operations(
     setGeneralConfig,
     setAssetConfig,

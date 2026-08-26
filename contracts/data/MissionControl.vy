@@ -76,17 +76,15 @@ struct RepayConfig:
     canAnyoneRepayDebt: bool
 
 struct RedeemCollateralConfig:
-    canRedeemCollateralGeneral: bool
-    canRedeemCollateralAsset: bool
-    isUserAllowed: bool
+    canRedeemCollateral: bool
     ltvPaybackBuffer: uint256
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct AuctionBuyConfig:
-    canBuyInAuctionGeneral: bool
-    canBuyInAuctionAsset: bool
-    isUserAllowed: bool
+    canBuyInAuction: bool
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct GenLiqConfig:
     canLiquidate: bool
@@ -734,14 +732,19 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 @view
 @external
-def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
+def getRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> RedeemCollateralConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
     return RedeemCollateralConfig(
-        canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
-        canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        canRedeemCollateral=(
+            self.genConfig.canRedeemCollateral
+            and assetConfig.canRedeemCollateral
+            and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
+            and (shouldTransferBalance or (self.genConfig.canWithdraw and assetConfig.canWithdraw))
+        ),
         ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+        shouldTransferBalance=shouldTransferBalance,
     )
 
 
@@ -756,13 +759,18 @@ def getLtvPaybackBuffer() -> uint256:
 
 @view
 @external
-def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
+def getAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> AuctionBuyConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
     return AuctionBuyConfig(
-        canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,
-        canBuyInAuctionAsset=assetConfig.canBuyInAuction,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        canBuyInAuction=(
+            self.genConfig.canBuyInAuction
+            and assetConfig.canBuyInAuction
+            and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
+            and (shouldTransferBalance or (self.genConfig.canWithdraw and assetConfig.canWithdraw))
+        ),
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+        shouldTransferBalance=shouldTransferBalance,
     )
 
 

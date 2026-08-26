@@ -55,6 +55,50 @@ def test_live_allocation_change_is_rejected_regardless_of_points_flag(
     assert switchboard_bravo.actionId() == action_id_before
 
 
+def test_live_allocation_head_decode_uses_distinct_staker_and_voter_words(
+    alpha_token,
+    setGeneralConfig,
+    setAssetConfig,
+    simple_erc20_vault,
+    vault_book,
+    switchboard_bravo,
+    governance,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    vault_ids = [1, vault_id]
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=vault_ids,
+        _stakersPointsAlloc=17,
+        _voterPointsAlloc=29,
+    )
+
+    action_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        vault_ids,
+        17,
+        29,
+        2_000 * EIGHTEEN_DECIMALS,
+        20_000 * EIGHTEEN_DECIMALS,
+        0,
+        sender=governance.address,
+    )
+    assert action_id > 0
+
+    with boa.reverts("invalid asset deposit params"):
+        switchboard_bravo.setAssetDepositParams(
+            alpha_token,
+            vault_ids,
+            29,
+            17,
+            2_000 * EIGHTEEN_DECIMALS,
+            20_000 * EIGHTEEN_DECIMALS,
+            0,
+            sender=governance.address,
+        )
+
+
 def test_live_allocation_is_revalidated_at_execution(
     alpha_token,
     setGeneralConfig,

@@ -4391,7 +4391,7 @@ def test_stab_vault_claims_no_dust_removal_above_threshold(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that claimable asset stays active at or above $0.02."""
+    """Test that claimable asset stays active at or above the $0.05 retention floor."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 

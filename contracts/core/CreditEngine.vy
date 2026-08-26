@@ -746,10 +746,10 @@ def _getUserBorrowTerms(
                 if hasBalance:
                     if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
                         bt.hasQuarantinedAsset = True
-            if amount != 0 and staticcall MissionControl(_a.missionControl).indexOfAsset(asset) == 0:
-                if bt.highestLtv < HUNDRED_PERCENT + 1:
-                    bt.highestLtv = HUNDRED_PERCENT + 1
             if amount != 0:
+                if staticcall MissionControl(_a.missionControl).indexOfAsset(asset) == 0:
+                    if bt.highestLtv < HUNDRED_PERCENT + 1:
+                        bt.highestLtv = HUNDRED_PERCENT + 1
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
                 # A positive debt-bearing balance without a usable price
                 # cannot safely contribute to account health decisions.

@@ -2313,7 +2313,7 @@ def test_stab_vault_redemptions_no_dust_removal_above_threshold(
     green_token,
     whale,
 ):
-    """Test that claimable asset stays active at or above $0.02."""
+    """Test that claimable asset stays active at or above the $0.05 retention floor."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 

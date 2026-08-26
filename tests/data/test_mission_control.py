@@ -837,6 +837,55 @@ def test_mission_control_get_teller_withdraw_config(mission_control, switchboard
     config = mission_control.getTellerWithdrawConfig(alpha_token.address, alice, bob)
     assert config.canWithdrawForUser
 
+
+def test_mission_control_effective_external_delivery_policy(
+    mission_control,
+    setGeneralConfig,
+    setAssetConfig,
+    switchboard_alpha,
+    alpha_token,
+    alice,
+):
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+
+    # Supported collateral honors the caller's requested delivery mode.
+    redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getAuctionBuyConfig(alpha_token, alice, True)
+    assert redeem.canRedeemCollateral and redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and auction.shouldTransferBalance
+
+    # External delivery is allowed while both withdrawal flags are enabled.
+    redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice, False)
+    auction = mission_control.getAuctionBuyConfig(alpha_token, alice, False)
+    assert redeem.canRedeemCollateral and not redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and not auction.shouldTransferBalance
+
+    # Asset-level withdrawal disable blocks external delivery but leaves a
+    # supported internal transfer available.
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _canWithdraw=False,
+    )
+    assert not mission_control.getRedeemCollateralConfig(alpha_token, alice, False).canRedeemCollateral
+    assert not mission_control.getAuctionBuyConfig(alpha_token, alice, False).canBuyInAuction
+    assert mission_control.getRedeemCollateralConfig(alpha_token, alice, True).canRedeemCollateral
+    assert mission_control.getAuctionBuyConfig(alpha_token, alice, True).canBuyInAuction
+
+    # Deregistration always coerces the effective mode to external, which now
+    # fails closed because withdrawals were disabled before deregistration.
+    assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+    redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getAuctionBuyConfig(alpha_token, alice, True)
+    assert not redeem.canRedeemCollateral and not redeem.shouldTransferBalance
+    assert not auction.canBuyInAuction and not auction.shouldTransferBalance
+
 def test_mission_control_get_borrow_config(mission_control, switchboard_alpha, alice, bob, sample_gen_config, sample_gen_debt_config, sample_action_delegation):
     """Test getting borrow configuration."""
     # Set up configs

@@ -41,8 +41,7 @@ interface CreditEngine:
     def getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256): view
 
 interface MissionControl:
-    def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
-    def indexOfAsset(_asset: address) -> uint256: view
+    def getRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> RedeemCollateralConfig: view
     def preferredStabVaultId() -> uint256: view
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
@@ -87,11 +86,10 @@ struct RepayDataBundle:
     numUserVaults: uint256
 
 struct RedeemCollateralConfig:
-    canRedeemCollateralGeneral: bool
-    canRedeemCollateralAsset: bool
-    isUserAllowed: bool
+    canRedeemCollateral: bool
     ltvPaybackBuffer: uint256
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct CollateralRedemption:
     user: address
@@ -199,8 +197,8 @@ def _redeemCollateral(
         return 0
 
     # redemptions not allowed on asset
-    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getRedeemCollateralConfig(_asset, _recipient)
-    if not config.canRedeemCollateralGeneral or not config.canRedeemCollateralAsset or not config.isUserAllowed:
+    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getRedeemCollateralConfig(_asset, _recipient, _shouldTransferBalance)
+    if not config.canRedeemCollateral:
         return 0
 
     # make sure caller can deposit to recipient
@@ -249,12 +247,8 @@ def _redeemCollateral(
     if maxAssetAmount == 0 or userAmount <= unsafe_sub(maxAssetAmount, 1) // maxRedeemValue:
         return 0
 
-    # Unsupported collateral is exit-only: never open a recipient vault row.
-    if staticcall MissionControl(_a.missionControl).indexOfAsset(_asset) == 0:
-        _shouldTransferBalance = False
-
     # withdraw or transfer balance to redeemer
-    amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(_shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)
+    amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(config.shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)
     assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
     if amountSent == 0:
         return 0
