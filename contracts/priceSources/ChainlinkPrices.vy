@@ -26,14 +26,14 @@ interface ChainlinkFeed:
     def latestRoundData() -> ChainlinkRound: view
     def decimals() -> uint8: view 
 
+interface PriceDesk:
+    def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
+
 interface MissionControl:
     def getPriceStaleTime() -> uint256: view
 
 interface RipeHq:
     def numAddrs() -> uint256: view
-
-interface PriceDesk:
-    def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
 
 struct ChainlinkRound:
     roundId: uint80
@@ -391,6 +391,26 @@ def _hasExpectedFeedDecimals(_feed: address, _expectedDecimals: uint256) -> bool
     return hasDecimals and liveDecimals == _expectedDecimals
 
 
+
+# qualify price source
+
+
+@view
+@internal
+def _qualifyPriceSource(_asset: address):
+    priceDesk: address = addys._getPriceDeskAddr()
+    if priceDesk == empty(address):
+        # fresh deployments seed feeds before ripe hq reaches the price desk slot.
+        # Once that slot has existed, a disabled/missing PriceDesk must fail closed.
+        assert staticcall RipeHq(addys._getRipeHq()).numAddrs() <= PRICE_DESK_ID # dev: missing price desk
+        return
+
+    qualifiedPrice: uint256 = 0
+    sourceStatus: uint256 = 0
+    qualifiedPrice, sourceStatus = staticcall PriceDesk(priceDesk).qualifyCallerPriceSource(_asset)
+    assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
+
+
 ##################
 # Chainlink Data #
 ##################
@@ -658,22 +678,6 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 
     log ChainlinkFeedUpdated(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, staleTime=d.config.staleTime, oldFeed=oldFeed)
     return True
-
-
-@view
-@internal
-def _qualifyPriceSource(_asset: address):
-    priceDesk: address = addys._getPriceDeskAddr()
-    if priceDesk == empty(address):
-        # Fresh deployments seed feeds before RipeHq reaches the PriceDesk slot.
-        # Once that slot has existed, a disabled/missing PriceDesk must fail closed.
-        assert staticcall RipeHq(addys._getRipeHq()).numAddrs() <= PRICE_DESK_ID # dev: missing price desk
-        return
-
-    qualifiedPrice: uint256 = 0
-    sourceStatus: uint256 = 0
-    qualifiedPrice, sourceStatus = staticcall PriceDesk(priceDesk).qualifyCallerPriceSource(_asset)
-    assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
 
 
 # cancel update feed

@@ -875,8 +875,8 @@ def _calcClaimSharesAndAmount(
 
     # finalize withdrawal amount / shares
     claimAmount: uint256 = min(maxClaimAmount, totalClaimAsset)
-    # A limit that already covers the full position needs no proration. This
-    # also keeps an arbitrarily large finite limit out of the multiplication.
+
+    # a limit that already covers the full position needs no proration. this also keeps an arbitrarily large finite limit out of the multiplication.
     if _maxUsdValue < maxClaimUsdValue:
         claimAmount = min(claimAmount, _maxUsdValue * maxClaimAmount // maxClaimUsdValue)
 
@@ -888,9 +888,7 @@ def _calcClaimSharesAndAmount(
     if _maxUsdValue != max_value(uint256):
         claimUsdValue = min(claimUsdValue, _maxUsdValue)
 
-    # Preserve the full-position exit when inverse/forward rounding leaves a
-    # sub-tolerance residual. Larger coarse-asset gaps must leave the
-    # corresponding shares intact.
+    # preserve the full-position exit when inverse/forward rounding leaves a sub-tolerance residual. larger coarse-asset gaps must leave the corresponding shares intact.
     if (
         _maxUsdValue >= maxClaimUsdValue
         and maxClaimAmount <= totalClaimAsset
