@@ -10,7 +10,7 @@ EIP170_LIMIT = 24_576
 # RipeGov headroom is 460 bytes after the migration, SharesVault, and
 # governance-remediation changes. Any RipeGov edit must remeasure this pin.
 # Composed SwitchboardAlpha headroom is 14 bytes after binding its chain-local
-# Pyth source ID. Teller and CreditEngine retain 24 and 15 bytes respectively at
+# Pyth source ID. Teller and CreditEngine retain 24 and 33 bytes respectively at
 # this head. Endaoment retains 1,190 bytes after binding its chain-local Curve
 # source ID. These pins include the deployed immutable data.
 # Lootbox headroom is 120 bytes at the pinned 24,456-byte deployed runtime
