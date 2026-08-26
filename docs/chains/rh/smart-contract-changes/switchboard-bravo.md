@@ -24,13 +24,17 @@ Teller, CreditEngine, and Endaoment resolve Curve through a constructor
 `CURVE_PRICES_ID` immutable. Bravo does not: the owner forbade a constructor
 argument on this addition. The PriceDesk ID remains a call argument. On
 Robinhood the keeper calls `addGreenRefPoolSnapshot(2)`. That `2` is
-CurvePrices' PriceDesk registry ID. It is separate from Bravo also being
-Switchboard child ID 2.
+CurvePrices' PriceDesk registry ID. It is separate from the fact that the
+currently deployed Bravo occupies Switchboard child ID 2.
 
 Measured deployed runtime after the wrapper is 24,177 bytes, leaving 399 bytes
 of EIP-170 headroom. That consumed 56% of Bravo's remaining budget. Bravo is
 no longer the last comfortable config-contract margin; the runtime gate now
-also enforces a 200-byte Bravo floor.
+also enforces a Bravo-only 200-byte floor. That floor is not the retired
+global RH-D026 mechanism.
+
+The complete keeper addition changes `SwitchboardBravo`'s ABI and cumulative
+seal. Later comment-only Bravo edits do not.
 
 ## Authorization and failure semantics
 
@@ -49,25 +53,52 @@ A successful Curve update returns true and logs `didUpdate=true`. Same-block
 duplicates and a paused Curve return false and log `didUpdate=false`. A
 genuine Curve revert leaves no operational event.
 
+The intended CurvePrices call is privileged and state-changing. The unexpected
+cross-source collision radius is empty today (no `__default__`, only
+CurvePrices exposes `0x7cdb0a4d`); that is a repository test, not an on-chain
+invariant.
+
 ## Lite-signer grant is the practical launch path
 
 Keeper cadence cannot be a Safe transaction per snapshot. The operational
-grant is:
+grant is two contract calls/steps:
 
 1. `SwitchboardAlpha.setCanPerformLiteAction(keeper, True)`
 2. `SwitchboardAlpha.executePendingAction(aid)`
 
-That is two Safe transactions even with Robinhood's zero timelock. Revoke is
-one transaction. Lite-signer status is not scoped to this function. The same
-key can disable or pause through Alpha, Charlie, Delta, and Echo, call Alpha's
-generic `addPriceSnapshot`, and push Pyth/Stork payloads. That unscoped
-disable/pause power belongs in the Robinhood launch risk register before the
-grant.
+With Robinhood's zero `actionTimeLock` they can confirm in the same block and
+may be Safe-batched if policy allows. Revoke is one immediate call.
+MissionControl accepts any address; use "keeper address/caller" until a
+credential architecture is selected.
+
+Lite-signer status is a broad, unscoped protocol-operations role. Immediate
+surfaces include Charlie pause, blacklist, account lock, debt updates, and
+loot/reward operations; Delta deleverage, contributor cash/cancel/freeze, bond
+disable, and booster removal; Echo Endaoment yield/fund movement, conversions,
+claims, and stabilization; Alpha generic `addPriceSnapshot` plus Pyth/Stork
+payloads; and this wrapper. Echo PSM-disable paths are proposals that still
+require governance `executePendingAction`. That unscoped operations power
+belongs in the Robinhood launch risk register before the grant.
+
+## Snapshots and dynamic rates are active
+
+Owner ratifies GREEN reference snapshots and Curve-driven dynamic borrow rates
+as active at Robinhood launch, with `DefaultsRobinhood.increasePerDangerBlock
+= 60`. Teller already snapshots on housekeeping; this keeper only guarantees
+cadence. A shallow configured pool is cheap to push past `dangerTrigger`,
+after which danger blocks raise borrow rates protocol-wide. That risk is
+accepted with the slope.
+
+[`curve-launch-activation.md`](../curve-launch-activation.md) is stale on a
+specific claim: it still says the launch candidate does not configure "the
+GREEN reference-pool configuration or Teller snapshots" and does not activate
+"Curve-driven dynamic rates." The inventory overlay and CAD-001 still say
+inactive. This page does not rewrite those files.
 
 ## Launch follow-up
 
-Merging this source does not make the wrapper available on the currently
-deployed Bravo. Before activation:
+Merging this source does not make the wrapper available on the Bravo that
+currently occupies Switchboard child ID 2. Before activation:
 
 - Deploy the exact final Bravo runtime and authenticate source, compiler, ABI,
   constructor arguments, and the 24,177-byte runtime.
@@ -75,19 +106,18 @@ deployed Bravo. Before activation:
   including `actionTimeLock == 0`.
 - Recheck every Bravo-local pending action; replacement creates fresh storage
   and can strand queued actions.
-- Perform an address update of existing Switchboard child ID 2, not a new
-  slot. Prove candidate rejection before registration and Curve qualification
-  after registration.
+- Address-update that existing Switchboard child ID 2 slot, not a new slot. A
+  newly deployed candidate is not a valid RIPE caller until that slot is
+  updated. Prove candidate rejection before the update and Curve qualification
+  after it.
 - If MissionControl is also replaced in the wider rollout, migrate and verify
   lite-signer membership.
-- Update keeper, indexer, ABI consumers, and monitoring to the new Bravo
-  address. Monitor failed receipts as well as events.
-- Account for Robinhood EVM `block.number` reuse across child blocks;
-  duplicate `false` outcomes can be legitimate.
+- Update the keeper address/caller, indexer, ABI consumers, and monitoring to
+  the new Bravo address. Monitor failed receipts as well as events.
+- Account for Robinhood EVM `block.number` reuse across child blocks
+  (BN-011); duplicate `false` outcomes can be legitimate.
 
-[`curve-launch-activation.md`](../curve-launch-activation.md) and several
-Blueprint Bravo anchors remain separately stale. This page does not refresh
-them.
+Several Blueprint Bravo anchors also remain separately stale.
 
 ## Tests
 

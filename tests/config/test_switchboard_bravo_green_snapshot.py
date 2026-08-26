@@ -39,6 +39,8 @@ def addGreenRefPoolSnapshot() -> bool:
     raise "snapshot failure"
 """
 
+# Serves only MissionControl (RipeHq ID 5) and PriceDesk (ID 7). Every other
+# getAddr id returns empty(address) on purpose.
 MOCK_HQ_SOURCE = """
 # @version 0.4.3
 
@@ -117,6 +119,10 @@ def _event_named(abi, name):
     )
 
 
+# Child-call traces use titanoboa 0.2.7 private internals
+# (`contract._computation`, `computation.children`, `child.msg.code_address`,
+# `child.msg.data`). They are not public boa API. A boa bump that changes
+# those attributes will break the no-write / pointer-rotation proofs first.
 def _walk_children(computation):
     for child in computation.children:
         yield child
@@ -143,7 +149,12 @@ def _price_source_vy_files():
 
 
 def _price_source_abi_paths():
-    return [ABI_DIR / f"{path.stem}.json" for path in _price_source_vy_files()]
+    paths = []
+    for source in _price_source_vy_files():
+        path = ABI_DIR / f"{source.stem}.json"
+        assert path.exists(), f"missing exported ABI for {source.stem}"
+        paths.append(path)
+    return paths
 
 
 def _register_price_source(price_desk, governance, source, description):
@@ -207,7 +218,9 @@ def _ring_state(curve):
 def _logs_from_wrapper(switchboard_bravo, event_name, computation=None):
     # Child logs live on the wrapper computation. Later Curve view calls
     # replace curve.get_logs(), so read them from Bravo immediately.
-    entries = switchboard_bravo.get_logs(computation=computation)
+    # Bravo events use boa's default strict=True. The Alpha regression below
+    # still uses filter_logs(..., _strict=False), the repo helper.
+    entries = switchboard_bravo.get_logs(strict=True, computation=computation)
     return [entry for entry in entries if type(entry).__name__ == event_name]
 
 
@@ -255,6 +268,8 @@ def _load_isolated_desk(mock_hq, name):
 # Titanoboa 0.2.7 wraps each test in boa.env.anchor() via its pytest plugin,
 # so module-scoped Curve storage mutations (pause, snapshots) do not leak.
 # These tests rely on that plugin isolation rather than local unpause/reset.
+# Child-call traces additionally depend on the private computation attributes
+# documented on `_walk_children`.
 
 
 @pytest.fixture(scope="module")
@@ -687,6 +702,10 @@ def test_wrapper_reads_current_price_desk_and_mission_control(alice, bob, sally)
         "Desk A counter",
         sender=bob,
     )
+    # Isolated desks start with registryChangeTimeLock == 0, so same-block
+    # confirm currently works. Travel anyway so this does not depend on that
+    # initial lock or on boa incrementing the block per transaction.
+    boa.env.time_travel(blocks=first_desk.registryChangeTimeLock() + 1)
     first_id = first_desk.confirmNewAddressToRegistry(first_counter, sender=bob)
     assert first_id == 1
 
@@ -697,6 +716,7 @@ def test_wrapper_reads_current_price_desk_and_mission_control(alice, bob, sally)
         "Desk B counter",
         sender=bob,
     )
+    boa.env.time_travel(blocks=second_desk.registryChangeTimeLock() + 1)
     second_id = second_desk.confirmNewAddressToRegistry(second_counter, sender=bob)
     assert second_id == 1
 
@@ -743,6 +763,13 @@ def test_only_curve_prices_exposes_specialized_green_snapshot(switchboard_bravo)
         if re.search(r"def\s+addGreenRefPoolSnapshot\s*\(", path.read_text())
     )
     assert source_hits == ["CurvePrices.vy"]
+
+    default_hits = sorted(
+        path.name
+        for path in _price_source_vy_files()
+        if re.search(r"def\s+__default__\s*\(", path.read_text())
+    )
+    assert default_hits == []
 
     specialized_hits = []
     wrapper_hits = []
