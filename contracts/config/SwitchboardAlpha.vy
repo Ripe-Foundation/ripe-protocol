@@ -68,6 +68,7 @@ interface PriceSource:
 
 interface Lootbox:
     def updateRipeRewards(): nonpayable
+    def isPaused() -> bool: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -1187,7 +1188,12 @@ def _setPendingRipeRewardsConfig(
 def _writeRipeRewardsConfig(_mc: address, _config: cs.RipeRewardsConfig, _settle: bool):
     if _settle:
         if _mc == self._getMissionControlAddr():
-            extcall Lootbox(self._hqAddr(LOOTBOX_ID)).updateRipeRewards()
+            lootbox: address = self._hqAddr(LOOTBOX_ID)
+            # Skip only the RH containment case: Lootbox paused and the new
+            # rate is 0. That forfeits the unsettled window. Any other paused
+            # RIPE-field settle must still call and revert.
+            if not (staticcall Lootbox(lootbox).isPaused() and _config.ripePerBlock == 0):
+                extcall Lootbox(lootbox).updateRipeRewards()
     extcall MissionControl(_mc).setRipeRewardsConfig(_config)
 
 

@@ -28,8 +28,8 @@ EIP170_LIMIT = 24_576
 # before merge.
 # SwitchboardBravo retains 47 bytes after head-decoding rewardsConfig.
 # A dead current VaultBook row fail-closes; restore the book, then Bravo.
-# SwitchboardAlpha retains 230 bytes after restoring live RIPE reward
-# settlement and emitting config logs after the MissionControl write.
+# SwitchboardAlpha retains 117 bytes after skipping settle only when
+# Lootbox is paused and the new ripePerBlock is 0.
 # SwitchboardCharlie retains 1,151 bytes after the governor-only historical
 # checkpoint wrapper. CreditRedeem retains 16,094 bytes after consuming MissionControl's
 # effective redemption-delivery flag. AuctionHouse retains 46 bytes after the
@@ -45,7 +45,7 @@ EIP170_LIMIT = 24_576
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16856,
     "DefaultsLocal": 1200,
-    "SwitchboardAlpha": 24346,
+    "SwitchboardAlpha": 24459,
     "SwitchboardBravo": 24529,
     "SwitchboardCharlie": 23425,
     "SwitchboardEcho": 23930,

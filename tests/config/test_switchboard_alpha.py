@@ -4349,3 +4349,49 @@ def test_alpha_live_ripe_per_block_fails_closed_when_lootbox_paused(
     with boa.reverts("contract paused"):
         switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     lootbox.pause(False, sender=switchboard_alpha.address)
+
+
+def test_alpha_paused_zero_ripe_per_block_skips_settle_and_forfeits(
+    switchboard_alpha,
+    governance,
+    lootbox,
+    ledger,
+    teller,
+    mission_control,
+    setRipeRewardsConfig,
+):
+    rate = 9
+    setRipeRewardsConfig(True, rate, 10_00, 90_00, 0, 0)
+    lootbox.updateRipeRewards(sender=teller.address)
+    before = ledger.ripeRewards()
+    boa.env.time_travel(blocks=7)
+    lootbox.pause(True, sender=switchboard_alpha.address)
+
+    action_id = switchboard_alpha.setRipePerBlock(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert lootbox.isPaused()
+    assert mission_control.rewardsConfig().ripePerBlock == 0
+    assert ledger.ripeRewards().lastUpdate == before.lastUpdate
+
+    lootbox.pause(False, sender=switchboard_alpha.address)
+    checkpoint = lootbox.updateRipeRewards(sender=teller.address)
+    assert checkpoint.newRipeRewards == 0
+    assert ledger.ripeRewards().lastUpdate == boa.env.evm.patch.block_number
+
+
+def test_alpha_live_allocs_fail_closed_when_lootbox_paused(
+    switchboard_alpha,
+    governance,
+    lootbox,
+    setRipeRewardsConfig,
+):
+    setRipeRewardsConfig(True, 9, 10_00, 90_00, 0, 0)
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    action_id = switchboard_alpha.setRipeRewardsAllocs(
+        40_00, 20_00, 20_00, 20_00, sender=governance.address
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("contract paused"):
+        switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    lootbox.pause(False, sender=switchboard_alpha.address)
