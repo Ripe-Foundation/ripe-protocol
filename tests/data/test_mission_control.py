@@ -504,7 +504,7 @@ def test_mission_control_deregister_asset(mission_control, switchboard_alpha, al
     "stakers_points_alloc,voter_points_alloc",
     [(77, 0), (0, 91)],
 )
-def test_mission_control_deregister_asset_rejects_active_points_alloc(
+def test_mission_control_deregister_asset_is_policy_neutral(
     mission_control,
     switchboard_alpha,
     alpha_token,
@@ -521,92 +521,20 @@ def test_mission_control_deregister_asset_rejects_active_points_alloc(
         sender=switchboard_alpha.address,
     )
 
-    supported_before = mission_control.isSupportedAsset(alpha_token.address)
-    index_before = mission_control.indexOfAsset(alpha_token.address)
     num_assets_before = mission_control.numAssets()
-    enumeration_before = [
-        mission_control.assets(i) for i in range(1, mission_control.getNumAssets() + 1)
-    ]
     config_before = mission_control.assetConfig(alpha_token.address)
     totals_before = mission_control.totalPointsAllocs()
 
-    with boa.reverts("active points alloc"):
-        mission_control.deregisterAsset(
-            alpha_token.address,
-            sender=switchboard_alpha.address,
-        )
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
 
-    assert mission_control.isSupportedAsset(alpha_token.address) == supported_before
-    assert mission_control.indexOfAsset(alpha_token.address) == index_before
-    assert mission_control.numAssets() == num_assets_before
-    assert [
-        mission_control.assets(i) for i in range(1, mission_control.getNumAssets() + 1)
-    ] == enumeration_before
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.indexOfAsset(alpha_token.address) == 0
+    assert mission_control.numAssets() == num_assets_before - 1
     assert mission_control.assetConfig(alpha_token.address) == config_before
     assert mission_control.totalPointsAllocs() == totals_before
-
-
-@pytest.mark.parametrize(
-    "field_index",
-    [
-        12,  # canWithdraw
-        13,  # canRedeemCollateral
-        15,  # canBuyInAuction
-    ],
-)
-def test_mission_control_deregister_asset_requires_open_exit_paths(
-    mission_control,
-    switchboard_alpha,
-    alpha_token,
-    sample_asset_config,
-    field_index,
-):
-    config = list(sample_asset_config)
-    config[1] = 0
-    config[2] = 0
-    config[field_index] = False
-    mission_control.setAssetConfig(
-        alpha_token,
-        tuple(config),
-        sender=switchboard_alpha.address,
-    )
-
-    index_before = mission_control.indexOfAsset(alpha_token)
-    num_assets_before = mission_control.numAssets()
-    with boa.reverts("exit paths disabled"):
-        mission_control.deregisterAsset(
-            alpha_token,
-            sender=switchboard_alpha.address,
-        )
-
-    assert mission_control.indexOfAsset(alpha_token) == index_before
-    assert mission_control.numAssets() == num_assets_before
-    assert mission_control.isSupportedAsset(alpha_token)
-
-
-def test_mission_control_deregister_zero_ltv_asset_only_requires_withdrawal_exit(
-    mission_control,
-    switchboard_alpha,
-    alpha_token,
-    sample_asset_config,
-):
-    config = list(sample_asset_config)
-    config[1] = 0
-    config[2] = 0
-    config[6] = (0, 0, 0, 0, 0, 0)
-    config[13] = False  # canRedeemCollateral is inapplicable at zero LTV
-    config[15] = False  # canBuyInAuction is inapplicable at zero LTV
-    mission_control.setAssetConfig(
-        alpha_token,
-        tuple(config),
-        sender=switchboard_alpha.address,
-    )
-
-    assert mission_control.deregisterAsset(
-        alpha_token,
-        sender=switchboard_alpha.address,
-    )
-    assert not mission_control.isSupportedAsset(alpha_token)
 
 
 def test_mission_control_deregister_asset_nonexistent(
@@ -810,50 +738,25 @@ def test_mission_control_deregister_asset_points_allocs_conservation(
         sender=switchboard_alpha.address,
     )
 
-    retired_before = mission_control.assetConfig(alpha_token.address)
     active_before = mission_control.assetConfig(bravo_token.address)
     totals_before = mission_control.totalPointsAllocs()
-    with boa.reverts("active points alloc"):
-        mission_control.deregisterAsset(
-            alpha_token.address,
-            sender=switchboard_alpha.address,
-        )
-    assert mission_control.assetConfig(alpha_token.address) == retired_before
-    assert mission_control.totalPointsAllocs() == totals_before
-
-    zeroed_config = list(retired_before)
-    zeroed_config[1] = 0
-    zeroed_config[2] = 0
-    mission_control.setAssetConfig(
-        alpha_token.address,
-        tuple(zeroed_config),
-        sender=switchboard_alpha.address,
-    )
-
-    retired_zeroed = mission_control.assetConfig(alpha_token.address)
-    totals_after_zeroing = mission_control.totalPointsAllocs()
-    assert list(retired_zeroed.vaultIds) == list(retired_before.vaultIds)
-    assert retired_zeroed.perUserDepositLimit == retired_before.perUserDepositLimit
-    assert retired_zeroed.globalDepositLimit == retired_before.globalDepositLimit
-    assert retired_zeroed.minDepositBalance == retired_before.minDepositBalance
-    assert totals_after_zeroing.stakersPointsAllocTotal == (
-        totals_before.stakersPointsAllocTotal - retired_before.stakersPointsAlloc
-    )
-    assert totals_after_zeroing.voterPointsAllocTotal == (
-        totals_before.voterPointsAllocTotal - retired_before.voterPointsAlloc
-    )
+    retired_before = mission_control.assetConfig(alpha_token.address)
 
     assert mission_control.deregisterAsset(
         alpha_token.address,
         sender=switchboard_alpha.address,
     )
     totals_after_deregister = mission_control.totalPointsAllocs()
-    assert totals_after_deregister == totals_after_zeroing
-    assert mission_control.assetConfig(alpha_token.address) == retired_zeroed
+    assert totals_after_deregister == totals_before
+    assert mission_control.assetConfig(alpha_token.address) == retired_before
     assert not mission_control.isSupportedAsset(alpha_token.address)
     assert mission_control.isSupportedAsset(bravo_token.address)
-    assert totals_after_deregister.stakersPointsAllocTotal == active_before.stakersPointsAlloc
-    assert totals_after_deregister.voterPointsAllocTotal == active_before.voterPointsAlloc
+    assert totals_after_deregister.stakersPointsAllocTotal == (
+        retired_before.stakersPointsAlloc + active_before.stakersPointsAlloc
+    )
+    assert totals_after_deregister.voterPointsAllocTotal == (
+        retired_before.voterPointsAlloc + active_before.voterPointsAlloc
+    )
 
 
 ######################

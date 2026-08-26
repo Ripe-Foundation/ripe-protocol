@@ -158,6 +158,16 @@ struct DepositPointsConfig:
     voterPointsAlloc: uint256
     isNft: bool
 
+struct AssetRetirementConfig:
+    isSupported: bool
+    hasPointsAlloc: bool
+    ltv: uint256
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canBuyInAuction: bool
+    shouldTransferToEndaoment: bool
+    isNft: bool
+
 struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
@@ -352,11 +362,6 @@ def deregisterAsset(_asset: address) -> bool:
     if targetIndex == 0:
         return False
 
-    assert self.assetConfig[_asset].stakersPointsAlloc == 0 and self.assetConfig[_asset].voterPointsAlloc == 0 # dev: active points alloc
-    # Deregistration is terminal until a full addAsset re-registration. Always
-    # preserve voluntary exit; debt exit flags also apply when the asset has LTV.
-    assert self.assetConfig[_asset].canWithdraw and (self.assetConfig[_asset].debtTerms.ltv == 0 or (self.assetConfig[_asset].canBuyInAuction and self.assetConfig[_asset].canRedeemCollateral)) # dev: exit paths disabled
-
     # update data
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
@@ -369,6 +374,22 @@ def deregisterAsset(_asset: address) -> bool:
         self.indexOfAsset[lastItem] = targetIndex
 
     return True
+
+
+@view
+@external
+def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    return AssetRetirementConfig(
+        isSupported=self.indexOfAsset[_asset] != 0,
+        hasPointsAlloc=assetConfig.stakersPointsAlloc != 0 or assetConfig.voterPointsAlloc != 0,
+        ltv=assetConfig.debtTerms.ltv,
+        canWithdraw=assetConfig.canWithdraw,
+        canRedeemCollateral=assetConfig.canRedeemCollateral,
+        canBuyInAuction=assetConfig.canBuyInAuction,
+        shouldTransferToEndaoment=assetConfig.shouldTransferToEndaoment,
+        isNft=assetConfig.isNft,
+    )
 
 
 ###############
@@ -749,6 +770,7 @@ def getRepayConfig(_user: address) -> RepayConfig:
 @view
 @external
 def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
+    # Legacy ABI-compatible view; protocol delivery uses getEffectiveRedeemCollateralConfig.
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return RedeemCollateralConfig(
         canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
@@ -790,6 +812,7 @@ def getLtvPaybackBuffer() -> uint256:
 @view
 @external
 def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
+    # Legacy ABI-compatible view; protocol delivery uses getEffectiveAuctionBuyConfig.
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return AuctionBuyConfig(
         canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,

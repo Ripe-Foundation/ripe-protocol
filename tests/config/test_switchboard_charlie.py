@@ -2595,6 +2595,126 @@ def test_deregister_asset_execute_success(
     assert switchboard_charlie.actionType(aid) == 0
 
 
+@pytest.mark.parametrize(
+    "field_index",
+    [
+        pytest.param(12, id="withdrawal"),
+        pytest.param(13, id="redemption"),
+        pytest.param(15, id="auction"),
+    ],
+)
+def test_deregister_asset_execute_rechecks_applicable_exit_paths(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    field_index,
+):
+    config = list(_asset_config([1]))
+    config[6] = (50_00, 60_00, 70_00, 10_00, 5_00, 0)
+    config[13] = True
+    config[15] = True
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+
+    config[field_index] = False
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+    assert switchboard_charlie.hasPendingAction(action)
+
+
+@pytest.mark.parametrize(
+    "ltv,should_transfer_to_endaoment,is_nft,can_buy_in_auction",
+    [
+        pytest.param(0, False, False, False, id="zero-ltv"),
+        pytest.param(50_00, False, True, True, id="nft"),
+        pytest.param(50_00, True, False, True, id="endaoment"),
+    ],
+)
+def test_deregister_asset_execute_allows_only_applicable_debt_exits(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    ltv,
+    should_transfer_to_endaoment,
+    is_nft,
+    can_buy_in_auction,
+):
+    config = list(_asset_config([1]))
+    config[6] = (ltv, 60_00, 70_00, 10_00, 5_00, 0)
+    config[8] = should_transfer_to_endaoment
+    config[13] = False
+    config[15] = can_buy_in_auction
+    config[20] = is_nft
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    assert switchboard_charlie.executePendingAction(
+        action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
+def test_deregister_zero_ltv_asset_still_requires_withdrawal_exit(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+):
+    config = list(_asset_config([1]))
+    config[12] = False
+    config[13] = False
+    config[15] = False
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+
+
 def test_deregister_asset_execute_rejects_already_unregistered(
     switchboard_bravo,
     switchboard_charlie,
@@ -2785,7 +2905,7 @@ def test_live_nonzero_allocations_can_be_zeroed_then_retired(
     if current_block < confirmation_block:
         boa.env.time_travel(blocks=confirmation_block - current_block)
 
-    with boa.reverts("active points alloc"):
+    with boa.reverts("invalid retirement config"):
         switchboard_charlie.executePendingAction(
             deregister_action,
             sender=governance.address,
@@ -2808,6 +2928,62 @@ def test_live_nonzero_allocations_can_be_zeroed_then_retired(
         sender=governance.address,
     )
     assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    with boa.reverts("invalid asset"):
+        switchboard_charlie.setCanWithdrawAsset(
+            alpha_token.address,
+            False,
+            sender=governance.address,
+        )
+
+    with boa.reverts("invalid asset"):
+        switchboard_bravo.setAssetDepositParams(
+            alpha_token.address,
+            list(zeroed.vaultIds),
+            0,
+            0,
+            zeroed.perUserDepositLimit,
+            zeroed.globalDepositLimit,
+            zeroed.minDepositBalance,
+            sender=governance.address,
+        )
+
+    readd_action = switchboard_bravo.addAsset(
+        alpha_token.address,
+        [1],
+        0,
+        0,
+        2_000,
+        20_000,
+        100,
+        (40_00, 50_00, 60_00, 10_00, 5_00, 0),
+        False,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+        False,
+        True,
+        False,
+        0,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_bravo, readd_action)
+    assert switchboard_bravo.executePendingAction(
+        readd_action,
+        sender=governance.address,
+    )
+    assert mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.getNumAssets() == 1
+    assert mission_control.assets(1) == alpha_token.address
+    readded = mission_control.assetConfig(alpha_token.address)
+    assert list(readded.vaultIds) == [1]
+    assert tuple(readded.debtTerms) == (40_00, 50_00, 60_00, 10_00, 5_00, 0)
+    assert readded.perUserDepositLimit == 2_000
+    assert readded.globalDepositLimit == 20_000
+    assert readded.minDepositBalance == 100
 
 
 def test_deregister_asset_rechecks_points_allocs_at_execution(
@@ -2861,7 +3037,7 @@ def test_deregister_asset_rechecks_points_allocs_at_execution(
     totals_before = mission_control.totalPointsAllocs()
 
     _advance_to_confirmation(switchboard_charlie, deregister_action)
-    with boa.reverts("active points alloc"):
+    with boa.reverts("invalid retirement config"):
         switchboard_charlie.executePendingAction(
             deregister_action,
             sender=governance.address,

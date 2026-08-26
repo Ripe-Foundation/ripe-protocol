@@ -28,7 +28,7 @@ import pytest
 from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import buy_fungible_auction, filter_logs
+from conf_utils import buy_fungible_auction, filter_logs, redeem_collateral
 
 
 
@@ -309,6 +309,89 @@ def test_deregistered_rebase_auction_forces_external_delivery(
     assert stock_token.balanceOf(alice) > wallet_before
     assert rebase_erc20_vault.userBalances(alice, stock_token) == 0
     assert not ledger.isParticipatingInVault(alice, vault_id)
+
+
+def test_deregistered_rebase_redemption_forces_external_delivery(
+    stock_token,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    green_token,
+    whale,
+    deploy3r,
+    bob,
+    alice,
+):
+    """A4 leaves no recipient shares or points after a Rebase redemption."""
+    vault_id = 4
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+        stakers_points_alloc=0,
+        voter_points_alloc=0,
+        can_redeem_collateral=True,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    assert teller.deposit(
+        stock_token,
+        deposit_amount,
+        bob,
+        rebase_erc20_vault,
+        sender=bob,
+    ) == deposit_amount
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(stock_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    assert mission_control.deregisterAsset(
+        stock_token,
+        sender=switchboard_alpha.address,
+    )
+    mission_control.eval(
+        f"self.assetConfig[{stock_token.address}].canWithdraw = False"
+    )
+
+    payment = 10 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    wallet_before = stock_token.balanceOf(alice)
+    borrower_shares_before = rebase_erc20_vault.userBalances(bob, stock_token)
+
+    assert redeem_collateral(
+        teller,
+        bob,
+        vault_id,
+        stock_token,
+        payment,
+        False,
+        True,
+        False,
+        sender=alice,
+    ) > 0
+
+    assert stock_token.balanceOf(alice) > wallet_before
+    assert rebase_erc20_vault.userBalances(bob, stock_token) < borrower_shares_before
+    assert rebase_erc20_vault.userBalances(alice, stock_token) == 0
+    assert rebase_erc20_vault.getTotalAmountForUser(alice, stock_token) == 0
+    assert not ledger.isParticipatingInVault(alice, vault_id)
+    recipient_points = ledger.userDepositPoints(alice, vault_id, stock_token)
+    assert recipient_points.lastBalance == 0
+    assert recipient_points.balancePoints == 0
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)

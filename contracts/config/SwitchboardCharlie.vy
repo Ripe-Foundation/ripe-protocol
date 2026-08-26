@@ -23,6 +23,16 @@ import contracts.modules.TimeLock as timeLock
 import contracts.modules.Addys as addys
 import interfaces.ConfigStructs as cs
 
+struct AssetRetirementConfig:
+    isSupported: bool
+    hasPointsAlloc: bool
+    ltv: uint256
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canBuyInAuction: bool
+    shouldTransferToEndaoment: bool
+    isNft: bool
+
 interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
@@ -45,6 +55,7 @@ interface MissionControl:
     def setCoreRipeGovVaultId(_vaultId: uint256): nonpayable
     def deregisterAsset(_asset: address) -> bool: nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
@@ -1042,6 +1053,28 @@ def setManyTrainingWheelsAccess(_addr: address, _trainingWheels: DynArray[Traini
 # deregister asset
 
 
+@view
+@internal
+def _validateAssetDeregistration(_asset: address, _missionControl: address):
+    config: AssetRetirementConfig = staticcall MissionControl(_missionControl).getAssetRetirementConfig(_asset)
+    assert config.isSupported # dev: invalid asset
+    assert (
+        not config.hasPointsAlloc
+        and config.canWithdraw
+        and (
+            config.ltv == 0
+            or (
+                config.canBuyInAuction
+                and (
+                    config.isNft
+                    or config.shouldTransferToEndaoment
+                    or config.canRedeemCollateral
+                )
+            )
+        )
+    ) # dev: invalid retirement config
+
+
 @external
 def deregisterAsset(_asset: address, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -1212,6 +1245,7 @@ def executePendingAction(_aid: uint256) -> bool:
         mc: address = self.pendingMissionControl[_aid]
         if mc == empty(address):
             mc = self._getMissionControlAddr()
+        self._validateAssetDeregistration(asset, mc)
         success: bool = extcall MissionControl(mc).deregisterAsset(asset)
         assert success # dev: invalid asset
         log AssetDeregistered(asset=asset)

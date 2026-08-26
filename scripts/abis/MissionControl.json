@@ -637,6 +637,57 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAssetRetirementConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "isSupported",
+            "type": "bool"
+          },
+          {
+            "name": "hasPointsAlloc",
+            "type": "bool"
+          },
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemCollateral",
+            "type": "bool"
+          },
+          {
+            "name": "canBuyInAuction",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferToEndaoment",
+            "type": "bool"
+          },
+          {
+            "name": "isNft",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "setUserConfig",

@@ -340,10 +340,10 @@ deployment, migration, configuration, or activation authority.
 ## Conditional post-deployment asset retirement
 
 This procedure applies only after a separately reviewed MissionControl runtime
-containing the `active points alloc` guard and a hardened SwitchboardCharlie
-runtime that checks MissionControl's boolean return have both been deployed and
-made authoritative. A source merge, passing suite, or artifact update does not
-change either deployed runtime or authorize either transition.
+and a hardened SwitchboardCharlie runtime containing the retirement-policy
+checks and MissionControl boolean-return check have both been deployed and made
+authoritative. A source merge, passing suite, or artifact update does not change
+either deployed runtime or authorize either transition.
 
 The rollout therefore contains two contract deployments. Bind and review each
 runtime and deployed address separately. For SwitchboardCharlie, also verify
@@ -359,10 +359,12 @@ Asset retirement is terminal unless governance later completes a full
 the asset to remain supported, so deregistration permanently retains the
 asset-level exit posture present at execution. Before starting either timelock
 action, verify `canWithdraw` is enabled. For an asset with nonzero LTV, also
-verify `canBuyInAuction` and `canRedeemCollateral` are enabled. If an applicable
-flag is disabled, repair and confirm it through the supported asset's normal
-governance path before continuing; do not retire first and plan to repair
-afterward. Zero-LTV assets do not require the two debt-exit flags.
+verify `canBuyInAuction` is enabled. Verify `canRedeemCollateral` as well unless
+redemption is inapplicable because the asset is an NFT or transfers to
+Endaoment. If an applicable flag is disabled, repair and confirm it through the
+supported asset's normal governance path before continuing; do not retire first
+and plan to repair afterward. Zero-LTV assets do not require either debt-exit
+flag.
 
 Asset retirement is then two governed timelock actions, not one:
 
@@ -373,7 +375,7 @@ Asset retirement is then two governed timelock actions, not one:
    staker/voter totals decreased by exactly the former allocations.
 3. Immediately before Charlie execution, read the complete `AssetConfig` again
    and confirm both allocations are zero and every applicable asset-level exit
-   flag remains enabled. MissionControl rejects retirement if any condition
+   flag remains enabled. SwitchboardCharlie rejects retirement if any condition
    fails.
 4. Execute the existing `SwitchboardCharlie.deregisterAsset` action and verify
    the asset is unsupported and the totals did not decrease a second time.

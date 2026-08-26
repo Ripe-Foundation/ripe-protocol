@@ -17,11 +17,11 @@ EIP170_LIMIT = 24_576
 # after removing the non-shippable global-deposit settle selector. Any Lootbox
 # edit, however small, must recompile and remeasure this pin before merge;
 # its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
-# MissionControl 17,354 / Ledger 13,306 after removing reward-settle
+# MissionControl 17,607 / Ledger 13,306 after removing reward-settle
 # orchestration, preserving the legacy delivery-config getters, adding compact
-# effective-delivery getters and the deregistration exit guard, and restoring
-# Ledger to its deployable interface. DefaultsLocal is 1,200 bytes (points
-# enabled to match production).
+# effective-delivery getters and the compact retirement-config getter, and
+# restoring Ledger to its deployable interface. DefaultsLocal is 1,200 bytes
+# (points enabled to match production).
 # StabilityPool headroom is 242 bytes after the actual-delivery claim,
 # separate $0.02 full-exit tolerance and $0.05 retention threshold, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
@@ -39,11 +39,11 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 17354,
+    "MissionControl": 17607,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24562,
     "SwitchboardBravo": 24177,
-    "SwitchboardCharlie": 23873,
+    "SwitchboardCharlie": 24211,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
