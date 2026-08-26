@@ -509,10 +509,17 @@ def isUserInLiquidation(_user: address) -> bool:
 
 
 @external
-def setRipeRewards(_ripeRewards: RipeRewards):
+def setRipeRewards(
+    _ripeRewards: RipeRewards,
+    _checkpointGlobalPoints: bool = False,
+    _stakersTotalAlloc: uint256 = 0,
+    _voteTotalAlloc: uint256 = 0,
+):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
     assert not deptBasics.isPaused # dev: not activated
     self._setRipeRewards(_ripeRewards)
+    if _checkpointGlobalPoints:
+        self.globalDepositPoints = self._checkpointGlobalDepositPoints(_stakersTotalAlloc, _voteTotalAlloc)
 
 
 @internal
@@ -520,6 +527,20 @@ def _setRipeRewards(_ripeRewards: RipeRewards):
     self.ripeRewards = _ripeRewards
     if _ripeRewards.newRipeRewards != 0:
         self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)
+
+
+@internal
+def _checkpointGlobalDepositPoints(_stakersTotalAlloc: uint256, _voteTotalAlloc: uint256) -> GlobalDepositPoints:
+    globalPoints: GlobalDepositPoints = self.globalDepositPoints
+    elapsedBlocks: uint256 = 0
+    if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
+        elapsedBlocks = block.number - globalPoints.lastUpdate
+    globalPoints.lastUpdate = block.number
+    if elapsedBlocks != 0:
+        globalPoints.ripeStakerPoints += _stakersTotalAlloc * elapsedBlocks
+        globalPoints.ripeVotePoints += _voteTotalAlloc * elapsedBlocks
+        globalPoints.ripeGenPoints += globalPoints.lastUsdValue * elapsedBlocks
+    return globalPoints
 
 
 @external
@@ -611,6 +632,12 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
         assetPoints=self.assetDepositPoints[_vaultId][_asset],
         globalPoints=self.globalDepositPoints,
     )
+
+
+@view
+@external
+def isDepositPointsRowInitialized(_vaultId: uint256, _asset: address) -> bool:
+    return self.assetDepositPoints[_vaultId][_asset].lastUpdate != 0
 
 
 ############

@@ -36,6 +36,14 @@ interface Vault:
 
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
+    def getNumAddrs() -> uint256: view
+
+interface Lootbox:
+    def updateRipeRewards(): nonpayable
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
+
+interface Ledger:
+    def isDepositPointsRowInitialized(_vaultId: uint256, _asset: address) -> bool: view
 
 struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
@@ -213,6 +221,7 @@ shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
+MAX_REWARD_VAULT_IDS: constant(uint256) = 32
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -306,8 +315,22 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 
 @internal
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
-    self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
+    prevConfig: cs.AssetConfig = self.assetConfig[_asset]
+    stakersChanged: bool = prevConfig.stakersPointsAlloc != _config.stakersPointsAlloc
+    votersChanged: bool = prevConfig.voterPointsAlloc != _config.voterPointsAlloc
+    checkpointVaultIds: DynArray[uint256, MAX_REWARD_VAULT_IDS] = []
+
+    if (stakersChanged or votersChanged) and self._isActiveHqMissionControl():
+        assert self.rewardsConfig.arePointsEnabled # dev: points disabled
+        checkpointVaultIds = self._collectInitializedRewardVaults(_asset, prevConfig.vaultIds, _config.vaultIds)
+        self._checkpointAssetRewardRows(_asset, checkpointVaultIds)
+
+    self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc)
     self.assetConfig[_asset] = _config
+
+    # Refresh lastUsdValue only when staker eligibility crosses zero.
+    if ((prevConfig.stakersPointsAlloc == 0) != (_config.stakersPointsAlloc == 0)) and len(checkpointVaultIds) != 0:
+        self._checkpointAssetRewardRows(_asset, checkpointVaultIds)
 
     # monotonic because retired stability pools can still hold user balances.
     if _config.specialStabPoolId != 0:
@@ -382,6 +405,16 @@ def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDele
 @external
 def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    if self._isActiveHqMissionControl():
+        prev: cs.RipeRewardsConfig = self.rewardsConfig
+        if (
+            prev.ripePerBlock != _config.ripePerBlock
+            or prev.borrowersAlloc != _config.borrowersAlloc
+            or prev.stakersAlloc != _config.stakersAlloc
+            or prev.votersAlloc != _config.votersAlloc
+            or prev.genDepositorsAlloc != _config.genDepositorsAlloc
+        ):
+            extcall Lootbox(addys._getLootboxAddr()).updateRipeRewards()
     self.rewardsConfig = _config
 
 
@@ -401,6 +434,71 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
     totalPointsAllocs.stakersPointsAllocTotal += _newStakersPointsAlloc
     totalPointsAllocs.voterPointsAllocTotal += _newVoterPointsAlloc
     self.totalPointsAllocs = totalPointsAllocs
+
+
+@view
+@internal
+def _isActiveHqMissionControl() -> bool:
+    return addys._getMissionControlAddr() == self
+
+
+# Bounded VaultBook scan plus old/new config IDs. HashMap rows are not
+# enumerable, so this is the complete historical-row path without a migration.
+@internal
+def _collectInitializedRewardVaults(
+    _asset: address,
+    _oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _newVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+) -> DynArray[uint256, MAX_REWARD_VAULT_IDS]:
+    ids: DynArray[uint256, MAX_REWARD_VAULT_IDS] = []
+    ledger: address = addys._getLedgerAddr()
+    vaultBook: address = addys._getVaultBookAddr()
+    numVaults: uint256 = staticcall VaultBook(vaultBook).getNumAddrs()
+    assert numVaults <= MAX_REWARD_VAULT_IDS # dev: too many vaults
+
+    for i: uint256 in range(numVaults, bound=MAX_REWARD_VAULT_IDS):
+        vaultId: uint256 = i + 1
+        if staticcall Ledger(ledger).isDepositPointsRowInitialized(vaultId, _asset):
+            ids.append(vaultId)
+
+    for vaultId: uint256 in _oldVaultIds:
+        ids = self._appendInitializedExtraVault(ids, ledger, vaultBook, vaultId, _asset)
+    for vaultId: uint256 in _newVaultIds:
+        ids = self._appendInitializedExtraVault(ids, ledger, vaultBook, vaultId, _asset)
+    return ids
+
+
+@internal
+def _appendInitializedExtraVault(
+    _ids: DynArray[uint256, MAX_REWARD_VAULT_IDS],
+    _ledger: address,
+    _vaultBook: address,
+    _vaultId: uint256,
+    _asset: address,
+) -> DynArray[uint256, MAX_REWARD_VAULT_IDS]:
+    ids: DynArray[uint256, MAX_REWARD_VAULT_IDS] = _ids
+    if _vaultId == 0 or _vaultId in ids:
+        return ids
+    if not staticcall Ledger(_ledger).isDepositPointsRowInitialized(_vaultId, _asset):
+        return ids
+    assert staticcall VaultBook(_vaultBook).getAddr(_vaultId) != empty(address) # dev: unresolvable reward row
+    assert len(ids) < MAX_REWARD_VAULT_IDS # dev: too many reward rows
+    ids.append(_vaultId)
+    return ids
+
+
+@internal
+def _checkpointAssetRewardRows(_asset: address, _vaultIds: DynArray[uint256, MAX_REWARD_VAULT_IDS]):
+    lootbox: address = addys._getLootboxAddr()
+    if len(_vaultIds) == 0:
+        extcall Lootbox(lootbox).updateRipeRewards()
+        return
+
+    vaultBook: address = addys._getVaultBookAddr()
+    for vaultId: uint256 in _vaultIds:
+        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vaultId)
+        assert vaultAddr != empty(address) # dev: unresolvable reward row
+        extcall Lootbox(lootbox).updateDepositPoints(empty(address), vaultId, vaultAddr, _asset)
 
 
 ################

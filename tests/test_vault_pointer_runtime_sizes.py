@@ -11,10 +11,10 @@ EIP170_LIMIT = 24_576
 # Pyth source ID. Teller and CreditEngine retain 24 and 16 bytes respectively at
 # this head. Endaoment retains 1,190 bytes after binding its chain-local Curve
 # source ID. These pins include the deployed immutable data.
-# Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
-# runtime. Any Lootbox edit, however small, must recompile and remeasure this
-# pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
-# load-bearing.
+# Lootbox headroom is 95 bytes at the pinned 24,481-byte deployed runtime
+# after the empty-row global deposit settle on updateRipeRewards. Any Lootbox
+# edit, however small, must recompile and remeasure this pin before merge;
+# its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
 # StabilityPool headroom is 242 bytes after the actual-delivery claim,
 # retention-threshold final-exit tolerance, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
@@ -29,7 +29,7 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16222,
+    "MissionControl": 18687,
     "SwitchboardAlpha": 24562,
     "SwitchboardBravo": 24177,
     "SwitchboardCharlie": 23873,
@@ -39,8 +39,8 @@ EXPECTED_RUNTIME_BYTES = {
     "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,
-    "Ledger": 13306,
-    "Lootbox": 24456,
+    "Ledger": 13887,
+    "Lootbox": 24481,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
     "RipeToken": 8760,

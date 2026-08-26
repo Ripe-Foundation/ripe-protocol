@@ -44,7 +44,7 @@ interface Ledger:
     def removeVaultFromUser(_user: address, _vaultId: uint256): nonpayable
     def getBorrowPointsBundle(_user: address) -> BorrowPointsBundle: view
     def userVaults(_user: address, _index: uint256) -> uint256: view
-    def setRipeRewards(_ripeRewards: RipeRewards): nonpayable
+    def setRipeRewards(_ripeRewards: RipeRewards, _checkpointGlobalPoints: bool = False, _stakersTotalAlloc: uint256 = 0, _voteTotalAlloc: uint256 = 0): nonpayable
     def getRipeRewardsBundle() -> RipeRewardsBundle: view
     def numUserVaults(_user: address) -> uint256: view
     def ripeAvailForRewards() -> uint256: view
@@ -1226,7 +1226,14 @@ def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
     a: addys.Addys = addys._getAddys(_a)
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
-    extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
+    # Empty-row alloc changes reuse this write. Ledger only advances the
+    # global deposit clock when points are enabled.
+    extcall Ledger(a.ledger).setRipeRewards(
+        ripeRewards,
+        config.arePointsEnabled,
+        config.stakersPointsAllocTotal,
+        config.voterPointsAllocTotal,
+    )
     return ripeRewards
 
 

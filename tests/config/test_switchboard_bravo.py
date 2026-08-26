@@ -14,6 +14,16 @@ def _register_price_desk_for_bravo_admission(ripe_hq):
     return ripe_hq
 
 
+@pytest.fixture(autouse=True)
+def _enable_points_for_live_alloc_writes(mission_control, switchboard_alpha):
+    rewards = mission_control.rewardsConfig()
+    if not rewards[0]:
+        mission_control.setRipeRewardsConfig(
+            (True, *tuple(rewards)[1:]),
+            sender=switchboard_alpha.address,
+        )
+
+
 def _add_asset(
     switchboard_bravo,
     governance,
