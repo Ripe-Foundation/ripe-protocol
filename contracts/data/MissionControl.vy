@@ -36,14 +36,16 @@ interface Vault:
 
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
-    def getNumAddrs() -> uint256: view
 
 interface Lootbox:
     def updateRipeRewards(): nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
+    def isPaused() -> bool: view
 
 interface Ledger:
     def isDepositPointsRowInitialized(_vaultId: uint256, _asset: address) -> bool: view
+    def depositPointsVaultAddr(_vaultId: uint256, _asset: address) -> address: view
+    def maxDepositPointsVaultId() -> uint256: view
 
 struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
@@ -221,7 +223,13 @@ shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
-MAX_REWARD_VAULT_IDS: constant(uint256) = 32
+# Protocol lifetime bound on vault IDs that may hold a deposit-points row.
+# IDs are monotonic and disable does not compact them. Registering ID 65 is
+# allowed; initializing a deposit-points row at ID 65 freezes live
+# asset-allocation mutations (including emergency zeroing) until this
+# constant is raised. Current production: RH = 3, Base ≈ 4.
+# Mixed-version activation must be Ledger → Lootbox → MissionControl.
+MAX_REWARD_VAULT_IDS: constant(uint256) = 64
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -315,22 +323,24 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 
 @internal
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
-    prevConfig: cs.AssetConfig = self.assetConfig[_asset]
-    stakersChanged: bool = prevConfig.stakersPointsAlloc != _config.stakersPointsAlloc
-    votersChanged: bool = prevConfig.voterPointsAlloc != _config.voterPointsAlloc
+    prevStakers: uint256 = self.assetConfig[_asset].stakersPointsAlloc
+    prevVoters: uint256 = self.assetConfig[_asset].voterPointsAlloc
+    stakersChanged: bool = prevStakers != _config.stakersPointsAlloc
+    votersChanged: bool = prevVoters != _config.voterPointsAlloc
     checkpointVaultIds: DynArray[uint256, MAX_REWARD_VAULT_IDS] = []
 
     if (stakersChanged or votersChanged) and self._isActiveHqMissionControl():
         assert self.rewardsConfig.arePointsEnabled # dev: points disabled
-        checkpointVaultIds = self._collectInitializedRewardVaults(_asset, prevConfig.vaultIds, _config.vaultIds)
-        self._checkpointAssetRewardRows(_asset, checkpointVaultIds)
+        checkpointVaultIds = self._collectInitializedRewardVaults(_asset)
+        self._settleRewardAllocCheckpoint(_asset, checkpointVaultIds, prevStakers)
 
+    # do first! _updatePointsAllocs re-reads self.assetConfig[_asset] for old allocs.
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc)
     self.assetConfig[_asset] = _config
 
     # Refresh lastUsdValue only when staker eligibility crosses zero.
-    if ((prevConfig.stakersPointsAlloc == 0) != (_config.stakersPointsAlloc == 0)) and len(checkpointVaultIds) != 0:
-        self._checkpointAssetRewardRows(_asset, checkpointVaultIds)
+    if (prevStakers == 0) != (_config.stakersPointsAlloc == 0) and len(checkpointVaultIds) != 0:
+        self._settleRewardAllocCheckpoint(_asset, checkpointVaultIds, _config.stakersPointsAlloc)
 
     # monotonic because retired stability pools can still hold user balances.
     if _config.specialStabPoolId != 0:
@@ -414,7 +424,13 @@ def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
             or prev.votersAlloc != _config.votersAlloc
             or prev.genDepositorsAlloc != _config.genDepositorsAlloc
         ):
-            extcall Lootbox(addys._getLootboxAddr()).updateRipeRewards()
+            lootbox: address = addys._getLootboxAddr()
+            # Containment: a paused Lootbox cannot distribute. Skip the
+            # settle so operators can still zero ripePerBlock. Changing a
+            # non-zero rate while paused prices the pause window at the new
+            # rate on the next update — accepted residual RH-D044.
+            if not staticcall Lootbox(lootbox).isPaused():
+                extcall Lootbox(lootbox).updateRipeRewards()
     self.rewardsConfig = _config
 
 
@@ -442,62 +458,48 @@ def _isActiveHqMissionControl() -> bool:
     return addys._getMissionControlAddr() == self
 
 
-# Bounded VaultBook scan plus old/new config IDs. HashMap rows are not
-# enumerable, so this is the complete historical-row path without a migration.
+# Scan the full ID bound, not the current VaultBook high-water. HashMap
+# rows are not enumerable; Ledger.maxDepositPointsVaultId is the
+# fail-closed high-water for IDs above this bound after VaultBook
+# replacement. The explicit assert is kept for a stable # dev: reason;
+# Vyper also reverts if range() exceeds the bound.
 @internal
-def _collectInitializedRewardVaults(
-    _asset: address,
-    _oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
-    _newVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
-) -> DynArray[uint256, MAX_REWARD_VAULT_IDS]:
+def _collectInitializedRewardVaults(_asset: address) -> DynArray[uint256, MAX_REWARD_VAULT_IDS]:
     ids: DynArray[uint256, MAX_REWARD_VAULT_IDS] = []
     ledger: address = addys._getLedgerAddr()
-    vaultBook: address = addys._getVaultBookAddr()
-    numVaults: uint256 = staticcall VaultBook(vaultBook).getNumAddrs()
-    assert numVaults <= MAX_REWARD_VAULT_IDS # dev: too many vaults
+    assert staticcall Ledger(ledger).maxDepositPointsVaultId() <= MAX_REWARD_VAULT_IDS # dev: too many vaults
 
-    for i: uint256 in range(numVaults, bound=MAX_REWARD_VAULT_IDS):
+    for i: uint256 in range(MAX_REWARD_VAULT_IDS):
         vaultId: uint256 = i + 1
         if staticcall Ledger(ledger).isDepositPointsRowInitialized(vaultId, _asset):
             ids.append(vaultId)
-
-    for vaultId: uint256 in _oldVaultIds:
-        ids = self._appendInitializedExtraVault(ids, ledger, vaultBook, vaultId, _asset)
-    for vaultId: uint256 in _newVaultIds:
-        ids = self._appendInitializedExtraVault(ids, ledger, vaultBook, vaultId, _asset)
     return ids
 
 
 @internal
-def _appendInitializedExtraVault(
-    _ids: DynArray[uint256, MAX_REWARD_VAULT_IDS],
-    _ledger: address,
-    _vaultBook: address,
-    _vaultId: uint256,
+def _settleRewardAllocCheckpoint(
     _asset: address,
-) -> DynArray[uint256, MAX_REWARD_VAULT_IDS]:
-    ids: DynArray[uint256, MAX_REWARD_VAULT_IDS] = _ids
-    if _vaultId == 0 or _vaultId in ids:
-        return ids
-    if not staticcall Ledger(_ledger).isDepositPointsRowInitialized(_vaultId, _asset):
-        return ids
-    assert staticcall VaultBook(_vaultBook).getAddr(_vaultId) != empty(address) # dev: unresolvable reward row
-    assert len(ids) < MAX_REWARD_VAULT_IDS # dev: too many reward rows
-    ids.append(_vaultId)
-    return ids
-
-
-@internal
-def _checkpointAssetRewardRows(_asset: address, _vaultIds: DynArray[uint256, MAX_REWARD_VAULT_IDS]):
+    _vaultIds: DynArray[uint256, MAX_REWARD_VAULT_IDS],
+    _stakersPointsAlloc: uint256,
+):
     lootbox: address = addys._getLootboxAddr()
     if len(_vaultIds) == 0:
         extcall Lootbox(lootbox).updateRipeRewards()
         return
 
     vaultBook: address = addys._getVaultBookAddr()
+    ledger: address = addys._getLedgerAddr()
     for vaultId: uint256 in _vaultIds:
-        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vaultId)
-        assert vaultAddr != empty(address) # dev: unresolvable reward row
+        stored: address = staticcall Ledger(ledger).depositPointsVaultAddr(vaultId, _asset)
+        current: address = staticcall VaultBook(vaultBook).getAddr(vaultId)
+        if stored != empty(address) and current != empty(address) and stored != current:
+            raise # dev: unresolvable reward row
+        vaultAddr: address = current
+        # Zero-user aggregate only calls the vault when stakersPointsAlloc
+        # is 0 (lastUsdValue). A disabled vault must not freeze nonzero-
+        # staker alloc changes.
+        if vaultAddr == empty(address):
+            assert _stakersPointsAlloc != 0 # dev: unresolvable reward row
         extcall Lootbox(lootbox).updateDepositPoints(empty(address), vaultId, vaultAddr, _asset)
 
 

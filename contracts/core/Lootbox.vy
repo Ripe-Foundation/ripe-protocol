@@ -44,7 +44,8 @@ interface Ledger:
     def removeVaultFromUser(_user: address, _vaultId: uint256): nonpayable
     def getBorrowPointsBundle(_user: address) -> BorrowPointsBundle: view
     def userVaults(_user: address, _index: uint256) -> uint256: view
-    def setRipeRewards(_ripeRewards: RipeRewards, _checkpointGlobalPoints: bool = False, _stakersTotalAlloc: uint256 = 0, _voteTotalAlloc: uint256 = 0): nonpayable
+    def setRipeRewards(_ripeRewards: RipeRewards): nonpayable
+    def setRipeRewardsAndGlobalDepositPoints(_ripeRewards: RipeRewards, _stakersTotalAlloc: uint256, _voteTotalAlloc: uint256): nonpayable
     def getRipeRewardsBundle() -> RipeRewardsBundle: view
     def numUserVaults(_user: address) -> uint256: view
     def ripeAvailForRewards() -> uint256: view
@@ -736,6 +737,8 @@ def resetAssetPoints(_asset: address, _vaultId: uint256):
 # global deposit points
 
 
+# Keep in sync with Ledger._checkpointGlobalDepositPoints. Both paths must
+# produce identical global deltas over the same window; a parity test pins it.
 @view
 @internal
 def _getLatestGlobalDepositPoints(
@@ -1226,14 +1229,18 @@ def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
     a: addys.Addys = addys._getAddys(_a)
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
-    # Empty-row alloc changes reuse this write. Ledger only advances the
-    # global deposit clock when points are enabled.
-    extcall Ledger(a.ledger).setRipeRewards(
-        ripeRewards,
-        config.arePointsEnabled,
-        config.stakersPointsAllocTotal,
-        config.voterPointsAllocTotal,
-    )
+    # Also advances the global deposit-points clock when points are enabled.
+    # Empty-row alloc changes reuse this write. SwitchboardCharlie and other
+    # ordinary callers now settle deposit points here as well — same math as
+    # updateDepositPoints over the same window.
+    if config.arePointsEnabled:
+        extcall Ledger(a.ledger).setRipeRewardsAndGlobalDepositPoints(
+            ripeRewards,
+            config.stakersPointsAllocTotal,
+            config.voterPointsAllocTotal,
+        )
+    else:
+        extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
     return ripeRewards
 
 

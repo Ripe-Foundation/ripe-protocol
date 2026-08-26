@@ -1695,6 +1695,56 @@ Source:
 [`smart-contract-changes/switchboard-bravo.md`](smart-contract-changes/switchboard-bravo.md)
 and draft PR #211.
 
+### RH-D046 — Automatic Lootbox reward-allocation checkpoints
+
+**Status:** Implemented on the PR #211 checkpoint candidate. Deployment,
+configuration, activation, and release remain separately unauthorized.
+
+MissionControl now settles Lootbox/Ledger reward and deposit-point clocks
+before a live allocation write. That is a governance-visible behavior
+change: asset `stakersPointsAlloc` / `voterPointsAlloc` writes revert
+while `arePointsEnabled` is false, and the active MissionControl
+hard-depends on Lootbox, Ledger, and VaultBook liveness.
+
+Accepted residuals, with tests:
+
+1. **Paused-Lootbox containment.** `setRipeRewardsConfig` skips the
+   pre-write settle when Lootbox is paused so the shipped
+   pause-then-zero `ripePerBlock` runbook still works. A paused Lootbox
+   cannot distribute. Changing a non-zero rate while paused prices the
+   pause window at the new rate on the next update.
+2. **64-ID protocol bound.** Vault IDs that have ever held a
+   deposit-points row must stay at or below 64. The bound is enforced
+   from Ledger's persisted high-water, not from the current VaultBook
+   registration count, so unused high IDs do not freeze emergency
+   zeroing. Raising the bound is a MissionControl + test change.
+3. **VaultBook replacement.** Discovery scans the full 1..64 ID space
+   and persists the first-init vault address. ID reuse against a stored
+   identity fails closed. Pre-upgrade rows have empty stored identity
+   until their next Lootbox write; replacement that reuses those IDs
+   before that write remains an identity-preserving-VaultBook
+   operational requirement.
+4. **Disabled vault.** A zero vault address fails closed only when the
+   checkpoint needs the vault (`stakersPointsAlloc == 0`, the
+   `lastUsdValue` path). Nonzero-staker alloc changes still settle.
+   Emergency zeroing of staker alloc on a disabled vault still requires
+   re-pointing the ID.
+5. **Points-toggle window.** If no deposit-point update occurs while
+   points are disabled, the first update after re-enable can include
+   that interval. Toggle semantics are unchanged.
+6. **`updateRipeRewards` clock.** Ordinary `updateRipeRewards` callers,
+   including SwitchboardCharlie, now also advance the global
+   deposit-points clock when points are enabled. The formula is the
+   same as `updateDepositPoints`.
+
+Mixed-version activation must be Ledger → Lootbox → MissionControl, or
+atomic. New Lootbox requires Ledger's
+`setRipeRewardsAndGlobalDepositPoints`; new MissionControl requires
+Ledger's row-identity views.
+
+This record grants no deployment, configuration, activation, or release
+authority.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

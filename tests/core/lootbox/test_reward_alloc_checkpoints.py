@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import boa
 import pytest
 
@@ -90,6 +92,72 @@ def _ripe_snapshot(ledger):
         "lastUpdate": rewards.lastUpdate,
         "avail": ledger.ripeAvailForRewards(),
     }
+
+
+def _global_points_snapshot(ledger):
+    points = ledger.globalDepositPoints()
+    return {
+        "lastUsdValue": points.lastUsdValue,
+        "ripeStakerPoints": points.ripeStakerPoints,
+        "ripeVotePoints": points.ripeVotePoints,
+        "ripeGenPoints": points.ripeGenPoints,
+        "lastUpdate": points.lastUpdate,
+    }
+
+
+def _assert_global_point_delta(ledger, before, elapsed, stakers_total, vote_total):
+    after = ledger.globalDepositPoints()
+    assert after.ripeStakerPoints - before["ripeStakerPoints"] == stakers_total * elapsed
+    assert after.ripeVotePoints - before["ripeVotePoints"] == vote_total * elapsed
+    assert after.ripeGenPoints - before["ripeGenPoints"] == before["lastUsdValue"] * elapsed
+    assert after.lastUpdate == boa.env.evm.patch.block_number
+    assert after.lastUsdValue == before["lastUsdValue"]
+    return after
+
+
+def _install_lootbox_call_counter(lootbox, ripe_hq):
+    source = Path("contracts/core/Lootbox.vy").read_text()
+    deposit_needle = """def updateDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+"""
+    ripe_needle = """def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+"""
+    assert source.count(deposit_needle) == 1
+    assert source.count(ripe_needle) == 1
+    source = source.replace(
+        deposit_needle,
+        deposit_needle + "    self.lastUnderscoreSend += 1\n",
+        1,
+    )
+    source = source.replace(
+        ripe_needle,
+        ripe_needle + "    self.lastUnderscoreSend += 100\n",
+        1,
+    )
+    mutant = boa.loads(
+        source,
+        ripe_hq.address,
+        43_200,
+        43_200,
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        name="lootbox_checkpoint_probe",
+    )
+    boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
+
+
+def _probe_counts(lootbox, before):
+    delta = lootbox.lastUnderscoreSend() - before
+    return delta % 100, delta // 100
 
 
 def _assert_ripe_delta(ledger, before, elapsed, ripe_per_block, allocs):
@@ -416,6 +484,7 @@ def test_voter_only_and_nonzero_to_nonzero_do_not_need_second_checkpoint(
     teller,
     mission_control,
     switchboard_bravo,
+    ripe_hq,
 ):
     vault_id = vault_book.getRegId(simple_erc20_vault)
     _setup_points(
@@ -441,15 +510,22 @@ def test_voter_only_and_nonzero_to_nonzero_do_not_need_second_checkpoint(
     )
     assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == 0
 
+    _install_lootbox_call_counter(lootbox, ripe_hq)
+    before_voter = lootbox.lastUnderscoreSend()
     boa.env.time_travel(blocks=6)
     _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_id], 10, 25)
+    deposit_calls, ripe_calls = _probe_counts(lootbox, before_voter)
+    assert (deposit_calls, ripe_calls) == (1, 0)
     voter_only = ledger.assetDepositPoints(vault_id, alpha_token)
     assert voter_only.lastUsdValue == 0
     assert voter_only.ripeStakerPoints == 10 * 6
     assert voter_only.ripeVotePoints == 10 * 6
 
+    before_nonzero = lootbox.lastUnderscoreSend()
     boa.env.time_travel(blocks=3)
     _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_id], 18, 25)
+    deposit_calls, ripe_calls = _probe_counts(lootbox, before_nonzero)
+    assert (deposit_calls, ripe_calls) == (1, 0)
     nonzero = ledger.assetDepositPoints(vault_id, alpha_token)
     assert nonzero.lastUsdValue == 0
     assert nonzero.ripeStakerPoints == 10 * 6 + 10 * 3
@@ -530,10 +606,16 @@ def test_removed_historical_vault_row_is_checkpointed_not_repriced(
 
 
 def test_empty_row_allocation_change_checkpoints_global_only(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
     charlie_token,
+    bob,
     setGeneralConfig,
     setAssetConfig,
     setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
     ledger,
     lootbox,
     teller,
@@ -543,24 +625,52 @@ def test_empty_row_allocation_change_checkpoints_global_only(
     vault_book,
 ):
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    setGeneralConfig()
-    setRipeRewardsConfig(True, 10, 25_00, 25_00, 25_00, 25_00)
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id],
+        stakers=0,
+        voters=19,
+        ripe_per_block=10,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_id,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _write_asset(mission_control, switchboard_bravo, bravo_token, [vault_id], 13, 0)
     lootbox.updateRipeRewards(sender=teller.address)
     before = _ripe_snapshot(ledger)
+    before_points = _global_points_snapshot(ledger)
+    assert before_points["lastUpdate"] != 0
+    assert before_points["lastUsdValue"] == 100
     assert ledger.assetDepositPoints(vault_id, charlie_token).lastUpdate == 0
     empty_row = ledger.assetDepositPoints(0, ZERO_ADDRESS)
+    old_totals = mission_control.totalPointsAllocs()
+    assert old_totals.stakersPointsAllocTotal == 13
+    assert old_totals.voterPointsAllocTotal == 19
 
     elapsed = 8
     boa.env.time_travel(blocks=elapsed)
     _write_asset(mission_control, switchboard_bravo, charlie_token, [vault_id], 7, 9)
     _assert_ripe_delta(ledger, before, elapsed, 10, (25_00, 25_00, 25_00, 25_00))
+    _assert_global_point_delta(ledger, before_points, elapsed, 13, 19)
 
     assert ledger.assetDepositPoints(vault_id, charlie_token).lastUpdate == 0
     assert ledger.assetDepositPoints(0, ZERO_ADDRESS) == empty_row
-    assert ledger.globalDepositPoints().lastUpdate == boa.env.evm.patch.block_number
     totals = mission_control.totalPointsAllocs()
-    assert totals.stakersPointsAllocTotal >= 7
-    assert totals.voterPointsAllocTotal >= 9
+    assert totals.stakersPointsAllocTotal == 20
+    assert totals.voterPointsAllocTotal == 28
 
 
 def test_disabled_points_and_paused_checkpoints_revert_without_writes(
@@ -804,7 +914,7 @@ def test_unresolvable_historical_row_fails_closed(
         mock_price_source,
         alpha_token,
         [vault_id],
-        stakers=4,
+        stakers=0,
         voters=4,
     )
     _init_row(
@@ -827,3 +937,608 @@ def test_unresolvable_historical_row_fails_closed(
     assert has_dev_reason(err.value, "unresolvable reward row")
     assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == before_alloc
     assert tuple(mission_control.totalPointsAllocs()) == before_totals
+
+
+def test_disabled_vault_with_nonzero_stakers_can_still_change_alloc(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    mission_control,
+    switchboard_bravo,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id],
+        stakers=6,
+        voters=4,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        20 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_id,
+    )
+    vault_book.eval(f"registry.addrInfo[{vault_id}].addr = empty(address)")
+    boa.env.time_travel(blocks=5)
+    _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_id], 8, 4)
+    row = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert row.ripeStakerPoints == 6 * 5
+    assert row.ripeVotePoints == 4 * 5
+    assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == 8
+
+
+def test_vault_id_reuse_fails_closed(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    mission_control,
+    switchboard_bravo,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id],
+        stakers=6,
+        voters=4,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        20 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_id,
+    )
+    assert ledger.depositPointsVaultAddr(vault_id, alpha_token) == simple_erc20_vault.address
+    vault_book.eval(
+        f"registry.addrInfo[{vault_id}].addr = {rebase_erc20_vault.address}"
+    )
+    before_alloc = mission_control.assetConfig(alpha_token).stakersPointsAlloc
+    with pytest.raises(boa.BoaError) as err:
+        _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_id], 8, 4)
+    assert has_dev_reason(err.value, "unresolvable reward row")
+    assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == before_alloc
+
+
+def test_historical_row_survives_vaultbook_high_water_shrink(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    mission_control,
+    switchboard_bravo,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    assert vault_id > 1
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id],
+        stakers=5,
+        voters=5,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        20 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_id,
+    )
+    assert ledger.maxDepositPointsVaultId() == vault_id
+    vault_book.eval("registry.numAddrs = 1")
+    boa.env.time_travel(blocks=6)
+    _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_id], 9, 5)
+    row = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert row.lastUpdate == boa.env.evm.patch.block_number
+    assert row.ripeStakerPoints == 5 * 6
+
+
+def test_multirow_current_and_historical_dedup_commits_ripe_once(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    mission_control,
+    switchboard_bravo,
+    ripe_hq,
+):
+    vault_a = vault_book.getRegId(simple_erc20_vault)
+    vault_b = vault_book.getRegId(rebase_erc20_vault)
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_a, vault_b],
+        stakers=4,
+        voters=6,
+        ripe_per_block=12,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        40 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_a,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        sally,
+        30 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        rebase_erc20_vault,
+        vault_b,
+    )
+    lootbox.updateRipeRewards(sender=teller.address)
+    before = _ripe_snapshot(ledger)
+    _install_lootbox_call_counter(lootbox, ripe_hq)
+    before_calls = lootbox.lastUnderscoreSend()
+
+    elapsed = 5
+    boa.env.time_travel(blocks=elapsed)
+    _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_b], 9, 6)
+    deposit_calls, ripe_calls = _probe_counts(lootbox, before_calls)
+    assert deposit_calls == 2
+    assert ripe_calls == 0
+    assert ledger.assetDepositPoints(vault_a, alpha_token).lastUpdate == boa.env.evm.patch.block_number
+    assert ledger.assetDepositPoints(vault_b, alpha_token).lastUpdate == boa.env.evm.patch.block_number
+    assert ledger.assetDepositPoints(vault_a, alpha_token).ripeVotePoints == 6 * elapsed
+    assert ledger.assetDepositPoints(vault_b, alpha_token).ripeVotePoints == 6 * elapsed
+    _assert_ripe_delta(ledger, before, elapsed, 12, (25_00, 25_00, 25_00, 25_00))
+
+
+def test_multirow_later_unresolvable_row_reverts_earlier_checkpoints(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    mission_control,
+    switchboard_bravo,
+):
+    vault_a = vault_book.getRegId(simple_erc20_vault)
+    vault_b = vault_book.getRegId(rebase_erc20_vault)
+    assert vault_a < vault_b
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_a, vault_b],
+        stakers=0,
+        voters=6,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        40 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_a,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        sally,
+        30 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        rebase_erc20_vault,
+        vault_b,
+    )
+    before_a = tuple(ledger.assetDepositPoints(vault_a, alpha_token))
+    before_b = tuple(ledger.assetDepositPoints(vault_b, alpha_token))
+    before_alloc = mission_control.assetConfig(alpha_token).voterPointsAlloc
+    vault_book.eval(f"registry.addrInfo[{vault_b}].addr = empty(address)")
+    boa.env.time_travel(blocks=4)
+    with pytest.raises(boa.BoaError) as err:
+        _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_a], 0, 9)
+    assert has_dev_reason(err.value, "unresolvable reward row")
+    assert tuple(ledger.assetDepositPoints(vault_a, alpha_token)) == before_a
+    assert tuple(ledger.assetDepositPoints(vault_b, alpha_token)) == before_b
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == before_alloc
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("ripePerBlock", 21),
+        ("borrowersAlloc", 10_00),
+        ("stakersAlloc", 10_00),
+        ("votersAlloc", 10_00),
+        ("genDepositorsAlloc", 10_00),
+    ],
+)
+def test_each_global_reward_trigger_field_checkpoints_independently(
+    field,
+    value,
+    setRipeRewardsConfig,
+    lootbox,
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setRipeRewardsConfig(True, 12, 25_00, 25_00, 25_00, 25_00)
+    lootbox.updateRipeRewards(sender=teller.address)
+    before = _ripe_snapshot(ledger)
+    elapsed = 4
+    boa.env.time_travel(blocks=elapsed)
+    _write_rewards(mission_control, switchboard_alpha, **{field: value})
+    _assert_ripe_delta(ledger, before, elapsed, 12, (25_00, 25_00, 25_00, 25_00))
+    assert getattr(mission_control.rewardsConfig(), field) == value
+
+
+def test_bravo_pending_staker_alloc_uses_old_rate_through_execute(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_bravo,
+    governance,
+    mission_control,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    gov_vault = mission_control.coreRipeGovVaultId()
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id, gov_vault],
+        stakers=10,
+        voters=0,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_id,
+    )
+    gap = 4
+    boa.env.time_travel(blocks=gap)
+    action_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        [vault_id, gov_vault],
+        4,
+        0,
+        2_000 * EIGHTEEN_DECIMALS,
+        20_000 * EIGHTEEN_DECIMALS,
+        0,
+        sender=governance.address,
+    )
+    timelock = switchboard_bravo.actionTimeLock()
+    boa.env.time_travel(blocks=timelock)
+    assert switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    settled = gap + timelock
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap.ripeStakerPoints == 10 * settled
+    assert ap.ripeVotePoints == 0
+
+
+def test_paused_lootbox_skips_ripe_config_checkpoint_but_ledger_pause_reverts(
+    setRipeRewardsConfig,
+    lootbox,
+    ledger,
+    teller,
+    mission_control,
+    switchboard_alpha,
+):
+    setRipeRewardsConfig(True, 9, 25_00, 25_00, 25_00, 25_00)
+    lootbox.updateRipeRewards(sender=teller.address)
+    before = _ripe_snapshot(ledger)
+    points_before = _global_points_snapshot(ledger)
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=7)
+    _write_rewards(mission_control, switchboard_alpha, ripePerBlock=0)
+    assert mission_control.rewardsConfig().ripePerBlock == 0
+    assert ledger.ripeRewards().lastUpdate == before["lastUpdate"]
+    assert ledger.globalDepositPoints().lastUpdate == points_before["lastUpdate"]
+    lootbox.pause(False, sender=switchboard_alpha.address)
+
+    ledger.pause(True, sender=switchboard_alpha.address)
+    with pytest.raises(boa.BoaError) as err:
+        _write_rewards(mission_control, switchboard_alpha, ripePerBlock=3)
+    assert has_dev_reason(err.value, "not activated")
+    ledger.pause(False, sender=switchboard_alpha.address)
+
+
+def test_charlie_update_ripe_rewards_advances_global_deposit_points(
+    setRipeRewardsConfig,
+    setGeneralConfig,
+    setAssetConfig,
+    mock_price_source,
+    alpha_token,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_charlie,
+    governance,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id],
+        stakers=11,
+        voters=17,
+        ripe_per_block=0,
+    )
+    lootbox.updateRipeRewards(sender=teller.address)
+    before = _global_points_snapshot(ledger)
+    elapsed = 6
+    boa.env.time_travel(blocks=elapsed)
+    assert switchboard_charlie.updateRipeRewards(sender=governance.address)
+    _assert_global_point_delta(ledger, before, elapsed, 11, 17)
+
+
+def test_update_ripe_rewards_and_deposit_points_global_deltas_match(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id],
+        stakers=11,
+        voters=17,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        50 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_id,
+    )
+    lootbox.updateRipeRewards(sender=teller.address)
+    first = _global_points_snapshot(ledger)
+    boa.env.time_travel(blocks=5)
+    lootbox.updateRipeRewards(sender=teller.address)
+    after_ripe = _global_points_snapshot(ledger)
+    ripe_delta = (
+        after_ripe["ripeStakerPoints"] - first["ripeStakerPoints"],
+        after_ripe["ripeVotePoints"] - first["ripeVotePoints"],
+        after_ripe["ripeGenPoints"] - first["ripeGenPoints"],
+    )
+    boa.env.time_travel(blocks=5)
+    lootbox.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    after_deposit = _global_points_snapshot(ledger)
+    deposit_delta = (
+        after_deposit["ripeStakerPoints"] - after_ripe["ripeStakerPoints"],
+        after_deposit["ripeVotePoints"] - after_ripe["ripeVotePoints"],
+        after_deposit["ripeGenPoints"] - after_ripe["ripeGenPoints"],
+    )
+    assert ripe_delta == deposit_delta == (11 * 5, 17 * 5, first["lastUsdValue"] * 5)
+
+
+def test_genesis_last_update_zero_does_not_accrue_from_block_zero(
+    charlie_token,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    ledger,
+    mission_control,
+    switchboard_bravo,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    setGeneralConfig()
+    setRipeRewardsConfig(True, 0, 0, 0, 0, 0)
+    _write_asset(mission_control, switchboard_bravo, charlie_token, [vault_id], 0, 0)
+    ledger.eval("self.globalDepositPoints.lastUpdate = 0")
+    ledger.eval("self.globalDepositPoints.ripeStakerPoints = 0")
+    ledger.eval("self.globalDepositPoints.ripeVotePoints = 0")
+    ledger.eval("self.globalDepositPoints.ripeGenPoints = 0")
+    boa.env.time_travel(blocks=50)
+    _write_asset(mission_control, switchboard_bravo, charlie_token, [vault_id], 9, 8)
+    points = ledger.globalDepositPoints()
+    assert points.lastUpdate == boa.env.evm.patch.block_number
+    assert points.ripeStakerPoints == 0
+    assert points.ripeVotePoints == 0
+    assert points.ripeGenPoints == 0
+
+
+def test_reward_vault_id_bound_is_sixty_four(
+    charlie_token,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    ledger,
+    mission_control,
+    switchboard_bravo,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    setGeneralConfig()
+    setRipeRewardsConfig(True, 0, 0, 0, 0, 0)
+    _write_asset(mission_control, switchboard_bravo, charlie_token, [vault_id], 1, 1)
+    ledger.eval("self.maxDepositPointsVaultId = 64")
+    _write_asset(mission_control, switchboard_bravo, charlie_token, [vault_id], 2, 1)
+    assert mission_control.assetConfig(charlie_token).stakersPointsAlloc == 2
+
+    ledger.eval("self.maxDepositPointsVaultId = 65")
+    with pytest.raises(boa.BoaError) as err:
+        _write_asset(mission_control, switchboard_bravo, charlie_token, [vault_id], 3, 1)
+    assert has_dev_reason(err.value, "too many vaults")
+    assert mission_control.assetConfig(charlie_token).stakersPointsAlloc == 2
+
+
+def test_alloc_change_gas_is_measured(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    mission_control,
+    switchboard_bravo,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _setup_points(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        mock_price_source,
+        alpha_token,
+        [vault_id],
+        stakers=8,
+        voters=8,
+    )
+    _init_row(
+        performDeposit,
+        lootbox,
+        teller,
+        bob,
+        50 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+        vault_id,
+    )
+    boa.env.time_travel(blocks=3)
+    gas_before = boa.env.get_gas_used()
+    _write_asset(mission_control, switchboard_bravo, alpha_token, [vault_id], 9, 8)
+    used = boa.env.get_gas_used() - gas_before
+    print(f"GAS_MATRIX reward_alloc_checkpoint={used}")
+    assert used < 2_000_000

@@ -554,7 +554,7 @@ def createAuctionParams():
 
 
 @pytest.fixture(scope="session")
-def setAssetConfig(mission_control, switchboard_bravo, switchboard_alpha, createDebtTerms, price_desk, governance):
+def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms, price_desk, governance):
     def setAssetConfig(
         _asset,
         _vaultIds = [3], # default simple erc20 vault
@@ -579,12 +579,6 @@ def setAssetConfig(mission_control, switchboard_bravo, switchboard_alpha, create
         _whitelist = ZERO_ADDRESS,
         _isNft = False,
     ):
-        rewards = mission_control.rewardsConfig()
-        if not rewards[0]:
-            mission_control.setRipeRewardsConfig(
-                (True, *tuple(rewards)[1:]),
-                sender=switchboard_alpha.address,
-            )
         asset_config = (
             _vaultIds,
             _stakersPointsAlloc,

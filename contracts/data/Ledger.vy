@@ -36,6 +36,9 @@ from interfaces import Department
 import interfaces.ConfigStructs as cs
 from interfaces import Defaults
 
+interface VaultBook:
+    def getAddr(_regId: uint256) -> address: view
+
 struct DepositLedgerData:
     isParticipatingInVault: bool
     numUserVaults: uint256
@@ -158,6 +161,12 @@ assetDepositPoints: public(HashMap[uint256, HashMap[address, AssetDepositPoints]
 userDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, UserDepositPoints]]]) # user -> vault id -> asset -> points
 userBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints
 globalBorrowPoints: public(BorrowPoints)
+# Identity of the vault that first initialized each deposit-points row.
+# Used by MissionControl to fail closed on VaultBook ID reuse.
+depositPointsVaultAddr: public(HashMap[uint256, HashMap[address, address]])
+# Highest vault ID that has ever held an initialized deposit-points row.
+# Survives VaultBook replacement so historical IDs stay discoverable.
+maxDepositPointsVaultId: public(uint256)
 
 # auctions
 fungibleAuctions: public(HashMap[address, HashMap[uint256, FungibleAuction]]) # liq user -> auction index -> FungibleAuction
@@ -509,17 +518,22 @@ def isUserInLiquidation(_user: address) -> bool:
 
 
 @external
-def setRipeRewards(
+def setRipeRewards(_ripeRewards: RipeRewards):
+    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert not deptBasics.isPaused # dev: not activated
+    self._setRipeRewards(_ripeRewards)
+
+
+@external
+def setRipeRewardsAndGlobalDepositPoints(
     _ripeRewards: RipeRewards,
-    _checkpointGlobalPoints: bool = False,
-    _stakersTotalAlloc: uint256 = 0,
-    _voteTotalAlloc: uint256 = 0,
+    _stakersTotalAlloc: uint256,
+    _voteTotalAlloc: uint256,
 ):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
     assert not deptBasics.isPaused # dev: not activated
     self._setRipeRewards(_ripeRewards)
-    if _checkpointGlobalPoints:
-        self.globalDepositPoints = self._checkpointGlobalDepositPoints(_stakersTotalAlloc, _voteTotalAlloc)
+    self.globalDepositPoints = self._checkpointGlobalDepositPoints(_stakersTotalAlloc, _voteTotalAlloc)
 
 
 @internal
@@ -529,6 +543,9 @@ def _setRipeRewards(_ripeRewards: RipeRewards):
         self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)
 
 
+# Keep in sync with Lootbox._getLatestGlobalDepositPoints. Ledger owns this
+# copy so updateRipeRewards can settle the empty-row path without growing
+# Lootbox past EIP-170. A parity test pins the two formulas together.
 @internal
 def _checkpointGlobalDepositPoints(_stakersTotalAlloc: uint256, _voteTotalAlloc: uint256) -> GlobalDepositPoints:
     globalPoints: GlobalDepositPoints = self.globalDepositPoints
@@ -575,6 +592,10 @@ def setDepositPointsAndRipeRewards(
 
     if _user != empty(address):
         self.userDepositPoints[_user][_vaultId][_asset] = _userPoints
+    if self.assetDepositPoints[_vaultId][_asset].lastUpdate == 0 and _assetPoints.lastUpdate != 0:
+        self.depositPointsVaultAddr[_vaultId][_asset] = staticcall VaultBook(addys._getVaultBookAddr()).getAddr(_vaultId)
+        if _vaultId > self.maxDepositPointsVaultId:
+            self.maxDepositPointsVaultId = _vaultId
     self.assetDepositPoints[_vaultId][_asset] = _assetPoints
     self.globalDepositPoints = _globalPoints
     self._setRipeRewards(_ripeRewards)

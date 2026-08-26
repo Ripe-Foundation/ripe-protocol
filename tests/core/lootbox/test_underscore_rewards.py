@@ -1017,10 +1017,12 @@ def test_distribute_respects_pending_allocations(
     limited_ripe = 500 * EIGHTEEN_DECIMALS
     setup_underscore_rewards(limited_ripe)
 
-    # Configure rewards that will consume some RIPE
+    # Configure rewards that will consume some RIPE. Use a tiny per-block
+    # rate so a one-day pending window cannot exhaust the 500 RIPE budget
+    # now that setRipeRewardsConfig starts the reward clock.
     setRipeRewardsConfig(
         _arePointsEnabled=True,
-        _ripePerBlock=1 * EIGHTEEN_DECIMALS,  # 1 RIPE per block
+        _ripePerBlock=1,
         _borrowersAlloc=25_00,
         _stakersAlloc=25_00,
         _votersAlloc=25_00,

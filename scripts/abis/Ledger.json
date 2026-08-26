@@ -750,6 +750,52 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "setRipeRewardsAndGlobalDepositPoints",
+    "inputs": [
+      {
+        "name": "_ripeRewards",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "borrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "stakers",
+            "type": "uint256"
+          },
+          {
+            "name": "voters",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositors",
+            "type": "uint256"
+          },
+          {
+            "name": "newRipeRewards",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_stakersTotalAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voteTotalAlloc",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "setRipeAvailForRewards",
     "inputs": [
       {
@@ -1194,6 +1240,27 @@
             ]
           }
         ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isDepositPointsRowInitialized",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
       }
     ]
   },
@@ -2197,6 +2264,39 @@
             "type": "uint256"
           }
         ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "depositPointsVaultAddr",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      },
+      {
+        "name": "arg1",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "maxDepositPointsVaultId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ]
   },
