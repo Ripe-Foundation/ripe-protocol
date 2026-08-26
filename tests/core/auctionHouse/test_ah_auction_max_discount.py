@@ -551,6 +551,7 @@ def test_sc30_stored_overflowing_window_purchases_at_max_discount(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
+    setRipeRewardsConfig,
     createDebtTerms,
     createAuctionParams,
     performDeposit,
@@ -568,6 +569,9 @@ def test_sc30_stored_overflowing_window_purchases_at_max_discount(
 ):
     # Switchboard now rejects this duration. A stored auction in the old
     # overflowing domain must still settle at maxDiscount instead of revert.
+    # The test jumps block_number into the overflow domain. Points accrual
+    # over that synthetic window overflows; this case is about discount
+    # math, so disable points after the auction exists.
     start_discount = 0
     max_discount = 50_00
     auction = _open_auction(
@@ -588,6 +592,7 @@ def test_sc30_stored_overflowing_window_purchases_at_max_discount(
         max_discount,
         20,
     )
+    setRipeRewardsConfig(False, 0, 0, 0, 0, 0)
     overflowing_duration = MAX_UINT256 // max_discount + 2
     stored = ledger.getFungibleAuction(bob, auction.vaultId, alpha_token)
     assert ledger.setFungibleAuction(

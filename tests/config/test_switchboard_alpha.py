@@ -751,12 +751,16 @@ def test_execute_rewards_config(switchboard_alpha, mission_control, governance):
 
 
 def test_rewards_points_enable_disable(switchboard_alpha, mission_control, governance):
-    # Enable points
+    # DefaultsLocal matches production and ships points enabled.
+    assert mission_control.rewardsConfig().arePointsEnabled
+    assert switchboard_alpha.setRewardsPointsEnabled(False, sender=governance.address)
+    assert not mission_control.rewardsConfig().arePointsEnabled
+    logs = filter_logs(switchboard_alpha, "RewardsPointsEnabledModified")
+    assert len(logs) == 1
+    assert not logs[0].arePointsEnabled
+
     assert switchboard_alpha.setRewardsPointsEnabled(True, sender=governance.address)
-    config = mission_control.rewardsConfig()
-    assert config.arePointsEnabled
-    
-    # Check event
+    assert mission_control.rewardsConfig().arePointsEnabled
     logs = filter_logs(switchboard_alpha, "RewardsPointsEnabledModified")
     assert len(logs) == 1
     assert logs[0].arePointsEnabled

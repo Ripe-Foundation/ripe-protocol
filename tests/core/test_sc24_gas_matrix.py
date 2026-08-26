@@ -18,7 +18,10 @@ BASIC_CHECKPOINT_CEILING = 66_000
 BASIC_WITHDRAW_CEILING = 202_000
 SHARES_CHECKPOINT_CEILING = 66_000
 REDEMPTION_CEILING = 300_000
-AUCTION_CEILING = 295_000
+# Calibrated with DefaultsLocal.arePointsEnabled=True (production parity).
+# The previous 295_000 ceiling was measured against a points-disabled local
+# deploy and understated a live auction purchase by ~96k. See RH-D046.
+AUCTION_CEILING = 470_000
 STAB_LIQ_CEILINGS = {1: 540_000, 2: 840_000, 5: 1_735_000}
 DELEVERAGE_MANY_CEILING = 400_000
 

@@ -339,10 +339,11 @@ decision_namespace:
     sc12_reserved_id: RH-D035
     integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036] }
     open_pr_allocations: { PR_145: [RH-D038], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043], PR_211: [RH-D044, RH-D045, RH-D046] }
+    proposed_unapproved: { PR_211: [RH-D046] }
     open_prs_with_no_new_decision: [PR_163]
     inherited_not_new: { PR_152: [RH-D033, RH-D034] }
     external_collision: none_detected_by_fail_closed_integration_allocator
-    scope: PR 145 records the live target and six open remediation PR heads checked on 2026-08-15; it does not edit, renumber, approve, or reject another branch.
+    scope: PR 145 records the live target and six open remediation PR heads checked on 2026-08-15; it does not edit, renumber, approve, or reject another branch. PR_211 / RH-D046 is a later proposed ID reservation only and is not an owner-accepted residual.
 
 sc12_activation_state:
   source: docs/chains/rh/smart-contract-changes/ripe-gov.md

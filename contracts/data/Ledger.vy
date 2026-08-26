@@ -36,9 +36,6 @@ from interfaces import Department
 import interfaces.ConfigStructs as cs
 from interfaces import Defaults
 
-interface VaultBook:
-    def getAddr(_regId: uint256) -> address: view
-
 struct DepositLedgerData:
     isParticipatingInVault: bool
     numUserVaults: uint256
@@ -161,12 +158,6 @@ assetDepositPoints: public(HashMap[uint256, HashMap[address, AssetDepositPoints]
 userDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, UserDepositPoints]]]) # user -> vault id -> asset -> points
 userBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints
 globalBorrowPoints: public(BorrowPoints)
-# Identity of the vault that first initialized each deposit-points row.
-# Used by MissionControl to fail closed on VaultBook ID reuse.
-depositPointsVaultAddr: public(HashMap[uint256, HashMap[address, address]])
-# Highest vault ID that has ever held an initialized deposit-points row.
-# Survives VaultBook replacement so historical IDs stay discoverable.
-maxDepositPointsVaultId: public(uint256)
 
 # auctions
 fungibleAuctions: public(HashMap[address, HashMap[uint256, FungibleAuction]]) # liq user -> auction index -> FungibleAuction
@@ -592,10 +583,6 @@ def setDepositPointsAndRipeRewards(
 
     if _user != empty(address):
         self.userDepositPoints[_user][_vaultId][_asset] = _userPoints
-    if self.assetDepositPoints[_vaultId][_asset].lastUpdate == 0 and _assetPoints.lastUpdate != 0:
-        self.depositPointsVaultAddr[_vaultId][_asset] = staticcall VaultBook(addys._getVaultBookAddr()).getAddr(_vaultId)
-        if _vaultId > self.maxDepositPointsVaultId:
-            self.maxDepositPointsVaultId = _vaultId
     self.assetDepositPoints[_vaultId][_asset] = _assetPoints
     self.globalDepositPoints = _globalPoints
     self._setRipeRewards(_ripeRewards)
@@ -659,6 +646,12 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
 @external
 def isDepositPointsRowInitialized(_vaultId: uint256, _asset: address) -> bool:
     return self.assetDepositPoints[_vaultId][_asset].lastUpdate != 0
+
+
+@view
+@external
+def depositPointsLastBalance(_vaultId: uint256, _asset: address) -> uint256:
+    return self.assetDepositPoints[_vaultId][_asset].lastBalance
 
 
 ############

@@ -1697,8 +1697,10 @@ and draft PR #211.
 
 ### RH-D046 — Automatic Lootbox reward-allocation checkpoints
 
-**Status:** Implemented on the PR #211 checkpoint candidate. Deployment,
-configuration, activation, and release remain separately unauthorized.
+**Status:** Proposed / unapproved. Implemented on the PR #211 checkpoint
+candidate only. No owner acceptance of the economic or operational
+residuals below. Deployment, configuration, activation, and release
+remain separately unauthorized.
 
 MissionControl now settles Lootbox/Ledger reward and deposit-point clocks
 before a live allocation write. That is a governance-visible behavior
@@ -1706,29 +1708,55 @@ change: asset `stakersPointsAlloc` / `voterPointsAlloc` writes revert
 while `arePointsEnabled` is false, and the active MissionControl
 hard-depends on Lootbox, Ledger, and VaultBook liveness.
 
-Accepted residuals, with tests:
+`setAssetConfig` has no paused-Lootbox exemption, so asset allocations
+are frozen during containment for two independent reasons (points
+disabled, Lootbox paused).
+
+Activation is safe only as Ledger → Lootbox → MissionControl, or one
+atomic Safe confirmation. Split or manual confirmations expose
+mixed-version incompatibility and are unsupported. New Lootbox requires
+Ledger's `setRipeRewardsAndGlobalDepositPoints`. Qualification should
+prove the batch is atomic.
+
+Local `DefaultsLocal.rewardsConfig.arePointsEnabled` is now `True` to
+match production Defaults. That is a test-environment semantic change:
+the `snapshot-gas` auction-purchase ceiling was previously calibrated
+against a points-disabled local deploy (~295k) and understated a live
+points-on purchase by ~96k. The required gas lane now uses a 470k
+ceiling. Recorded here as an explicit re-baseline, not a silent bump.
+
+A Ledger redeploy (the planned RH path) is state-destroying: accrued
+points, rewards, and `lastTouch` are dropped. There is no retained-state
+Ledger upgrade and no identity backfill. Fresh Ledger only.
+
+Proposed residuals, pending owner decision, with tests:
 
 1. **Paused-Lootbox containment.** `setRipeRewardsConfig` skips the
-   pre-write settle when Lootbox is paused so the shipped
-   pause-then-zero `ripePerBlock` runbook still works. A paused Lootbox
-   cannot distribute. Changing a non-zero rate while paused prices the
-   pause window at the new rate on the next update.
-2. **64-ID protocol bound.** Vault IDs that have ever held a
-   deposit-points row must stay at or below 64. The bound is enforced
-   from Ledger's persisted high-water, not from the current VaultBook
-   registration count, so unused high IDs do not freeze emergency
-   zeroing. Raising the bound is a MissionControl + test change.
-3. **VaultBook replacement.** Discovery scans the full 1..64 ID space
-   and persists the first-init vault address. ID reuse against a stored
-   identity fails closed. Pre-upgrade rows have empty stored identity
-   until their next Lootbox write; replacement that reuses those IDs
-   before that write remains an identity-preserving-VaultBook
-   operational requirement.
-4. **Disabled vault.** A zero vault address fails closed only when the
-   checkpoint needs the vault (`stakersPointsAlloc == 0`, the
-   `lastUsdValue` path). Nonzero-staker alloc changes still settle.
-   Emergency zeroing of staker alloc on a disabled vault still requires
-   re-pointing the ID.
+   pre-write settle only when Lootbox is paused **and** the new
+   `ripePerBlock` is 0. That preserves the pause-then-zero runbook.
+   Skipping forfeits every block since Ledger `lastUpdate`, including
+   pre-pause active blocks — the conservative direction. Any other
+   paused RIPE-field change (nonzero rate or bucket allocs) must settle
+   and therefore reverts. A paused Lootbox cannot distribute.
+2. **64-ID discovery bound.** Asset-allocation checkpoints scan vault
+   IDs 1..64 (`MissionControl.maxRewardVaultIds()`). IDs above 64 may
+   register and initialize; those rows are not discovered and do not
+   freeze other assets. VaultBook registration comments and the
+   `maxRewardVaultIds` view are the pre-flight. A 64-row nonzero-to-nonzero
+   change measures ~7.2M gas (Safe-viable on Base). Raising the bound is a
+   MissionControl + test change. Current production: RH = 3, Base ≈ 4.
+3. **VaultBook replacement.** Discovery uses the current VaultBook
+   address. Sanctioned `confirmAddressUpdateToRegistry` at a live ID is
+   allowed; replaced vaults are provably empty. There is no persisted
+   vault-identity guard.
+4. **Disabled vault.** A zero vault address fails closed only when
+   Lootbox would actually call the vault: `stakersPointsAlloc == 0` and
+   (`isRipeGovVaultId` or `lastBalance != 0`). Emergency zeroing and
+   gen-mode (`stakers == 0`) writes succeed when `lastBalance == 0` and
+   the vault is not RipeGov. A gen-mode row on a disabled vault with
+   nonzero `lastBalance` still blocks every allocation change, including
+   voter-only writes, until the ID is re-pointed or the balance is
+   cleared.
 5. **Points-toggle window.** If no deposit-point update occurs while
    points are disabled, the first update after re-enable can include
    that interval. Toggle semantics are unchanged.
@@ -1736,11 +1764,11 @@ Accepted residuals, with tests:
    including SwitchboardCharlie, now also advance the global
    deposit-points clock when points are enabled. The formula is the
    same as `updateDepositPoints`.
-
-Mixed-version activation must be Ledger → Lootbox → MissionControl, or
-atomic. New Lootbox requires Ledger's
-`setRipeRewardsAndGlobalDepositPoints`; new MissionControl requires
-Ledger's row-identity views.
+7. **Lootbox selector.** Lootbox uses a dedicated
+   `setRipeRewardsAndGlobalDepositPoints` rather than a default-arg
+   overload, spending ~54 bytes of EIP-170 headroom (41 bytes remain).
+   Default-arg overloads can checkpoint with zero totals via a partial
+   selector.
 
 This record grants no deployment, configuration, activation, or release
 authority.

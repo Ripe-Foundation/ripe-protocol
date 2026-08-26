@@ -1,3 +1,5 @@
+import boa
+
 EIP170_LIMIT = 24_576
 
 # Exact deployed runtimes at this head (boa, including immutables).
@@ -15,6 +17,9 @@ EIP170_LIMIT = 24_576
 # after the dedicated Ledger global-deposit settle selector. Any Lootbox
 # edit, however small, must recompile and remeasure this pin before merge;
 # its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
+# MissionControl 17,862 / Ledger 13,862 after dropping the vault-identity
+# guard and narrowing the paused-Lootbox exemption. DefaultsLocal is
+# 1,200 bytes (points enabled to match production).
 # StabilityPool headroom is 242 bytes after the actual-delivery claim,
 # retention-threshold final-exit tolerance, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
@@ -29,7 +34,8 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 17939,
+    "MissionControl": 17862,
+    "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24562,
     "SwitchboardBravo": 24177,
     "SwitchboardCharlie": 23873,
@@ -39,7 +45,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,
-    "Ledger": 14096,
+    "Ledger": 13862,
     "Lootbox": 24535,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
@@ -100,8 +106,10 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     undy_vault_prices,
     wsuper_oethb_prices,
 ):
+    defaults_local = boa.load("contracts/config/DefaultsLocal.vy")
     deployed_runtime_bytes = {
         "MissionControl": len(mission_control.env.get_code(mission_control.address)),
+        "DefaultsLocal": len(defaults_local.env.get_code(defaults_local.address)),
         "SwitchboardAlpha": len(
             switchboard_alpha.env.get_code(switchboard_alpha.address)
         ),

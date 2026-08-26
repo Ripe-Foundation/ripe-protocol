@@ -755,6 +755,18 @@
     "outputs": []
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "maxRewardVaultIds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "setCoreRipeGovVaultId",
