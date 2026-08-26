@@ -49,13 +49,13 @@ interface MissionControl:
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
+    def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def setTrainingWheels(_trainingWheels: address): nonpayable
     def setPreferredStabVaultId(_vaultId: uint256): nonpayable
     def setCoreRipeGovVaultId(_vaultId: uint256): nonpayable
     def deregisterAsset(_asset: address) -> bool: nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
-    def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
@@ -80,9 +80,6 @@ interface RipeEcoContract:
     def recoverFunds(_recipient: address, _asset: address): nonpayable
     def pause(_shouldPause: bool): nonpayable
 
-interface CreditEngine:
-    def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_vaultId: uint256) -> address: view
@@ -93,6 +90,9 @@ interface RipeGovVault:
 
 interface Switchboard:
     def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
+
+interface CreditEngine:
+    def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface Ledger:
     def setLockedAccount(_wallet: address, _shouldLock: bool): nonpayable
@@ -1053,6 +1053,27 @@ def setManyTrainingWheelsAccess(_addr: address, _trainingWheels: DynArray[Traini
 # deregister asset
 
 
+@external
+def deregisterAsset(_asset: address, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _asset != empty(address) # dev: invalid asset
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DEREGISTER_ASSET
+    self.pendingDeregisterAsset[aid] = _asset
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingDeregisterAssetAction(
+        asset=_asset,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# validate
+
+
 @view
 @internal
 def _validateAssetDeregistration(_asset: address, _missionControl: address):
@@ -1073,24 +1094,6 @@ def _validateAssetDeregistration(_asset: address, _missionControl: address):
             )
         )
     ) # dev: invalid retirement config
-
-
-@external
-def deregisterAsset(_asset: address, _missionControl: address = empty(address)) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert _asset != empty(address) # dev: invalid asset
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.DEREGISTER_ASSET
-    self.pendingDeregisterAsset[aid] = _asset
-    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingDeregisterAssetAction(
-        asset=_asset,
-        confirmationBlock=confirmationBlock,
-        actionId=aid,
-    )
-    return aid
 
 
 # deregister vault asset
