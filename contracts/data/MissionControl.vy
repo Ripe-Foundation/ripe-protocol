@@ -972,7 +972,6 @@ def getRewardsConfig() -> RewardsConfig:
 def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     shouldFundGenPoints: bool = assetConfig.stakersPointsAlloc == 0
-    # Membership gates staker and voter allocations; gen funding remains asset-level.
     if _vaultId not in assetConfig.vaultIds:
         return DepositPointsConfig(
             stakersPointsAlloc=0,
