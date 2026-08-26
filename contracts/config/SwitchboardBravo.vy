@@ -36,31 +36,31 @@ interface StabilityPool:
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
-    def canPerformLiteAction(_user: address) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
-
-interface VaultBook:
-    def isValidRegId(_regId: uint256) -> bool: view
-    def getAddr(_regId: uint256) -> address: view
 
 interface PriceDesk:
     def tokenScale(_asset: address) -> uint256: view
     def syncTokenScale(_asset: address): nonpayable
     def getAddr(_regId: uint256) -> address: view
 
-interface CurvePrices:
-    def addGreenRefPoolSnapshot() -> bool: nonpayable
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
 
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
+
+interface CurvePrices:
+    def addGreenRefPoolSnapshot() -> bool: nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -909,9 +909,9 @@ def _cancelPendingAction(_aid: uint256):
     self.pendingMissionControl[_aid] = empty(address)
 
 
-################################
-# GREEN Reference Pool Snapshot #
-################################
+###########################
+# GREEN Ref Pool Snapshot #
+###########################
 
 
 @external
@@ -923,7 +923,6 @@ def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
     assert priceDesk != empty(address) # dev: missing price desk
 
     priceSourceAddr: address = staticcall PriceDesk(priceDesk).getAddr(_curvePricesId)
-    # Disabled registry rows store empty(address), so one zero-check covers both.
     assert priceSourceAddr != empty(address) # dev: invalid price source id
 
     didUpdate: bool = extcall CurvePrices(priceSourceAddr).addGreenRefPoolSnapshot()
