@@ -1601,6 +1601,63 @@ Source:
 [`user-flow-audit-group-11-trusted-clone-hr-clamp.md`](user-flow-audit-group-11-trusted-clone-hr-clamp.md)
 and draft PR #211.
 
+### RH-D045 — Bravo GREEN keeper uses a caller-supplied PriceDesk ID
+
+**Status:** Implemented in draft PR #211; not deployed, registered, or
+activated on Robinhood. A numbered decision is used because this adds a new
+externally callable, lite-signer-reachable Switchboard surface and deliberately
+diverges from the constructor-immutable Curve ID used by Teller, CreditEngine,
+and Endaoment. The ordinary bug-fix exception does not apply.
+
+`SwitchboardBravo.addGreenRefPoolSnapshot(_curvePricesId)` lets current
+governance or the current MissionControl `canPerformLiteAction` signer trigger
+`CurvePrices.addGreenRefPoolSnapshot()` through a typed `extcall`. The registry
+ID remains a call argument. On Robinhood the keeper call is
+`addGreenRefPoolSnapshot(2)`, where `2` is CurvePrices' PriceDesk ID, not
+Bravo's Switchboard child ID. Bravo was chosen because composed Alpha runtime
+had 14 bytes of EIP-170 headroom; Bravo had 910 and now has 399 after this
+wrapper (24,177 deployed bytes). No constructor argument or immutable was
+added.
+
+A production keeper at snapshot cadence effectively requires the lite-signer
+grant: `SwitchboardAlpha.setCanPerformLiteAction(keeper, True)` then
+`executePendingAction`. That is two Safe transactions even with Robinhood's
+zero timelock; revoke is one transaction. Lite-signer status is not scoped to
+this wrapper. The same key can disable or pause through Alpha, Charlie, Delta,
+and Echo, call Alpha's generic `addPriceSnapshot`, and push Pyth/Stork
+payloads. Governance calling the wrapper directly is a Safe transaction per
+snapshot and is impractical at keeper cadence. Standing up the keeper therefore
+places a hot key in an unscoped disable/pause role.
+
+The caller-supplied ID lets a lite signer make Bravo, a fully privileged RIPE
+address, fire selector `0x7cdb0a4d` (`addGreenRefPoolSnapshot()`) at any
+current PriceDesk row. Today that blast radius is empty: disabled rows resolve
+to zero, no production price source has a `__default__` fallback, and only
+CurvePrices exposes the specialized selector. Those guards are repository tests
+and ABI inventory, not an on-chain invariant. A future source that implements
+the same selector would become reachable without a Bravo change.
+
+Merging this source does not activate the keeper. The updated Bravo runtime
+must later be deployed, temporary local governance relinquished, and the
+existing Switchboard child ID 2 updated — not registered into a new slot.
+Pending Bravo actions on the replaced contract are stranded. A candidate that
+is not registered or promoted is still rejected by CurvePrices as an invalid
+RIPE caller. After promotion, grant the keeper lite-signer role only with the
+unscoped-pause risk recorded. Monitor failed receipts as well as
+`GreenRefPoolSnapshotAttempted`: a genuine Curve revert leaves no event, while
+`didUpdate=false` covers same-block duplicates, a paused Curve, and other
+legitimate no-update cases. Robinhood child blocks can share an EVM
+`block.number`, so duplicate `false` outcomes can be legitimate.
+
+This record does not authorize deployment, registry promotion, lite-signer
+grant, configuration, activation, or release. It does not refresh
+[`curve-launch-activation.md`](curve-launch-activation.md) or Blueprint Bravo
+anchors; those remain separately authorized launch-metadata cleanup.
+
+Source:
+[`smart-contract-changes/switchboard-bravo.md`](smart-contract-changes/switchboard-bravo.md)
+and draft PR #211.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

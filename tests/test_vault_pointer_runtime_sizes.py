@@ -22,12 +22,12 @@ EIP170_LIMIT = 24_576
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
 # SwitchboardBravo retains 399 bytes of headroom after the dedicated GREEN
-# reference-pool keeper wrapper. AuctionHouse and Deleverage
-# retain 5 and 39 bytes respectively. CurvePrices retains 1,170 bytes
-# after switching to codesize optimization for confirmation-time registry
-# snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
-# metadata binding and checked runtime arithmetic. Any edit to these contracts
-# must recompile and remeasure.
+# reference-pool keeper wrapper. AuctionHouse and Deleverage retain 5 and
+# 39 bytes respectively. CurvePrices retains 1,170 bytes after switching
+# to codesize optimization for confirmation-time registry snapshot checks.
+# UndyVaultPrices retains 6,270 bytes after confirmation-time metadata
+# binding and checked runtime arithmetic. Any edit to these contracts must
+# recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16222,
     "SwitchboardAlpha": 24562,
@@ -160,6 +160,10 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         if size > EIP170_LIMIT
     }
     assert not oversized, f"EIP-170 runtime limit exceeded: {oversized}"
+    assert headroom["SwitchboardBravo"] >= 200, (
+        "SwitchboardBravo must keep at least 200 bytes of EIP-170 headroom: "
+        f"{headroom['SwitchboardBravo']}"
+    )
     runtime_diff = {
         name: (
             EXPECTED_RUNTIME_BYTES.get(name),

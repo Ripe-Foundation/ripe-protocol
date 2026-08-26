@@ -923,6 +923,7 @@ def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
     assert priceDesk != empty(address) # dev: missing price desk
 
     priceSourceAddr: address = staticcall PriceDesk(priceDesk).getAddr(_curvePricesId)
+    # Disabled registry rows store empty(address), so one zero-check covers both.
     assert priceSourceAddr != empty(address) # dev: invalid price source id
 
     didUpdate: bool = extcall CurvePrices(priceSourceAddr).addGreenRefPoolSnapshot()
