@@ -2563,8 +2563,8 @@ def test_deregister_asset_execute_success(
     # First add the asset
     action_id = switchboard_bravo.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
-        (0, 0, 0, 0, 0, 0),
-        False, False, False, True, True, True, False, True, True, True, 0,
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
+        False, False, False, True, True, True, True, True, True, True, 0,
         sender=governance.address
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
@@ -2610,14 +2610,14 @@ def test_deregister_asset_execute_rejects_already_unregistered(
         1_000,
         10_000,
         0,
-        (0, 0, 0, 0, 0, 0),
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
         False,
         False,
         False,
         True,
         True,
         True,
-        False,
+        True,
         True,
         True,
         True,
@@ -2692,8 +2692,8 @@ def test_deregister_asset_on_new_mission_control(
     # Add asset to new MC
     action_id = switchboard_bravo.addAsset(
         bravo_token.address, [1], 0, 0, 1000, 10000, 0,
-        (0, 0, 0, 0, 0, 0),
-        False, False, False, True, True, True, False, True, True, True, 0,
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
+        False, False, False, True, True, True, True, True, True, True, 0,
         (False, 0, 0, 0, 0), ZERO_ADDRESS, False,
         new_mission_control.address,  # _missionControl
         sender=governance.address
@@ -2724,7 +2724,7 @@ def test_deregister_asset_on_new_mission_control(
     assert not new_mission_control.isSupportedAsset(bravo_token.address)
 
 
-def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
+def test_live_nonzero_allocations_can_be_zeroed_then_retired(
     switchboard_bravo,
     switchboard_charlie,
     governance,
@@ -2734,19 +2734,19 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
     add_action = switchboard_bravo.addAsset(
         alpha_token.address,
         [1],
-        0,
-        0,
+        25_00,
+        15_00,
         1_000,
         10_000,
         0,
-        (0, 0, 0, 0, 0, 0),
+        (50_00, 60_00, 70_00, 10_00, 5_00, 0),
         False,
         False,
         False,
         True,
         True,
         True,
-        False,
+        True,
         True,
         True,
         True,
@@ -2759,14 +2759,6 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
         sender=governance.address,
     )
 
-    nonzero_config = list(mission_control.assetConfig(alpha_token.address))
-    nonzero_config[1] = 25_00
-    nonzero_config[2] = 15_00
-    mission_control.setAssetConfig(
-        alpha_token.address,
-        nonzero_config,
-        sender=switchboard_bravo.address,
-    )
     live_before = mission_control.assetConfig(alpha_token.address)
     totals_before = mission_control.totalPointsAllocs()
     deregister_action = switchboard_charlie.deregisterAsset(
@@ -2774,19 +2766,25 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
         sender=governance.address,
     )
 
-    with boa.reverts("invalid asset deposit params"):
-        switchboard_bravo.setAssetDepositParams(
-            alpha_token.address,
-            list(live_before.vaultIds),
-            0,
-            0,
-            live_before.perUserDepositLimit,
-            live_before.globalDepositLimit,
-            live_before.minDepositBalance,
-            sender=governance.address,
-        )
+    zero_action = switchboard_bravo.setAssetDepositParams(
+        alpha_token.address,
+        list(live_before.vaultIds),
+        0,
+        0,
+        live_before.perUserDepositLimit,
+        live_before.globalDepositLimit,
+        live_before.minDepositBalance,
+        sender=governance.address,
+    )
 
-    _advance_to_confirmation(switchboard_charlie, deregister_action)
+    confirmation_block = max(
+        switchboard_charlie.getActionConfirmationBlock(deregister_action),
+        switchboard_bravo.getActionConfirmationBlock(zero_action),
+    )
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+
     with boa.reverts("active points alloc"):
         switchboard_charlie.executePendingAction(
             deregister_action,
@@ -2796,6 +2794,20 @@ def test_live_nonzero_allocations_cannot_be_zeroed_or_retired(
     assert mission_control.assetConfig(alpha_token.address) == live_before
     assert mission_control.totalPointsAllocs() == totals_before
     assert switchboard_charlie.hasPendingAction(deregister_action)
+
+    assert switchboard_bravo.executePendingAction(
+        zero_action,
+        sender=governance.address,
+    )
+    zeroed = mission_control.assetConfig(alpha_token.address)
+    assert zeroed.stakersPointsAlloc == 0
+    assert zeroed.voterPointsAlloc == 0
+
+    assert switchboard_charlie.executePendingAction(
+        deregister_action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
 
 
 def test_deregister_asset_rechecks_points_allocs_at_execution(

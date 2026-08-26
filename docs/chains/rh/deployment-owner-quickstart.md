@@ -354,6 +354,16 @@ Charlie behavior. The reviewed Charlie candidate has 703 bytes of EIP-170
 deployed-runtime headroom; recompile and recheck that gate after every further
 Charlie change rather than carrying this measurement forward by assumption.
 
+Asset retirement is terminal unless governance later completes a full
+`addAsset` re-registration. Ordinary Bravo and Charlie asset mutations require
+the asset to remain supported, so deregistration permanently retains the
+asset-level exit posture present at execution. Before starting either timelock
+action, verify `canWithdraw` is enabled. For an asset with nonzero LTV, also
+verify `canBuyInAuction` and `canRedeemCollateral` are enabled. If an applicable
+flag is disabled, repair and confirm it through the supported asset's normal
+governance path before continuing; do not retire first and plan to repair
+afterward. Zero-LTV assets do not require the two debt-exit flags.
+
 Asset retirement is then two governed timelock actions, not one:
 
 1. Read the complete live `AssetConfig`. Through
@@ -361,7 +371,11 @@ Asset retirement is then two governed timelock actions, not one:
    deposit limits while setting both fixed reward allocations to zero.
 2. Execute the Bravo action and verify both fields are zero and the global
    staker/voter totals decreased by exactly the former allocations.
-3. Execute the existing `SwitchboardCharlie.deregisterAsset` action and verify
+3. Immediately before Charlie execution, read the complete `AssetConfig` again
+   and confirm both allocations are zero and every applicable asset-level exit
+   flag remains enabled. MissionControl rejects retirement if any condition
+   fails.
+4. Execute the existing `SwitchboardCharlie.deregisterAsset` action and verify
    the asset is unsupported and the totals did not decrease a second time.
 
 Do not reconstruct the deposit tuple from defaults. If Bravo rejects the live

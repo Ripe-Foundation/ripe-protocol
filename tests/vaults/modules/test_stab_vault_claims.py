@@ -140,7 +140,7 @@ def test_stab_claim_coarse_asset_can_empty_cohort(
         teller, vault_id, alpha_token, claim_token, sender=bob
     )
     bob_amount = claim_token.balanceOf(bob)
-    assert 10**12 <= bob_value_before - bob_claimed < 2 * 10**16
+    assert 10**12 <= bob_value_before - bob_claimed < FULL_EXIT_TOLERANCE_USD
     assert bob_claimed == price_desk.getUsdValue(claim_token, bob_amount)
     assert stability_pool.userBalances(bob, alpha_token) == 0
 
@@ -157,7 +157,7 @@ def test_stab_claim_coarse_asset_can_empty_cohort(
     assert stability_pool.totalClaimableBalances(claim_token) == residual
     assert claim_token.balanceOf(stability_pool) == residual
     if residual != 0:
-        assert price_desk.getUsdValue(claim_token, residual) < 2 * 10**16
+        assert price_desk.getUsdValue(claim_token, residual) < FULL_EXIT_TOLERANCE_USD
 
 
 def test_stab_claim_covering_finite_max_does_not_overflow(
@@ -4331,7 +4331,7 @@ def test_stab_vault_claims_meaningful_live_residual_stays_listed(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Live-share partial claim below $0.02 stays listed unless the leftover is microscopic."""
+    """Live-share partial claim below $0.05 stays listed unless the leftover is microscopic."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4447,7 +4447,7 @@ def test_stab_vault_claims_dust_balance_preserved(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Claim and total balances stay intact after a live-share sub-$0.02 residual."""
+    """Claim and total balances stay intact after a live-share sub-$0.05 residual."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4472,7 +4472,7 @@ def test_stab_vault_claims_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.29, leaving a $0.01 residual that stays ACTIVE: below $0.02 but not microscopic.
+    # Claim $0.29, leaving a $0.01 residual that stays ACTIVE: below $0.05 but not microscopic.
     claim_usd_value = 29 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
@@ -4506,7 +4506,7 @@ def test_stab_vault_claims_receipt_accumulates_on_listed_live_residual(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """A later receipt adds onto a live-share sub-$0.02 residual that stayed listed."""
+    """A later receipt adds onto a live-share sub-$0.05 residual that stayed listed."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4633,7 +4633,7 @@ def test_stab_vault_claims_dust_different_price_levels(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """A live-share residual below $0.02 stays listed at a high unit price."""
+    """A live-share residual below $0.05 stays listed at a high unit price."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 

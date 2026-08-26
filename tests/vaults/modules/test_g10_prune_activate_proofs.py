@@ -1730,7 +1730,7 @@ def test_g10_swap_with_claimable_green_meaningful_residual_stays_listed(
     green_token,
     savings_green,
 ):
-    """A leftover just under $0.02 is meaningful, not microscopic, while shares remain."""
+    """A leftover just under $0.05 is meaningful, not microscopic, while shares remain."""
     pair_amount = _seed_green_claim(
         stability_pool, alpha_token, alpha_token_whale, bob, teller,
         mock_price_source, green_token, savings_green, whale, auction_house,

@@ -49,7 +49,7 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
 
 interface MissionControl:
-    def getAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> AuctionBuyConfig: view
+    def getEffectiveAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> AuctionBuyConfig: view
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getGenAuctionParams() -> cs.AuctionParams: view
     def getGenLiqConfig() -> GenLiqConfig: view
@@ -1131,7 +1131,7 @@ def _buyFungibleAuction(
         return 0
 
     # check auction config
-    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getAuctionBuyConfig(_liqAsset, _recipient, _shouldTransferBalance)
+    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getEffectiveAuctionBuyConfig(_liqAsset, _recipient, _shouldTransferBalance)
     if not config.canBuyInAuction:
         return 0
 

@@ -755,18 +755,6 @@
     "outputs": []
   },
   {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "maxRewardVaultIds",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "setCoreRipeGovVaultId",
@@ -1329,6 +1317,49 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "getEffectiveRedeemCollateralConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_shouldTransferBalance",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canRedeemCollateral",
+            "type": "bool"
+          },
+          {
+            "name": "ltvPaybackBuffer",
+            "type": "uint256"
+          },
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferBalance",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "getLtvPaybackBuffer",
     "inputs": [],
     "outputs": [
@@ -1371,6 +1402,45 @@
           },
           {
             "name": "canAnyoneDeposit",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getEffectiveAuctionBuyConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_shouldTransferBalance",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canBuyInAuction",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferBalance",
             "type": "bool"
           }
         ]

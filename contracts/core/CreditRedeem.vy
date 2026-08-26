@@ -41,7 +41,7 @@ interface CreditEngine:
     def getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256): view
 
 interface MissionControl:
-    def getRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> RedeemCollateralConfig: view
+    def getEffectiveRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> RedeemCollateralConfig: view
     def preferredStabVaultId() -> uint256: view
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
@@ -197,7 +197,7 @@ def _redeemCollateral(
         return 0
 
     # redemptions not allowed on asset
-    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getRedeemCollateralConfig(_asset, _recipient, _shouldTransferBalance)
+    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getEffectiveRedeemCollateralConfig(_asset, _recipient, _shouldTransferBalance)
     if not config.canRedeemCollateral:
         return 0
 

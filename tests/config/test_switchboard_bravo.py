@@ -377,7 +377,7 @@ def test_explicit_target_is_stored_and_used_for_every_asset_action(
     assert not mission_control.isSupportedAsset(alpha_token)
 
 
-def test_staged_nonzero_alloc_is_rejected_if_target_becomes_live_before_execution(
+def test_staged_nonzero_alloc_executes_if_target_becomes_live_before_execution(
     switchboard_bravo,
     governance,
     ripe_hq,
@@ -401,14 +401,14 @@ def test_staged_nonzero_alloc_is_rejected_if_target_becomes_live_before_executio
         new_mission_control,
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    with boa.reverts("invalid asset config"):
-        switchboard_bravo.executePendingAction(
-            action_id,
-            sender=governance.address,
-        )
+    assert switchboard_bravo.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
 
-    assert switchboard_bravo.hasPendingAction(action_id)
-    assert not new_mission_control.isSupportedAsset(alpha_token)
+    assert not switchboard_bravo.hasPendingAction(action_id)
+    assert new_mission_control.isSupportedAsset(alpha_token)
+    assert new_mission_control.assetConfig(alpha_token).stakersPointsAlloc == 50_00
     assert mission_control.isSupportedAsset(alpha_token) is False
 
 
@@ -2963,7 +2963,7 @@ def test_cannot_set_zero_thresholds_with_positive_ltv(
         alpha_token,
         [1],  # vaultIds
         0,  # stakersPointsAlloc
-        0,  # voterPointsAlloc (30%) - total 80% < 100%
+        0,  # voterPointsAlloc
         10000 * 10**18,  # perUserDepositLimit
         1000000 * 10**18,  # globalDepositLimit
         0,      # minDepositBalance

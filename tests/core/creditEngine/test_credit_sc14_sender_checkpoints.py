@@ -271,7 +271,7 @@ def test_sc14_redeem_withdrawal_does_not_credit_external_recipient(
     assert ledger.assetDepositPoints(vault_id, alpha_token).lastBalance < asset_before
 
 
-def test_deregistered_redeem_forces_external_delivery(
+def test_deregistered_redeem_forces_external_delivery_even_if_withdrawals_disabled(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -317,6 +317,11 @@ def test_deregistered_redeem_forces_external_delivery(
         sender=switchboard_alpha.address,
     )
     assert mission_control.indexOfAsset(alpha_token) == 0
+    # Model a legacy retired config. New retirements cannot enter this posture,
+    # but canWithdraw still must not disable the redemption path.
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canWithdraw = False"
+    )
     assert not ledger.isParticipatingInVault(alice, vault_id)
 
     payment = 10 * EIGHTEEN_DECIMALS
@@ -349,7 +354,7 @@ def test_deregistered_redeem_forces_external_delivery(
     assert recipient_points.balancePoints == 0
 
 
-def test_deregistered_redeem_fails_closed_when_withdrawals_disabled(
+def test_deregistered_redeem_fails_closed_when_redemption_is_disabled(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -369,13 +374,6 @@ def test_deregistered_redeem_fails_closed_when_withdrawals_disabled(
     bob,
     alice,
 ):
-    debt_terms = createDebtTerms(
-        _ltv=50_00,
-        _redemptionThreshold=70_00,
-        _liqThreshold=80_00,
-        _liqFee=0,
-        _borrowRate=0,
-    )
     _make_redeemable(
         setGeneralConfig,
         setAssetConfig,
@@ -394,14 +392,11 @@ def test_deregistered_redeem_fails_closed_when_withdrawals_disabled(
         70 * EIGHTEEN_DECIMALS // 100,
         enable_rewards=False,
     )
-    setAssetConfig(
-        alpha_token,
-        _stakersPointsAlloc=0,
-        _voterPointsAlloc=0,
-        _debtTerms=debt_terms,
-        _canWithdraw=False,
-    )
     assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+    # Model a legacy retired config with its dedicated redemption lever disabled.
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canRedeemCollateral = False"
+    )
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
     payment = 10 * EIGHTEEN_DECIMALS

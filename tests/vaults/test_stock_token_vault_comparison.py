@@ -70,6 +70,9 @@ def _configure_stock_asset(
     createDebtTerms,
     *,
     should_auction=True,
+    stakers_points_alloc=10,
+    voter_points_alloc=10,
+    can_redeem_collateral=False,
 ):
     setGeneralConfig()
     setGeneralDebtConfig(_ltvPaybackBuffer=0)
@@ -83,10 +86,12 @@ def _configure_stock_asset(
     setAssetConfig(
         token,
         _vaultIds=[vault_id],
+        _stakersPointsAlloc=stakers_points_alloc,
+        _voterPointsAlloc=voter_points_alloc,
         _debtTerms=debt_terms,
         _shouldSwapInStabPools=False,
         _shouldAuctionInstantly=should_auction,
-        _canRedeemCollateral=False,
+        _canRedeemCollateral=can_redeem_collateral,
     )
 
 
@@ -221,6 +226,89 @@ def test_internal_auction_after_total_issuer_burn(
     assert vault.getTotalAmountForUser(alice, stock_token) == 0
     assert stock_token.balanceOf(alice) == 0
     assert stock_token.balanceOf(vault) == 0
+
+
+def test_deregistered_rebase_auction_forces_external_delivery(
+    stock_token,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    green_token,
+    whale,
+    deploy3r,
+    bob,
+    alice,
+    sally,
+):
+    """A4 also forces the share-based Rebase vault down its external path."""
+    vault_id = 4
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+        stakers_points_alloc=0,
+        voter_points_alloc=0,
+        can_redeem_collateral=True,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    assert teller.deposit(
+        stock_token,
+        deposit_amount,
+        bob,
+        rebase_erc20_vault,
+        sender=bob,
+    ) == deposit_amount
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+    assert mission_control.deregisterAsset(
+        stock_token,
+        sender=switchboard_alpha.address,
+    )
+    mission_control.eval(
+        f"self.assetConfig[{stock_token.address}].canWithdraw = False"
+    )
+
+    payment = 20 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    wallet_before = stock_token.balanceOf(alice)
+    green_spent = buy_fungible_auction(
+        teller,
+        bob,
+        vault_id,
+        stock_token,
+        payment,
+        False,
+        True,
+        False,
+        sender=alice,
+    )
+
+    assert green_spent > 0
+    assert stock_token.balanceOf(alice) > wallet_before
+    assert rebase_erc20_vault.userBalances(alice, stock_token) == 0
+    assert not ledger.isParticipatingInVault(alice, vault_id)
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
@@ -1254,9 +1342,9 @@ def test_registry_and_required_asset_flags(
     )
     assert vault_book.getRegId(vault) == vault_id
     assert mission_control.getFirstVaultIdForAsset(stock_token) == vault_id
-    redeem_config = mission_control.getRedeemCollateralConfig(stock_token, bob, True)
+    redeem_config = mission_control.getRedeemCollateralConfig(stock_token, bob)
     liq_config = mission_control.getAssetLiqConfig(stock_token)
-    assert not redeem_config.canRedeemCollateral
+    assert not redeem_config.canRedeemCollateralAsset
     assert not liq_config.shouldSwapInStabPools
 
 

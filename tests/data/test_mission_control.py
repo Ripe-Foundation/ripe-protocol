@@ -546,6 +546,69 @@ def test_mission_control_deregister_asset_rejects_active_points_alloc(
     assert mission_control.totalPointsAllocs() == totals_before
 
 
+@pytest.mark.parametrize(
+    "field_index",
+    [
+        12,  # canWithdraw
+        13,  # canRedeemCollateral
+        15,  # canBuyInAuction
+    ],
+)
+def test_mission_control_deregister_asset_requires_open_exit_paths(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+    field_index,
+):
+    config = list(sample_asset_config)
+    config[1] = 0
+    config[2] = 0
+    config[field_index] = False
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+
+    index_before = mission_control.indexOfAsset(alpha_token)
+    num_assets_before = mission_control.numAssets()
+    with boa.reverts("exit paths disabled"):
+        mission_control.deregisterAsset(
+            alpha_token,
+            sender=switchboard_alpha.address,
+        )
+
+    assert mission_control.indexOfAsset(alpha_token) == index_before
+    assert mission_control.numAssets() == num_assets_before
+    assert mission_control.isSupportedAsset(alpha_token)
+
+
+def test_mission_control_deregister_zero_ltv_asset_only_requires_withdrawal_exit(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+):
+    config = list(sample_asset_config)
+    config[1] = 0
+    config[2] = 0
+    config[6] = (0, 0, 0, 0, 0, 0)
+    config[13] = False  # canRedeemCollateral is inapplicable at zero LTV
+    config[15] = False  # canBuyInAuction is inapplicable at zero LTV
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+
+    assert mission_control.deregisterAsset(
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+
 def test_mission_control_deregister_asset_nonexistent(
     mission_control,
     switchboard_alpha,
@@ -853,38 +916,107 @@ def test_mission_control_effective_external_delivery_policy(
         _voterPointsAlloc=0,
     )
 
+    # The deployed two-argument getters retain their original selector and
+    # return layout for compatibility with existing callers.
+    legacy_redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice)
+    legacy_auction = mission_control.getAuctionBuyConfig(alpha_token, alice)
+    assert legacy_redeem.canRedeemCollateralGeneral
+    assert legacy_redeem.canRedeemCollateralAsset
+    assert legacy_redeem.isUserAllowed
+    assert legacy_auction.canBuyInAuctionGeneral
+    assert legacy_auction.canBuyInAuctionAsset
+    assert legacy_auction.isUserAllowed
+
     # Supported collateral honors the caller's requested delivery mode.
-    redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice, True)
-    auction = mission_control.getAuctionBuyConfig(alpha_token, alice, True)
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True)
     assert redeem.canRedeemCollateral and redeem.shouldTransferBalance
     assert auction.canBuyInAuction and auction.shouldTransferBalance
 
-    # External delivery is allowed while both withdrawal flags are enabled.
-    redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice, False)
-    auction = mission_control.getAuctionBuyConfig(alpha_token, alice, False)
+    # External delivery is governed by the dedicated redemption/auction flags,
+    # not the user-withdrawal flag.
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, False)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, False)
     assert redeem.canRedeemCollateral and not redeem.shouldTransferBalance
     assert auction.canBuyInAuction and not auction.shouldTransferBalance
 
-    # Asset-level withdrawal disable blocks external delivery but leaves a
-    # supported internal transfer available.
+    # Disabling voluntary Teller withdrawals does not disable either solvency
+    # path, regardless of requested delivery mode.
     setAssetConfig(
         alpha_token,
         _stakersPointsAlloc=0,
         _voterPointsAlloc=0,
         _canWithdraw=False,
     )
-    assert not mission_control.getRedeemCollateralConfig(alpha_token, alice, False).canRedeemCollateral
-    assert not mission_control.getAuctionBuyConfig(alpha_token, alice, False).canBuyInAuction
-    assert mission_control.getRedeemCollateralConfig(alpha_token, alice, True).canRedeemCollateral
-    assert mission_control.getAuctionBuyConfig(alpha_token, alice, True).canBuyInAuction
+    assert mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, False).canRedeemCollateral
+    assert mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, False).canBuyInAuction
+    assert mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True).canRedeemCollateral
+    assert mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True).canBuyInAuction
 
-    # Deregistration always coerces the effective mode to external, which now
-    # fails closed because withdrawals were disabled before deregistration.
+    # The new lifecycle guard prevents retiring the asset while an exit path is
+    # disabled. Restore the flag, retire it, then model a legacy retained config
+    # to pin the decoupled canWithdraw policy for already-retired assets.
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
     assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
-    redeem = mission_control.getRedeemCollateralConfig(alpha_token, alice, True)
-    auction = mission_control.getAuctionBuyConfig(alpha_token, alice, True)
-    assert not redeem.canRedeemCollateral and not redeem.shouldTransferBalance
-    assert not auction.canBuyInAuction and not auction.shouldTransferBalance
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canWithdraw = False"
+    )
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True)
+    assert redeem.canRedeemCollateral and not redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and not auction.shouldTransferBalance
+
+
+@pytest.mark.parametrize(
+    "scope,path",
+    [
+        ("general", "redeem"),
+        ("asset", "redeem"),
+        ("general", "auction"),
+        ("asset", "auction"),
+    ],
+)
+def test_mission_control_effective_delivery_uses_dedicated_path_flags(
+    scope,
+    path,
+    mission_control,
+    setGeneralConfig,
+    setAssetConfig,
+    alpha_token,
+    alice,
+):
+    gen_kwargs = {}
+    asset_kwargs = {
+        "_stakersPointsAlloc": 0,
+        "_voterPointsAlloc": 0,
+    }
+    if path == "redeem":
+        if scope == "general":
+            gen_kwargs["_canRedeemCollateral"] = False
+        else:
+            asset_kwargs["_canRedeemCollateral"] = False
+    else:
+        if scope == "general":
+            gen_kwargs["_canBuyInAuction"] = False
+        else:
+            asset_kwargs["_canBuyInAuction"] = False
+
+    setGeneralConfig(**gen_kwargs)
+    setAssetConfig(alpha_token, **asset_kwargs)
+    if path == "redeem":
+        config = mission_control.getEffectiveRedeemCollateralConfig(
+            alpha_token, alice, False
+        )
+        assert not config.canRedeemCollateral
+    else:
+        config = mission_control.getEffectiveAuctionBuyConfig(
+            alpha_token, alice, False
+        )
+        assert not config.canBuyInAuction
 
 def test_mission_control_get_borrow_config(mission_control, switchboard_alpha, alice, bob, sample_gen_config, sample_gen_debt_config, sample_action_delegation):
     """Test getting borrow configuration."""

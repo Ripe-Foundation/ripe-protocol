@@ -44,14 +44,6 @@ interface MissionControl:
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
 
-# Deliberately decode only the leading ABI words of MissionControl's dynamic
-# AssetConfig getter. Word 0 is the outer tuple offset, word 1 is the vaultIds
-# offset, and words 2/3 are stakersPointsAlloc/voterPointsAlloc. This is pinned
-# to the current struct order and Vyper 0.4.3 by a regression with distinct
-# allocation values; update this interface if either layout changes.
-interface MissionControlAssetConfigHead:
-    def assetConfig(_asset: address) -> (uint256, uint256, uint256, uint256): view
-
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
@@ -442,9 +434,6 @@ def _isValidAssetDepositParams(
         if not hasStakerVault:
             return False
 
-    if _missionControl == self._getMissionControlAddr():
-        storedConfigHead: (uint256, uint256, uint256, uint256) = staticcall MissionControlAssetConfigHead(_missionControl).assetConfig(_asset)
-        return _stakersPointsAlloc == storedConfigHead[2] and _voterPointsAlloc == storedConfigHead[3]
     return True
 
 

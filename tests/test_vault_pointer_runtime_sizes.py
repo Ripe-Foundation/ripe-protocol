@@ -17,30 +17,32 @@ EIP170_LIMIT = 24_576
 # after removing the non-shippable global-deposit settle selector. Any Lootbox
 # edit, however small, must recompile and remeasure this pin before merge;
 # its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
-# MissionControl 16,452 / Ledger 13,306 after removing reward-settle
-# orchestration and restoring Ledger to its deployable interface. DefaultsLocal is
-# 1,200 bytes (points enabled to match production).
+# MissionControl 17,354 / Ledger 13,306 after removing reward-settle
+# orchestration, preserving the legacy delivery-config getters, adding compact
+# effective-delivery getters and the deregistration exit guard, and restoring
+# Ledger to its deployable interface. DefaultsLocal is 1,200 bytes (points
+# enabled to match production).
 # StabilityPool headroom is 242 bytes after the actual-delivery claim,
 # separate $0.02 full-exit tolerance and $0.05 retention threshold, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
 # and partial-reservation admission remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
-# SwitchboardBravo retains 269 bytes of headroom after the live-allocation
-# freeze. CreditRedeem retains 16,094 bytes after consuming MissionControl's
+# SwitchboardBravo retains 399 bytes of headroom after removing the
+# live-allocation freeze. CreditRedeem retains 16,094 bytes after consuming MissionControl's
 # effective redemption-delivery flag. AuctionHouse retains 46 bytes after the
 # compact effective auction-delivery config; unsupported collateral is delivered
-# externally and external delivery fails closed when withdrawals are disabled.
+# externally, while the dedicated auction/redemption flags govern those paths.
 # Deleverage retains 39 bytes. CurvePrices retains 1,170 bytes after switching
 # to codesize optimization for confirmation-time registry snapshot checks.
 # UndyVaultPrices retains 6,270 bytes after confirmation-time metadata
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16452,
+    "MissionControl": 17354,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24562,
-    "SwitchboardBravo": 24307,
+    "SwitchboardBravo": 24177,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
@@ -171,6 +173,10 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         if size > EIP170_LIMIT
     }
     assert not oversized, f"EIP-170 runtime limit exceeded: {oversized}"
+    assert headroom["SwitchboardBravo"] >= 200, (
+        "SwitchboardBravo must keep at least 200 bytes of EIP-170 headroom: "
+        f"{headroom['SwitchboardBravo']}"
+    )
     runtime_diff = {
         name: (
             EXPECTED_RUNTIME_BYTES.get(name),

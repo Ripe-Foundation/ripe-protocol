@@ -76,12 +76,25 @@ struct RepayConfig:
     canAnyoneRepayDebt: bool
 
 struct RedeemCollateralConfig:
+    canRedeemCollateralGeneral: bool
+    canRedeemCollateralAsset: bool
+    isUserAllowed: bool
+    ltvPaybackBuffer: uint256
+    canAnyoneDeposit: bool
+
+struct EffectiveRedeemCollateralConfig:
     canRedeemCollateral: bool
     ltvPaybackBuffer: uint256
     canAnyoneDeposit: bool
     shouldTransferBalance: bool
 
 struct AuctionBuyConfig:
+    canBuyInAuctionGeneral: bool
+    canBuyInAuctionAsset: bool
+    isUserAllowed: bool
+    canAnyoneDeposit: bool
+
+struct EffectiveAuctionBuyConfig:
     canBuyInAuction: bool
     canAnyoneDeposit: bool
     shouldTransferBalance: bool
@@ -340,6 +353,9 @@ def deregisterAsset(_asset: address) -> bool:
         return False
 
     assert self.assetConfig[_asset].stakersPointsAlloc == 0 and self.assetConfig[_asset].voterPointsAlloc == 0 # dev: active points alloc
+    # Deregistration is terminal until a full addAsset re-registration. Always
+    # preserve voluntary exit; debt exit flags also apply when the asset has LTV.
+    assert self.assetConfig[_asset].canWithdraw and (self.assetConfig[_asset].debtTerms.ltv == 0 or (self.assetConfig[_asset].canBuyInAuction and self.assetConfig[_asset].canRedeemCollateral)) # dev: exit paths disabled
 
     # update data
     lastIndex: uint256 = numAssets - 1
@@ -732,15 +748,29 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 @view
 @external
-def getRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> RedeemCollateralConfig:
+def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    return RedeemCollateralConfig(
+        canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
+        canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+    )
+
+
+@view
+@external
+def getEffectiveRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveRedeemCollateralConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
-    return RedeemCollateralConfig(
+    # canWithdraw gates voluntary Teller withdrawals only. Redemptions use
+    # their dedicated general/asset flags and remain available for solvency.
+    return EffectiveRedeemCollateralConfig(
         canRedeemCollateral=(
             self.genConfig.canRedeemCollateral
             and assetConfig.canRedeemCollateral
             and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
-            and (shouldTransferBalance or (self.genConfig.canWithdraw and assetConfig.canWithdraw))
         ),
         ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
@@ -759,15 +789,28 @@ def getLtvPaybackBuffer() -> uint256:
 
 @view
 @external
-def getAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> AuctionBuyConfig:
+def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    return AuctionBuyConfig(
+        canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,
+        canBuyInAuctionAsset=assetConfig.canBuyInAuction,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+    )
+
+
+@view
+@external
+def getEffectiveAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveAuctionBuyConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
-    return AuctionBuyConfig(
+    # canWithdraw gates voluntary Teller withdrawals only. Auctions use their
+    # dedicated general/asset flags and remain available for liquidation.
+    return EffectiveAuctionBuyConfig(
         canBuyInAuction=(
             self.genConfig.canBuyInAuction
             and assetConfig.canBuyInAuction
             and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
-            and (shouldTransferBalance or (self.genConfig.canWithdraw and assetConfig.canWithdraw))
         ),
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
         shouldTransferBalance=shouldTransferBalance,

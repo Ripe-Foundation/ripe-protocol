@@ -86,9 +86,6 @@ def isVaultBookAddr(_addr: address) -> bool:
 
 
 # new address
-# Pre-flight: MissionControl.maxRewardVaultIds() is the deposit-points
-# discovery bound (currently 64). IDs above that bound can register;
-# their reward rows are not checkpointed on allocation changes.
 
 
 @external

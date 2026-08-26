@@ -759,7 +759,7 @@ def test_sc14_self_transfer_rejected_before_checkpoint(
     assert simple_erc20_vault.userBalances(bob, alpha_token) == amount
 
 
-def test_deregistered_auction_forces_external_delivery_without_recipient_row(
+def test_deregistered_auction_forces_external_delivery_even_if_withdrawals_disabled(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -801,6 +801,11 @@ def test_deregistered_auction_forces_external_delivery_without_recipient_row(
         100 * EIGHTEEN_DECIMALS,
     )
     assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+    # Model a legacy retired config. New retirements cannot enter this posture,
+    # but canWithdraw still must not disable the liquidation path.
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canWithdraw = False"
+    )
     vault_id = vault_book.getRegId(simple_erc20_vault)
     assert not ledger.isParticipatingInVault(alice, vault_id)
 
@@ -820,7 +825,7 @@ def test_deregistered_auction_forces_external_delivery_without_recipient_row(
     assert recipient.balancePoints == 0
 
 
-def test_deregistered_auction_fails_closed_when_withdrawals_disabled(
+def test_deregistered_auction_fails_closed_when_auction_is_disabled(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -860,13 +865,11 @@ def test_deregistered_auction_fails_closed_when_withdrawals_disabled(
         200 * EIGHTEEN_DECIMALS,
         100 * EIGHTEEN_DECIMALS,
     )
-    setAssetConfig(
-        alpha_token,
-        _stakersPointsAlloc=0,
-        _voterPointsAlloc=0,
-        _canWithdraw=False,
-    )
     assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+    # Model a legacy retired config with its dedicated auction lever disabled.
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canBuyInAuction = False"
+    )
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
     payment = 10 * EIGHTEEN_DECIMALS
