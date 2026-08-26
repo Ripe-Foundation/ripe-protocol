@@ -21,7 +21,8 @@ EIP170_LIMIT = 24_576
 # and partial-reservation admission remediations.
 # Any StabilityPool or StabVault edit must recompile and remeasure this pin
 # before merge.
-# SwitchboardBravo retains 910 bytes of headroom. AuctionHouse and Deleverage
+# SwitchboardBravo retains 399 bytes of headroom after the dedicated GREEN
+# reference-pool keeper wrapper. AuctionHouse and Deleverage
 # retain 5 and 39 bytes respectively. CurvePrices retains 1,170 bytes
 # after switching to codesize optimization for confirmation-time registry
 # snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
@@ -30,7 +31,7 @@ EIP170_LIMIT = 24_576
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16222,
     "SwitchboardAlpha": 24562,
-    "SwitchboardBravo": 23666,
+    "SwitchboardBravo": 24177,
     "SwitchboardCharlie": 23873,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,

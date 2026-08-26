@@ -38,6 +38,7 @@ interface MissionControl:
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
+    def canPerformLiteAction(_user: address) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
@@ -50,6 +51,10 @@ interface VaultBook:
 interface PriceDesk:
     def tokenScale(_asset: address) -> uint256: view
     def syncTokenScale(_asset: address): nonpayable
+    def getAddr(_regId: uint256) -> address: view
+
+interface CurvePrices:
+    def addGreenRefPoolSnapshot() -> bool: nonpayable
 
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
@@ -181,6 +186,12 @@ event AssetDebtTermsSet:
 event WhitelistAssetSet:
     asset: indexed(address)
     whitelist: indexed(address)
+
+event GreenRefPoolSnapshotAttempted:
+    caller: indexed(address)
+    priceSourceId: indexed(uint256)
+    priceSourceAddr: indexed(address)
+    didUpdate: bool
 
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
@@ -896,3 +907,29 @@ def _cancelPendingAction(_aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.actionType[_aid] = empty(ActionType)
     self.pendingMissionControl[_aid] = empty(address)
+
+
+################################
+# GREEN Reference Pool Snapshot #
+################################
+
+
+@external
+def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
+    if not gov._canGovern(msg.sender):
+        assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
+
+    priceDesk: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
+    assert priceDesk != empty(address) # dev: missing price desk
+
+    priceSourceAddr: address = staticcall PriceDesk(priceDesk).getAddr(_curvePricesId)
+    assert priceSourceAddr != empty(address) # dev: invalid price source id
+
+    didUpdate: bool = extcall CurvePrices(priceSourceAddr).addGreenRefPoolSnapshot()
+    log GreenRefPoolSnapshotAttempted(
+        caller=msg.sender,
+        priceSourceId=_curvePricesId,
+        priceSourceAddr=priceSourceAddr,
+        didUpdate=didUpdate,
+    )
+    return didUpdate
