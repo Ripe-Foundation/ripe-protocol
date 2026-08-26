@@ -2232,7 +2232,7 @@ def test_stab_vault_redeem_fragmented_claims_round_up_for_protocol(
 #################################
 
 
-DUST_USD_THRESHOLD = 5 * 10 ** 16  # $0.05 in 18-decimal USD
+DUST_USD_THRESHOLD = 2 * 10 ** 16  # $0.02 in 18-decimal USD
 
 
 def test_stab_vault_redemptions_meaningful_live_residual_stays_listed(
@@ -2253,7 +2253,7 @@ def test_stab_vault_redemptions_meaningful_live_residual_stays_listed(
     green_token,
     whale,
 ):
-    """A live-share leftover below $0.05 stays listed when it is not microscopic."""
+    """A live-share leftover below $0.02 stays listed when it is not microscopic."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -2282,8 +2282,8 @@ def test_stab_vault_redemptions_meaningful_live_residual_stays_listed(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Redeem $0.26, leaving $0.04 — below $0.05, but well above P // 10**10.
-    redeem_amount = 26 * 10 ** 16
+    # Redeem $0.29, leaving $0.01 — below $0.02, but well above P // 10**10.
+    redeem_amount = 29 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)
@@ -2368,7 +2368,7 @@ def test_stab_vault_redemptions_dust_balance_preserved(
     green_token,
     whale,
 ):
-    """Claim and total balances stay intact after a live-share sub-$0.05 residual."""
+    """Claim and total balances stay intact after a live-share sub-$0.02 residual."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -2393,8 +2393,8 @@ def test_stab_vault_redemptions_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Redeem to leave $0.04. Live shares keep a meaningful residual listed.
-    redeem_amount = 11 * 10 ** 16
+    # Redeem to leave $0.01. Live shares keep a meaningful residual listed.
+    redeem_amount = 14 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)
@@ -2472,8 +2472,8 @@ def test_stab_vault_redemptions_dust_readdition_after_removal(
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == 2
     assert stability_pool.totalBalances(alpha_token) == 0
 
-    # Redeem to leave $0.04; empty-cohort dust-unlists even though R > P // 10**10.
-    redeem_amount = 11 * 10 ** 16
+    # Redeem to leave $0.01; empty-cohort dust-unlists even though R > P // 10**10.
+    redeem_amount = 14 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)
@@ -2650,8 +2650,8 @@ def test_stab_vault_redemptions_dust_multiple_stab_assets(
     assert stability_pool.totalBalances(charlie_token) == 0
 
     vault_id = vault_book.getRegId(stability_pool)
-    # First cohort (live alpha) is exhausted; empty charlie keeps a $0.04 leftover.
-    redeem_amount = 56 * 10 ** 16
+    # First cohort (live alpha) is exhausted; empty charlie keeps a $0.01 leftover.
+    redeem_amount = 59 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)

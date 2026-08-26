@@ -22,7 +22,7 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
 ACTIVATION_THRESHOLD = 10 * 10**16
-RETENTION_THRESHOLD = 5 * 10**16
+RETENTION_THRESHOLD = 2 * 10**16
 LIVE_RESIDUAL_DIVISOR = 10**10
 CLAIM_ASSET_ABSENT = 0
 CLAIM_ASSET_DORMANT = 1
@@ -1927,7 +1927,7 @@ def test_g10_usd_below_retention_without_microscopic_ratio_stays_listed(
         stability_pool, alpha_token, bravo_token, bravo_token_whale,
         pile, bob, auction_house, green_token, savings_green,
     )
-    leftover = 4 * 10**16
+    leftover = RETENTION_THRESHOLD - 1
     consume = pile - leftover
     vault_id = vault_book.getRegId(stability_pool)
     green_token.transfer(bob, consume, sender=whale)
@@ -1957,7 +1957,7 @@ def test_g10_microscopic_ratio_at_retention_usd_stays_listed(
     savings_green,
     credit_engine,
 ):
-    pile = 5 * 10**26
+    pile = RETENTION_THRESHOLD * LIVE_RESIDUAL_DIVISOR
     leftover = pile // LIVE_RESIDUAL_DIVISOR
     assert leftover == RETENTION_THRESHOLD
     green_token.mint(whale, pile, sender=credit_engine.address)
@@ -2246,7 +2246,7 @@ def test_g10_empty_cohort_partial_redemption_dust_unlists(
     pile = dormant + top_up
     assert pile == 30 * 10**16
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
-    leftover = 4 * 10**16
+    leftover = RETENTION_THRESHOLD - 1
     consume = pile - leftover
     vault_id = vault_book.getRegId(stability_pool)
     green_token.transfer(bob, consume, sender=whale)

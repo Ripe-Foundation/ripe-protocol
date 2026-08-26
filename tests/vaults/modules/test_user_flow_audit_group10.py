@@ -23,7 +23,7 @@ from constants import MAX_UINT256
 
 EIGHTEEN = 10**18
 ACTIVATION = 10**17          # $0.10
-RETENTION = 5 * 10**16       # $0.05
+RETENTION = 2 * 10**16       # $0.02
 MAX_ACTIVE = 20
 MAX_MAINT = 15
 ROOT = Path(__file__).resolve().parents[3]

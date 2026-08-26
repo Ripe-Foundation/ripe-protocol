@@ -17,7 +17,7 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
 ACTIVATION_THRESHOLD = 10 * 10**16
-RETENTION_THRESHOLD = 5 * 10**16
+RETENTION_THRESHOLD = 2 * 10**16
 CLAIM_ASSET_ABSENT = 0
 CLAIM_ASSET_DORMANT = 1
 CLAIM_ASSET_ACTIVE = 2
@@ -2272,7 +2272,7 @@ def test_claim_data_model_tracks_dust_claim_reactivation_and_zero_removal(
         100 * 10**6,
     )
 
-    partial_claim = 6 * 10**16
+    partial_claim = ACTIVATION_THRESHOLD - (RETENTION_THRESHOLD - 1)
     claim = _deploy_claim_token(
         governance,
         alice,

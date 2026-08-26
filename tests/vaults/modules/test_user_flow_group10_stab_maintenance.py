@@ -16,7 +16,7 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
 ACTIVATION_THRESHOLD = 10 * 10**16   # $0.10
-RETENTION_THRESHOLD = 5 * 10**16     # $0.05
+RETENTION_THRESHOLD = 2 * 10**16     # $0.02
 CLAIM_ASSET_ABSENT = 0
 CLAIM_ASSET_DORMANT = 1
 CLAIM_ASSET_ACTIVE = 2
@@ -338,7 +338,7 @@ def test_low_quote_live_prune_does_not_move_value_between_existing_and_new_share
     """
     PILE = 100 * EIGHTEEN_DECIMALS
     DEPOSIT = 100 * EIGHTEEN_DECIMALS
-    LOW_QUOTE = 4 * 10**14  # pile -> $0.04, below RETENTION
+    LOW_QUOTE = 10**14  # pile -> $0.01, below RETENTION
 
     def _setup():
         _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller,
