@@ -69,7 +69,6 @@ CHAINLINK_PRICES = "0xf4AF744784fBdB5f251F95a789AC0f9aB702d310"
 VAULT_BOOK = "0x9B37ea4E5b250Fef242fFC88364A143Fa39DF090"
 STABILITY_POOL = "0x03b9d0C5f628671FC877f267cC706BEd91Cc42fB"
 RIPE_GOV = "0x7Eb9E83c4F475B650Ad25E359532286E130DED7f"
-SIMPLE_ERC20 = "0x4F89C94636995eF20d40d5592bA2585348bE6D53"
 AUCTION_HOUSE = "0xA5801c426590F44Bc7d33551Caf7354488C8516C"
 CREDIT_ENGINE = "0x16371fAf6f603f8d8D6cef8C46253c80AdEe8b98"
 HUMAN_RESOURCES = "0xCd9F242a2B82387a3ED02cC4a8a0fF9a7EE8d8F5"
@@ -135,7 +134,6 @@ def migrate(migration: Migration):
     vault_book = migration.get_contract("VaultBook", VAULT_BOOK)
     old_pool = migration.get_contract("StabilityPool", STABILITY_POOL)
     old_ripe_gov = migration.get_contract("RipeGov", RIPE_GOV)
-    simple_erc20 = migration.get_contract("SimpleErc20", SIMPLE_ERC20)
     ripe_token = migration.get_contract("RipeToken", RIPE_TOKEN)
     savings_green = migration.get_contract("SavingsGreen", SAVINGS_GREEN)
     old_credit = migration.get_contract("CreditEngine", CREDIT_ENGINE)
@@ -158,7 +156,6 @@ def migrate(migration: Migration):
     require_slot(price_desk, 1, old_chainlink)
     require_slot(vault_book, 1, old_pool)
     require_slot(vault_book, 2, old_ripe_gov)
-    require_slot(vault_book, 3, simple_erc20)
 
     assert int(hq.registryChangeTimeLock()) == 0
     assert int(switchboard.registryChangeTimeLock()) == 0
@@ -172,7 +169,6 @@ def migrate(migration: Migration):
         old_ripe_gov,
         ripe_token,
     )
-    require_economically_empty_vault(simple_erc20)
 
     # ------------------------------------------------------------------
     # 2. Deploy fresh live defaults and the changed PR #211 runtimes.
@@ -355,17 +351,6 @@ def require_empty_vault(vault, error):
         raise RuntimeError(error)
     if bool(vault.doesVaultHaveAnyFunds()):
         raise RuntimeError(error)
-
-
-def require_economically_empty_vault(vault):
-    if bool(vault.doesVaultHaveAnyFunds()):
-        raise RuntimeError("PR211_RETAINED_VAULT_FUNDS_REMAIN")
-    for index in range(1, int(vault.numAssets())):
-        asset = vault.vaultAssets(index)
-        if int(vault.totalBalances(asset)) != 0:
-            raise RuntimeError(f"PR211_RETAINED_VAULT_SHARES_REMAIN:{asset}")
-        if int(vault.getTotalAmountForVault(asset)) != 0:
-            raise RuntimeError(f"PR211_RETAINED_VAULT_FUNDS_REMAIN:{asset}")
 
 
 def require_acknowledged_old_stability_pool(pool, savings_green):

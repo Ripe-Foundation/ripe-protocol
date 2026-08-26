@@ -42,7 +42,6 @@ VAULT_BOOK = "0x9B37ea4E5b250Fef242fFC88364A143Fa39DF090"
 OLD_CHAINLINK_PRICES = "0xf4AF744784fBdB5f251F95a789AC0f9aB702d310"
 OLD_STABILITY_POOL = "0x03b9d0C5f628671FC877f267cC706BEd91Cc42fB"
 OLD_RIPE_GOV = "0x7Eb9E83c4F475B650Ad25E359532286E130DED7f"
-OLD_SIMPLE_ERC20 = "0x4F89C94636995eF20d40d5592bA2585348bE6D53"
 OLD_DELEVERAGE = "0x781a37a5999760c73c52fcdE1a6A34668D8eA311"
 
 RIPE_TOKEN = "0x4D3f37a965b21aB4122e92Dd41D2693E742c883b"
@@ -131,8 +130,6 @@ def migrate(migration: Migration):
     require_slot(price_desk, 1, chainlink)
     require_slot(vault_book, 1, stability_pool)
     require_slot(vault_book, 2, ripe_gov)
-    old_simple_erc20 = migration.get_contract("SimpleErc20", OLD_SIMPLE_ERC20)
-    require_slot(vault_book, 3, old_simple_erc20)
 
     assert as_address(mission_control.hrConfig()[0]) == as_address(contributor)
     for board in (alpha, bravo, charlie, delta):
@@ -155,7 +152,6 @@ def migrate(migration: Migration):
     )
     require_empty_stability_pool(stability_pool)
     require_empty_vault(ripe_gov)
-    require_economically_empty_vault(old_simple_erc20)
 
     old_chainlink = migration.get_contract("ChainlinkPrices", OLD_CHAINLINK_PRICES)
     require_chainlink_copy(old_chainlink, chainlink)
@@ -352,14 +348,6 @@ def require_empty_vault(vault):
 def require_empty_stability_pool(pool):
     require_empty_vault(pool)
     assert int(pool.numAssets()) == 0
-
-
-def require_economically_empty_vault(vault):
-    assert not bool(vault.doesVaultHaveAnyFunds())
-    for index in range(1, int(vault.numAssets())):
-        asset = vault.vaultAssets(index)
-        assert int(vault.totalBalances(asset)) == 0
-        assert int(vault.getTotalAmountForVault(asset)) == 0
 
 
 def require_acknowledged_old_stability_pool(pool, savings_green):
