@@ -17,10 +17,11 @@ EIP170_LIMIT = 24_576
 # adding vault-aware deposit-point lookup and overflow-safe RIPE distribution.
 # Any Lootbox edit, however small, must recompile and remeasure this pin before
 # merge; its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
-# MissionControl is 16,856 bytes after adding vault-aware deposit-point allocs;
-# Ledger remains 13,306 after restoring its deployable interface. DefaultsLocal
-# is 1,200 bytes (points enabled to match production).
-# StabilityPool headroom is 242 bytes after the actual-delivery claim,
+# MissionControl is 16,864 bytes after adding vault-aware deposit-point allocs
+# and the Stability claim retirement gate; Ledger remains 13,306 after restoring
+# its deployable interface. DefaultsLocal is 1,200 bytes (points enabled to
+# match production).
+# StabilityPool headroom is 244 bytes after the actual-delivery claim,
 # separate $0.02 full-exit tolerance and $0.05 retention threshold, and
 # redemption hardening, deferred claim checkpoint, claimable-aware retirement,
 # and partial-reservation admission remediations.
@@ -30,8 +31,9 @@ EIP170_LIMIT = 24_576
 # A dead current VaultBook row fail-closes; restore the book, then Bravo.
 # SwitchboardAlpha retains 117 bytes after skipping settle only when
 # Lootbox is paused and the new ripePerBlock is 0.
-# SwitchboardCharlie retains 1,151 bytes after the governor-only historical
-# checkpoint wrapper. CreditRedeem retains 16,094 bytes after consuming MissionControl's
+# SwitchboardCharlie retains 1,122 bytes after the governor-only historical
+# checkpoint wrapper and the Stability/NFT retirement guards. CreditRedeem
+# retains 16,094 bytes after consuming MissionControl's
 # effective redemption-delivery flag. AuctionHouse retains 46 bytes after the
 # compact effective auction-delivery config; unsupported collateral is delivered
 # externally, while the dedicated auction/redemption flags govern those paths.
@@ -43,11 +45,11 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16856,
+    "MissionControl": 16864,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 24459,
     "SwitchboardBravo": 24529,
-    "SwitchboardCharlie": 23425,
+    "SwitchboardCharlie": 23454,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
@@ -68,7 +70,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Endaoment": 23386,
     "PriceDesk": 17742,
     "Deleverage": 24537,
-    "StabilityPool": 24334,
+    "StabilityPool": 24332,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 16988,
     "CurvePrices": 23406,

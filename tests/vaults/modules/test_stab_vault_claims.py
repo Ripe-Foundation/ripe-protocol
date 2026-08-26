@@ -213,6 +213,63 @@ def test_stab_claim_covering_finite_max_does_not_overflow(
     assert stability_pool.totalBalances(alpha_token) == 0
 
 
+def test_stab_claim_partial_large_values_does_not_overflow(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    governance,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1)
+
+    deposit_amount = 10**30
+    alpha_token.mint(alpha_token_whale, deposit_amount, sender=governance.address)
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+
+    claim_amount = deposit_amount * EIGHTEEN_DECIMALS
+    bravo_token.mint(bravo_token_whale, claim_amount, sender=governance.address)
+    bravo_token.transfer(stability_pool, claim_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claim_amount,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    partial_usd_value = deposit_amount // 2
+    claimed = claim_from_stability_pool(
+        teller,
+        vault_book.getRegId(stability_pool),
+        alpha_token,
+        bravo_token,
+        partial_usd_value,
+        sender=bob,
+    )
+    assert claimed == partial_usd_value
+    assert bravo_token.balanceOf(bob) == partial_usd_value * EIGHTEEN_DECIMALS
+    assert stability_pool.userBalances(bob, alpha_token) != 0
+
+
 def test_stab_vault_claims_full(
     stability_pool,
     alpha_token,

@@ -878,7 +878,7 @@ def _calcClaimSharesAndAmount(
 
     # a limit that already covers the full position needs no proration. this also keeps an arbitrarily large finite limit out of the multiplication.
     if _maxUsdValue < maxClaimUsdValue:
-        claimAmount = min(claimAmount, _maxUsdValue * maxClaimAmount // maxClaimUsdValue)
+        claimAmount = min(claimAmount, self._getAssetAmount(_claimAsset, _maxUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk, True))
 
     # finalize values
     claimUsdValue: uint256 = min(

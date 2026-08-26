@@ -562,6 +562,29 @@ def test_asset_retirement_config_reports_whitelist_posture(
     assert not mission_control.getAssetRetirementConfig(alpha_token).hasWhitelist
 
 
+def test_asset_retirement_config_reports_stability_claim_posture(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+):
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        sample_asset_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.getAssetRetirementConfig(alpha_token).canClaimInStabPool
+
+    config = list(sample_asset_config)
+    config[16] = False
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.getAssetRetirementConfig(alpha_token).canClaimInStabPool
+
+
 def test_mission_control_deregister_asset_nonexistent(
     mission_control,
     switchboard_alpha,

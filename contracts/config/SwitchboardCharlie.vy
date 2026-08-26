@@ -32,6 +32,7 @@ struct AssetRetirementConfig:
     canWithdraw: bool
     canRedeemCollateral: bool
     canBuyInAuction: bool
+    canClaimInStabPool: bool
     shouldTransferToEndaoment: bool
     isNft: bool
 
@@ -1116,13 +1117,14 @@ def _validateAssetDeregistration(_asset: address, _missionControl: address):
         not config.hasPointsAlloc
         and not config.hasWhitelist
         and config.canWithdraw
+        and config.canClaimInStabPool
         and (
             config.ltv == 0
             or (
-                config.canBuyInAuction
+                not config.isNft
+                and config.canBuyInAuction
                 and (
-                    config.isNft
-                    or config.shouldTransferToEndaoment
+                    config.shouldTransferToEndaoment
                     or config.canRedeemCollateral
                 )
             )

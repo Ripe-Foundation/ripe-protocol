@@ -154,6 +154,7 @@ struct AssetRetirementConfig:
     canWithdraw: bool
     canRedeemCollateral: bool
     canBuyInAuction: bool
+    canClaimInStabPool: bool
     shouldTransferToEndaoment: bool
     isNft: bool
 
@@ -377,6 +378,7 @@ def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig:
         canWithdraw=assetConfig.canWithdraw,
         canRedeemCollateral=assetConfig.canRedeemCollateral,
         canBuyInAuction=assetConfig.canBuyInAuction,
+        canClaimInStabPool=assetConfig.canClaimInStabPool,
         shouldTransferToEndaoment=assetConfig.shouldTransferToEndaoment,
         isNft=assetConfig.isNft,
     )

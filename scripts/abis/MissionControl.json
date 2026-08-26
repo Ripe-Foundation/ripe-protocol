@@ -680,6 +680,10 @@
             "type": "bool"
           },
           {
+            "name": "canClaimInStabPool",
+            "type": "bool"
+          },
+          {
             "name": "shouldTransferToEndaoment",
             "type": "bool"
           },

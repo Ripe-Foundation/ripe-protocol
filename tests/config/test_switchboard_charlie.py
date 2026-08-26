@@ -2601,6 +2601,7 @@ def test_deregister_asset_execute_success(
         pytest.param(12, id="withdrawal"),
         pytest.param(13, id="redemption"),
         pytest.param(15, id="auction"),
+        pytest.param(16, id="stability-claims"),
     ],
 )
 def test_deregister_asset_execute_rechecks_applicable_exit_paths(
@@ -2646,7 +2647,6 @@ def test_deregister_asset_execute_rechecks_applicable_exit_paths(
     "ltv,should_transfer_to_endaoment,is_nft,can_buy_in_auction",
     [
         pytest.param(0, False, False, False, id="zero-ltv"),
-        pytest.param(50_00, False, True, True, id="nft"),
         pytest.param(50_00, True, False, True, id="endaoment"),
     ],
 )
@@ -2685,7 +2685,7 @@ def test_deregister_asset_execute_allows_only_applicable_debt_exits(
     assert not mission_control.isSupportedAsset(alpha_token)
 
 
-def test_deregister_zero_ltv_asset_still_requires_withdrawal_exit(
+def test_deregister_positive_ltv_nft_requires_a_functional_debt_exit(
     switchboard_charlie,
     switchboard_bravo,
     governance,
@@ -2693,7 +2693,46 @@ def test_deregister_zero_ltv_asset_still_requires_withdrawal_exit(
     alpha_token,
 ):
     config = list(_asset_config([1]))
-    config[12] = False
+    config[6] = (50_00, 60_00, 70_00, 10_00, 5_00, 0)
+    config[13] = False
+    config[15] = True
+    config[20] = True
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(config),
+        sender=switchboard_bravo.address,
+    )
+    action = switchboard_charlie.deregisterAsset(
+        alpha_token,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, action)
+
+    with boa.reverts("invalid retirement config"):
+        switchboard_charlie.executePendingAction(
+            action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(alpha_token)
+
+
+@pytest.mark.parametrize(
+    "field_index",
+    [
+        pytest.param(12, id="withdrawal"),
+        pytest.param(16, id="stability-claims"),
+    ],
+)
+def test_deregister_zero_ltv_asset_still_requires_operational_exits(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    field_index,
+):
+    config = list(_asset_config([1]))
+    config[field_index] = False
     config[13] = False
     config[15] = False
     mission_control.setAssetConfig(
