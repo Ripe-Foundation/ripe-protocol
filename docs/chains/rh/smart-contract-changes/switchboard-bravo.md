@@ -24,7 +24,8 @@ Teller, CreditEngine, and Endaoment resolve Curve through a constructor
 `CURVE_PRICES_ID` immutable. Bravo does not: the owner forbade a constructor
 argument on this addition. The PriceDesk ID remains a call argument. On
 Robinhood the keeper calls `addGreenRefPoolSnapshot(2)`. That `2` is
-CurvePrices' PriceDesk registry ID. It is separate from the fact that the
+`CURVE_PRICES_ID` in [`config/robinhood_launch.py`](../../../../config/robinhood_launch.py)
+— CurvePrices' PriceDesk registry ID. It is separate from the fact that the
 currently deployed Bravo occupies Switchboard child ID 2.
 
 Measured deployed runtime after the wrapper is 24,177 bytes, leaving 399 bytes
@@ -39,10 +40,11 @@ seal. Later comment-only Bravo edits do not.
 ## Authorization and failure semantics
 
 - Governance may call immediately.
-- Otherwise the current MissionControl must return true from
+- Otherwise the current MissionControl row must return true from
   `canPerformLiteAction(msg.sender)`; unauthorized callers revert `no perms`.
-- Bravo resolves the current PriceDesk through the current RipeHq
-  `PRICE_DESK_ID`. A zero pointer reverts `missing price desk`.
+- Bravo's RipeHq address is constructor-immutable. It rereads MissionControl
+  (ID 5) and PriceDesk (ID 7) from that HQ on each call. A zero PriceDesk
+  pointer reverts `missing price desk`.
 - `_curvePricesId` is resolved through that PriceDesk. Zero or disabled rows
   both store `empty(address)` and revert `invalid price source id` before the
   specialized `extcall`.
@@ -50,8 +52,9 @@ seal. Later comment-only Bravo edits do not.
   wrapper does not copy Teller's fail-open Curve housekeeping.
 
 A successful Curve update returns true and logs `didUpdate=true`. Same-block
-duplicates and a paused Curve return false and log `didUpdate=false`. A
-genuine Curve revert leaves no operational event.
+duplicates, a paused Curve, missing configuration, and other legitimate
+no-update cases return false and log `didUpdate=false`. A genuine Curve
+revert leaves no operational event.
 
 The intended CurvePrices call is privileged and state-changing. The unexpected
 cross-source collision radius is empty today (no `__default__`, only
@@ -72,28 +75,38 @@ MissionControl accepts any address; use "keeper address/caller" until a
 credential architecture is selected.
 
 Lite-signer status is a broad, unscoped protocol-operations role. Immediate
-surfaces include Charlie pause, blacklist, account lock, debt updates, and
-loot/reward operations; Delta deleverage, contributor cash/cancel/freeze, bond
-disable, and booster removal; Echo Endaoment yield/fund movement, conversions,
-claims, and stabilization; Alpha generic `addPriceSnapshot` plus Pyth/Stork
-payloads; and this wrapper. Echo PSM-disable paths are proposals that still
-require governance `executePendingAction`. That unscoped operations power
-belongs in the Robinhood launch risk register before the grant.
+surfaces include Alpha's protocol-wide disable switches (`setCanDeposit(false)`,
+withdraw, borrow, repay, liquidate, redeem, auction buy, Stability
+claim/redeem, loot claim), Charlie pause/blacklist/lock/debt/loot, Delta
+deleverage/HR/bond/boosters, Echo Endaoment yield plus the explicit
+fund-transfer entrypoints `transferFundsToEndaomentPsmInEndaoment`,
+`transferFundsToVaultInEndaoment`, and `transferUsdcToEndaomentFundsInPsm`,
+and this wrapper. Alpha generic `addPriceSnapshot` is immediate. Pyth/Stork
+payload paths exist but those sources are not current Robinhood deployments.
+Echo PSM-disable paths are proposals that still require governance
+`executePendingAction`. That unscoped operations power belongs in the
+Robinhood launch risk register before the grant.
 
 ## Snapshots and dynamic rates are active
 
-Owner ratifies GREEN reference snapshots and Curve-driven dynamic borrow rates
-as active at Robinhood launch, with `DefaultsRobinhood.increasePerDangerBlock
-= 60`. Teller already snapshots on housekeeping; this keeper only guarantees
-cadence. A shallow configured pool is cheap to push past `dangerTrigger`,
-after which danger blocks raise borrow rates protocol-wide. That risk is
-accepted with the slope.
+Owner authorized on 25 August 2026 that GREEN reference snapshots and
+Curve-driven dynamic borrow rates are active at Robinhood launch, with
+`DefaultsRobinhood.increasePerDangerBlock = 60`. Teller already snapshots on
+housekeeping. This wrapper is an entrypoint only — it does not schedule,
+retry, or guarantee cadence. One valid closed interval can produce a
+weighted ratio; the ring need not be full. At `dangerTrigger`,
+`minDynamicRateBoost = 100%` doubles the base rate before the per-danger-block
+slope (`60 / 1_000_000 = 0.006%` ideal, not `0.60%`). A nonempty GREEN
+ref-pool config also enables Endaoment `stabilizeGreenRefPool` through Echo;
+that coupled capability is accepted with the live configuration. A shallow
+pool can trip the threshold. That risk is accepted with the slope.
 
 [`curve-launch-activation.md`](../curve-launch-activation.md) is stale on a
 specific claim: it still says the launch candidate does not configure "the
 GREEN reference-pool configuration or Teller snapshots" and does not activate
-"Curve-driven dynamic rates." The inventory overlay and CAD-001 still say
-inactive. This page does not rewrite those files.
+"Curve-driven dynamic rates." The inventory overlay, CAD-001, `status.yaml`,
+and Blueprint still describe snapshots, rates, or raw `60` as inactive or
+separately gated. This page does not rewrite those files.
 
 ## Launch follow-up
 

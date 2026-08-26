@@ -41,17 +41,18 @@ The release-packet checklist has been updated to match.
 
 **The headroom-waiver mechanism is retired.** RH-D026 through RH-D036 describe
 a 200-byte minimum-headroom floor, per-contract exact source/runtime/deployed
-identity pins, and zero-growth reopen-on-change rules. The global floor and
-those identity pins are not enforced in any lane. Those entries stand as
-historical accepted-risk records of what was approved at the time. Read their
-sizes, waivers, and "reopens on change" language as past tense; none of it
-creates an obligation on a current PR.
+identity pins, and zero-growth reopen-on-change rules. The retired global
+floor and the RH-D026 source/creation/runtime *hash* identities are not
+enforced in any lane. Those entries stand as historical accepted-risk
+records. Read their waivers and "reopens on change" language as past tense;
+none of it creates an obligation on a current PR.
 
-`tests/test_vault_pointer_runtime_sizes.py` asserts the EIP-170 ceiling for
-every pinned contract and, separately, a Bravo-only 200-byte headroom floor
-after the GREEN keeper wrapper (RH-D045). That Bravo floor is not the retired
-global RH-D026 mechanism. Every other contract is still judged only against
-24,576 bytes.
+`tests/test_vault_pointer_runtime_sizes.py` currently enforces three live
+rules: the EIP-170 24,576-byte ceiling for every measured contract; an exact
+deployed-runtime byte pin per named contract (`EXPECTED_RUNTIME_BYTES` — a
+one-byte drift fails the gate and must be updated if intentional); and a
+Bravo-only 200-byte headroom floor after the GREEN keeper wrapper (RH-D045).
+That Bravo floor is not the retired global RH-D026 mechanism.
 
 This register does not replace the linked decision records, authorize a new
 phase, or convert an approved direction into implementation, integration,
@@ -1608,21 +1609,28 @@ and draft PR #211.
 
 ### RH-D045 — Bravo GREEN keeper uses a caller-supplied PriceDesk ID
 
-**Status:** Implemented in draft PR #211; not deployed, registered, or
+**Status:** Owner authorized on 25 August 2026 the Bravo GREEN keeper with a
+caller-supplied PriceDesk ID, GREEN reference snapshots and Curve-driven
+dynamic borrow rates as active at Robinhood launch, and
+`DefaultsRobinhood.increasePerDangerBlock = 60` including shallow-pool
+rate risk. Carried by draft PR #211; not deployed, registered, or
 activated on Robinhood. A numbered decision is used because this adds a new
 externally callable, lite-signer-reachable Switchboard surface and deliberately
 diverges from the constructor-immutable Curve ID used by Teller, CreditEngine,
 and Endaoment. The ordinary bug-fix exception does not apply.
 
 `SwitchboardBravo.addGreenRefPoolSnapshot(_curvePricesId)` lets current
-governance or the current MissionControl `canPerformLiteAction` signer trigger
-`CurvePrices.addGreenRefPoolSnapshot()` through a typed `extcall`. The registry
-ID remains a call argument. On Robinhood the keeper call is
-`addGreenRefPoolSnapshot(2)`, where `2` is CurvePrices' PriceDesk ID, not
-Bravo's Switchboard child ID. Bravo was chosen because composed Alpha runtime
-had 14 bytes of EIP-170 headroom; Bravo had 910 and now has 399 after this
-wrapper (24,177 deployed bytes). No constructor argument or immutable was
-added.
+governance or a signer authorized by the current MissionControl row's
+`canPerformLiteAction` trigger `CurvePrices.addGreenRefPoolSnapshot()` through
+a typed `extcall`. Bravo's RipeHq address is a constructor immutable
+(`RIPE_HQ_FOR_GOV`); MissionControl (ID 5) and PriceDesk (ID 7) rows are
+reread from that HQ on each call. The PriceDesk source ID remains a call
+argument. On Robinhood the keeper call is `addGreenRefPoolSnapshot(2)`, where
+`2` is `CURVE_PRICES_ID` in [`config/robinhood_launch.py`](../../../config/robinhood_launch.py).
+That is CurvePrices' PriceDesk ID, not Bravo's Switchboard child ID. Bravo was
+chosen because composed Alpha runtime had 14 bytes of EIP-170 headroom; Bravo
+had 910 and now has 399 after this wrapper (24,177 deployed bytes). No
+constructor argument or immutable Curve ID was added.
 
 A production keeper at snapshot cadence effectively requires the lite-signer
 grant: `SwitchboardAlpha.setCanPerformLiteAction(keeper, True)` then
@@ -1634,13 +1642,28 @@ architecture is selected. Governance calling the wrapper directly is a Safe
 transaction per snapshot and is impractical at keeper cadence.
 
 Lite-signer status is a broad, unscoped protocol-operations role, not a
-pause-only grant. Immediate surfaces include Charlie pause, blacklist, account
-lock, debt updates, and loot/reward operations; Delta arbitrary-user
-deleverage, contributor cash/cancel/freeze, bond disable, and booster removal;
-Echo Endaoment yield deposit/withdraw, conversions, claims, and stabilization;
-Alpha generic `addPriceSnapshot` plus Pyth/Stork payload pushes; and this Bravo
-wrapper. Alpha/Charlie/Delta enable-style paths stay governance-only. Echo
-PSM-disable (`setPsmCanMint(false)`, `setPsmCanRedeem(false)`,
+pause-only grant. Immediate surfaces include:
+
+- **Alpha disable switches** (more consequential than most other listed
+  powers): `setCanDeposit(false)`, `setCanWithdraw(false)`,
+  `setCanBorrow(false)`, `setCanRepay(false)`, `setCanLiquidate(false)`,
+  `setCanRedeemCollateral(false)`, `setCanRedeemInStabPool(false)`,
+  `setCanBuyInAuction(false)`, `setCanClaimInStabPool(false)`,
+  `setCanClaimLoot(false)`, plus generic `addPriceSnapshot`. Pyth/Stork
+  payload pushes exist on Alpha but those sources are not current Robinhood
+  deployments (`PYTH_PRICES_ID = 0` in `robinhood_launch.py`).
+- **Charlie:** pause, blacklist, account lock, debt updates, and loot/reward
+  operations.
+- **Delta:** arbitrary-user deleverage, contributor cash/cancel/freeze, bond
+  disable, and booster removal.
+- **Echo:** Endaoment yield deposit/withdraw, conversions, claims,
+  stabilization, and the explicit fund-transfer entrypoints
+  `transferFundsToEndaomentPsmInEndaoment`, `transferFundsToVaultInEndaoment`,
+  and `transferUsdcToEndaomentFundsInPsm`.
+- **This Bravo wrapper.**
+
+Alpha/Charlie/Delta enable-style paths stay governance-only. Echo PSM-disable
+(`setPsmCanMint(false)`, `setPsmCanRedeem(false)`,
 `setPsmShouldAutoDeposit(false)`) is only a pending action: the lite signer
 may propose it, and governance must still `executePendingAction`.
 
@@ -1656,22 +1679,37 @@ become reachable without a Bravo change.
 
 GREEN reference snapshots and Curve-driven dynamic borrow rates are
 **active** at Robinhood launch. Teller already calls
-`addGreenRefPoolSnapshot()` on housekeeping paths; this keeper only guarantees
-cadence when user activity is sparse. Snapshots filling the ring is what can
-flip CreditEngine from the base rate to the dynamic path
-(`weightedRatio >= dangerTrigger`). Owner ratifies
-`DefaultsRobinhood.increasePerDangerBlock = 60` (6× Base's 10, the
-shared-clock "preserve the Base time-rate" candidate). A shallow configured
-GREEN ref pool is cheap to push past `dangerTrigger`, after which
-`numBlocksInDanger` accumulates and raises borrow rates protocol-wide; that
-risk is accepted with the slope, not deferred. This supersedes the inactive
-posture in [`curve-launch-activation.md`](curve-launch-activation.md)
+`addGreenRefPoolSnapshot()` on housekeeping paths. This wrapper is only an
+entrypoint: it supplies no scheduler, retries, liveness guarantee, or SLA.
+One valid closed interval after the seeded observation can produce a
+nonzero weighted ratio; the ring need not be full. CreditEngine leaves the
+base rate while `weightedRatio == 0` or `weightedRatio < dangerTrigger`.
+At the threshold, Robinhood's `minDynamicRateBoost = 100%` immediately
+doubles the base rate before the separate per-danger-block slope applies.
+Owner ratifies `DefaultsRobinhood.increasePerDangerBlock = 60` (6× Base's
+10). Runtime's ideal slope is `60 / 1_000_000 = 0.006%` per danger block
+before integer flooring — not `0.60%`. The generic parameter formatter still
+renders raw `10` as `0.10%` and would render raw `60` the same wrong way;
+that display bug is unchanged and is not fixed here.
+
+A nonempty GREEN reference-pool configuration also enables Endaoment
+`stabilizeGreenRefPool`, reachable through Echo by the same lite-signer
+role. That coupled capability is accepted with the live configuration. A
+shallow configured pool is cheap to push past `dangerTrigger`; the immediate
+100% boost plus the per-danger-block slope can then raise borrow rates
+protocol-wide. That risk is accepted with the slope, not deferred.
+
+This supersedes the inactive posture in
+[`curve-launch-activation.md`](curve-launch-activation.md)
 ("does not configure … GREEN reference-pool configuration or Teller
 snapshots" / "Curve-driven dynamic rates"), the
 [`block-number-inventory.md`](block-number-inventory.md) overlay banner, BN-011
 ("mark Curve integration disabled"), and CAD-001 ("mark explicitly inactive in
-DefaultsRobinhood"). Those pages remain separately stale and are not rewritten
-here.
+DefaultsRobinhood"). [`status.yaml`](status.yaml),
+[`config/robinhood_blueprint.py`](../../../config/robinhood_blueprint.py), and
+the shared-clock specification still describe snapshots, dynamic rates, or
+raw `60` as inactive or separately gated. Those machine-facing and narrative
+artifacts remain separately stale and are not rewritten here.
 
 Merging this source does not make the wrapper available on the Bravo that
 currently occupies Switchboard child ID 2. The updated Bravo runtime must
@@ -1682,14 +1720,17 @@ Pending Bravo actions on the replaced contract are stranded. After promotion,
 grant the keeper lite-signer role only with the unscoped operations risk
 recorded. Monitor failed receipts as well as
 `GreenRefPoolSnapshotAttempted`: a genuine Curve revert leaves no event, while
-`didUpdate=false` covers same-block duplicates, a paused Curve, and other
-legitimate no-update cases. Robinhood child blocks can share an EVM
-`block.number` (BN-011), so duplicate `false` outcomes can be legitimate.
+`didUpdate=false` covers same-block duplicates, a paused Curve, missing
+configuration, and other legitimate no-update cases. Robinhood child blocks
+can share an EVM `block.number` (BN-011), so duplicate `false` outcomes can
+be legitimate.
 
 This record does not authorize deployment, registry promotion, lite-signer
 grant, configuration, activation, or release. It does not refresh
 [`curve-launch-activation.md`](curve-launch-activation.md), the block-number
-inventory overlay, CAD-001, or Blueprint Bravo anchors.
+inventory overlay, CAD-001, [`status.yaml`](status.yaml),
+[`config/robinhood_blueprint.py`](../../../config/robinhood_blueprint.py),
+or Blueprint Bravo anchors.
 
 Source:
 [`smart-contract-changes/switchboard-bravo.md`](smart-contract-changes/switchboard-bravo.md)
