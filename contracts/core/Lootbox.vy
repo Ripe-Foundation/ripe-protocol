@@ -52,6 +52,7 @@ interface Ledger:
 interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
+    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def getRewardsConfig() -> RewardsConfig: view
@@ -872,7 +873,13 @@ def _getLatestDepositPoints(
 
     # latest asset points
     assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset) 
-    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
+    # Historical rows keep earned points but do not receive the current vault's asset allocation.
+    stakersPointsAlloc: uint256 = 0
+    voterPointsAlloc: uint256 = 0
+    if staticcall MissionControl(_a.missionControl).isSupportedAssetInVault(_vaultId, _asset):
+        stakersPointsAlloc = assetConfig.stakersPointsAlloc
+        voterPointsAlloc = assetConfig.voterPointsAlloc
+    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, stakersPointsAlloc, voterPointsAlloc)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
@@ -1261,7 +1268,9 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
         return rewards
 
     # new Ripe rewards
-    newRipeDistro: uint256 = min(elapsedBlocks * _config.ripePerBlock, b.ripeAvailForRewards)
+    newRipeDistro: uint256 = b.ripeAvailForRewards
+    if _config.ripePerBlock <= b.ripeAvailForRewards // elapsedBlocks:
+        newRipeDistro = elapsedBlocks * _config.ripePerBlock
 
     # allocate ripe rewards to global buckets
     total: uint256 = _config.borrowersAlloc + _config.stakersAlloc + _config.votersAlloc + _config.genDepositorsAlloc
