@@ -1027,8 +1027,7 @@ def _performHousekeeping(
         assert not staticcall Ledger(_a.ledger).isLockedAccount(_user) # dev: account locked
 
     # update green ref pool snapshot
-    # A call to the zero address succeeds as a no-op when CurvePrices is not
-    # configured. A broken or expensive configured route remains fail-open.
+    # a call to the zero address succeeds as a no-op when curve prices is not configured. a broken or expensive configured route remains fail-open.
     if not raw_call(
             staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID),
             method_id("addGreenRefPoolSnapshot()"),

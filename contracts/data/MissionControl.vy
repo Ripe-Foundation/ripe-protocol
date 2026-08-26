@@ -764,7 +764,6 @@ def getRepayConfig(_user: address) -> RepayConfig:
 @view
 @external
 def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
-    # Legacy ABI-compatible view; protocol delivery uses getEffectiveRedeemCollateralConfig.
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return RedeemCollateralConfig(
         canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
@@ -780,8 +779,8 @@ def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCol
 def getEffectiveRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveRedeemCollateralConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
-    # canWithdraw gates voluntary Teller withdrawals only. Redemptions use
-    # their dedicated general/asset flags and remain available for solvency.
+
+    # canWithdraw gates voluntary teller withdrawals only. Redemptions use their dedicated general/asset flags and remain available for solvency.
     return EffectiveRedeemCollateralConfig(
         canRedeemCollateral=(
             self.genConfig.canRedeemCollateral
@@ -808,8 +807,8 @@ def getLtvPaybackBuffer() -> uint256:
 def getEffectiveAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveAuctionBuyConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
-    # canWithdraw gates voluntary Teller withdrawals only. Auctions use their
-    # dedicated general/asset flags and remain available for liquidation.
+
+    # canWithdraw gates voluntary teller withdrawals only. Auctions use their dedicated general/asset flags and remain available for liquidation.
     return EffectiveAuctionBuyConfig(
         canBuyInAuction=(
             self.genConfig.canBuyInAuction
