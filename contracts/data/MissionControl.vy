@@ -969,19 +969,20 @@ def getRewardsConfig() -> RewardsConfig:
 @external
 def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    # Only current vault rows receive the asset's staker and voter allocations.
+    shouldFundGenPoints: bool = assetConfig.stakersPointsAlloc == 0
+    # Membership gates staker and voter allocations; gen funding remains asset-level.
     if _vaultId not in assetConfig.vaultIds:
         return DepositPointsConfig(
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
             isNft=assetConfig.isNft,
-            shouldFundGenPoints=assetConfig.stakersPointsAlloc == 0,
+            shouldFundGenPoints=shouldFundGenPoints,
         )
     return DepositPointsConfig(
         stakersPointsAlloc=assetConfig.stakersPointsAlloc,
         voterPointsAlloc=assetConfig.voterPointsAlloc,
         isNft=assetConfig.isNft,
-        shouldFundGenPoints=assetConfig.stakersPointsAlloc == 0,
+        shouldFundGenPoints=shouldFundGenPoints,
     )
 
 
