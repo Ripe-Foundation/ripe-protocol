@@ -3559,3 +3559,228 @@ def test_debt_terms_successful_event_values_unchanged(
         log.daowry,
     ) == (alpha_token.address, *pending_terms)
     assert mission_control.assetConfig(alpha_token).debtTerms == pending_terms
+
+
+def _count_mc_writes(computation, mission_control):
+    selector = mission_control.setAssetConfig.prepare_calldata(
+        ZERO_ADDRESS,
+        _asset_config_with_debt_terms(),
+    )[:4]
+    expected = bytes.fromhex(str(mission_control.address)[2:])
+
+    def walk(node):
+        yield node
+        for child in getattr(node, "children", []) or []:
+            yield from walk(child)
+
+    return sum(
+        getattr(child.msg, "code_address", None) == expected
+        and bytes(child.msg.data[:4]) == selector
+        for child in walk(computation)
+        if getattr(child, "msg", None) is not None
+    )
+
+
+@pytest.mark.parametrize("action_kind", BINDING_ACTIONS)
+def test_consolidated_writer_parity_for_each_bravo_branch(
+    action_kind,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    bravo_token,
+    mock_whitelist,
+    price_desk,
+):
+    asset = bravo_token if action_kind == "add" else alpha_token
+    if action_kind != "add":
+        _seed_binding_asset(mission_control, switchboard_bravo, asset)
+
+    scale_before = price_desk.tokenScale(asset)
+    action_id = _queue_binding_action(
+        action_kind,
+        switchboard_bravo,
+        governance,
+        asset,
+        mock_whitelist,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, action_id)
+    _assert_binding_action_effect(
+        action_kind,
+        mission_control,
+        asset,
+        mock_whitelist,
+    )
+    assert _count_mc_writes(switchboard_bravo._computation, mission_control) == 1
+    if action_kind == "add" and not mission_control.assetConfig(asset).isNft:
+        assert price_desk.tokenScale(asset) != 0 or scale_before != 0
+        if scale_before == 0:
+            assert price_desk.tokenScale(asset) != 0
+    if action_kind == "add":
+        assert filter_logs(switchboard_bravo, "AssetAdded")
+    elif action_kind == "deposit":
+        assert filter_logs(switchboard_bravo, "AssetDepositParamsSet")
+    elif action_kind == "liquidation":
+        assert filter_logs(switchboard_bravo, "AssetLiqConfigSet")
+    elif action_kind == "debt":
+        assert filter_logs(switchboard_bravo, "AssetDebtTermsSet")
+        assert mission_control.assetConfig(asset).debtTerms == BINDING_DEBT_TERMS
+    else:
+        assert filter_logs(switchboard_bravo, "WhitelistAssetSet")
+
+
+def test_structural_rules_for_add_and_deposit_params(
+    switchboard_bravo,
+    governance,
+    mission_control,
+    alpha_token,
+    bravo_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _seed_binding_asset(mission_control, switchboard_bravo, alpha_token)
+
+    # ADD_NEW must start at zero allocations (execution-time).
+    add_id = switchboard_bravo.addAsset(
+        bravo_token,
+        [1],
+        0,
+        1,
+        1_000,
+        10_000,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    with boa.reverts("new asset must start at zero allocs"):
+        switchboard_bravo.executePendingAction(add_id, sender=governance.address)
+
+    add_ok = switchboard_bravo.addAsset(
+        bravo_token,
+        [1],
+        0,
+        0,
+        1_000,
+        10_000,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, add_ok)
+
+    # Limit-only write remains allowed.
+    limit_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        [1],
+        0,
+        0,
+        2_000,
+        20_000,
+        0,
+        sender=governance.address,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, limit_id)
+    assert mission_control.assetConfig(alpha_token).perUserDepositLimit == 2_000
+
+    # Membership and allocation cannot change together.
+    together_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        [vault_id],
+        0,
+        8,
+        2_000,
+        20_000,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    with boa.reverts("cannot change membership and allocs together"):
+        switchboard_bravo.executePendingAction(
+            together_id,
+            sender=governance.address,
+        )
+
+    # Nonzero allocation change requires exactly one vault.
+    seeded = list(mission_control.assetConfig(alpha_token))
+    seeded[0] = [1, vault_id]
+    seeded[1] = 0
+    seeded[2] = 0
+    mission_control.setAssetConfig(alpha_token, seeded, sender=switchboard_bravo.address)
+    multi_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        [1, vault_id],
+        0,
+        8,
+        2_000,
+        20_000,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    with boa.reverts("nonzero allocs require one vault"):
+        switchboard_bravo.executePendingAction(
+            multi_id,
+            sender=governance.address,
+        )
+
+    live = list(mission_control.assetConfig(alpha_token))
+    live[0] = [1]
+    live[1] = 0
+    live[2] = 12
+    mission_control.setAssetConfig(alpha_token, live, sender=switchboard_bravo.address)
+    membership_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        [vault_id],
+        0,
+        12,
+        2_000,
+        20_000,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    with boa.reverts("membership change requires zero allocs"):
+        switchboard_bravo.executePendingAction(
+            membership_id,
+            sender=governance.address,
+        )
+
+    # Unrelated legacy configuration changes remain allowed with multi-vault
+    # and leftover allocations.
+    live[0] = [1, vault_id]
+    live[1] = 10
+    live[2] = 10
+    mission_control.setAssetConfig(alpha_token, live, sender=switchboard_bravo.address)
+    debt_id = switchboard_bravo.setAssetDebtTerms(
+        alpha_token,
+        *BINDING_DEBT_TERMS,
+        sender=governance.address,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, debt_id)
+    assert mission_control.assetConfig(alpha_token).debtTerms == BINDING_DEBT_TERMS
+    assert list(mission_control.assetConfig(alpha_token).vaultIds) == [1, vault_id]
+    assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == 10

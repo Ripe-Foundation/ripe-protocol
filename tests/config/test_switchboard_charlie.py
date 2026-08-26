@@ -4255,6 +4255,133 @@ def test_pointer_execution_rejects_disabled_vault_binding(
     assert switchboard_charlie.hasPendingAction(action_id)
 
 
+def test_checkpoint_asset_deposit_points_at_is_governor_only(
+    switchboard_charlie,
+    switchboard_alpha,
+    governance,
+    bob,
+    alpha_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lite_id = switchboard_alpha.setCanPerformLiteAction(bob, True, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(lite_id, sender=governance.address)
+
+    with boa.reverts("no perms"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            simple_erc20_vault.address,
+            sender=bob,
+        )
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        vault_id,
+        simple_erc20_vault.address,
+        sender=governance.address,
+    )
+    logs = filter_logs(switchboard_charlie, "AssetDepositPointsCheckpointedAt")
+    assert logs[0].asset == alpha_token.address
+    assert logs[0].vaultId == vault_id
+    assert logs[0].vaultAddr == simple_erc20_vault.address
+
+
+def test_checkpoint_asset_deposit_points_at_vault_book_matching(
+    switchboard_charlie,
+    governance,
+    alpha_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    with boa.reverts("invalid parameters"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            ZERO_ADDRESS,
+            vault_id,
+            simple_erc20_vault.address,
+            sender=governance.address,
+        )
+    with boa.reverts("invalid parameters"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            ZERO_ADDRESS,
+            sender=governance.address,
+        )
+    with boa.reverts("vault addr mismatch"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            vault_id,
+            rebase_erc20_vault.address,
+            sender=governance.address,
+        )
+    assert switchboard_charlie.checkpointAssetDepositPointsAt(
+        alpha_token,
+        999,
+        simple_erc20_vault.address,
+        sender=governance.address,
+    )
+
+
+def test_flag_setters_preserve_allocation_totals(
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+    mission_control,
+    alpha_token,
+):
+    add_action = switchboard_bravo.addAsset(
+        alpha_token.address,
+        [1],
+        0,
+        0,
+        1_000,
+        10_000,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    assert switchboard_bravo.executePendingAction(add_action, sender=governance.address)
+
+    seeded = list(mission_control.assetConfig(alpha_token.address))
+    seeded[1] = 25_00
+    seeded[2] = 15_00
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        seeded,
+        sender=switchboard_bravo.address,
+    )
+    totals_before = mission_control.totalPointsAllocs()
+    allocs_before = (
+        mission_control.assetConfig(alpha_token.address).stakersPointsAlloc,
+        mission_control.assetConfig(alpha_token.address).voterPointsAlloc,
+    )
+    assert switchboard_charlie.setCanDepositAsset(
+        alpha_token,
+        False,
+        sender=governance.address,
+    )
+    assert mission_control.totalPointsAllocs() == totals_before
+    config = mission_control.assetConfig(alpha_token.address)
+    assert (config.stakersPointsAlloc, config.voterPointsAlloc) == allocs_before
+    assert not config.canDeposit
+
+
 # Run the tests
 if __name__ == "__main__":
     print("Additional comprehensive tests for SwitchboardThree.vy")

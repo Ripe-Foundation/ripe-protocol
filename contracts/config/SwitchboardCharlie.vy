@@ -295,6 +295,12 @@ event DepositPointsUpdatedMany:
     asset: indexed(address)
     caller: indexed(address)
 
+event AssetDepositPointsCheckpointedAt:
+    asset: indexed(address)
+    vaultId: uint256
+    vaultAddr: indexed(address)
+    caller: indexed(address)
+
 event TrainingWheelsSet:
     trainingWheels: indexed(address)
 
@@ -885,6 +891,19 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
 
     extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(_user, _vaultId, vaultAddr, _asset)
     log DepositPointsUpdated(user=_user, vaultId=_vaultId, asset=_asset, caller=msg.sender)
+    return True
+
+
+@external
+def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert empty(address) not in [_asset, _vaultAddr] # dev: invalid parameters
+
+    bookAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
+    assert bookAddr == empty(address) or bookAddr == _vaultAddr # dev: vault addr mismatch
+
+    extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
+    log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)
     return True
 
 

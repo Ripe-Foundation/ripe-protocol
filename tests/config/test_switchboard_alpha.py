@@ -4178,3 +4178,98 @@ def test_set_can_withdraw_on_new_mission_control(
 
     # Verify registered MC unchanged
     assert mission_control.genConfig().canWithdraw == original_can_withdraw
+
+
+def test_alpha_live_ripe_per_block_and_allocs_checkpoint_lootbox(
+    switchboard_alpha,
+    mission_control,
+    governance,
+    ledger,
+    lootbox,
+    teller,
+):
+    lootbox.updateRipeRewards(sender=teller.address)
+    rewards_before = ledger.ripeRewards().lastUpdate
+    points_before = ledger.globalDepositPoints().lastUpdate
+
+    action_id = switchboard_alpha.setRipePerBlock(1_000, sender=governance.address)
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == boa.env.evm.patch.block_number
+    assert ledger.ripeRewards().lastUpdate > rewards_before
+    assert filter_logs(switchboard_alpha, "RipeRewardsPerBlockSet")[0].ripePerBlock == 1_000
+
+    rewards_mid = ledger.ripeRewards().lastUpdate
+    action_id = switchboard_alpha.setRipeRewardsAllocs(
+        40_00, 20_00, 20_00, 20_00, sender=governance.address
+    )
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == boa.env.evm.patch.block_number
+    assert ledger.ripeRewards().lastUpdate > rewards_mid
+    assert mission_control.rewardsConfig().borrowersAlloc == 40_00
+    assert ledger.globalDepositPoints().lastUpdate == points_before
+
+
+def test_alpha_points_and_autostake_writes_do_not_checkpoint(
+    switchboard_alpha,
+    mission_control,
+    governance,
+    ledger,
+    lootbox,
+    teller,
+):
+    lootbox.updateRipeRewards(sender=teller.address)
+    rewards_before = ledger.ripeRewards().lastUpdate
+
+    boa.env.time_travel(blocks=4)
+    assert switchboard_alpha.setRewardsPointsEnabled(False, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+    assert not mission_control.rewardsConfig().arePointsEnabled
+    assert switchboard_alpha.setRewardsPointsEnabled(True, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+
+    action_id = switchboard_alpha.setAutoStakeParams(
+        10_00, 20_00, 3, sender=governance.address
+    )
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+    config = mission_control.rewardsConfig()
+    assert config.autoStakeRatio == 10_00
+    assert config.autoStakeDurationRatio == 20_00
+    assert config.stabPoolRipePerDollarClaimed == 3
+
+
+def test_alpha_staged_target_does_not_checkpoint_ripe_rewards(
+    switchboard_alpha,
+    new_mission_control,
+    governance,
+    ledger,
+    lootbox,
+    teller,
+):
+    lootbox.updateRipeRewards(sender=teller.address)
+    rewards_before = ledger.ripeRewards().lastUpdate
+    action_id = switchboard_alpha.setRipePerBlock(
+        2_500,
+        new_mission_control.address,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=max(switchboard_alpha.actionTimeLock(), 3))
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert ledger.ripeRewards().lastUpdate == rewards_before
+    assert new_mission_control.rewardsConfig().ripePerBlock == 2_500
+
+
+def test_alpha_live_ripe_per_block_fails_closed_when_lootbox_paused(
+    switchboard_alpha,
+    governance,
+    lootbox,
+):
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    action_id = switchboard_alpha.setRipePerBlock(750, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("contract paused"):
+        switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    lootbox.pause(False, sender=switchboard_alpha.address)
