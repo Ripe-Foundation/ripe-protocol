@@ -1824,6 +1824,10 @@
       {
         "name": "_asset",
         "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
       }
     ],
     "outputs": [
@@ -1841,6 +1845,10 @@
           },
           {
             "name": "isNft",
+            "type": "bool"
+          },
+          {
+            "name": "shouldFundGenPoints",
             "type": "bool"
           }
         ]
