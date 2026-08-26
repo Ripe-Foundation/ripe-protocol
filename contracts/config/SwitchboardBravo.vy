@@ -44,28 +44,6 @@ interface MissionControl:
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
 
-# Local copy of Ledger.AssetDepositPoints. Field order must stay identical.
-struct AssetDepositPoints:
-    balancePoints: uint256
-    lastBalance: uint256
-    lastUsdValue: uint256
-    ripeStakerPoints: uint256
-    ripeVotePoints: uint256
-    ripeGenPoints: uint256
-    lastUpdate: uint256
-    precision: uint256
-
-interface Ledger:
-    def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
-
-interface Lootbox:
-    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
-
-# Word 0 of RipeRewardsConfig is arePointsEnabled. Same head-decode idiom as
-# the retired MissionControlAssetConfigHead interface.
-interface MissionControlRewardsHead:
-    def rewardsConfig() -> bool: view
-
 interface PriceDesk:
     def tokenScale(_asset: address) -> uint256: view
     def syncTokenScale(_asset: address): nonpayable
@@ -74,6 +52,12 @@ interface PriceDesk:
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
+
+interface Lootbox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
+
+interface Ledger:
+    def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
 
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
@@ -87,12 +71,25 @@ interface CurvePrices:
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
+interface MissionControlRewardsHead:
+    def rewardsConfig() -> bool: view
+
 flag ActionType:
     ASSET_ADD_NEW
     ASSET_DEPOSIT_PARAMS
     ASSET_LIQ_CONFIG
     ASSET_DEBT_TERMS
     ASSET_WHITELIST
+
+struct AssetDepositPoints:
+    balancePoints: uint256
+    lastBalance: uint256
+    lastUsdValue: uint256
+    ripeStakerPoints: uint256
+    ripeVotePoints: uint256
+    ripeGenPoints: uint256
+    lastUpdate: uint256
+    precision: uint256
 
 struct AssetUpdate:
     asset: address
@@ -838,8 +835,6 @@ def _isValidRedeemCollateralConfig(
 
 @view
 @internal
-# Order-sensitive: [1, 2] vs [2, 1] is a membership change. Do not spend
-# Bravo headroom on a set-compare.
 def _vaultIdsEqual(
     _a: DynArray[uint256, MAX_VAULTS_PER_ASSET],
     _b: DynArray[uint256, MAX_VAULTS_PER_ASSET],
