@@ -43,11 +43,28 @@ interface MissionControl:
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
-    # Word 0 of RipeRewardsConfig is arePointsEnabled.
-    def rewardsConfig() -> bool: view
+
+# Local copy of Ledger.AssetDepositPoints. Field order must stay identical.
+struct AssetDepositPoints:
+    balancePoints: uint256
+    lastBalance: uint256
+    lastUsdValue: uint256
+    ripeStakerPoints: uint256
+    ripeVotePoints: uint256
+    ripeGenPoints: uint256
+    lastUpdate: uint256
+    precision: uint256
+
+interface Ledger:
+    def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
 
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
+
+# Word 0 of RipeRewardsConfig is arePointsEnabled. Same head-decode idiom as
+# the retired MissionControlAssetConfigHead interface.
+interface MissionControlRewardsHead:
+    def rewardsConfig() -> bool: view
 
 interface PriceDesk:
     def tokenScale(_asset: address) -> uint256: view
@@ -209,6 +226,7 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 
 GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
+LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 SWITCHBOARD_ID: constant(uint256) = 6
 PRICE_DESK_ID: constant(uint256) = 7
@@ -857,16 +875,14 @@ def _assertAssetAllocStructure(
 
 
 @internal
-def _checkpointCurrentRows(
+def _checkpointSelectedRows(
     _asset: address,
     _vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
-    _vaultBook: address,
+    _vaultAddrs: DynArray[address, MAX_VAULTS_PER_ASSET],
     _lootbox: address,
 ):
-    for vaultId: uint256 in _vaultIds:
-        vaultAddr: address = staticcall VaultBook(_vaultBook).getAddr(vaultId)
-        assert vaultAddr != empty(address) # dev: invalid vault
-        extcall Lootbox(_lootbox).updateDepositPoints(empty(address), vaultId, vaultAddr, _asset)
+    for i: uint256 in range(len(_vaultIds), bound=MAX_VAULTS_PER_ASSET):
+        extcall Lootbox(_lootbox).updateDepositPoints(empty(address), _vaultIds[i], _vaultAddrs[i], _asset)
 
 
 @internal
@@ -888,20 +904,29 @@ def _writeAssetConfig(
         and _mc == self._getMissionControlAddr()
         and (_oldStakers != _config.stakersPointsAlloc or _oldVoter != _config.voterPointsAlloc)
     )
-    vaultBook: address = empty(address)
+    selectedIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = []
+    selectedAddrs: DynArray[address, MAX_VAULTS_PER_ASSET] = []
     lootbox: address = empty(address)
     if needCkpt:
-        assert staticcall MissionControl(_mc).rewardsConfig() # dev: points disabled
+        assert staticcall MissionControlRewardsHead(_mc).rewardsConfig() # dev: points disabled
         ripeHq: address = gov._getRipeHqFromGov()
-        vaultBook = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
+        ledger: address = staticcall RipeHq(ripeHq).getAddr(LEDGER_ID)
+        vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
         lootbox = staticcall RipeHq(ripeHq).getAddr(LOOTBOX_ID)
-        # Fresh current rows initialize here with zero elapsed time.
-        self._checkpointCurrentRows(_asset, _oldVaultIds, vaultBook, lootbox)
+        for vaultId: uint256 in _oldVaultIds:
+            row: AssetDepositPoints = staticcall Ledger(ledger).assetDepositPoints(vaultId, _asset)
+            if row.lastUpdate != 0:
+                vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vaultId)
+                assert vaultAddr != empty(address) # dev: invalid vault
+                selectedIds.append(vaultId)
+                selectedAddrs.append(vaultAddr)
+        assert len(selectedIds) != 0 # dev: no initialized deposit points
+        self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
 
     extcall MissionControl(_mc).setAssetConfig(_asset, _config)
 
     if needCkpt and (_oldStakers == 0) != (_config.stakersPointsAlloc == 0):
-        self._checkpointCurrentRows(_asset, _oldVaultIds, vaultBook, lootbox)
+        self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
 
 
 #############
