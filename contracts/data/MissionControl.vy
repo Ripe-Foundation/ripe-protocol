@@ -261,6 +261,8 @@ def __init__(_ripeHq: address, _defaults: address):
         assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()
         for entry: cs.AssetConfigEntry in assetConfigs:
             self._setAssetConfig(entry.asset, entry.config)
+            if (entry.config.stakersPointsAlloc != 0 or entry.config.voterPointsAlloc != 0) and len(entry.config.vaultIds) == 1:
+                self.rewardVaultId[entry.asset] = entry.config.vaultIds[0]
 
         # priority lists
         self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
@@ -322,9 +324,6 @@ def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     assert earner == 0 or earner in _config.vaultIds # dev: reward vault not supported
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
-    # A sole supported vault is the unambiguous earner; multi-vault assets require an explicit choice.
-    if len(_config.vaultIds) == 1:
-        self.rewardVaultId[_asset] = _config.vaultIds[0]
 
     # monotonic because retired stability pools can still hold user balances.
     if _config.specialStabPoolId != 0:
