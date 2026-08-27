@@ -322,6 +322,8 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     earner: uint256 = self.rewardVaultId[_asset]
     assert earner == 0 or earner in _config.vaultIds # dev: reward vault not supported
+    if _config.stakersPointsAlloc != 0 and earner != 0:
+        assert earner == self.coreRipeGovVaultId or self.isStabVaultId[earner] # dev: invalid staker vault
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
@@ -438,9 +440,8 @@ def setRewardVaultId(_asset: address, _vaultId: uint256):
     assert self.indexOfAsset[_asset] != 0 # dev: invalid asset
     if _vaultId != 0:
         assert _vaultId in self.assetConfig[_asset].vaultIds # dev: invalid reward vault
-    if _vaultId == 0:
-        assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-        assert assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 # dev: points alloc still set
+        if self.assetConfig[_asset].stakersPointsAlloc != 0:
+            assert _vaultId == self.coreRipeGovVaultId or self.isStabVaultId[_vaultId] # dev: invalid staker vault
     self.rewardVaultId[_asset] = _vaultId
 
 

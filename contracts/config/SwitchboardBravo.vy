@@ -57,9 +57,6 @@ interface VaultBook:
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
 
-interface Ledger:
-    def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
-
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
@@ -78,16 +75,6 @@ flag ActionType:
     ASSET_LIQ_CONFIG
     ASSET_DEBT_TERMS
     ASSET_WHITELIST
-
-struct AssetDepositPoints:
-    balancePoints: uint256
-    lastBalance: uint256
-    lastUsdValue: uint256
-    ripeStakerPoints: uint256
-    ripeVotePoints: uint256
-    ripeGenPoints: uint256
-    lastUpdate: uint256
-    precision: uint256
 
 struct AssetUpdate:
     asset: address
@@ -869,9 +856,6 @@ def _assertAssetAllocStructure(
         assert earner == 0 or earner in _newVaultIds # dev: cannot drop reward vault
     if _newStakers != 0 or _newVoter != 0:
         assert earner != 0 # dev: active allocs require reward vault
-    if _newStakers != 0:
-        coreVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-        assert earner == coreVaultId or staticcall MissionControl(_missionControl).isStabVaultId(earner) # dev: invalid staker vault
 
 
 @internal
