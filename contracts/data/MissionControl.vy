@@ -41,6 +41,14 @@ struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
     voterPointsAllocTotal: uint256
 
+struct VaultAssetReward:
+    vaultId: uint256
+    vaultAddr: address
+    stakersPointsAlloc: uint256
+    voterPointsAlloc: uint256
+    fundGenPoints: bool
+    retired: bool
+
 struct TellerDepositConfig:
     canDepositGeneral: bool
     canDepositAsset: bool
@@ -223,7 +231,17 @@ trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 
+# reward pair inventory (append-only storage extension)
+pinnedVaultAddr: HashMap[uint256, address]
+pinCountByVaultId: HashMap[uint256, uint256]
+numPinnedRows: public(HashMap[address, uint256])
+rewardPairs: HashMap[address, DynArray[VaultAssetReward, MAX_REWARD_PAIRS_PER_ASSET]]
+pairAllocTotals: public(HashMap[address, TotalPointsAllocs])
+rewardsEpoch: public(uint256)
+rewardGov: public(address)
+
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
+MAX_REWARD_PAIRS_PER_ASSET: constant(uint256) = 20
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -274,6 +292,8 @@ def __init__(_ripeHq: address, _defaults: address):
         for signer: address in liteSigners:
             self._addLiteSigner(signer)
 
+    self.rewardsEpoch = 1
+
 
 #################
 # Global Config #
@@ -317,6 +337,8 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 
 @internal
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
+    if self.indexOfAsset[_asset] == 0:
+        assert self.numPinnedRows[_asset] == 0 # dev: reward pairs exist
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
@@ -409,7 +431,143 @@ def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDele
 @external
 def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
     self.rewardsConfig = _config
+
+
+# reward pair authority
+
+
+@external
+def setRewardGov(_rewardGov: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    assert self.rewardGov == empty(address) # dev: reward gov already set
+    assert _rewardGov != empty(address) and _rewardGov.is_contract # dev: invalid reward gov
+    self.rewardGov = _rewardGov
+
+
+# reward pair inventory
+
+
+@view
+@internal
+def _findRewardPair(_asset: address, _vaultId: uint256) -> (bool, uint256):
+    numPairs: uint256 = len(self.rewardPairs[_asset])
+    for i: uint256 in range(numPairs, bound=MAX_REWARD_PAIRS_PER_ASSET):
+        if self.rewardPairs[_asset][i].vaultId == _vaultId:
+            return True, i
+    return False, 0
+
+
+@view
+@external
+def numRewardPairs(_asset: address) -> uint256:
+    return len(self.rewardPairs[_asset])
+
+
+@view
+@external
+def rewardPairAt(_asset: address, _index: uint256) -> VaultAssetReward:
+    return self.rewardPairs[_asset][_index]
+
+
+@view
+@external
+def getRewardPair(_asset: address, _vaultId: uint256) -> VaultAssetReward:
+    found: bool = False
+    pairIndex: uint256 = 0
+    found, pairIndex = self._findRewardPair(_asset, _vaultId)
+    if not found:
+        return empty(VaultAssetReward)
+    return self.rewardPairs[_asset][pairIndex]
+
+
+@view
+@external
+def getPinnedVaultAddr(_vaultId: uint256) -> address:
+    return self.pinnedVaultAddr[_vaultId]
+
+
+@view
+@external
+def hasPinnedRowsForVaultId(_vaultId: uint256) -> bool:
+    return self.pinCountByVaultId[_vaultId] != 0
+
+
+@external
+def setRewardPair(_asset: address, _pair: VaultAssetReward):
+    assert msg.sender == self.rewardGov # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    assert self.indexOfAsset[_asset] != 0 # dev: invalid asset
+    assert _pair.vaultId != 0 # dev: invalid vault id
+    assert not _pair.retired # dev: retired pair
+    assert not (_pair.fundGenPoints and (_pair.stakersPointsAlloc != 0 or _pair.voterPointsAlloc != 0)) # dev: invalid reward policy
+
+    found: bool = False
+    pairIndex: uint256 = 0
+    found, pairIndex = self._findRewardPair(_asset, _pair.vaultId)
+    previousPair: VaultAssetReward = empty(VaultAssetReward)
+    if found:
+        previousPair = self.rewardPairs[_asset][pairIndex]
+        assert not previousPair.retired # dev: retired pair
+        assert previousPair.vaultAddr == _pair.vaultAddr # dev: vault addr mismatch
+    else:
+        assert len(self.rewardPairs[_asset]) < MAX_REWARD_PAIRS_PER_ASSET # dev: too many reward pairs
+
+    pinnedAddr: address = self.pinnedVaultAddr[_pair.vaultId]
+    if pinnedAddr == empty(address):
+        assert _pair.vaultAddr != empty(address) and _pair.vaultAddr.is_contract # dev: invalid vault
+        bookAddr: address = staticcall VaultBook(addys._getVaultBookAddr()).getAddr(_pair.vaultId)
+        if bookAddr != empty(address):
+            assert bookAddr == _pair.vaultAddr # dev: vault addr mismatch
+        self.pinnedVaultAddr[_pair.vaultId] = _pair.vaultAddr
+    else:
+        assert _pair.vaultAddr == pinnedAddr # dev: vault addr mismatch
+
+    if _pair.stakersPointsAlloc != 0:
+        assert _pair.vaultId == self.coreRipeGovVaultId or self.isStabVaultId[_pair.vaultId] # dev: invalid staker vault
+
+    totals: TotalPointsAllocs = self.pairAllocTotals[_asset]
+    if found:
+        totals.stakersPointsAllocTotal -= previousPair.stakersPointsAlloc
+        totals.voterPointsAllocTotal -= previousPair.voterPointsAlloc
+    totals.stakersPointsAllocTotal += _pair.stakersPointsAlloc
+    totals.voterPointsAllocTotal += _pair.voterPointsAlloc
+    assert totals.stakersPointsAllocTotal <= HUNDRED_PERCENT # dev: invalid reward allocs
+    assert totals.voterPointsAllocTotal <= HUNDRED_PERCENT - totals.stakersPointsAllocTotal # dev: invalid reward allocs
+
+    if found:
+        self.rewardPairs[_asset][pairIndex] = _pair
+    else:
+        self.rewardPairs[_asset].append(_pair)
+        self.numPinnedRows[_asset] += 1
+        self.pinCountByVaultId[_pair.vaultId] += 1
+    self.pairAllocTotals[_asset] = totals
+
+
+@external
+def retireRewardPair(_asset: address, _vaultId: uint256):
+    assert msg.sender == self.rewardGov # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+
+    found: bool = False
+    pairIndex: uint256 = 0
+    found, pairIndex = self._findRewardPair(_asset, _vaultId)
+    assert found # dev: reward pair not found
+
+    pair: VaultAssetReward = self.rewardPairs[_asset][pairIndex]
+    assert not pair.retired # dev: retired pair
+    totals: TotalPointsAllocs = self.pairAllocTotals[_asset]
+    totals.stakersPointsAllocTotal -= pair.stakersPointsAlloc
+    totals.voterPointsAllocTotal -= pair.voterPointsAlloc
+
+    pair.stakersPointsAlloc = 0
+    pair.voterPointsAlloc = 0
+    pair.fundGenPoints = False
+    pair.retired = True
+    self.rewardPairs[_asset][pairIndex] = pair
+    self.pairAllocTotals[_asset] = totals
 
 
 # points allocs
