@@ -148,3 +148,29 @@ def test_deposit_lock_duration_silently_clamped_both_ends(
     ripe_token.approve(teller, amount, sender=bob)
     teller.depositIntoGovVault(ripe_token, amount, 1, bob, sender=bob)
     assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == boa.env.evm.patch.block_number + 100
+
+
+def test_topup_floored_at_remaining_duration_never_shortens(
+    teller, ripe_gov_vault, ripe_token, whale, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """The fix for the shortening hazard: if the selector floors at the REMAINING
+    duration (unlock - block.number) rather than at minLockDuration, the weighted
+    blend can never land below the current unlock - a weighted average of two
+    durations is never below the smaller one. Proves option (a) is implementable
+    purely in the UI, with no contract change."""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()
+
+    first = 100 * EIGHTEEN_DECIMALS
+    second = 900 * EIGHTEEN_DECIMALS
+    ripe_token.approve(teller, first + second, sender=whale)
+
+    teller.depositIntoGovVault(ripe_token, first, 1000, whale, sender=whale)
+    unlock_before = ripe_gov_vault.userGovData(whale, ripe_token).unlock
+
+    # what the UI would compute as the floor
+    remaining = unlock_before - boa.env.evm.patch.block_number
+    teller.depositIntoGovVault(ripe_token, second, remaining, whale, sender=whale)
+
+    unlock_after = ripe_gov_vault.userGovData(whale, ripe_token).unlock
+    assert unlock_after >= unlock_before
