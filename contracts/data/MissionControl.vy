@@ -424,16 +424,6 @@ def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
 @external
 def setRewardVaultId(_asset: address, _vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert self == addys._getMissionControlAddr() # dev: not current mission control
-    assert self.indexOfAsset[_asset] != 0 # dev: invalid asset
-
-    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    if _vaultId != 0:
-        assert _vaultId in assetConfig.vaultIds # dev: invalid reward vault
-    if assetConfig.stakersPointsAlloc != 0 or assetConfig.voterPointsAlloc != 0:
-        assert _vaultId != 0 # dev: active allocs require reward vault
-    if _vaultId != 0 and assetConfig.stakersPointsAlloc != 0:
-        assert _vaultId == self.coreRipeGovVaultId or self.isStabVaultId[_vaultId] # dev: invalid staker vault
     self.rewardVaultId[_asset] = _vaultId
 
 
@@ -994,11 +984,11 @@ def getRewardsConfig() -> RewardsConfig:
 
 @view
 @external
-def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256):
+def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256, uint256):
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     if self.indexOfAsset[_asset] == 0 or (_vaultId != 0 and _vaultId not in assetConfig.vaultIds):
-        return 0, 0
-    return assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc
+        return 0, 0, 0
+    return assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc, 1
 
 
 @view

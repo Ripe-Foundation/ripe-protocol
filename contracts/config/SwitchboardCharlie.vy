@@ -54,7 +54,7 @@ interface MissionControl:
     def setRewardVaultId(_asset: address, _vaultId: uint256): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
-    def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256): view
+    def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256, uint256): view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def setTrainingWheels(_trainingWheels: address): nonpayable
     def setPreferredStabVaultId(_vaultId: uint256): nonpayable
@@ -572,9 +572,14 @@ def _getLedgerAddr() -> address:
 
 @view
 @internal
-def _assertValidRewardVaultId(_vaultId: uint256, _stakersPointsAlloc: uint256, _voterPointsAlloc: uint256, _missionControl: address):
-    assert (_stakersPointsAlloc == 0 and _voterPointsAlloc == 0) or _vaultId != 0
-    if _vaultId != 0 and _stakersPointsAlloc != 0:
+def _assertValidRewardVaultId(_asset: address, _vaultId: uint256, _missionControl: address):
+    stakersPointsAlloc: uint256 = 0
+    voterPointsAlloc: uint256 = 0
+    isValid: uint256 = 0
+    stakersPointsAlloc, voterPointsAlloc, isValid = staticcall MissionControl(_missionControl).getRewardVaultPolicy(_asset, _vaultId)
+    assert isValid != 0
+    assert (stakersPointsAlloc == 0 and voterPointsAlloc == 0) or _vaultId != 0
+    if _vaultId != 0 and stakersPointsAlloc != 0:
         coreVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
         assert _vaultId == coreVaultId or staticcall MissionControl(_missionControl).isStabVaultId(_vaultId)
 
@@ -586,15 +591,11 @@ def _assertValidRewardVaultId(_vaultId: uint256, _stakersPointsAlloc: uint256, _
 # 4. setRewardVaultId(asset, newVault); new vault must already be in vaultIds
 # 5. set allocs in a second timelock for staker/voter, or leave both 0 for gen only
 @external
-def setRewardVaultId(_asset: address, _vaultId: uint256, _missionControl: address = empty(address)) -> uint256:
+def setRewardVaultId(_asset: address, _vaultId: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert _missionControl == empty(address)
     mc: address = self._getMissionControlAddr()
     oldVaultId: uint256 = staticcall MissionControl(mc).rewardVaultId(_asset)
-    stakersPointsAlloc: uint256 = 0
-    voterPointsAlloc: uint256 = 0
-    stakersPointsAlloc, voterPointsAlloc = staticcall MissionControl(mc).getRewardVaultPolicy(_asset, _vaultId)
-    self._assertValidRewardVaultId(_vaultId, stakersPointsAlloc, voterPointsAlloc, mc)
+    self._assertValidRewardVaultId(_asset, _vaultId, mc)
     assert _vaultId != oldVaultId
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.REWARD_VAULT_ID
@@ -1264,6 +1265,7 @@ def _checkpointRewardVault(_lootbox: address, _asset: address, _vaultId: uint256
 @internal
 def _executeRewardVaultId(_missionControl: address, _update: RewardVaultUpdate):
     assert _missionControl == self._getMissionControlAddr()
+    self._assertValidRewardVaultId(_update.asset, _update.newVaultId, _missionControl)
     assert staticcall MissionControl(_missionControl).rewardVaultId(_update.asset) == _update.oldVaultId
 
     vaultBook: address = self._getVaultBookAddr()
