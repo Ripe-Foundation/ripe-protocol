@@ -996,7 +996,8 @@ def getRewardsConfig() -> RewardsConfig:
 @external
 def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256):
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    assert self.indexOfAsset[_asset] != 0 and (_vaultId == 0 or _vaultId in assetConfig.vaultIds)
+    if self.indexOfAsset[_asset] == 0 or (_vaultId != 0 and _vaultId not in assetConfig.vaultIds):
+        return 0, 0
     return assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc
 
 
