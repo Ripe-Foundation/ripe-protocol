@@ -681,7 +681,8 @@ def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256):
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    assert empty(address) not in [vaultAddr, _asset, _user] # dev: invalid reset
+    if empty(address) in [vaultAddr, _asset, _user]:
+        return
 
     # get latest deposit points
     up: UserDepositPoints = empty(UserDepositPoints)
@@ -709,7 +710,8 @@ def resetAssetPoints(_asset: address, _vaultId: uint256):
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    assert empty(address) not in [vaultAddr, _asset] # dev: invalid reset
+    if empty(address) in [vaultAddr, _asset]:
+        return
 
     # get latest deposit points
     up: UserDepositPoints = empty(UserDepositPoints)
@@ -1020,7 +1022,8 @@ def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
 def resetUserBorrowPoints(_user: address):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
-    assert _user != empty(address) # dev: invalid reset
+    if _user == empty(address):
+        return
 
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
