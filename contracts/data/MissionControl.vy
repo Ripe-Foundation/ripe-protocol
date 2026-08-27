@@ -361,6 +361,7 @@ def deregisterAsset(_asset: address) -> bool:
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
     self.indexOfAsset[_asset] = 0
+    self.rewardVaultId[_asset] = 0
 
     # get last item, replace the removed item
     if targetIndex != lastIndex:
