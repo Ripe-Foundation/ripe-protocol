@@ -244,8 +244,14 @@ def migrate(migration: Migration):
                 REGISTRY_MAX_DELAY,
             ),
         ),
-        promotion("StabilityPool", "VaultBook", vault_book, 1, (hq,)),
-        promotion("RipeGov", "VaultBook", vault_book, 2, (hq,)),
+        promotion(
+            "StabilityPool",
+            VAULT_BOOK_STAGED,
+            vault_book,
+            1,
+            (hq,),
+        ),
+        promotion("RipeGov", VAULT_BOOK_STAGED, vault_book, 2, (hq,)),
         promotion("AuctionHouse", "RipeHq", hq, 9, (hq,)),
         promotion("CreditEngine", "RipeHq", hq, 13, (hq, CURVE_PRICES_ID)),
         promotion(
