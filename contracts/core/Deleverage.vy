@@ -1156,7 +1156,7 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
 
             # get asset LTV for weighted calculation
             debtTerms: cs.DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(asset)
-    
+
             # zero-LTV assets remain repayment liquidity even though they do not contribute borrowing capacity in creditEngine collateral value.
             ltvSum += usdValue * debtTerms.ltv
 

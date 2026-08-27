@@ -339,20 +339,27 @@ deployment, migration, configuration, or activation authority.
 
 ## Conditional post-deployment asset retirement
 
-This procedure applies only after a separately reviewed MissionControl runtime
-and a hardened SwitchboardCharlie runtime containing the retirement-policy
-checks and MissionControl boolean-return check have both been deployed and made
-authoritative. A source merge, passing suite, or artifact update does not change
-either deployed runtime or authorize either transition.
+This procedure applies only after a separately reviewed, selector-compatible
+generation of MissionControl, SwitchboardCharlie, AuctionHouse, CreditRedeem,
+and Deleverage has been deployed and made authoritative. AuctionHouse and
+CreditRedeem consume MissionControl selectors introduced by this generation;
+AuctionHouse and Deleverage also share a changed internal withdrawal-wrapper
+selector. A source merge, passing suite, or artifact update does not change any
+deployed runtime or authorize a transition.
 
-The rollout therefore contains two contract deployments. Bind and review each
-runtime and deployed address separately. For SwitchboardCharlie, also verify
-its Switchboard registration, governance permission, and action-timelock
-wiring before relying on the execution-time revert behavior. Do not infer that
-deploying or activating the guarded MissionControl also activates the hardened
-Charlie behavior. The reviewed Charlie candidate has 703 bytes of EIP-170
-deployed-runtime headroom; recompile and recheck that gate after every further
-Charlie change rather than carrying this measurement forward by assumption.
+The retirement rollout therefore contains five required contract deployments.
+Promote them atomically or through a separately qualified order, and do not
+execute retirement, auction purchase, collateral redemption, or deleveraging
+while those runtimes are mixed. The broader Ledger/Lootbox/MissionControl and
+Alpha/Bravo/Charlie/Delta matched-generation constraints remain controlling.
+Bind and review each runtime and deployed address separately. For
+SwitchboardCharlie, also verify its Switchboard registration, governance
+permission, and action-timelock wiring before relying on the execution-time
+revert behavior. Do not infer that deploying or activating MissionControl also
+activates the hardened Charlie behavior. The reviewed Charlie candidate has
+1,122 bytes of EIP-170 deployed-runtime headroom; recompile and recheck that
+gate after every further Charlie change rather than carrying this measurement
+forward by assumption.
 
 Asset retirement is terminal unless governance later completes a full
 `addAsset` re-registration. Ordinary Bravo and Charlie asset mutations require
