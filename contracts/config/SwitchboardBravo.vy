@@ -917,7 +917,6 @@ def _writeAssetConfig(
             assert vaultAddr != empty(address) # dev: invalid vault
             selectedIds.append(earner)
             selectedAddrs.append(vaultAddr)
-        assert len(selectedIds) != 0 # dev: no initialized deposit points
         self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
 
     extcall MissionControl(_mc).setAssetConfig(_asset, _config)
