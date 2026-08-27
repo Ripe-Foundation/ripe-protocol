@@ -438,6 +438,9 @@ def setRewardVaultId(_asset: address, _vaultId: uint256):
     assert self.indexOfAsset[_asset] != 0 # dev: invalid asset
     if _vaultId != 0:
         assert _vaultId in self.assetConfig[_asset].vaultIds # dev: invalid reward vault
+    if _vaultId == 0:
+        assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+        assert assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 # dev: points alloc still set
     self.rewardVaultId[_asset] = _vaultId
 
 
