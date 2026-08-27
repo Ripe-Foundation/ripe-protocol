@@ -958,6 +958,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log AssetAdded(asset=p.asset)
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:
+        assert mc == self._getMissionControlAddr() # dev: not current mission control
         assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = config.vaultIds

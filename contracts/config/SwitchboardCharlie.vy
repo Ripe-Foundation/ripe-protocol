@@ -960,7 +960,7 @@ def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAdd
     vaultBook: address = self._getVaultBookAddr()
     assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
     bookAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
-    assert bookAddr == empty(address) or bookAddr == _vaultAddr # dev: vault addr mismatch
+    assert bookAddr == _vaultAddr # dev: vault addr mismatch
 
     extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
     log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)

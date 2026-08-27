@@ -357,6 +357,11 @@ def deregisterAsset(_asset: address) -> bool:
     if targetIndex == 0:
         return False
 
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    assert self.rewardVaultId[_asset] == 0 # dev: reward vault still set
+    assert assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 # dev: points alloc still set
+    self._updatePointsAllocs(_asset, 0, 0)
+
     # update data
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
@@ -378,7 +383,11 @@ def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return AssetRetirementConfig(
         isSupported=self.indexOfAsset[_asset] != 0,
-        hasPointsAlloc=self.rewardVaultId[_asset] != 0,
+        hasPointsAlloc=(
+            self.rewardVaultId[_asset] != 0
+            or assetConfig.stakersPointsAlloc != 0
+            or assetConfig.voterPointsAlloc != 0
+        ),
         hasWhitelist=assetConfig.whitelist != empty(address),
         ltv=assetConfig.debtTerms.ltv,
         canWithdraw=assetConfig.canWithdraw,
@@ -425,6 +434,10 @@ def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
 @external
 def setRewardVaultId(_asset: address, _vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    assert self.indexOfAsset[_asset] != 0 # dev: invalid asset
+    if _vaultId != 0:
+        assert _vaultId in self.assetConfig[_asset].vaultIds # dev: invalid reward vault
     self.rewardVaultId[_asset] = _vaultId
 
 
@@ -996,6 +1009,13 @@ def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint25
 @external
 def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    if self.indexOfAsset[_asset] == 0:
+        return DepositPointsConfig(
+            stakersPointsAlloc=0,
+            voterPointsAlloc=0,
+            isNft=assetConfig.isNft,
+            shouldFundGenPoints=False,
+        )
     earner: uint256 = self.rewardVaultId[_asset]
     isEarner: bool = earner != 0 and _vaultId == earner
     stakers: uint256 = assetConfig.stakersPointsAlloc if isEarner else 0
