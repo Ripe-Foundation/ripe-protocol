@@ -71,9 +71,6 @@ interface CurvePrices:
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
-interface MissionControlRewardsHead:
-    def rewardsConfig() -> bool: view
-
 flag ActionType:
     ASSET_ADD_NEW
     ASSET_DEPOSIT_PARAMS
@@ -903,7 +900,6 @@ def _writeAssetConfig(
     selectedAddrs: DynArray[address, MAX_VAULTS_PER_ASSET] = []
     lootbox: address = empty(address)
     if needCkpt:
-        assert staticcall MissionControlRewardsHead(_mc).rewardsConfig() # dev: points disabled
         ripeHq: address = gov._getRipeHqFromGov()
         ledger: address = staticcall RipeHq(ripeHq).getAddr(LEDGER_ID)
         vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)

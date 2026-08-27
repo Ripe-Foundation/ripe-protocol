@@ -653,7 +653,6 @@ def updateDepositPoints(
     _a: addys.Addys = empty(addys.Addys),
 ):
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest global rewards
@@ -676,7 +675,6 @@ def updateDepositPoints(
 @external
 def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
 
     # get latest global rewards
@@ -706,7 +704,6 @@ def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256):
 @external
 def resetAssetPoints(_asset: address, _vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
 
     # get latest global rewards
@@ -741,7 +738,6 @@ def resetAssetPoints(_asset: address, _vaultId: uint256):
 @internal
 def _getLatestGlobalDepositPoints(
     _globalPoints: GlobalDepositPoints,
-    _arePointsEnabled: bool,
     _stakersTotalAlloc: uint256,
     _voteDepositorTotalAlloc: uint256,
 ) -> GlobalDepositPoints:
@@ -756,7 +752,7 @@ def _getLatestGlobalDepositPoints(
     globalPoints.lastUpdate = block.number
 
     # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return globalPoints
 
     # update ripe rewards points
@@ -776,7 +772,6 @@ def _getLatestGlobalDepositPoints(
 @internal
 def _getLatestAssetDepositPoints(
     _assetPoints: AssetDepositPoints,
-    _arePointsEnabled: bool,
     _stakersAlloc: uint256,
     _voteDepositorAlloc: uint256,
 ) -> AssetDepositPoints:
@@ -791,7 +786,7 @@ def _getLatestAssetDepositPoints(
     assetPoints.lastUpdate = block.number
 
     # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return assetPoints
 
     # update ripe rewards points
@@ -814,7 +809,6 @@ def _getLatestAssetDepositPoints(
 @internal
 def _getLatestUserDepositPoints(
     _userPoints: UserDepositPoints,
-    _arePointsEnabled: bool,
 ) -> UserDepositPoints:
     userPoints: UserDepositPoints = _userPoints
 
@@ -827,7 +821,7 @@ def _getLatestUserDepositPoints(
     userPoints.lastUpdate = block.number
 
     # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return userPoints
 
     # add user balance points
@@ -869,11 +863,11 @@ def _getLatestDepositPoints(
     p: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, _vaultId, _asset)
 
     # latest global points
-    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.arePointsEnabled, _c.stakersPointsAllocTotal, _c.voterPointsAllocTotal)
+    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.stakersPointsAllocTotal, _c.voterPointsAllocTotal)
 
     # latest asset points
     assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset, _vaultId)
-    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
+    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
@@ -885,7 +879,7 @@ def _getLatestDepositPoints(
     # includes value represented by normalized holder points.
     userPoints: UserDepositPoints = empty(UserDepositPoints)
     if _user != empty(address):
-        userPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
+        userPoints = self._getLatestUserDepositPoints(p.userPoints)
         userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
         if userLootShare != 0 and not isRipeGovVault:
             userLootShare = userLootShare // assetPoints.precision
@@ -1011,14 +1005,13 @@ def _getAssetPrecision(_isNft: bool, _asset: address) -> uint256:
 @external
 def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, a.ledger)
+    up, gp = self._getLatestBorrowPoints(_user, a.ledger)
     extcall Ledger(a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRewards)
 
 
@@ -1028,7 +1021,6 @@ def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
 @external
 def resetUserBorrowPoints(_user: address):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     if _user == empty(address):
         return
@@ -1037,7 +1029,7 @@ def resetUserBorrowPoints(_user: address):
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, a.ledger)
+    up, gp = self._getLatestBorrowPoints(_user, a.ledger)
 
     # reset user borrow points
     gp.points -= min(up.points, gp.points)
@@ -1052,7 +1044,7 @@ def resetUserBorrowPoints(_user: address):
 
 @view 
 @internal 
-def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _arePointsEnabled: bool) -> BorrowPoints:
+def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints) -> BorrowPoints:
     globalPoints: BorrowPoints = _globalPoints
 
     # elapsed blocks
@@ -1064,7 +1056,7 @@ def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _arePointsEnabled:
     globalPoints.lastUpdate = block.number
 
     # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return globalPoints
 
     # update borrow points
@@ -1077,7 +1069,7 @@ def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _arePointsEnabled:
 
 @view 
 @internal 
-def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _arePointsEnabled: bool) -> BorrowPoints:
+def _getLatestUserBorrowPoints(_userPoints: BorrowPoints) -> BorrowPoints:
     userPoints: BorrowPoints = _userPoints
 
     # elapsed blocks
@@ -1089,7 +1081,7 @@ def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _arePointsEnabled: boo
     userPoints.lastUpdate = block.number
 
     # nothing to do here
-    if not _arePointsEnabled or elapsedBlocks == 0:
+    if elapsedBlocks == 0:
         return userPoints
 
     # update borrow points
@@ -1104,20 +1096,19 @@ def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _arePointsEnabled: boo
 @internal 
 def _getLatestBorrowPoints(
     _user: address,
-    _arePointsEnabled: bool,
     _ledger: address,
 ) -> (BorrowPoints, BorrowPoints):
     p: BorrowPointsBundle = staticcall Ledger(_ledger).getBorrowPointsBundle(_user)
     
     # global points
-    globalPoints: BorrowPoints = self._getLatestGlobalBorrowPoints(p.globalPoints, _arePointsEnabled)
+    globalPoints: BorrowPoints = self._getLatestGlobalBorrowPoints(p.globalPoints)
 
     # if no user, return global points
     if _user == empty(address):
         return empty(BorrowPoints), globalPoints
     
     # user points
-    userPoints: BorrowPoints = self._getLatestUserBorrowPoints(p.userPoints, _arePointsEnabled)
+    userPoints: BorrowPoints = self._getLatestUserBorrowPoints(p.userPoints)
 
     # normalize user debt -- reduce risk of integer overflow
     userDebt: uint256 = p.userDebtPrincipal
@@ -1176,7 +1167,7 @@ def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, Bo
     # latest borrow points
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, _a.ledger)
+    up, gp = self._getLatestBorrowPoints(_user, _a.ledger)
 
     # calc borrower rewards
     cappedPoints: uint256 = min(up.points, gp.points)
@@ -1224,7 +1215,6 @@ def getClaimableBorrowLoot(_user: address) -> uint256:
 @external
 def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
