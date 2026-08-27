@@ -51,8 +51,10 @@ interface Lootbox:
 interface MissionControl:
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
+    def setRewardVaultId(_asset: address, _vaultId: uint256): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
+    def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256): view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def setTrainingWheels(_trainingWheels: address): nonpayable
     def setPreferredStabVaultId(_vaultId: uint256): nonpayable
@@ -63,6 +65,8 @@ interface MissionControl:
     def isSupportedAsset(_asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
+    def rewardVaultId(_asset: address) -> uint256: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
 
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -126,6 +130,7 @@ flag ActionType:
     SET_USER_DELEGATION
     CORE_RIPE_GOV_VAULT
     PREFERRED_STAB_VAULT
+    REWARD_VAULT_ID
 
 flag AssetFlag:
     CAN_DEPOSIT
@@ -166,6 +171,11 @@ struct UserDelegationAction:
     user: address
     delegate: address
     config: cs.ActionDelegation
+
+struct RewardVaultUpdate:
+    asset: address
+    oldVaultId: uint256
+    newVaultId: uint256
 
 event PendingRecoverFundsAction:
     contractAddr: indexed(address)
@@ -438,6 +448,12 @@ event PreferredStabVaultIdSet:
     newVaultId: uint256
     newVaultAddr: address
 
+event RewardVaultIdSet:
+    asset: indexed(address)
+    oldVaultId: uint256
+    newVaultId: uint256
+    caller: indexed(address)
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingRecoverFundsActions: public(HashMap[uint256, RecoverFundsAction])
@@ -457,6 +473,7 @@ pendingUserConfig: public(HashMap[uint256, UserConfigAction])
 pendingUserDelegation: public(HashMap[uint256, UserDelegationAction])
 pendingCoreRipeGovVaultId: public(HashMap[uint256, uint256])
 pendingPreferredStabVaultId: public(HashMap[uint256, uint256])
+pendingRewardVault: HashMap[uint256, RewardVaultUpdate]
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
 MAX_AUCTIONS: constant(uint256) = 20
@@ -546,6 +563,44 @@ def _getVaultBookAddr() -> address:
 @internal
 def _getLedgerAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+
+
+###################
+# Reward Vault Id #
+###################
+
+
+@view
+@internal
+def _assertValidRewardVaultId(_vaultId: uint256, _stakersPointsAlloc: uint256, _voterPointsAlloc: uint256, _missionControl: address):
+    assert (_stakersPointsAlloc == 0 and _voterPointsAlloc == 0) or _vaultId != 0
+    if _vaultId != 0 and _stakersPointsAlloc != 0:
+        coreVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+        assert _vaultId == coreVaultId or staticcall MissionControl(_missionControl).isStabVaultId(_vaultId)
+
+
+# Operator migration:
+# 1. checkpoint old earner (the setter does this)
+# 2. setRewardVaultId(asset, 0) turns off staker, voter, and gen
+# 3. move user balances / change vaultIds
+# 4. setRewardVaultId(asset, newVault); new vault must already be in vaultIds
+# 5. set allocs in a second timelock for staker/voter, or leave both 0 for gen only
+@external
+def setRewardVaultId(_asset: address, _vaultId: uint256, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _missionControl == empty(address)
+    mc: address = self._getMissionControlAddr()
+    oldVaultId: uint256 = staticcall MissionControl(mc).rewardVaultId(_asset)
+    stakersPointsAlloc: uint256 = 0
+    voterPointsAlloc: uint256 = 0
+    stakersPointsAlloc, voterPointsAlloc = staticcall MissionControl(mc).getRewardVaultPolicy(_asset, _vaultId)
+    self._assertValidRewardVaultId(_vaultId, stakersPointsAlloc, voterPointsAlloc, mc)
+    assert _vaultId != oldVaultId
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.REWARD_VAULT_ID
+    self.pendingMissionControl[aid] = mc
+    self.pendingRewardVault[aid] = RewardVaultUpdate(asset=_asset, oldVaultId=oldVaultId, newVaultId=_vaultId)
+    return aid
 
 
 ##########################
@@ -1191,6 +1246,41 @@ def setUserDelegation(
     return aid
 
 
+@view
+@internal
+def _getRequiredVaultAddr(_vaultBook: address, _vaultId: uint256) -> address:
+    if _vaultId == 0:
+        return empty(address)
+    vaultAddr: address = staticcall VaultBook(_vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address)
+    return vaultAddr
+
+
+@internal
+def _checkpointRewardVault(_lootbox: address, _asset: address, _vaultId: uint256, _vaultAddr: address):
+    extcall Lootbox(_lootbox).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
+
+
+@internal
+def _executeRewardVaultId(_missionControl: address, _update: RewardVaultUpdate):
+    assert _missionControl == self._getMissionControlAddr()
+    assert staticcall MissionControl(_missionControl).rewardVaultId(_update.asset) == _update.oldVaultId
+
+    vaultBook: address = self._getVaultBookAddr()
+    oldVaultAddr: address = self._getRequiredVaultAddr(vaultBook, _update.oldVaultId)
+    newVaultAddr: address = self._getRequiredVaultAddr(vaultBook, _update.newVaultId)
+
+    lootbox: address = self._getLootboxAddr()
+    if _update.oldVaultId != 0:
+        self._checkpointRewardVault(lootbox, _update.asset, _update.oldVaultId, oldVaultAddr)
+    extcall MissionControl(_missionControl).setRewardVaultId(_update.asset, _update.newVaultId)
+    if _update.oldVaultId != 0:
+        self._checkpointRewardVault(lootbox, _update.asset, _update.oldVaultId, oldVaultAddr)
+    if _update.newVaultId != 0:
+        self._checkpointRewardVault(lootbox, _update.asset, _update.newVaultId, newVaultAddr)
+    log RewardVaultIdSet(asset=_update.asset, oldVaultId=_update.oldVaultId, newVaultId=_update.newVaultId, caller=msg.sender)
+
+
 #############
 # Execution #
 #############
@@ -1267,6 +1357,9 @@ def executePendingAction(_aid: uint256) -> bool:
         newVaultAddr, previousVaultId = self._validatePreferredStabVaultId(newVaultId, mc)
         extcall MissionControl(mc).setPreferredStabVaultId(newVaultId)
         log PreferredStabVaultIdSet(previousVaultId=previousVaultId, newVaultId=newVaultId, newVaultAddr=newVaultAddr)
+
+    elif actionType == ActionType.REWARD_VAULT_ID:
+        self._executeRewardVaultId(self.pendingMissionControl[_aid], self.pendingRewardVault[_aid])
 
     elif actionType == ActionType.DEREGISTER_ASSET:
         asset: address = self.pendingDeregisterAsset[_aid]
