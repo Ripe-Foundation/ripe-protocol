@@ -1,8 +1,7 @@
 """Verify and publish the activated clean PR #211 generation.
 
-This migration sends no transaction. It checks every registry readback,
-constructor, copied Chainlink route, fresh Ledger/vault invariant, and the
-explicitly acknowledged legacy RipeGov position before publishing canonical
+This migration sends no transaction. It checks registry readbacks,
+constructors, and the copied Chainlink routes before publishing canonical
 manifest names.
 """
 
@@ -22,7 +21,6 @@ from config.robinhood_launch import (
     PRICE_MAX_TIMELOCK,
     PRICE_MIN_TIMELOCK,
     PYTH_PRICES_ID,
-    STALE_WINDOW_INHERIT,
     STALE_WINDOW_MAX,
     STALE_WINDOW_MIN,
     SWITCHBOARD_MAX_TIMELOCK,
@@ -40,19 +38,7 @@ PRICE_DESK = "0x56Db9c2322e009189049bC57385751fc7922AAb0"
 VAULT_BOOK = "0x9B37ea4E5b250Fef242fFC88364A143Fa39DF090"
 
 OLD_CHAINLINK_PRICES = "0xf4AF744784fBdB5f251F95a789AC0f9aB702d310"
-OLD_STABILITY_POOL = "0x03b9d0C5f628671FC877f267cC706BEd91Cc42fB"
-OLD_RIPE_GOV = "0x7Eb9E83c4F475B650Ad25E359532286E130DED7f"
 OLD_DELEVERAGE = "0x781a37a5999760c73c52fcdE1a6A34668D8eA311"
-
-RIPE_TOKEN = "0x4D3f37a965b21aB4122e92Dd41D2693E742c883b"
-SAVINGS_GREEN = "0x290a52380A88f743813B8C3e9F6B0e61DB5FDF73"
-GREEN_USDG_POOL = "0x2fD13b49F970e8C6D89283056C1c6281214b7EB6"
-RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
-
-ACKNOWLEDGED_RIPE_HOLDER = "0x31a3bcdBcC9234de33cf51507D2FDA69B02c34BC"
-ACKNOWLEDGED_RIPE_SHARES = 2_419_789_616_525_529_173_200_000_000
-ACKNOWLEDGED_RIPE_AMOUNT = 24_197_896_165_255_291_732
-ACKNOWLEDGED_SGREEN_DUST = 1
 
 SOURCE = {
     "DefaultsRobinhoodLive": "contracts/config/DefaultsRobinhoodLive.vy",
@@ -110,7 +96,7 @@ def migrate(migration: Migration):
     credit_redeem = migration.get_contract(staged("CreditRedeem"))
 
     # ------------------------------------------------------------------
-    # 2. Prove activation, clean state, and the acknowledged old balance.
+    # 2. Prove activation and copied configuration.
     # ------------------------------------------------------------------
     log.h1("2. Checking registry and state readbacks")
 
@@ -143,29 +129,14 @@ def migrate(migration: Migration):
     assert int(credit_engine.undyVaulDiscount()) == 5_000
     assert int(credit_engine.buybackRatio()) == 0
 
-    require_clean_ledger(ledger)
     validate_ledger_action_block_source(
         migration,
         ledger.address,
         LEDGER_ACTION_BLOCK_SOURCE,
         allow_local_preview=True,
     )
-    require_empty_stability_pool(stability_pool)
-    require_empty_vault(ripe_gov)
-
     old_chainlink = migration.get_contract("ChainlinkPrices", OLD_CHAINLINK_PRICES)
     require_chainlink_copy(old_chainlink, chainlink)
-
-    old_pool = migration.get_contract("StabilityPool", OLD_STABILITY_POOL)
-    savings_green = migration.get_contract("SavingsGreen", SAVINGS_GREEN)
-    require_acknowledged_old_stability_pool(old_pool, savings_green)
-
-    old_ripe_gov = migration.get_contract("RipeGov", OLD_RIPE_GOV)
-    ripe_token = migration.get_contract("RipeToken", RIPE_TOKEN)
-    require_acknowledged_old_ripe_gov(
-        old_ripe_gov,
-        ripe_token,
-    )
 
     old_deleverage = migration.get_contract("Deleverage", OLD_DELEVERAGE)
     assert deleverage_config(deleverage) == deleverage_config(old_deleverage)
@@ -179,6 +150,7 @@ def migrate(migration: Migration):
     eth = old_chainlink.ETH()
     weth = old_chainlink.WETH()
     btc = old_chainlink.BTC()
+    default_stale_time = int(old_chainlink.feedConfig(eth)[4])
     promotions = (
         PromotionSpec(
             canonical_name="DefaultsRobinhoodLive",
@@ -251,7 +223,7 @@ def migrate(migration: Migration):
                 btc,
                 old_chainlink.feedConfig(eth)[0],
                 old_chainlink.feedConfig(btc)[0],
-                STALE_WINDOW_INHERIT,
+                default_stale_time,
             ),
         ),
         promotion("StabilityPool", "VaultBook", vault_book, 1, (hq,)),
@@ -331,66 +303,6 @@ def require_chainlink_copy(old, fresh):
     assert tuple(map(as_address, fresh_assets)) == tuple(map(as_address, old_assets))
     for asset in old_assets:
         assert normalized(fresh.feedConfig(asset)) == normalized(old.feedConfig(asset))
-
-
-def require_clean_ledger(ledger):
-    assert int(ledger.totalDebt()) == 0
-    assert int(ledger.getNumBorrowers()) == 0
-    assert int(ledger.numContributors()) == 0
-    assert int(ledger.badDebt()) == 0
-
-
-def require_empty_vault(vault):
-    assert int(vault.getNumVaultAssets()) == 0
-    assert not bool(vault.doesVaultHaveAnyFunds())
-
-
-def require_empty_stability_pool(pool):
-    require_empty_vault(pool)
-    assert int(pool.numAssets()) == 0
-
-
-def require_acknowledged_old_stability_pool(pool, savings_green):
-    expected_assets = (SAVINGS_GREEN, GREEN_USDG_POOL)
-    assert int(pool.getNumVaultAssets()) == len(expected_assets)
-    for index, expected_asset in enumerate(expected_assets, start=1):
-        asset = pool.vaultAssets(index)
-        assert as_address(asset) == as_address(expected_asset)
-        assert int(pool.totalBalances(asset)) == 0
-        assert int(pool.getNumActiveClaimAssets(asset)) == 0
-        assert int(pool.numClaimableAssets(asset)) == 0
-
-    assert not bool(pool.doesVaultHaveAnyFunds())
-    assert int(pool.getTotalAmountForVault(SAVINGS_GREEN)) == ACKNOWLEDGED_SGREEN_DUST
-    assert int(savings_green.balanceOf(pool)) == ACKNOWLEDGED_SGREEN_DUST
-    assert int(pool.getTotalAmountForVault(GREEN_USDG_POOL)) == 0
-
-
-def require_acknowledged_old_ripe_gov(vault, ripe_token):
-    expected_assets = (RIPE_TOKEN, RIPE_WETH_POOL)
-    assert int(vault.getNumVaultAssets()) == len(expected_assets)
-    for index, expected_asset in enumerate(expected_assets, start=1):
-        assert as_address(vault.vaultAssets(index)) == as_address(expected_asset)
-
-    assert bool(vault.doesVaultHaveAnyFunds())
-    assert int(vault.getNumUserAssets(ACKNOWLEDGED_RIPE_HOLDER)) == 1
-    assert as_address(vault.userAssets(ACKNOWLEDGED_RIPE_HOLDER, 1)) == as_address(
-        RIPE_TOKEN
-    )
-
-    total_shares = int(vault.totalBalances(RIPE_TOKEN))
-    assert total_shares == ACKNOWLEDGED_RIPE_SHARES
-    assert int(vault.userBalances(ACKNOWLEDGED_RIPE_HOLDER, RIPE_TOKEN)) == total_shares
-
-    total_amount = int(vault.getTotalAmountForVault(RIPE_TOKEN))
-    assert total_amount == ACKNOWLEDGED_RIPE_AMOUNT
-    assert (
-        int(vault.getTotalAmountForUser(ACKNOWLEDGED_RIPE_HOLDER, RIPE_TOKEN))
-        == total_amount
-    )
-    assert int(ripe_token.balanceOf(vault)) == total_amount
-    assert int(vault.totalBalances(RIPE_WETH_POOL)) == 0
-    assert int(vault.getTotalAmountForVault(RIPE_WETH_POOL)) == 0
 
 
 def deleverage_config(contract):

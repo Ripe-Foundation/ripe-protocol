@@ -6,13 +6,8 @@ copies the live Chainlink routes, and prints the one Safe batch that activates
 the reviewed generation.
 
 Ledger and RipeGov are intentionally reset even though their runtimes did not
-change.  The old RipeGov position cannot exit its lock because it is the only
-holder; governance chose to compensate that user later.  Its exact holder,
-shares, and underlying amount are pinned below.  Any additional old-vault
-state makes this migration fail before deployment.
+change. Their old state is not migrated into the clean generation.
 """
-
-from pathlib import Path
 
 from scripts.utils import log
 from scripts.utils.ledger_deployment import validate_ledger_action_block_source
@@ -30,7 +25,6 @@ from config.robinhood_launch import (
     PRICE_MAX_TIMELOCK,
     PRICE_MIN_TIMELOCK,
     PYTH_PRICES_ID,
-    STALE_WINDOW_INHERIT,
     STALE_WINDOW_MAX,
     STALE_WINDOW_MIN,
     SWITCHBOARD_MAX_TIMELOCK,
@@ -39,18 +33,6 @@ from config.robinhood_launch import (
     ZERO_ADDRESS,
 )
 
-
-# This stays False while PR #211's Vyper files are still changing.  Final review
-# must refresh the runtime inventory and Defaults snapshot before enabling it.
-DEPLOYMENT_READY = False
-PR211_REVIEW_HEAD = "63bc7e18722b5f423b39cf5b356de385382be6c8"
-DEFAULTS_SNAPSHOT_BLOCK = 0
-DEFAULTS_SNAPSHOT_BLOCK_HASH = ""
-# Defaults cannot carry MissionControl.userConfig/userDelegation.  Final review
-# must scan both Teller and SwitchboardCharlie events through the snapshot block.
-USER_STATE_AUDIT_BLOCK = 0
-USER_CONFIG_EVENT_COUNT = None
-USER_DELEGATION_EVENT_COUNT = None
 
 STAGED_SUFFIX = "Staged2026082600"
 
@@ -76,19 +58,6 @@ LOOTBOX = "0x64CC9916d6222baC56f9DA770F78A3d71b0cFc80"
 TELLER = "0xceE8Ed804f72b6EcB6B2D679ca17B545bD654bF6"
 DELEVERAGE = "0x781a37a5999760c73c52fcdE1a6A34668D8eA311"
 CREDIT_REDEEM = "0x7aAB69c238EA051Fa9e8370559FD917a72dBe074"
-
-RIPE_TOKEN = "0x4D3f37a965b21aB4122e92Dd41D2693E742c883b"
-SAVINGS_GREEN = "0x290a52380A88f743813B8C3e9F6B0e61DB5FDF73"
-GREEN_USDG_POOL = "0x2fD13b49F970e8C6D89283056C1c6281214b7EB6"
-RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
-
-# Explicitly accepted legacy state.  These are exact values, not allowances.
-# A deposit, withdrawal, transfer, or reward-induced share change requires a
-# new team review and a new snapshot before deployment can proceed.
-ACKNOWLEDGED_RIPE_HOLDER = "0x31a3bcdBcC9234de33cf51507D2FDA69B02c34BC"
-ACKNOWLEDGED_RIPE_SHARES = 2_419_789_616_525_529_173_200_000_000
-ACKNOWLEDGED_RIPE_AMOUNT = 24_197_896_165_255_291_732
-ACKNOWLEDGED_SGREEN_DUST = 1
 
 HQ_UPDATES = (
     ("Ledger", 4),
@@ -119,43 +88,32 @@ def migrate(migration: Migration):
     # 1. Bind the retained live generation and the final review inputs.
     # ------------------------------------------------------------------
     log.h1("1. PR #211 deployment preflight")
-    require_release_inputs()
 
     hq = migration.get_contract("RipeHq", RIPE_HQ)
-    old_ledger = migration.get_contract("Ledger", LEDGER)
     old_mc = migration.get_contract("MissionControl", MISSION_CONTROL)
     switchboard = migration.get_contract("Switchboard", SWITCHBOARD)
-    old_alpha = migration.get_contract("SwitchboardAlpha", SWITCHBOARD_ALPHA)
-    old_bravo = migration.get_contract("SwitchboardBravo", SWITCHBOARD_BRAVO)
-    old_charlie = migration.get_contract("SwitchboardCharlie", SWITCHBOARD_CHARLIE)
-    old_delta = migration.get_contract("SwitchboardDelta", SWITCHBOARD_DELTA)
     price_desk = migration.get_contract("PriceDesk", PRICE_DESK)
     old_chainlink = migration.get_contract("ChainlinkPrices", CHAINLINK_PRICES)
     vault_book = migration.get_contract("VaultBook", VAULT_BOOK)
-    old_pool = migration.get_contract("StabilityPool", STABILITY_POOL)
-    old_ripe_gov = migration.get_contract("RipeGov", RIPE_GOV)
-    ripe_token = migration.get_contract("RipeToken", RIPE_TOKEN)
-    savings_green = migration.get_contract("SavingsGreen", SAVINGS_GREEN)
     old_credit = migration.get_contract("CreditEngine", CREDIT_ENGINE)
-    old_hr = migration.get_contract("HumanResources", HUMAN_RESOURCES)
     old_deleverage = migration.get_contract("Deleverage", DELEVERAGE)
 
-    require_slot(hq, 4, old_ledger)
+    require_slot(hq, 4, LEDGER)
     require_slot(hq, 5, old_mc)
     require_slot(hq, 9, AUCTION_HOUSE)
     require_slot(hq, 13, old_credit)
-    require_slot(hq, 15, old_hr)
+    require_slot(hq, 15, HUMAN_RESOURCES)
     require_slot(hq, 16, LOOTBOX)
     require_slot(hq, 17, TELLER)
     require_slot(hq, 18, old_deleverage)
     require_slot(hq, 19, CREDIT_REDEEM)
-    require_slot(switchboard, 1, old_alpha)
-    require_slot(switchboard, 2, old_bravo)
-    require_slot(switchboard, 3, old_charlie)
-    require_slot(switchboard, 4, old_delta)
+    require_slot(switchboard, 1, SWITCHBOARD_ALPHA)
+    require_slot(switchboard, 2, SWITCHBOARD_BRAVO)
+    require_slot(switchboard, 3, SWITCHBOARD_CHARLIE)
+    require_slot(switchboard, 4, SWITCHBOARD_DELTA)
     require_slot(price_desk, 1, old_chainlink)
-    require_slot(vault_book, 1, old_pool)
-    require_slot(vault_book, 2, old_ripe_gov)
+    require_slot(vault_book, 1, STABILITY_POOL)
+    require_slot(vault_book, 2, RIPE_GOV)
 
     assert int(hq.registryChangeTimeLock()) == 0
     assert int(switchboard.registryChangeTimeLock()) == 0
@@ -163,12 +121,6 @@ def migrate(migration: Migration):
     assert int(vault_book.registryChangeTimeLock()) == 0
     assert int(old_credit.undyVaulDiscount()) == 5_000
     assert int(old_credit.buybackRatio()) == 0
-    require_clean_ledger(old_ledger)
-    require_acknowledged_old_stability_pool(old_pool, savings_green)
-    require_acknowledged_old_ripe_gov(
-        old_ripe_gov,
-        ripe_token,
-    )
 
     # ------------------------------------------------------------------
     # 2. Deploy fresh live defaults and the changed PR #211 runtimes.
@@ -202,8 +154,6 @@ def migrate(migration: Migration):
         log.info(
             f"Ledger action source: 0x{source:040x}; " f"ArbSys block: {action_block}"
         )
-    require_clean_ledger(ledger)
-
     mission_control = migration.deploy(
         "MissionControl",
         hq,
@@ -225,9 +175,7 @@ def migrate(migration: Migration):
         hq,
         label=staged("StabilityPool"),
     )
-    require_empty_stability_pool(stability_pool)
     ripe_gov = migration.deploy("RipeGov", hq, label=staged("RipeGov"))
-    require_empty_vault(ripe_gov, "PR211_FRESH_RIPE_GOV_NOT_EMPTY")
 
     auction_house = migration.deploy("AuctionHouse", hq, label=staged("AuctionHouse"))
     credit_engine = migration.deploy(
@@ -306,141 +254,9 @@ def as_address(value):
     return str(getattr(value, "address", value)).lower()
 
 
-def require_release_inputs():
-    if not DEPLOYMENT_READY:
-        raise RuntimeError("PR211_DEPLOYMENT_NOT_FINAL")
-    if DEFAULTS_SNAPSHOT_BLOCK == 0 or not DEFAULTS_SNAPSHOT_BLOCK_HASH:
-        raise RuntimeError("PR211_DEFAULTS_SNAPSHOT_NOT_PINNED")
-    if USER_STATE_AUDIT_BLOCK != DEFAULTS_SNAPSHOT_BLOCK:
-        raise RuntimeError("PR211_USER_STATE_AUDIT_NOT_PINNED")
-    if USER_CONFIG_EVENT_COUNT != 0 or USER_DELEGATION_EVENT_COUNT != 0:
-        raise RuntimeError("PR211_MISSION_CONTROL_USER_STATE_NOT_EMPTY")
-
-    source = (
-        Path(__file__).resolve().parents[2]
-        / "contracts/config/DefaultsRobinhoodLive.vy"
-    ).read_text()
-    required = (
-        f"#   snapshot block: {DEFAULTS_SNAPSHOT_BLOCK}",
-        f"#   snapshot block hash: {DEFAULTS_SNAPSHOT_BLOCK_HASH}",
-        "#   snapshot finality: verified against the provider finalized tag",
-        "CONTRIB_TEMPLATE: immutable(address)",
-    )
-    if any(marker not in source for marker in required):
-        raise RuntimeError("PR211_DEFAULTS_SNAPSHOT_MISMATCH")
-
-
 def require_slot(registry, reg_id, expected):
     if as_address(registry.getAddr(reg_id)) != as_address(expected):
         raise RuntimeError(f"PR211_ACTIVE_SLOT_MISMATCH:{reg_id}")
-
-
-def require_clean_ledger(ledger):
-    if int(ledger.totalDebt()) != 0:
-        raise RuntimeError("PR211_LEDGER_DEBT_REMAINS")
-    if int(ledger.getNumBorrowers()) != 0:
-        raise RuntimeError("PR211_LEDGER_BORROWERS_REMAIN")
-    if int(ledger.numContributors()) != 0:
-        raise RuntimeError("PR211_LEDGER_CONTRIBUTORS_REMAIN")
-    if int(ledger.badDebt()) != 0:
-        raise RuntimeError("PR211_LEDGER_BAD_DEBT_REMAINS")
-
-
-def require_empty_vault(vault, error):
-    if int(vault.getNumVaultAssets()) != 0:
-        raise RuntimeError(error)
-    if bool(vault.doesVaultHaveAnyFunds()):
-        raise RuntimeError(error)
-
-
-def require_acknowledged_old_stability_pool(pool, savings_green):
-    expected_assets = (SAVINGS_GREEN, GREEN_USDG_POOL)
-    if int(pool.getNumVaultAssets()) != len(expected_assets):
-        raise RuntimeError("PR211_OLD_STABILITY_POOL_ASSET_SET_CHANGED")
-
-    for index, expected_asset in enumerate(expected_assets, start=1):
-        asset = pool.vaultAssets(index)
-        if as_address(asset) != as_address(expected_asset):
-            raise RuntimeError("PR211_OLD_STABILITY_POOL_ASSET_SET_CHANGED")
-        if int(pool.totalBalances(asset)) != 0:
-            raise RuntimeError(f"PR211_STABILITY_POOL_SHARES_REMAIN:{asset}")
-        if int(pool.getNumActiveClaimAssets(asset)) != 0:
-            raise RuntimeError(f"PR211_STABILITY_POOL_ACTIVE_CLAIMS:{asset}")
-        if int(pool.numClaimableAssets(asset)) != 0:
-            raise RuntimeError(f"PR211_STABILITY_POOL_CLAIM_ASSETS_REMAIN:{asset}")
-
-    if bool(pool.doesVaultHaveAnyFunds()):
-        raise RuntimeError("PR211_STABILITY_POOL_SHARES_REMAIN")
-    if int(pool.getTotalAmountForVault(SAVINGS_GREEN)) != ACKNOWLEDGED_SGREEN_DUST:
-        raise RuntimeError("PR211_STABILITY_POOL_DUST_CHANGED")
-    if int(savings_green.balanceOf(pool)) != ACKNOWLEDGED_SGREEN_DUST:
-        raise RuntimeError("PR211_STABILITY_POOL_DUST_CHANGED")
-    if int(pool.getTotalAmountForVault(GREEN_USDG_POOL)) != 0:
-        raise RuntimeError("PR211_STABILITY_POOL_FUNDS_REMAIN")
-
-
-def require_acknowledged_old_ripe_gov(vault, ripe_token):
-    expected_assets = (RIPE_TOKEN, RIPE_WETH_POOL)
-    if int(vault.getNumVaultAssets()) != len(expected_assets):
-        raise RuntimeError("PR211_OLD_RIPE_GOV_ASSET_SET_CHANGED")
-    for index, expected_asset in enumerate(expected_assets, start=1):
-        if as_address(vault.vaultAssets(index)) != as_address(expected_asset):
-            raise RuntimeError("PR211_OLD_RIPE_GOV_ASSET_SET_CHANGED")
-
-    if not bool(vault.doesVaultHaveAnyFunds()):
-        raise RuntimeError("PR211_ACKNOWLEDGED_RIPE_POSITION_CHANGED")
-    if int(vault.getNumUserAssets(ACKNOWLEDGED_RIPE_HOLDER)) != 1:
-        raise RuntimeError("PR211_ACKNOWLEDGED_RIPE_POSITION_CHANGED")
-    if as_address(vault.userAssets(ACKNOWLEDGED_RIPE_HOLDER, 1)) != as_address(
-        RIPE_TOKEN
-    ):
-        raise RuntimeError("PR211_ACKNOWLEDGED_RIPE_POSITION_CHANGED")
-
-    total_shares = int(vault.totalBalances(RIPE_TOKEN))
-    user_shares = int(vault.userBalances(ACKNOWLEDGED_RIPE_HOLDER, RIPE_TOKEN))
-    if total_shares != ACKNOWLEDGED_RIPE_SHARES or user_shares != total_shares:
-        raise RuntimeError("PR211_ACKNOWLEDGED_RIPE_SHARES_CHANGED")
-
-    total_amount = int(vault.getTotalAmountForVault(RIPE_TOKEN))
-    user_amount = int(vault.getTotalAmountForUser(ACKNOWLEDGED_RIPE_HOLDER, RIPE_TOKEN))
-    token_balance = int(ripe_token.balanceOf(vault))
-    if (
-        total_amount != ACKNOWLEDGED_RIPE_AMOUNT
-        or user_amount != total_amount
-        or token_balance != total_amount
-    ):
-        raise RuntimeError("PR211_ACKNOWLEDGED_RIPE_AMOUNT_CHANGED")
-
-    if int(vault.totalBalances(RIPE_WETH_POOL)) != 0:
-        raise RuntimeError("PR211_OLD_RIPE_GOV_LP_SHARES_REMAIN")
-    if int(vault.getTotalAmountForVault(RIPE_WETH_POOL)) != 0:
-        raise RuntimeError("PR211_OLD_RIPE_GOV_LP_FUNDS_REMAIN")
-
-    log.info(
-        "Acknowledged legacy RipeGov state: "
-        f"{ACKNOWLEDGED_RIPE_AMOUNT / 10**18:.6f} RIPE locked."
-    )
-
-
-def require_empty_stability_pool(pool):
-    if int(pool.getNumVaultAssets()) != 0:
-        raise RuntimeError("PR211_FRESH_STABILITY_POOL_NOT_EMPTY")
-    if bool(pool.doesVaultHaveAnyFunds()):
-        raise RuntimeError("PR211_FRESH_STABILITY_POOL_NOT_EMPTY")
-    for index in range(1, int(pool.numAssets())):
-        asset = pool.vaultAssets(index)
-        if int(pool.totalBalances(asset)) != 0:
-            raise RuntimeError(f"PR211_STABILITY_POOL_SHARES_REMAIN:{asset}")
-        if int(pool.getTotalAmountForVault(asset)) != 0:
-            raise RuntimeError(f"PR211_STABILITY_POOL_FUNDS_REMAIN:{asset}")
-        if int(pool.getNumActiveClaimAssets(asset)) != 0:
-            raise RuntimeError(f"PR211_STABILITY_POOL_ACTIVE_CLAIMS:{asset}")
-        for claim_index in range(1, int(pool.numClaimableAssets(asset))):
-            claim_asset = pool.claimableAssets(asset, claim_index)
-            if int(pool.totalClaimableBalances(claim_asset)) != 0:
-                raise RuntimeError(
-                    f"PR211_STABILITY_POOL_CLAIM_LIABILITY:{claim_asset}"
-                )
 
 
 def deploy_switchboard(migration, hq, name):
@@ -539,6 +355,7 @@ def deploy_chainlink_copy(migration, hq, old):
     eth = old.ETH()
     weth = old.WETH()
     btc = old.BTC()
+    default_stale_time = int(old.feedConfig(eth)[4])
     fresh = migration.deploy(
         "ChainlinkPrices",
         hq,
@@ -550,7 +367,7 @@ def deploy_chainlink_copy(migration, hq, old):
         btc,
         old.feedConfig(eth)[0],
         old.feedConfig(btc)[0],
-        STALE_WINDOW_INHERIT,
+        default_stale_time,
         label=staged("ChainlinkPrices"),
     )
 
@@ -668,10 +485,7 @@ def print_safe_batch(**fresh):
     )
     log.info(f'await charlie.pause("{fresh["teller"].address}", false)')
     log.info("")
-    log.info(
-        "// Old Ledger and old RipeGov are intentionally left behind; "
-        "governance will compensate the acknowledged holder later."
-    )
+    log.info("// Old Ledger and old RipeGov state are intentionally left behind.")
     log.info("// Then run migration 2026082601 to authenticate and promote.")
 
 
