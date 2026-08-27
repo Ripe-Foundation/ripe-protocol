@@ -1,8 +1,8 @@
 """Verify and publish the activated clean PR #211 generation.
 
 This migration sends no transaction. It checks registry readbacks,
-constructors, and the copied Chainlink routes before publishing canonical
-manifest names.
+constructors, the fresh VaultBook, and the copied Chainlink routes before
+publishing canonical manifest names.
 """
 
 from scripts.utils import log
@@ -21,6 +21,8 @@ from config.robinhood_launch import (
     PRICE_MAX_TIMELOCK,
     PRICE_MIN_TIMELOCK,
     PYTH_PRICES_ID,
+    REGISTRY_MAX_DELAY,
+    REGISTRY_MIN_DELAY,
     STALE_WINDOW_MAX,
     STALE_WINDOW_MIN,
     SWITCHBOARD_MAX_TIMELOCK,
@@ -35,7 +37,7 @@ STAGED_SUFFIX = "Staged2026082600"
 RIPE_HQ = "0xD4e82AE1De673bba3B53386A2D2C630AE6630940"
 SWITCHBOARD = "0xA1872467AC4fb442aeA341163A65263915ce178a"
 PRICE_DESK = "0x56Db9c2322e009189049bC57385751fc7922AAb0"
-VAULT_BOOK = "0x9B37ea4E5b250Fef242fFC88364A143Fa39DF090"
+VAULT_BOOK_STAGED = "VaultBookStaged2026082601"
 
 OLD_CHAINLINK_PRICES = "0xf4AF744784fBdB5f251F95a789AC0f9aB702d310"
 OLD_DELEVERAGE = "0x781a37a5999760c73c52fcdE1a6A34668D8eA311"
@@ -49,6 +51,7 @@ SOURCE = {
     "SwitchboardCharlie": "contracts/config/SwitchboardCharlie.vy",
     "SwitchboardDelta": "contracts/config/SwitchboardDelta.vy",
     "ChainlinkPrices": "contracts/priceSources/ChainlinkPrices.vy",
+    "VaultBook": "contracts/registries/VaultBook.vy",
     "StabilityPool": "contracts/vaults/StabilityPool.vy",
     "RipeGov": "contracts/vaults/RipeGov.vy",
     "AuctionHouse": "contracts/core/AuctionHouse.vy",
@@ -74,7 +77,7 @@ def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq", RIPE_HQ)
     switchboard = migration.get_contract("Switchboard", SWITCHBOARD)
     price_desk = migration.get_contract("PriceDesk", PRICE_DESK)
-    vault_book = migration.get_contract("VaultBook", VAULT_BOOK)
+    vault_book = migration.get_contract(VAULT_BOOK_STAGED)
 
     defaults = migration.get_contract(staged("DefaultsRobinhoodLive"))
     contributor = migration.get_contract("Contributor")
@@ -102,6 +105,7 @@ def migrate(migration: Migration):
 
     require_slot(hq, 4, ledger)
     require_slot(hq, 5, mission_control)
+    require_slot(hq, 8, vault_book)
     require_slot(hq, 9, auction_house)
     require_slot(hq, 13, credit_engine)
     require_slot(hq, 15, human_resources)
@@ -224,6 +228,20 @@ def migrate(migration: Migration):
                 old_chainlink.feedConfig(eth)[0],
                 old_chainlink.feedConfig(btc)[0],
                 default_stale_time,
+            ),
+        ),
+        PromotionSpec(
+            canonical_name="VaultBook",
+            expected_source_path=SOURCE["VaultBook"],
+            candidate_label=VAULT_BOOK_STAGED,
+            registry_name="RipeHq",
+            registry=hq,
+            registry_id=8,
+            expected_constructor_args=(
+                hq,
+                deployer,
+                REGISTRY_MIN_DELAY,
+                REGISTRY_MAX_DELAY,
             ),
         ),
         promotion("StabilityPool", "VaultBook", vault_book, 1, (hq,)),
