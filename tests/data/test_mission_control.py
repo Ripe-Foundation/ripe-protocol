@@ -724,6 +724,40 @@ def test_mission_control_set_ripe_rewards_config_unauthorized(mission_control, a
     with boa.reverts("no perms"):
         mission_control.setRipeRewardsConfig(sample_ripe_rewards_config, sender=alice)
 
+
+def test_mission_control_clear_reward_vault_zeroes_asset_allocs_and_totals(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+):
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        sample_asset_config,
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token.address,
+        1,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.assetStakersPointsAlloc(alpha_token.address) == 100
+
+    mission_control.setRewardVaultId(
+        alpha_token.address,
+        0,
+        sender=switchboard_alpha.address,
+    )
+
+    assert mission_control.rewardVaultId(alpha_token.address) == 0
+    config = mission_control.assetConfig(alpha_token.address)
+    assert config.stakersPointsAlloc == 0
+    assert config.voterPointsAlloc == 0
+    totals = mission_control.totalPointsAllocs()
+    assert totals.stakersPointsAllocTotal == 0
+    assert totals.voterPointsAllocTotal == 0
+
+
 def test_mission_control_points_allocs_tracking(mission_control, switchboard_alpha, alpha_token, bravo_token, sample_asset_config):
     """Test that points allocations are tracked correctly."""
     # Initially no allocations

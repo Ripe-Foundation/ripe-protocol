@@ -261,8 +261,10 @@ def __init__(_ripeHq: address, _defaults: address):
         assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()
         for entry: cs.AssetConfigEntry in assetConfigs:
             self._setAssetConfig(entry.asset, entry.config)
-            if (entry.config.stakersPointsAlloc != 0 or entry.config.voterPointsAlloc != 0) and len(entry.config.vaultIds) == 1:
+            if len(entry.config.vaultIds) == 1:
                 self.rewardVaultId[entry.asset] = entry.config.vaultIds[0]
+            else:
+                assert entry.config.stakersPointsAlloc == 0 and entry.config.voterPointsAlloc == 0 # dev: multi-vault defaults cannot have allocs
 
         # priority lists
         self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
@@ -426,10 +428,22 @@ def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
 # reward vault
 
 
+@view
+@external
+def assetStakersPointsAlloc(_asset: address) -> uint256:
+    return self.assetConfig[_asset].stakersPointsAlloc
+
+
 @external
 def setRewardVaultId(_asset: address, _vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert self == addys._getMissionControlAddr() # dev: not current mission control
+    if _vaultId == 0:
+        self._updatePointsAllocs(_asset, 0, 0)
+        assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+        assetConfig.stakersPointsAlloc = 0
+        assetConfig.voterPointsAlloc = 0
+        self.assetConfig[_asset] = assetConfig
     self.rewardVaultId[_asset] = _vaultId
 
 
@@ -986,15 +1000,6 @@ def getRewardsConfig() -> RewardsConfig:
 
 
 # deposit points
-
-
-@view
-@external
-def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256, uint256):
-    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    if self.indexOfAsset[_asset] == 0 or (_vaultId != 0 and _vaultId not in assetConfig.vaultIds):
-        return 0, 0, 0
-    return assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc, 1
 
 
 @view
