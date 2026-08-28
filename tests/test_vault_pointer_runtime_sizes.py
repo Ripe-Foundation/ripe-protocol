@@ -34,10 +34,10 @@ EIP170_LIMIT = 24_576
 # SwitchboardCharlie retains 1,122 bytes after the governor-only historical
 # checkpoint wrapper and the Stability/NFT retirement guards. CreditRedeem
 # retains 16,094 bytes after consuming MissionControl's
-# effective redemption-delivery flag. AuctionHouse retains 46 bytes after the
+# effective redemption-delivery flag. AuctionHouse retains 12 bytes after the
 # compact effective auction-delivery config; unsupported collateral is delivered
 # externally, while the dedicated auction/redemption flags govern those paths.
-# Deleverage retains 39 bytes. CurvePrices retains 1,170 bytes after switching
+# Deleverage retains 17 bytes. CurvePrices retains 1,170 bytes after switching
 # to codesize optimization for confirmation-time registry snapshot checks.
 # ChainlinkPrices retains 7,588 bytes after qualifying every active dependent
 # route when an ETH/USD or BTC/USD anchor changes.
@@ -64,12 +64,12 @@ EXPECTED_RUNTIME_BYTES = {
     "RebaseErc20": 11602,
     "RipeGov": 24116,
     "HumanResources": 14932,
-    "AuctionHouse": 24530,
+    "AuctionHouse": 24564,
     "CreditEngine": 24543,
-    "CreditRedeem": 8482,
+    "CreditRedeem": 8504,
     "Endaoment": 23386,
     "PriceDesk": 17742,
-    "Deleverage": 24537,
+    "Deleverage": 24559,
     "StabilityPool": 24332,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 16988,
