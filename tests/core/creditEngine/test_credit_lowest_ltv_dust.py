@@ -5,6 +5,8 @@ from conf_utils import filter_logs, redeem_collateral
 
 
 def _target_repay(debt_amount, collateral_value, target_ltv):
+    if target_ltv >= HUNDRED_PERCENT:
+        return debt_amount
     coll_adjusted = collateral_value * target_ltv // HUNDRED_PERCENT
     if debt_amount <= coll_adjusted:
         return debt_amount
@@ -12,6 +14,64 @@ def _target_repay(debt_amount, collateral_value, target_ltv):
         (debt_amount - coll_adjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - target_ltv),
         debt_amount,
     )
+
+
+def test_c11_max_pay_surfaces_return_full_debt_at_100_percent_ltv(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    credit_redeem,
+    deleverage,
+    auction_house,
+    teller,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=createDebtTerms(
+            _ltv=HUNDRED_PERCENT,
+            _redemptionThreshold=70_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+        _shouldTransferToEndaoment=False,
+        _shouldBurnAsPayment=False,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    # Enter the redemption/deleverage band without starting liquidation.
+    mock_price_source.setPrice(alpha_token, 60 * EIGHTEEN_DECIMALS // 100)
+    user_debt, terms, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    debt = user_debt.amount
+    assert not user_debt.inLiquidation
+    assert credit_engine.canRedeemUserCollateral(bob)
+    assert terms.lowestLtv >= HUNDRED_PERCENT
+
+    assert credit_redeem.getMaxRedeemValue(bob) == debt
+    assert deleverage.getMaxDeleverageAmount(bob) == debt
+    assert auction_house.calcTargetRepayAmount(
+        debt,
+        terms.collateralVal,
+        terms.lowestLtv,
+    ) == debt
 
 
 def _configure_mixed_ltv(
