@@ -45,7 +45,7 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 17971,
+    "MissionControl": 18598,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 23990,
     "SwitchboardBravo": 24448,
