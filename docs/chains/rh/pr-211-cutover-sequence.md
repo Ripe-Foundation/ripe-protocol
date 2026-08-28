@@ -1,221 +1,107 @@
-# PR #211 activation — do this now
+# PR #211 cutover
 
-One sequence for a **new** RH HQ of this generation. Start at 1, finish at the end.
-If an HQ already exists with balances or reward state, stop. Do not use this list
-(replacing a live Ledger/MC/vault wipes that state; this PR does not copy it).
+Replace these nine. Nothing else. Do not replace Ledger.
 
-Do not call any Foxtrot reserve-engine function (`startReserveEngine`,
-`setCanAcquireRipe`, `setReserveEngine*`). Leave that blocked.
-
----
-
-## IDs
-
-**RipeHq:** 4 Ledger · 5 MissionControl · 6 Switchboard · 7 PriceDesk · 8 VaultBook · 9 AuctionHouse · 13 CreditEngine · 15 HumanResources · 16 Lootbox · 17 Teller · 18 Deleverage · 19 CreditRedeem
-
-**Switchboard:** 1 Alpha · 2 Bravo · 3 Charlie · 4 Delta · 5 Echo · **6 Foxtrot (you must add this; `0002` does not)**
-
-**VaultBook:** 1 StabilityPool (sGREEN earner) · 2 RipeGov (RIPE earner) · 3 SimpleErc20 (WETH earner)
-
-GREEN has no vault and no earner.
+| Contract | Slot |
+|---|---|
+| SwitchboardFoxtrot | Switchboard 6 |
+| SwitchboardCharlie | Switchboard 3 |
+| MissionControl | RipeHq 5 |
+| Lootbox | RipeHq 16 |
+| SwitchboardAlpha | Switchboard 1 |
+| SwitchboardBravo | Switchboard 2 |
+| AuctionHouse | RipeHq 9 |
+| Deleverage | RipeHq 18 |
+| CreditRedeem | RipeHq 19 |
 
 ---
 
-## 1. Tokens, HQ, Defaults
+## Live assets (read 2026-08-28)
 
-`0000_TokensAndHq.py`
+Constructor only copies WETH, RIPE, sGREEN, GREEN. The other nine are already on live MissionControl. If HQ 5 flips without them, those rows vanish. Stocks are 70% LTV; leftover deposits then block all new borrow on that account.
 
-GREEN, RIPE, sGREEN, RipeHq, Contributor blueprint, TrainingWheels, DefaultsRobinhood.
+Copy the **live** `assetConfig` tuple. Do not invent Defaults values.
 
----
+| Asset | Address | Vault | On new MC how | Checkpoint? |
+|---|---|---|---|---|
+| WETH | `0x0Bd7…AD73` | 3 SimpleErc20 | constructor | yes (`lastUpdate` set) |
+| RIPE | `0x4D3f…883b` | 2 RipeGov | constructor | yes |
+| sGREEN | `0x290a…DF73` | 1 StabilityPool | constructor | yes |
+| GREEN | `0x355b…82F3` | — | constructor | no (no vault) |
+| GREEN/USDG | `0x2fD1…7EB6` | 1 | Bravo `addAsset` onto the **candidate** | yes |
+| SPCX | `0x4a0E…5eEa` | 3 | Bravo add onto candidate | yes |
+| AAPL | `0xaF3D…93f9` | 3 | Bravo add onto candidate | yes |
+| GME | `0x1b0E…153E` | 3 | Bravo add onto candidate | yes |
+| UNI-V2 | `0xba6F…CEcE` | 2 | Bravo add onto candidate | yes |
+| UNI-V2 | `0x9b85…769D` | 2 | Bravo add onto candidate | yes |
+| NVDA | `0xd060…9EEC` | 3 | Bravo add onto candidate | no (`lastUpdate == 0`) |
+| TSLA | `0x322F…3b2d` | 3 | Bravo add onto candidate | no |
+| GOOGL | `0x2e08…4FE3` | 3 | Bravo add onto candidate | no |
 
-## 2. Ledger, then MissionControl
+Vault addrs: StabilityPool `0xe238b50d…C395`, RipeGov `0xFa767a19…b2f2`, SimpleErc20 `0x4F89C946…6D53`.
 
-`0001_Registries.py`
+Live Bravo `addAsset(..., _missionControl = candidate)`. ADD_NEW execute does not require HQ-current MC. Initiate now, execute after the Bravo timelock, **then** flip HQ 5.
 
-1. Deploy Ledger with Defaults → HQ **4**.
-2. Deploy MissionControl with Defaults → HQ **5**.
-3. Read immediately (constructor already wrote these):
+Constructor already set earners on WETH / RIPE / sGREEN. Bravo add does **not** set `rewardVaultId`. After new Charlie is live, `setRewardVaultId` on each copied asset to its only vault (3 / 2 / 1). Do not Charlie the four Defaults assets.
 
 ```
-rewardVaultId(WETH)   == 3
-rewardVaultId(RIPE)   == 2
-rewardVaultId(sGREEN) == 1
-rewardVaultId(GREEN)  == 0
-
-assetConfig(WETH).stakersPointsAlloc   == 0
-assetConfig(RIPE).stakersPointsAlloc   == 15_00
-assetConfig(sGREEN).stakersPointsAlloc == 15_00
-
-rewardsConfig():
-  ripePerBlock            == 0.009e18
-  borrowersAlloc          == 10_00
-  stakersAlloc            == 90_00
-  votersAlloc             == 0
-  genDepositorsAlloc      == 0
-  stabPoolRipePerDollarClaimed == 1e18
+constructor:   rewardVaultId WETH=3, RIPE=2, sGREEN=1
+               stakers RIPE=15%, sGREEN=15%, WETH=0
+               ripePerBlock 0.009e18
+               gen 0, borrowers 10%, stakers 90%, voters 0
 ```
 
-If any earner is wrong, do not continue. Do not Bravo-set allocs and do not
-Charlie-set earners for these four — constructor already did it.
-
-`ripePerBlock` is already **0.009**. The first `updateRipeRewards` (Teller
-housekeep, Alpha rate write, etc.) starts the clock. Teller is still paused
-later, so you have a window. Do not unpause Teller until step 10.
-
-If you need the clock at 0 until the rest of this list is done: Alpha
-`setRipePerBlock(0)` → execute **now**, before PriceDesk/Teller/Lootbox exist
-enough to settle. Then turn 0.009 back on in step 10.
+Leave `genDepositorsAlloc` at 0. Do not call Foxtrot `startReserveEngine`, `setCanAcquireRipe`, or `setReserveEngine*`.
 
 ---
 
-## 3. Switchboards, including Foxtrot
+## Ledger — settle, then leave it alone
 
-`0002_Switchboards.py` deploys Alpha–Echo as 1–5, then puts Switchboard on HQ 6.
+Ledger keeps deposit points, borrow points, and the RIPE buckets. Replacing Lootbox does **not** wipe unclaimed loot. Users do not have to claim first.
 
-**Before any auction can run, add Foxtrot:**
+Do not call `resetUserBalancePoints`, `resetAssetPoints`, or `resetUserBorrowPoints`. Do not pause Ledger or the live Lootbox until the settles below have landed.
 
-1. Deploy SwitchboardFoxtrot (same timelock args as Charlie).
-2. `switchboard.startAddNewAddressToRegistry(foxtrot, "SwitchboardFoxtrot")`
-3. `switchboard.confirmNewAddressToRegistry(foxtrot)` must return **6**.
-4. `switchboard.getAddr(6) == foxtrot`
+Live Lootbox is pause-gated. Live Alpha `setRipePerBlock(0)` **skips** the settle if Lootbox is paused. Leave Lootbox unpaused until that execute lands.
 
-Charlie does **not** have `startAuction` / `pauseAuction`. Those are Foxtrot only.
+On the **current** Charlie (Lootbox unpaused). `checkpointAssetDepositPointsAt(asset, vaultId, vaultAddr)`.
 
----
+1. `updateRipeRewards()`
+2. Checkpoint every **yes** row in the table above (touched stocks and LPs too, not just stab/gov)
+3. Alpha `setRipePerBlock(0)` → execute
+4. Read back: those `lastUpdate`s are this block, `ripePerBlock == 0`
 
-## 4. PriceDesk and sources
-
-`0003_PriceSources.py` → PriceDesk HQ **7**. Chainlink is PriceDesk id 1.
+Borrow points use the same formula. No extra borrow step.
 
 ---
 
-## 5. Vaults — this order, these ids
+## Order
 
-`0004_Vaults.py`
+**1. Settle Ledger** (above). Cancel pending Charlie, and Foxtrot if slot 6 is filled. Pause Teller if it is unpaused.
 
-1. VaultBook → then HQ **8**.
-2. StabilityPool → VaultBook **1**
-3. RipeGov → VaultBook **2**
-4. SimpleErc20 → VaultBook **3**
+**2. Deploy the nine candidates.** Do not flip yet.
 
-Confirm:
+**3. Copy the nine extra assets** onto the candidate MissionControl (live Bravo `addAsset` with the live tuple). Execute those timelocks. Read back `isSupportedAsset` for all 13 on the **candidate** before HQ 5 moves.
+
+**4. Flip pointers** (same batch, or back-to-back with no traffic)
+
+1. Foxtrot → Switchboard 6 **and** Charlie → Switchboard 3
+2. MissionControl → HQ 5 **and** Lootbox → HQ 16, then in the **same transaction** new Charlie `updateRipeRewards()`. New MC already stores `0.009`. A later-block first settle mints that gap. Same-tx elapsed is 0.
+3. New Charlie `setRewardVaultId` for each copied asset → its only vault
+4. Alpha → Switchboard 1, Bravo → Switchboard 2
+5. AuctionHouse → HQ 9, Deleverage → HQ 18, CreditRedeem → HQ 19
+
+**5. Check, then start**
 
 ```
-missionControl.coreRipeGovVaultId() == 2
-missionControl.isStabVaultId(1) == true
-vaultBook.getAddr(1/2/3) match those three contracts
+hq.getAddr(5 / 9 / 16 / 18 / 19)     new MC / AH / Lootbox / DL / CR
+switchboard.getAddr(3 / 6)           new Charlie / Foxtrot
+isSupportedAsset                     all 13 live assets
+rewardVaultId                        every asset with a vault → that vault
+totalPointsAllocs.stakers            30_00  (copied extras are 0/0)
+rewardsConfig.genDepositorsAlloc     0
 ```
 
-Do not register vaults in any other order. Earners already point at 1/2/3.
+- Alpha `setRipePerBlock(0.009e18)` → execute
+- Unpause Teller
 
----
-
-## 6. Departments
-
-`0005_Departments.py` — keep this order, these HQ ids:
-
-9 AuctionHouse · 10 AuctionHouseNFT · 11 Boardroom · 12 BondRoom · 13 CreditEngine · 14 Endaoment · 15 HumanResources · 16 Lootbox · 17 Teller (**starts paused**) · 18 Deleverage · 19 CreditRedeem · 20 TellerUtils · 21 EndaomentFunds · 22 EndaomentPSM (mint/redeem off)
-
-AuctionHouse and Deleverage both go in on this step. Do not ship one without the other.
-
----
-
-## 7. Curve pool / leftover migrations
-
-`0006_CurvePool.py`, `0008_UniswapV2Prices.py` if those are in this packet.
-Do not run `0009` / `0010` Ledger or vault replacements.
-
----
-
-## 8. Timelocks and Safe
-
-`0007_FinishSetup.py`
-
-Include **Foxtrot** in `setActionTimeLockAfterSetup` if Alpha–Echo get one.
-Then `hq.finishRipeHqSetup(GOVERNANCE)`.
-
-After this, every Alpha/Bravo/Charlie/Foxtrot write is a timelock + execute.
-
----
-
-## 9. Readback before anything is live
-
-```
-HQ 5  == this MissionControl
-HQ 9  == this AuctionHouse
-HQ 16 == this Lootbox
-HQ 17 == this Teller (paused)
-HQ 18 == this Deleverage
-HQ 19 == this CreditRedeem
-
-Switchboard 3 == this Charlie
-Switchboard 6 == this Foxtrot
-
-rewardVaultId WETH/RIPE/sGREEN == 3/2/1
-totalPointsAllocs.stakers == 30_00   # 15 RIPE + 15 sGREEN
-rewardsConfig.genDepositorsAlloc == 0
-rewardsConfig.ripePerBlock == 0.009e18   # or 0 if you zeroed in step 2
-```
-
-If `genDepositorsAlloc` is ever nonzero, WETH (earner, 0/0) starts earning gen.
-Leave it 0.
-
----
-
-## 10. Turn the protocol on
-
-Only after step 9 matches.
-
-1. If you zeroed the rate in step 2: Alpha `setRipePerBlock(0.009e18)` → execute.
-   That settles the last interval (0), then writes 0.009.
-2. Unpause Teller.
-3. First deposit or borrow starts deposit/borrow clocks. First `updateRipeRewards`
-   after a nonzero rate starts RIPE emission. That is intended.
-
-Do **not** raise `genDepositorsAlloc`. Do **not** Bravo-change WETH/RIPE/sGREEN
-allocs or Charlie-repoint their earners in this activation. Defaults is the
-intended live policy.
-
----
-
-## If you must change policy in this same session
-
-Do it **after step 9, before step 10** (Teller still paused).
-
-**Add another asset**
-
-1. Bravo `addAsset(..., canDeposit=False, stakers=0, voter=0)` → execute.
-2. Charlie `setRewardVaultId(asset, vaultId)` → execute (`vaultId` already in `vaultIds`).
-3. Enable `canDeposit`.
-4. Bravo set allocs only if needed. Nonzero stakers require earner 1 or 2.
-
-**Rotate an earner**
-
-1. Charlie `setRewardVaultId(asset, 0)` → execute (zeros that asset’s allocs too).
-2. Move balances / Bravo `vaultIds` if needed.
-3. Charlie `setRewardVaultId(asset, newVault)` → execute.
-4. Bravo set allocs.
-
-**Retire an asset**
-
-1. Migrate balances first if you need VaultMigrator.
-2. Charlie `setRewardVaultId(asset, 0)` → execute.
-3. Charlie `deregisterAsset` → execute.
-   Any leftover positive-LTV balance (including 1 wei) blocks **all** new borrow
-   on that account. Positive-LTV NFTs cannot be retired.
-
-**Stop emissions**
-
-Alpha `setRipePerBlock(0)` → execute. Pause Lootbox only stops claims, not clocks.
-
----
-
-## Stop if
-
-- Ledger / MissionControl / vault 1–3 would be “replaced” on an HQ that already ran.
-- Foxtrot is missing from Switchboard 6.
-- AuctionHouse is live and Deleverage is not (or the reverse).
-- Any Defaults earner is 0.
-- `genDepositorsAlloc != 0` and you did not mean to pay WETH gen.
-- Someone is about to call Foxtrot reserve-engine setters.
+To stop again: Alpha `setRipePerBlock(0)` → execute.
