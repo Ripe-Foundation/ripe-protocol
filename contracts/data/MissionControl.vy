@@ -320,10 +320,6 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 
 @internal
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
-    earner: uint256 = self.rewardVaultId[_asset]
-    assert earner == 0 or earner in _config.vaultIds # dev: reward vault not supported
-    if _config.stakersPointsAlloc != 0 and earner != 0:
-        assert earner == self.coreRipeGovVaultId or self.isStabVaultId[earner] # dev: invalid staker vault
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
@@ -359,9 +355,6 @@ def deregisterAsset(_asset: address) -> bool:
     if targetIndex == 0:
         return False
 
-    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    assert self.rewardVaultId[_asset] == 0 # dev: reward vault still set
-    assert assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 # dev: points alloc still set
     self._updatePointsAllocs(_asset, 0, 0)
 
     # update data
@@ -437,11 +430,6 @@ def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
 def setRewardVaultId(_asset: address, _vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert self == addys._getMissionControlAddr() # dev: not current mission control
-    assert self.indexOfAsset[_asset] != 0 # dev: invalid asset
-    if _vaultId != 0:
-        assert _vaultId in self.assetConfig[_asset].vaultIds # dev: invalid reward vault
-        if self.assetConfig[_asset].stakersPointsAlloc != 0:
-            assert _vaultId == self.coreRipeGovVaultId or self.isStabVaultId[_vaultId] # dev: invalid staker vault
     self.rewardVaultId[_asset] = _vaultId
 
 

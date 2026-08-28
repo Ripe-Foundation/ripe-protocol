@@ -425,19 +425,12 @@ def _isValidAssetDepositParams(
         if not staticcall VaultBook(vaultBook).isValidRegId(vaultId):
             return False
     
-    # staker allocs must be with staker vaults
     if _stakersPointsAlloc != 0:
-        coreRipeGovVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-
-        hasStakerVault: bool = False
-        for vaultId: uint256 in _vaultIds:
-            if coreRipeGovVaultId != 0 and vaultId == coreRipeGovVaultId:
-                hasStakerVault = True
-                break
-            if staticcall MissionControl(_missionControl).isStabVaultId(vaultId):
-                hasStakerVault = True
-                break
-        if not hasStakerVault:
+        earner: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
+        if earner == 0:
+            return False
+        coreVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+        if earner != coreVaultId and not staticcall MissionControl(_missionControl).isStabVaultId(earner):
             return False
 
     return True
