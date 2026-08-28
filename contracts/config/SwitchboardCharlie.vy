@@ -572,7 +572,7 @@ def _getLedgerAddr() -> address:
 @internal
 def _assertValidRewardVaultId(_asset: address, _vaultId: uint256, _oldVaultId: uint256, _missionControl: address):
     checkVaultId: uint256 = _oldVaultId if _vaultId == 0 else _vaultId
-    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(checkVaultId, _asset)
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(checkVaultId, _asset) # dev: unsupported reward vault
 
 
 # Operator retirement / migration:
@@ -592,7 +592,7 @@ def setRewardVaultId(_asset: address, _vaultId: uint256) -> uint256:
     mc: address = self._getMissionControlAddr()
     oldVaultId: uint256 = staticcall MissionControl(mc).rewardVaultId(_asset)
     self._assertValidRewardVaultId(_asset, _vaultId, oldVaultId, mc)
-    assert _vaultId != oldVaultId
+    assert _vaultId != oldVaultId # dev: reward vault unchanged
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.REWARD_VAULT_ID
     self.pendingMissionControl[aid] = mc
@@ -1249,7 +1249,7 @@ def _getRequiredVaultAddr(_vaultBook: address, _vaultId: uint256) -> address:
     if _vaultId == 0:
         return empty(address)
     vaultAddr: address = staticcall VaultBook(_vaultBook).getAddr(_vaultId)
-    assert vaultAddr != empty(address)
+    assert vaultAddr != empty(address) # dev: missing reward vault
     return vaultAddr
 
 
@@ -1260,9 +1260,9 @@ def _checkpointRewardVault(_lootbox: address, _asset: address, _vaultId: uint256
 
 @internal
 def _executeRewardVaultId(_missionControl: address, _update: RewardVaultUpdate):
-    assert _missionControl == self._getMissionControlAddr()
+    assert _missionControl == self._getMissionControlAddr() # dev: not current mission control
     self._assertValidRewardVaultId(_update.asset, _update.newVaultId, _update.oldVaultId, _missionControl)
-    assert staticcall MissionControl(_missionControl).rewardVaultId(_update.asset) == _update.oldVaultId
+    assert staticcall MissionControl(_missionControl).rewardVaultId(_update.asset) == _update.oldVaultId # dev: reward vault changed
 
     vaultBook: address = self._getVaultBookAddr()
     oldVaultAddr: address = self._getRequiredVaultAddr(vaultBook, _update.oldVaultId)
