@@ -353,6 +353,10 @@ def getMaxRedeemValue(_user: address) -> uint256:
 @view
 @internal
 def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+    # 100% target is not a defined LTV gap; pay all rather than divide by zero.
+    if _targetLtv >= HUNDRED_PERCENT:
+        return _debtAmount
+
     # only reduce the debt necessary to get LTV back to a safe position — never perfectly precise depending on which assets are taken
     # to ensure maximum protocol solvency, we target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
