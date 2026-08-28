@@ -1815,7 +1815,7 @@ def test_loot_claim_basic(
     assert claimable == 0
 
 
-def test_accrued_loot_buckets_remain_claimable_while_new_points_are_disabled(
+def test_accrued_loot_buckets_remain_claimable_when_stored_points_flag_is_false(
     bob,
     setGeneralConfig,
     setAssetConfig,
@@ -1946,7 +1946,7 @@ def test_loot_claim_specific_asset(
     assert up.balancePoints == 0
 
 
-def test_loot_claim_points_disabled(
+def test_stored_points_flag_false_does_not_disable_deposit_points(
     bob,
     setGeneralConfig,
     setAssetConfig,
@@ -1960,7 +1960,7 @@ def test_loot_claim_points_disabled(
     alpha_token,
     alpha_token_whale,
 ):
-    # basic setup with points disabled
+    # The legacy field remains stored, but Clock ignores it.
     setGeneralConfig()
     setAssetConfig(alpha_token)
     setRipeRewardsConfig(_arePointsEnabled=False)
@@ -1975,17 +1975,16 @@ def test_loot_claim_points_disabled(
     vault_id = vault_book.getRegId(simple_erc20_vault)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-    # verify no points accumulated
+    # Points continue to accumulate.
     up = ledger.userDepositPoints(bob, vault_id, alpha_token)
-    assert up.balancePoints == 0
+    assert up.balancePoints > 0
 
-    # verify no claimable loot
+    # The accrued points remain claimable.
     claimable = lootbox.getClaimableLoot(bob)
-    assert claimable == 0
+    assert claimable > 0
 
-    # attempt to claim loot
     total_ripe = teller.claimLoot(bob, False, sender=bob)
-    assert total_ripe == 0
+    assert total_ripe == claimable
 
 
 def test_loot_claim_different_allocations(
@@ -2128,7 +2127,7 @@ def test_loot_claim_borrow_multiple_users(
     assert up_alice.points == 0
 
 
-def test_loot_claim_borrow_points_disabled(
+def test_stored_points_flag_false_does_not_disable_borrow_points(
     bob,
     setGeneralConfig,
     setRipeRewardsConfig,
@@ -2139,7 +2138,7 @@ def test_loot_claim_borrow_points_disabled(
     createDebtTerms,
     ripe_token,
 ):
-    # basic setup with points disabled
+    # The legacy field remains stored, but Clock ignores it.
     setGeneralConfig()
     setRipeRewardsConfig(False)
 
@@ -2158,14 +2157,13 @@ def test_loot_claim_borrow_points_disabled(
     # Update again
     lootbox.updateBorrowPoints(bob, sender=teller.address)
 
-    # Verify no claimable loot
+    # Borrow points and rewards continue to accrue.
     claimable = lootbox.getClaimableBorrowLoot(bob)
-    assert claimable == 0
+    assert claimable > 0
 
-    # Attempt to claim
     total_ripe = lootbox.claimBorrowLoot(bob, sender=teller.address)
-    assert total_ripe == 0
-    assert ripe_token.balanceOf(bob) == 0
+    assert total_ripe == claimable
+    assert ripe_token.balanceOf(bob) == total_ripe
 
 
 def test_loot_claim_borrow_debt_changes(
