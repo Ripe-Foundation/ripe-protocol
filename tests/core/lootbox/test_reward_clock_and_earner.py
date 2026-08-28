@@ -3,6 +3,119 @@ import boa
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
+_DEFAULTS_ASSET_CONFIG_SOURCE = """
+# @version 0.4.3
+
+import interfaces.ConfigStructs as cs
+
+asset: immutable(address)
+vaultIds: DynArray[uint256, 2]
+stakersPointsAlloc: uint256
+voterPointsAlloc: uint256
+
+
+@deploy
+def __init__(
+    _asset: address,
+    _vaultIds: DynArray[uint256, 2],
+    _stakersPointsAlloc: uint256,
+    _voterPointsAlloc: uint256,
+):
+    asset = _asset
+    self.vaultIds = _vaultIds
+    self.stakersPointsAlloc = _stakersPointsAlloc
+    self.voterPointsAlloc = _voterPointsAlloc
+
+
+@view
+@external
+def genConfig() -> cs.GenConfig:
+    return empty(cs.GenConfig)
+
+
+@view
+@external
+def genDebtConfig() -> cs.GenDebtConfig:
+    return empty(cs.GenDebtConfig)
+
+
+@view
+@external
+def hrConfig() -> cs.HrConfig:
+    return empty(cs.HrConfig)
+
+
+@view
+@external
+def ripeBondConfig() -> cs.RipeBondConfig:
+    return empty(cs.RipeBondConfig)
+
+
+@view
+@external
+def rewardsConfig() -> cs.RipeRewardsConfig:
+    return empty(cs.RipeRewardsConfig)
+
+
+@view
+@external
+def underscoreRegistry() -> address:
+    return empty(address)
+
+
+@view
+@external
+def trainingWheels() -> address:
+    return empty(address)
+
+
+@view
+@external
+def shouldCheckLastTouch() -> bool:
+    return False
+
+
+@view
+@external
+def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
+    return []
+
+
+@view
+@external
+def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
+    config: cs.AssetConfig = empty(cs.AssetConfig)
+    config.vaultIds = self.vaultIds
+    config.stakersPointsAlloc = self.stakersPointsAlloc
+    config.voterPointsAlloc = self.voterPointsAlloc
+    return [cs.AssetConfigEntry(asset=asset, config=config)]
+
+
+@view
+@external
+def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:
+    return []
+
+
+@view
+@external
+def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
+    return []
+
+
+@view
+@external
+def priorityPriceSourceIds() -> DynArray[uint256, 10]:
+    return []
+
+
+@view
+@external
+def liteSigners() -> DynArray[address, 10]:
+    return []
+"""
+
+
 def _execute(switchboard, governance, action_id):
     boa.env.time_travel(blocks=max(switchboard.actionTimeLock(), 1))
     return switchboard.executePendingAction(action_id, sender=governance.address)
@@ -116,6 +229,43 @@ def test_reset_paths_revert_on_empty_book_user_or_asset(
         lootbox.resetUserBorrowPoints(
             ZERO_ADDRESS,
             sender=switchboard_delta.address,
+        )
+
+
+def test_mission_control_constructor_seeds_one_vault_and_rejects_multi_vault_allocs(
+    ripe_hq,
+    alpha_token,
+):
+    one_vault_defaults = boa.loads(
+        _DEFAULTS_ASSET_CONFIG_SOURCE,
+        alpha_token.address,
+        [3],
+        0,
+        0,
+        name="one_vault_gen_only_defaults",
+    )
+    candidate = boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        one_vault_defaults,
+        name="one_vault_gen_only_mission_control",
+    )
+    assert candidate.rewardVaultId(alpha_token) == 3
+
+    invalid_defaults = boa.loads(
+        _DEFAULTS_ASSET_CONFIG_SOURCE,
+        alpha_token.address,
+        [1, 3],
+        1,
+        0,
+        name="multi_vault_alloc_defaults",
+    )
+    with boa.reverts("multi-vault defaults cannot have allocs"):
+        boa.load(
+            "contracts/data/MissionControl.vy",
+            ripe_hq,
+            invalid_defaults,
+            name="multi_vault_alloc_mission_control",
         )
 
 
@@ -338,6 +488,52 @@ def test_bravo_initiate_refuses_stakers_when_earner_is_not_core_or_stab(
         )
 
 
+def test_charlie_refuses_plain_earner_while_stakers_are_live(
+    setAssetConfig,
+    alpha_token,
+    stability_pool,
+    simple_erc20_vault,
+    vault_book,
+    switchboard_bravo,
+    switchboard_charlie,
+    mission_control,
+    governance,
+):
+    stab_vault_id = vault_book.getRegId(stability_pool)
+    plain_vault_id = vault_book.getRegId(simple_erc20_vault)
+    assert mission_control.isStabVaultId(stab_vault_id)
+    assert plain_vault_id != mission_control.coreRipeGovVaultId()
+    assert not mission_control.isStabVaultId(plain_vault_id)
+
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[stab_vault_id, plain_vault_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token,
+        stab_vault_id,
+        sender=switchboard_bravo.address,
+    )
+    enable_id = _set_deposit_params(
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        [stab_vault_id, plain_vault_id],
+        5,
+        0,
+    )
+    assert _execute(switchboard_bravo, governance, enable_id)
+
+    with boa.reverts("staker vault class"):
+        switchboard_charlie.setRewardVaultId(
+            alpha_token,
+            plain_vault_id,
+            sender=governance.address,
+        )
+
+
 def test_charlie_rotation_fences_initialized_new_earner_history(
     setGeneralConfig,
     setAssetConfig,
@@ -467,7 +663,7 @@ def test_charlie_rotation_fences_initialized_new_earner_history(
     )
 
 
-def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
+def test_charlie_clear_zeroes_live_allocs_without_starting_gen(
     setGeneralConfig,
     setAssetConfig,
     performDeposit,
@@ -523,6 +719,7 @@ def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
     )
     b_before = ledger.assetDepositPoints(vault_b, alpha_token)
     assert b_before.lastUpdate != 0
+    totals_before_clear = mission_control.totalPointsAllocs()
 
     clear_id = switchboard_charlie.setRewardVaultId(
         alpha_token,
@@ -558,6 +755,16 @@ def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
         sender=governance.address,
     )
     assert mission_control.rewardVaultId(alpha_token) == 0
+    stored_after_clear = mission_control.assetConfig(alpha_token)
+    assert stored_after_clear.stakersPointsAlloc == 0
+    assert stored_after_clear.voterPointsAlloc == 0
+    totals_after_clear = mission_control.totalPointsAllocs()
+    assert totals_after_clear.stakersPointsAllocTotal == (
+        totals_before_clear.stakersPointsAllocTotal - 8
+    )
+    assert totals_after_clear.voterPointsAllocTotal == (
+        totals_before_clear.voterPointsAllocTotal
+    )
     config_after_clear = mission_control.getDepositPointsConfig(alpha_token, vault_a)
     assert config_after_clear.stakersPointsAlloc == 0
     assert config_after_clear.voterPointsAlloc == 0
@@ -567,6 +774,10 @@ def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
         zero_id,
         sender=governance.address,
     )
+    stored_after_zero = mission_control.assetConfig(alpha_token)
+    assert stored_after_zero.stakersPointsAlloc == 0
+    assert stored_after_zero.voterPointsAlloc == 0
+    assert mission_control.totalPointsAllocs() == totals_after_clear
     config_after_zero = mission_control.getDepositPointsConfig(alpha_token, vault_a)
     assert config_after_zero.stakersPointsAlloc == 0
     assert config_after_zero.voterPointsAlloc == 0

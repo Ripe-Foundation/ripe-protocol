@@ -45,12 +45,13 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 17733,
+    "MissionControl": 17971,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 23990,
     "SwitchboardBravo": 24448,
-    "SwitchboardCharlie": 24469,
+    "SwitchboardCharlie": 21770,
     "SwitchboardEcho": 23930,
+    "SwitchboardFoxtrot": 11433,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
     "Teller": 24552,
@@ -88,6 +89,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     switchboard_bravo,
     switchboard_charlie,
     switchboard_echo,
+    switchboard_foxtrot,
     vault_migrator,
     vault_book,
     teller,
@@ -132,6 +134,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         ),
         "SwitchboardEcho": len(
             switchboard_echo.env.get_code(switchboard_echo.address)
+        ),
+        "SwitchboardFoxtrot": len(
+            switchboard_foxtrot.env.get_code(switchboard_foxtrot.address)
         ),
         "VaultMigrator": len(vault_migrator.env.get_code(vault_migrator.address)),
         "VaultBook": len(vault_book.env.get_code(vault_book.address)),
