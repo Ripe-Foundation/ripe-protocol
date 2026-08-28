@@ -8,6 +8,7 @@ from conf_utils import (
     assert_reverted_call,
     claim_from_stability_pool,
     filter_logs,
+    install_lootbox_user_checkpoint_trap,
     sync_deployed_token,
 )
 
@@ -799,7 +800,7 @@ def test_stability_claim_checkpoint_failure_rolls_back_batch(
     savings_green,
     lootbox,
     ledger,
-    switchboard_alpha,
+    ripe_hq,
     setGeneralConfig,
     setAssetConfig,
     setRipeRewardsConfig,
@@ -833,8 +834,8 @@ def test_stability_claim_checkpoint_failure_rolls_back_batch(
         ledger.userDepositPoints(bob, vault_id, alpha_token),
     )
 
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    with boa.reverts():
         claim_from_stability_pool(
             teller, vault_id, alpha_token, bravo_token, sender=bob
         )
@@ -5637,6 +5638,11 @@ def _clone_reward_source(
             source_mission_control.assetConfig(asset),
             sender=switchboard_alpha.address,
         )
+        target_mission_control.setRewardVaultId(
+            asset,
+            source_mission_control.rewardVaultId(asset),
+            sender=switchboard_alpha.address,
+        )
 
 
 def test_stab_reward_lock_follows_the_active_mission_control_source(
@@ -5690,6 +5696,7 @@ def test_stab_reward_lock_follows_the_active_mission_control_source(
         name="second_mission_control",
         override_address=boa.env.generate_address(),
     )
+    _swap_mission_control(ripe_hq_deploy, governance, second_mission_control)
     _clone_reward_source(
         mission_control,
         second_mission_control,
@@ -5700,7 +5707,6 @@ def test_stab_reward_lock_follows_the_active_mission_control_source(
         min_lock=200,
         max_lock=1_200,
     )
-    _swap_mission_control(ripe_hq_deploy, governance, second_mission_control)
 
     _claim_for_stab_rewards(
         stability_pool, alpha_token, bravo_token, alpha_token_whale,

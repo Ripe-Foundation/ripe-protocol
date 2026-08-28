@@ -602,8 +602,11 @@ def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms, price_de
             _isNft,
         )
         mission_control.setAssetConfig(_asset, asset_config, sender=switchboard_bravo.address)
-        if (_stakersPointsAlloc != 0 or _voterPointsAlloc != 0) and mission_control.rewardVaultId(_asset) == 0:
-            assert len(_vaultIds) == 1
+        if (
+            (_stakersPointsAlloc != 0 or _voterPointsAlloc != 0)
+            and mission_control.rewardVaultId(_asset) == 0
+            and len(_vaultIds) >= 1
+        ):
             mission_control.setRewardVaultId(
                 _asset,
                 _vaultIds[0],
