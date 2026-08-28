@@ -19,6 +19,12 @@ def _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfi
         asset,
         _vaultIds=[vault_id],
         _stakersPointsAlloc=0,
+        _voterPointsAlloc=1,
+    )
+    setAssetConfig(
+        asset,
+        _vaultIds=[vault_id],
+        _stakersPointsAlloc=0,
         _voterPointsAlloc=0,
     )
     setRipeRewardsConfig(
@@ -305,6 +311,11 @@ def test_sc24_ripegov_already_normalized_share_and_vault_total_usd(
         _vaultIds=[core_id],
         _stakersPointsAlloc=0,
         _voterPointsAlloc=0,
+    )
+    mission_control.setRewardVaultId(
+        ripe_token,
+        core_id,
+        sender=switchboard_alpha.address,
     )
     setRipeRewardsConfig(True, 10, 0, 0, 0, HUNDRED_PERCENT)
     mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)

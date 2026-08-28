@@ -1196,6 +1196,33 @@
     "type": "event"
   },
   {
+    "name": "RewardVaultIdSet",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "oldVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -1822,6 +1849,27 @@
     "type": "function",
     "name": "expiration",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRewardVaultId",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",

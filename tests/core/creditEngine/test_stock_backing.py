@@ -671,7 +671,13 @@ def test_existing_stab_and_basic_vault_empty_zero_remain_absent(
 ):
     setGeneralConfig()
     setGeneralDebtConfig()
-    setAssetConfig(alpha_token, _vaultIds=[1, 3], _debtTerms=createDebtTerms())
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[1, 3],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _debtTerms=createDebtTerms(),
+    )
     ledger.addVaultToUser(bob, 1, sender=teller.address)
     ledger.addVaultToUser(bob, 3, sender=teller.address)
 

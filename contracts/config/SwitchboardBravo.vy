@@ -36,6 +36,7 @@ interface StabilityPool:
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def rewardVaultId(_asset: address) -> uint256: view
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
@@ -56,9 +57,6 @@ interface VaultBook:
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
 
-interface Ledger:
-    def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
-
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
@@ -71,25 +69,12 @@ interface CurvePrices:
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
-interface MissionControlRewardsHead:
-    def rewardsConfig() -> bool: view
-
 flag ActionType:
     ASSET_ADD_NEW
     ASSET_DEPOSIT_PARAMS
     ASSET_LIQ_CONFIG
     ASSET_DEBT_TERMS
     ASSET_WHITELIST
-
-struct AssetDepositPoints:
-    balancePoints: uint256
-    lastBalance: uint256
-    lastUsdValue: uint256
-    ripeStakerPoints: uint256
-    ripeVotePoints: uint256
-    ripeGenPoints: uint256
-    lastUpdate: uint256
-    precision: uint256
 
 struct AssetUpdate:
     asset: address
@@ -440,19 +425,12 @@ def _isValidAssetDepositParams(
         if not staticcall VaultBook(vaultBook).isValidRegId(vaultId):
             return False
     
-    # staker allocs must be with staker vaults
     if _stakersPointsAlloc != 0:
-        coreRipeGovVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-
-        hasStakerVault: bool = False
-        for vaultId: uint256 in _vaultIds:
-            if coreRipeGovVaultId != 0 and vaultId == coreRipeGovVaultId:
-                hasStakerVault = True
-                break
-            if staticcall MissionControl(_missionControl).isStabVaultId(vaultId):
-                hasStakerVault = True
-                break
-        if not hasStakerVault:
+        earner: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
+        if earner == 0:
+            return False
+        coreVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+        if earner != coreVaultId and not staticcall MissionControl(_missionControl).isStabVaultId(earner):
             return False
 
     return True
@@ -850,6 +828,8 @@ def _vaultIdsEqual(
 @view
 @internal
 def _assertAssetAllocStructure(
+    _asset: address,
+    _missionControl: address,
     _isAddNew: bool,
     _oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
     _newVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
@@ -863,10 +843,12 @@ def _assertAssetAllocStructure(
     membershipChanged: bool = not self._vaultIdsEqual(_oldVaultIds, _newVaultIds)
     allocsChanged: bool = _oldStakers != _newStakers or _oldVoter != _newVoter
     assert not (membershipChanged and allocsChanged) # dev: cannot change membership and allocs together
+    earner: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
     if membershipChanged:
         assert _oldStakers == 0 and _oldVoter == 0 and _newStakers == 0 and _newVoter == 0 # dev: membership change requires zero allocs
-    if allocsChanged and (_newStakers != 0 or _newVoter != 0):
-        assert len(_newVaultIds) == 1 # dev: nonzero allocs require one vault
+        assert earner == 0 or earner in _newVaultIds # dev: cannot drop reward vault
+    if _newStakers != 0 or _newVoter != 0:
+        assert earner != 0 # dev: active allocs require reward vault
 
 
 @internal
@@ -891,7 +873,7 @@ def _writeAssetConfig(
     _oldVoter: uint256,
 ):
     if _actionType == ActionType.ASSET_ADD_NEW or _actionType == ActionType.ASSET_DEPOSIT_PARAMS:
-        self._assertAssetAllocStructure(_actionType == ActionType.ASSET_ADD_NEW, _oldVaultIds, _config.vaultIds, _oldStakers, _oldVoter, _config.stakersPointsAlloc, _config.voterPointsAlloc)
+        self._assertAssetAllocStructure(_asset, _mc, _actionType == ActionType.ASSET_ADD_NEW, _oldVaultIds, _config.vaultIds, _oldStakers, _oldVoter, _config.stakersPointsAlloc, _config.voterPointsAlloc)
     assert self._isValidAssetConfig(_asset, _config, _mc) # dev: invalid asset config
 
     needCkpt: bool = (
@@ -903,19 +885,15 @@ def _writeAssetConfig(
     selectedAddrs: DynArray[address, MAX_VAULTS_PER_ASSET] = []
     lootbox: address = empty(address)
     if needCkpt:
-        assert staticcall MissionControlRewardsHead(_mc).rewardsConfig() # dev: points disabled
         ripeHq: address = gov._getRipeHqFromGov()
-        ledger: address = staticcall RipeHq(ripeHq).getAddr(LEDGER_ID)
         vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
         lootbox = staticcall RipeHq(ripeHq).getAddr(LOOTBOX_ID)
-        for vaultId: uint256 in _oldVaultIds:
-            row: AssetDepositPoints = staticcall Ledger(ledger).assetDepositPoints(vaultId, _asset)
-            if row.lastUpdate != 0:
-                vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vaultId)
-                assert vaultAddr != empty(address) # dev: invalid vault
-                selectedIds.append(vaultId)
-                selectedAddrs.append(vaultAddr)
-        assert len(selectedIds) != 0 # dev: no initialized deposit points
+        earner: uint256 = staticcall MissionControl(_mc).rewardVaultId(_asset)
+        if earner != 0:
+            vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(earner)
+            assert vaultAddr != empty(address) # dev: invalid vault
+            selectedIds.append(earner)
+            selectedAddrs.append(vaultAddr)
         self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
 
     extcall MissionControl(_mc).setAssetConfig(_asset, _config)
@@ -957,6 +935,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log AssetAdded(asset=p.asset)
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:
+        assert mc == self._getMissionControlAddr() # dev: not current mission control
         assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = config.vaultIds

@@ -45,11 +45,11 @@ EIP170_LIMIT = 24_576
 # binding and checked runtime arithmetic. Any edit to these contracts must
 # recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16864,
+    "MissionControl": 17733,
     "DefaultsLocal": 1200,
-    "SwitchboardAlpha": 24459,
-    "SwitchboardBravo": 24529,
-    "SwitchboardCharlie": 23454,
+    "SwitchboardAlpha": 23990,
+    "SwitchboardBravo": 24448,
+    "SwitchboardCharlie": 24469,
     "SwitchboardEcho": 23930,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
@@ -57,7 +57,7 @@ EXPECTED_RUNTIME_BYTES = {
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
-    "Lootbox": 24502,
+    "Lootbox": 24293,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
     "RipeToken": 8760,

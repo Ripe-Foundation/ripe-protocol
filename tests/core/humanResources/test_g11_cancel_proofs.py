@@ -2,7 +2,11 @@ import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
 
-from conf_utils import assert_reverted_call, filter_logs
+from conf_utils import (
+    assert_reverted_call,
+    filter_logs,
+    install_lootbox_user_checkpoint_trap,
+)
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from contracts.modules import Contributor
 from tests.core.humanResources.g11_proof_helpers import (
@@ -461,7 +465,6 @@ def test_g11_pre_cliff_cancel_lootbox_revert_rolls_back(
     contributor_contract,
     setupRipeGovVaultConfig,
     switchboard_delta,
-    switchboard_charlie,
     governance,
     owner_address,
     ripe_token,
@@ -469,6 +472,7 @@ def test_g11_pre_cliff_cancel_lootbox_revert_rolls_back(
     ledger,
     human_resources,
     lootbox,
+    ripe_hq,
 ):
     _prep(setupRipeGovVaultConfig)
     c = contributor_contract
@@ -479,13 +483,12 @@ def test_g11_pre_cliff_cancel_lootbox_revert_rolls_back(
     snap = _grant_snapshot(
         human_resources, ledger, c, ripe_gov_vault, ripe_token, switchboard_delta, aid
     )
-    charlie_pause(switchboard_charlie, governance, lootbox.address, True)
+    install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, c.address)
     with pytest.raises(BoaError):
         switchboard_delta.executePendingAction(aid, sender=governance.address)
     assert _grant_snapshot(
         human_resources, ledger, c, ripe_gov_vault, ripe_token, switchboard_delta, aid
     ) == snap
-    charlie_pause(switchboard_charlie, governance, lootbox.address, False)
 
 
 def test_g11_pre_cliff_cancel_vault_withdraw_revert_rolls_back(

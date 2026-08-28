@@ -395,6 +395,7 @@ def test_loot_ripe_rewards_permissions(
 def test_loot_ripe_rewards_pause(
     setRipeRewardsConfig,
     lootbox,
+    ledger,
     switchboard_alpha,
     teller,
 ):
@@ -405,10 +406,12 @@ def test_loot_ripe_rewards_pause(
     
     # Pause the contract
     lootbox.pause(True, sender=switchboard_alpha.address)
-    
-    # Cannot update rewards when paused
-    with boa.reverts("contract paused"):
-        lootbox.updateRipeRewards(sender=teller.address)
+
+    # Clock updates stay live while user-facing claims are paused.
+    before = ledger.ripeRewards().lastUpdate
+    boa.env.time_travel(blocks=2)
+    lootbox.updateRipeRewards(sender=teller.address)
+    assert ledger.ripeRewards().lastUpdate > before
 
 
 def test_loot_ripe_rewards_state_transitions(

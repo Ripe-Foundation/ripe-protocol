@@ -222,6 +222,7 @@ underscoreRegistry: public(address)
 trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
+rewardVaultId: public(HashMap[address, uint256]) # asset -> vaultId, 0 = no earner
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -260,6 +261,8 @@ def __init__(_ripeHq: address, _defaults: address):
         assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()
         for entry: cs.AssetConfigEntry in assetConfigs:
             self._setAssetConfig(entry.asset, entry.config)
+            if (entry.config.stakersPointsAlloc != 0 or entry.config.voterPointsAlloc != 0) and len(entry.config.vaultIds) == 1:
+                self.rewardVaultId[entry.asset] = entry.config.vaultIds[0]
 
         # priority lists
         self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
@@ -352,10 +355,13 @@ def deregisterAsset(_asset: address) -> bool:
     if targetIndex == 0:
         return False
 
+    self._updatePointsAllocs(_asset, 0, 0)
+
     # update data
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
     self.indexOfAsset[_asset] = 0
+    self.rewardVaultId[_asset] = 0
 
     # get last item, replace the removed item
     if targetIndex != lastIndex:
@@ -372,7 +378,11 @@ def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return AssetRetirementConfig(
         isSupported=self.indexOfAsset[_asset] != 0,
-        hasPointsAlloc=assetConfig.stakersPointsAlloc != 0 or assetConfig.voterPointsAlloc != 0,
+        hasPointsAlloc=(
+            self.rewardVaultId[_asset] != 0
+            or assetConfig.stakersPointsAlloc != 0
+            or assetConfig.voterPointsAlloc != 0
+        ),
         hasWhitelist=assetConfig.whitelist != empty(address),
         ltv=assetConfig.debtTerms.ltv,
         canWithdraw=assetConfig.canWithdraw,
@@ -409,7 +419,18 @@ def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDele
 @external
 def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
     self.rewardsConfig = _config
+
+
+# reward vault
+
+
+@external
+def setRewardVaultId(_asset: address, _vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    self.rewardVaultId[_asset] = _vaultId
 
 
 # points allocs
@@ -969,21 +990,33 @@ def getRewardsConfig() -> RewardsConfig:
 
 @view
 @external
+def getRewardVaultPolicy(_asset: address, _vaultId: uint256) -> (uint256, uint256, uint256):
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    if self.indexOfAsset[_asset] == 0 or (_vaultId != 0 and _vaultId not in assetConfig.vaultIds):
+        return 0, 0, 0
+    return assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc, 1
+
+
+@view
+@external
 def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    shouldFundGenPoints: bool = assetConfig.stakersPointsAlloc == 0
-    if _vaultId not in assetConfig.vaultIds:
+    if self.indexOfAsset[_asset] == 0:
         return DepositPointsConfig(
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
             isNft=assetConfig.isNft,
-            shouldFundGenPoints=shouldFundGenPoints,
+            shouldFundGenPoints=False,
         )
+    earner: uint256 = self.rewardVaultId[_asset]
+    isEarner: bool = earner != 0 and _vaultId == earner
+    stakers: uint256 = assetConfig.stakersPointsAlloc if isEarner else 0
+    voters: uint256 = assetConfig.voterPointsAlloc if isEarner else 0
     return DepositPointsConfig(
-        stakersPointsAlloc=assetConfig.stakersPointsAlloc,
-        voterPointsAlloc=assetConfig.voterPointsAlloc,
+        stakersPointsAlloc=stakers,
+        voterPointsAlloc=voters,
         isNft=assetConfig.isNft,
-        shouldFundGenPoints=shouldFundGenPoints,
+        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0,
     )
 
 

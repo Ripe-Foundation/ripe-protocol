@@ -2832,7 +2832,6 @@ def test_deregister_asset_execute_rejects_already_unregistered(
         add_action,
         sender=governance.address,
     )
-
     first_action = switchboard_charlie.deregisterAsset(
         alpha_token.address,
         sender=governance.address,
@@ -2962,6 +2961,11 @@ def test_live_allocations_can_be_zeroed_then_retired(
         add_action,
         sender=governance.address,
     )
+    mission_control.setRewardVaultId(
+        alpha_token.address,
+        1,
+        sender=switchboard_bravo.address,
+    )
 
     vault_addr = vault_book.getAddr(1)
     assert switchboard_charlie.checkpointAssetDepositPointsAt(
@@ -2990,6 +2994,11 @@ def test_live_allocations_can_be_zeroed_then_retired(
 
     live_before = mission_control.assetConfig(alpha_token.address)
     totals_before = mission_control.totalPointsAllocs()
+    clear_earner_action = switchboard_charlie.setRewardVaultId(
+        alpha_token.address,
+        0,
+        sender=governance.address,
+    )
     deregister_action = switchboard_charlie.deregisterAsset(
         alpha_token.address,
         sender=governance.address,
@@ -3007,6 +3016,7 @@ def test_live_allocations_can_be_zeroed_then_retired(
     )
 
     confirmation_block = max(
+        switchboard_charlie.getActionConfirmationBlock(clear_earner_action),
         switchboard_charlie.getActionConfirmationBlock(deregister_action),
         switchboard_bravo.getActionConfirmationBlock(zero_action),
     )
@@ -3024,6 +3034,11 @@ def test_live_allocations_can_be_zeroed_then_retired(
     assert mission_control.totalPointsAllocs() == totals_before
     assert switchboard_charlie.hasPendingAction(deregister_action)
 
+    assert switchboard_charlie.executePendingAction(
+        clear_earner_action,
+        sender=governance.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token.address) == 0
     assert switchboard_bravo.executePendingAction(
         zero_action,
         sender=governance.address,
@@ -4442,32 +4457,28 @@ def doesVaultHaveAnyFunds() -> bool:
     )
     assert vault_book.getAddr(historical_id) == ZERO_ADDRESS
     assert vault_book.isValidRegId(historical_id)
-    assert switchboard_charlie.checkpointAssetDepositPointsAt(
-        alpha_token,
-        historical_id,
-        historical.address,
-        sender=governance.address,
-    )
+    with boa.reverts("vault addr mismatch"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            alpha_token,
+            historical_id,
+            historical.address,
+            sender=governance.address,
+        )
 
 
-def test_checkpoint_asset_deposit_points_at_requires_points_enabled(
+def test_checkpoint_asset_deposit_points_at_ignores_stored_points_enabled(
     switchboard_charlie,
     switchboard_alpha,
+    mission_control,
     governance,
     alpha_token,
     simple_erc20_vault,
     vault_book,
 ):
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    switchboard_alpha.setRewardsPointsEnabled(False, sender=governance.address)
-    with boa.reverts("points disabled"):
-        switchboard_charlie.checkpointAssetDepositPointsAt(
-            alpha_token,
-            vault_id,
-            simple_erc20_vault.address,
-            sender=governance.address,
-        )
-    switchboard_alpha.setRewardsPointsEnabled(True, sender=governance.address)
+    config = list(mission_control.rewardsConfig())
+    config[0] = False
+    mission_control.setRipeRewardsConfig(config, sender=switchboard_alpha.address)
     assert switchboard_charlie.checkpointAssetDepositPointsAt(
         alpha_token,
         vault_id,

@@ -751,6 +751,8 @@ def test_claim_loot_preserves_healthy_deposit_rewards_beside_stale_vault(
     vault_book,
     governance,
     lootbox,
+    mission_control,
+    switchboard_bravo,
 ):
     stale_vault_id, _ = _create_stale_repointed_vault(
         user=bob,
@@ -776,6 +778,9 @@ def test_claim_loot_preserves_healthy_deposit_rewards_beside_stale_vault(
         _vaultIds=[healthy_vault_id],
         _stakersPointsAlloc=100,
         _voterPointsAlloc=0,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token, healthy_vault_id, sender=switchboard_bravo.address
     )
     setRipeRewardsConfig(
         _arePointsEnabled=True,
@@ -854,6 +859,8 @@ def test_claiming_healthy_peer_preserves_stale_points_and_registration(
     simple_erc20_vault,
     vault_book,
     governance,
+    mission_control,
+    switchboard_bravo,
 ):
     setGeneralConfig()
     setAssetConfig(
@@ -917,6 +924,9 @@ def test_claiming_healthy_peer_preserves_stale_points_and_registration(
         _vaultIds=[healthy_vault_id],
         _stakersPointsAlloc=100,
         _voterPointsAlloc=0,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token, healthy_vault_id, sender=switchboard_bravo.address
     )
     performDeposit(
         bob,

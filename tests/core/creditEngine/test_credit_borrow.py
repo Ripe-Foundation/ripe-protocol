@@ -964,7 +964,12 @@ def test_borrow_terms_exclude_current_and_retired_stability_pools(
     assert not mission_control.isStabVaultId(3)
 
     setGeneralConfig()
-    setAssetConfig(alpha_token, [1, 3, alternate_id])
+    setAssetConfig(
+        alpha_token,
+        [1, 3, alternate_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
     setGeneralDebtConfig()
     amount = 100 * EIGHTEEN_DECIMALS
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
@@ -1005,6 +1010,8 @@ def test_borrow_terms_exclude_retired_stab_vault_from_every_registry_source(
     setAssetConfig(
         alpha_token,
         [3, alternate_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
         _specialStabPoolId=special_id,
     )
     setGeneralDebtConfig()
@@ -1032,6 +1039,8 @@ def test_borrow_terms_exclude_retired_stab_vault_from_every_registry_source(
         setAssetConfig(
             alpha_token,
             [3, alternate_id],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
             _specialStabPoolId=0,
         )
 
