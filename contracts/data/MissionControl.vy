@@ -358,6 +358,10 @@ def deregisterAsset(_asset: address) -> bool:
         return False
 
     self._updatePointsAllocs(_asset, 0, 0)
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    assetConfig.stakersPointsAlloc = 0
+    assetConfig.voterPointsAlloc = 0
+    self.assetConfig[_asset] = assetConfig
 
     # update data
     lastIndex: uint256 = numAssets - 1
