@@ -504,7 +504,7 @@ def test_mission_control_deregister_asset(mission_control, switchboard_alpha, al
     "stakers_points_alloc,voter_points_alloc",
     [(77, 0), (0, 91)],
 )
-def test_mission_control_deregister_asset_retains_policy_but_removes_live_totals(
+def test_mission_control_deregister_asset_zeros_stored_allocs_and_removes_live_totals(
     mission_control,
     switchboard_alpha,
     alpha_token,
@@ -533,7 +533,15 @@ def test_mission_control_deregister_asset_retains_policy_but_removes_live_totals
     assert not mission_control.isSupportedAsset(alpha_token.address)
     assert mission_control.indexOfAsset(alpha_token.address) == 0
     assert mission_control.numAssets() == num_assets_before - 1
-    assert mission_control.assetConfig(alpha_token.address) == config_before
+    stored = mission_control.assetConfig(alpha_token.address)
+    assert stored.stakersPointsAlloc == 0
+    assert stored.voterPointsAlloc == 0
+    expected = list(config_before)
+    expected[1] = 0
+    expected[2] = 0
+    assert list(stored) == expected
+    assert mission_control.rewardVaultId(alpha_token.address) == 0
+    assert not mission_control.getAssetRetirementConfig(alpha_token.address).hasPointsAlloc
     totals_after = mission_control.totalPointsAllocs()
     assert totals_after.stakersPointsAllocTotal == (
         totals_before.stakersPointsAllocTotal - stakers_points_alloc
@@ -835,9 +843,18 @@ def test_mission_control_deregister_asset_points_allocs_conservation(
         sender=switchboard_alpha.address,
     )
     totals_after_deregister = mission_control.totalPointsAllocs()
-    assert mission_control.assetConfig(alpha_token.address) == retired_before
+    stored = mission_control.assetConfig(alpha_token.address)
+    assert stored.stakersPointsAlloc == 0
+    assert stored.voterPointsAlloc == 0
+    expected = list(retired_before)
+    expected[1] = 0
+    expected[2] = 0
+    assert list(stored) == expected
+    assert mission_control.rewardVaultId(alpha_token.address) == 0
+    assert not mission_control.getAssetRetirementConfig(alpha_token.address).hasPointsAlloc
     assert not mission_control.isSupportedAsset(alpha_token.address)
     assert mission_control.isSupportedAsset(bravo_token.address)
+    assert mission_control.assetConfig(bravo_token.address) == active_before
     assert totals_after_deregister.stakersPointsAllocTotal == (
         active_before.stakersPointsAlloc
     )
@@ -850,6 +867,65 @@ def test_mission_control_deregister_asset_points_allocs_conservation(
     assert totals_after_deregister.voterPointsAllocTotal == (
         totals_before.voterPointsAllocTotal - retired_before.voterPointsAlloc
     )
+
+
+def test_mission_control_readd_after_deregister_does_not_underflow_totals(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    sample_asset_config,
+):
+    retired_config = list(sample_asset_config)
+    retired_config[1] = 77
+    retired_config[2] = 31
+    retired_config[3] = 1_234 * EIGHTEEN_DECIMALS
+    retired_config[4] = 12_345 * EIGHTEEN_DECIMALS
+    active_config = list(sample_asset_config)
+    active_config[1] = 23
+    active_config[2] = 19
+
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(retired_config),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setAssetConfig(
+        bravo_token.address,
+        tuple(active_config),
+        sender=switchboard_alpha.address,
+    )
+    retired_before = mission_control.assetConfig(alpha_token.address)
+
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
+    totals_after_deregister = mission_control.totalPointsAllocs()
+    assert totals_after_deregister.stakersPointsAllocTotal == 23
+    assert totals_after_deregister.voterPointsAllocTotal == 19
+    retired_stored = mission_control.assetConfig(alpha_token.address)
+    assert retired_stored.stakersPointsAlloc == 0
+    assert retired_stored.voterPointsAlloc == 0
+    assert retired_stored.perUserDepositLimit == retired_before.perUserDepositLimit
+    assert retired_stored.globalDepositLimit == retired_before.globalDepositLimit
+
+    readd_config = list(sample_asset_config)
+    readd_config[1] = 40
+    readd_config[2] = 10
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(readd_config),
+        sender=switchboard_alpha.address,
+    )
+
+    assert mission_control.isSupportedAsset(alpha_token.address)
+    totals_after_readd = mission_control.totalPointsAllocs()
+    assert totals_after_readd.stakersPointsAllocTotal == 23 + 40
+    assert totals_after_readd.voterPointsAllocTotal == 19 + 10
+    readded_stored = mission_control.assetConfig(alpha_token.address)
+    assert readded_stored.stakersPointsAlloc == 40
+    assert readded_stored.voterPointsAlloc == 10
 
 
 ######################
