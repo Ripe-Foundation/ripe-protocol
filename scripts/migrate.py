@@ -5,6 +5,7 @@ import tempfile
 import boa
 import boa.deployments
 import click
+from boa.interpret import set_cache_dir
 from boa.rpc import EthereumRPC
 
 from config.network_profiles import (
@@ -61,6 +62,26 @@ def _load_dotenv() -> None:
     except ImportError:
         return
     load_dotenv(override=False)
+
+
+def _configure_compiler_cache() -> Path:
+    """Keep migration compiler artifacts local to this repository.
+
+    Boa's global cache can contain resolved source paths from temporary
+    worktrees after those worktrees have been removed. Vyper then fails while
+    building deployment metadata even though the contract deployed correctly.
+    A repository-owned cache keeps normal migration runs reproducible without
+    disabling compilation caching.
+    """
+    configured = os.environ.get("RIPE_MIGRATION_BOA_CACHE_DIR")
+    cache_dir = (
+        Path(configured).expanduser()
+        if configured
+        else ROOT / "cache" / "migrations" / "boa"
+    )
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    set_cache_dir(cache_dir)
+    return cache_dir
 
 
 def read_chain_id(rpc_url: str) -> int | str:
@@ -367,6 +388,7 @@ def cli(
     """
 
     _load_dotenv()
+    _configure_compiler_cache()
 
     operation = (
         Operation.MIGRATION_FORK if fork else Operation.MIGRATION_LIVE
