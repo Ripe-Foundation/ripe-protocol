@@ -88,7 +88,6 @@ def updateDepositPoints(
     _a: addys.Addys = empty(addys.Addys),
 ):
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 """
     assert source.count(needle) == 1
     # Use a # dev: assert, not a string revert: a string payload makes the

@@ -435,7 +435,6 @@ def test_live_active_empty_category_blocks_funded_category_atomically(
         staker_points=1,
         voter_points=1,
     )
-
     assert lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token) == 0
     assert teller.claimLoot(bob, False, sender=bob) == 0
     assert ripe_token.balanceOf(bob) == 0
@@ -490,7 +489,6 @@ def test_exited_empty_active_category_defers_until_reward_flows(
         alpha_token,
         staker_points=1,
     )
-
     # Same-block zero rewards are not terminal: the configured category can receive RIPE next block.
     assert teller.claimLoot(bob, False, sender=bob) == 0
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
@@ -760,6 +758,7 @@ def test_final_reward_wei_that_rounds_out_of_every_bucket_is_terminal(
     alpha_token,
     alpha_token_whale,
     switchboard_alpha,
+    mission_control,
 ):
     setGeneralConfig()
     setAssetConfig(alpha_token, _stakersPointsAlloc=1, _voterPointsAlloc=1)
@@ -790,6 +789,11 @@ def test_final_reward_wei_that_rounds_out_of_every_bucket_is_terminal(
         alpha_token,
         staker_points=1,
         voter_points=1,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token,
+        0,
+        sender=switchboard_alpha.address,
     )
 
     boa.env.time_travel(blocks=1)
@@ -827,6 +831,7 @@ def test_rounding_zero_allocation_defers_only_until_finite_budget_is_exhausted(
     alpha_token,
     alpha_token_whale,
     switchboard_alpha,
+    mission_control,
 ):
     setGeneralConfig()
     setAssetConfig(alpha_token, _stakersPointsAlloc=1)
@@ -856,6 +861,11 @@ def test_rounding_zero_allocation_defers_only_until_finite_budget_is_exhausted(
         vault_id,
         alpha_token,
         staker_points=1,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token,
+        0,
+        sender=switchboard_alpha.address,
     )
 
     boa.env.time_travel(blocks=1)

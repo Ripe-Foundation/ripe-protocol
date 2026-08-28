@@ -1559,21 +1559,19 @@ def test_delta_rewards_budget_settles_lootbox_before_replace(
     assert ledger.ripeRewards().borrowers == settled.borrowers + later * rate
 
 
-def test_delta_rewards_budget_fails_closed_when_lootbox_paused(
+def test_delta_rewards_budget_settles_when_lootbox_paused(
     switchboard_delta,
     switchboard_alpha,
     governance,
     ledger,
     lootbox,
 ):
-    before = ledger.ripeAvailForRewards()
     lootbox.pause(True, sender=switchboard_alpha.address)
     action_id = switchboard_delta.setRipeAvailableForRewards(1, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    with boa.reverts("contract paused"):
-        switchboard_delta.executePendingAction(action_id, sender=governance.address)
-    assert ledger.ripeAvailForRewards() == before
-    assert switchboard_delta.hasPendingAction(action_id)
+    assert switchboard_delta.executePendingAction(action_id, sender=governance.address)
+    assert ledger.ripeAvailForRewards() == 1
+    assert not switchboard_delta.hasPendingAction(action_id)
     lootbox.pause(False, sender=switchboard_alpha.address)
 
 

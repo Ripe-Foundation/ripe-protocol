@@ -18,6 +18,12 @@ def _configure(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, asset, va
         asset,
         _vaultIds=[vault_id],
         _stakersPointsAlloc=0,
+        _voterPointsAlloc=1,
+    )
+    setAssetConfig(
+        asset,
+        _vaultIds=[vault_id],
+        _stakersPointsAlloc=0,
         _voterPointsAlloc=0,
     )
     setRipeRewardsConfig(True, 10, 0, 0, 0, HUNDRED_PERCENT)
@@ -598,6 +604,11 @@ def test_sc24_ripegov_empty_holder_book_still_uses_vault_total(
         _vaultIds=[core_id],
         _stakersPointsAlloc=0,
         _voterPointsAlloc=0,
+    )
+    mission_control.setRewardVaultId(
+        ripe_token,
+        core_id,
+        sender=switchboard_alpha.address,
     )
     setRipeRewardsConfig(True, 10, 0, 0, 0, HUNDRED_PERCENT)
     mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
