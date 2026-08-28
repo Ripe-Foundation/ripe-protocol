@@ -341,19 +341,18 @@ def test_bravo_initiate_refuses_stakers_when_earner_is_not_core_or_stab(
 def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
     setAssetConfig,
     alpha_token,
-    simple_erc20_vault,
-    vault_book,
     switchboard_bravo,
     switchboard_charlie,
     mission_control,
     governance,
 ):
-    vault_id = vault_book.getRegId(simple_erc20_vault)
+    vault_id = 1
+    assert mission_control.isStabVaultId(vault_id)
     setAssetConfig(
         alpha_token,
         _vaultIds=[vault_id],
-        _stakersPointsAlloc=0,
-        _voterPointsAlloc=8,
+        _stakersPointsAlloc=8,
+        _voterPointsAlloc=0,
     )
     assert mission_control.rewardVaultId(alpha_token) == vault_id
 
@@ -364,6 +363,10 @@ def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
     )
     assert _execute(switchboard_charlie, governance, clear_id)
     assert mission_control.rewardVaultId(alpha_token) == 0
+    config_after_clear = mission_control.getDepositPointsConfig(alpha_token, vault_id)
+    assert config_after_clear.stakersPointsAlloc == 0
+    assert config_after_clear.voterPointsAlloc == 0
+    assert not config_after_clear.shouldFundGenPoints
 
     zero_id = _set_deposit_params(
         switchboard_bravo,
@@ -374,10 +377,10 @@ def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
         0,
     )
     assert _execute(switchboard_bravo, governance, zero_id)
-    config = mission_control.getDepositPointsConfig(alpha_token, vault_id)
-    assert config.stakersPointsAlloc == 0
-    assert config.voterPointsAlloc == 0
-    assert not config.shouldFundGenPoints
+    config_after_zero = mission_control.getDepositPointsConfig(alpha_token, vault_id)
+    assert config_after_zero.stakersPointsAlloc == 0
+    assert config_after_zero.voterPointsAlloc == 0
+    assert not config_after_zero.shouldFundGenPoints
 
 
 def test_charlie_historical_checkpoint_reverts_on_empty_book_or_addr_mismatch(
