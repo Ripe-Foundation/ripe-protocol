@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "UniswapV2PricesNvda": {
+      "address": "0x6CA83A04BCF7651fFB0D2D1ab4376E8EC3b91d89",
+      "file": "contracts/priceSources/UniswapV2Prices.vy"
+    }
+  }
+}
