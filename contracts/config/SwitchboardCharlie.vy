@@ -1172,6 +1172,7 @@ def executePendingAction(_aid: uint256) -> bool:
         mc: address = self.pendingMissionControl[_aid]
         if mc == empty(address):
             mc = self._getMissionControlAddr()
+        assert mc == self._getMissionControlAddr() # dev: not current mission control
         self._validateAssetDeregistration(asset, mc)
         success: bool = extcall MissionControl(mc).deregisterAsset(asset)
         assert success # dev: invalid asset

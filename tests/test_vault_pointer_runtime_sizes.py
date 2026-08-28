@@ -49,7 +49,7 @@ EXPECTED_RUNTIME_BYTES = {
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 23990,
     "SwitchboardBravo": 24448,
-    "SwitchboardCharlie": 21770,
+    "SwitchboardCharlie": 21794,
     "SwitchboardEcho": 23930,
     "SwitchboardFoxtrot": 11433,
     "VaultMigrator": 15626,

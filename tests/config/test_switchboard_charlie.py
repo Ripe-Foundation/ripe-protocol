@@ -2909,40 +2909,35 @@ def test_deregister_asset_execute_rejects_already_unregistered(
 def test_deregister_asset_on_new_mission_control(
     switchboard_bravo, switchboard_charlie, governance, new_mission_control, mission_control, bravo_token
 ):
-    """Test deregisterAsset targeting a new MissionControl"""
-    # Add asset to new MC
+    """Dark-MC deregister may queue; execute requires the HQ-current MissionControl."""
     action_id = switchboard_bravo.addAsset(
         bravo_token.address, [1], 0, 0, 1000, 10000, 0,
         (50_00, 60_00, 70_00, 10_00, 5_00, 0),
         False, False, False, True, True, True, True, True, True, True, 0,
         (False, 0, 0, 0, 0), ZERO_ADDRESS, False,
-        new_mission_control.address,  # _missionControl
+        new_mission_control.address,
         sender=governance.address
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
     switchboard_bravo.executePendingAction(action_id, sender=governance.address)
 
-    # Verify asset is on new MC
     assert new_mission_control.isSupportedAsset(bravo_token.address)
     assert not mission_control.isSupportedAsset(bravo_token.address)
 
-    # Deregister from new MC
     aid = switchboard_charlie.deregisterAsset(
         bravo_token.address,
-        new_mission_control.address,  # _missionControl
+        new_mission_control.address,
         sender=governance.address
     )
-
-    # Verify pending MC is stored
     assert switchboard_charlie.pendingMissionControl(aid) == new_mission_control.address
 
-    # Execute
     boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
-    success = switchboard_charlie.executePendingAction(aid, sender=governance.address)
-    assert success
+    with boa.reverts("not current mission control"):
+        switchboard_charlie.executePendingAction(aid, sender=governance.address)
 
-    # Verify deregistered from new MC
-    assert not new_mission_control.isSupportedAsset(bravo_token.address)
+    assert switchboard_charlie.hasPendingAction(aid)
+    assert new_mission_control.isSupportedAsset(bravo_token.address)
+    assert mission_control.isSupportedAsset(bravo_token.address) is False
 
 
 def test_live_allocations_can_be_zeroed_then_retired(
