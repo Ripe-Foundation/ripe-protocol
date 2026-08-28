@@ -338,49 +338,262 @@ def test_bravo_initiate_refuses_stakers_when_earner_is_not_core_or_stab(
         )
 
 
-def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
+def test_charlie_rotation_fences_initialized_new_earner_history(
+    setGeneralConfig,
     setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
     alpha_token,
+    alpha_token_whale,
+    stability_pool,
+    ripe_gov_vault,
+    vault_book,
+    lootbox,
+    ledger,
+    teller,
+    switchboard_alpha,
+    switchboard_charlie,
+    mission_control,
+    governance,
+    bob,
+):
+    vault_a = vault_book.getRegId(stability_pool)
+    vault_b = vault_book.getRegId(ripe_gov_vault)
+    assert mission_control.isStabVaultId(vault_a)
+    assert vault_b == mission_control.coreRipeGovVaultId()
+
+    setGeneralConfig()
+    setRipeRewardsConfig(
+        _ripePerBlock=10,
+        _borrowersAlloc=0,
+        _stakersAlloc=100_00,
+        _votersAlloc=0,
+        _genDepositorsAlloc=0,
+    )
+    ledger.setRipeAvailForRewards(
+        10**24,
+        sender=switchboard_alpha.address,
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[vault_a, vault_b],
+        _stakersPointsAlloc=8,
+        _voterPointsAlloc=0,
+    )
+    mission_control.setRipeGovVaultConfig(
+        alpha_token,
+        100_00,
+        False,
+        (0, 1_000, 100_00, True, 0),
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == vault_a
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    amount = 25 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        amount,
+        alpha_token,
+        alpha_token_whale,
+        stability_pool,
+    )
+    performDeposit(
+        bob,
+        amount,
+        alpha_token,
+        alpha_token_whale,
+        ripe_gov_vault,
+    )
+    lootbox.updateDepositPoints(
+        bob,
+        vault_a,
+        stability_pool,
+        alpha_token,
+        sender=teller.address,
+    )
+    lootbox.updateDepositPoints(
+        bob,
+        vault_b,
+        ripe_gov_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    a_before = ledger.assetDepositPoints(vault_a, alpha_token)
+    b_before = ledger.assetDepositPoints(vault_b, alpha_token)
+    global_before = ledger.globalDepositPoints()
+    assert b_before.lastUpdate != 0
+
+    rotate_id = switchboard_charlie.setRewardVaultId(
+        alpha_token,
+        vault_b,
+        sender=governance.address,
+    )
+    assert _execute(switchboard_charlie, governance, rotate_id)
+
+    a_after = ledger.assetDepositPoints(vault_a, alpha_token)
+    b_after = ledger.assetDepositPoints(vault_b, alpha_token)
+    global_after = ledger.globalDepositPoints()
+    elapsed = a_after.lastUpdate - a_before.lastUpdate
+    assert elapsed >= switchboard_charlie.actionTimeLock()
+    assert a_after.ripeStakerPoints == a_before.ripeStakerPoints + 8 * elapsed
+    assert b_after.ripeStakerPoints == b_before.ripeStakerPoints
+    assert global_after.ripeStakerPoints == (
+        global_before.ripeStakerPoints + 8 * elapsed
+    )
+
+    global_before_b_claim = ledger.globalDepositPoints().ripeStakerPoints
+    assert lootbox.getClaimableDepositLootForAsset(bob, vault_b, alpha_token) == 0
+    assert (
+        lootbox.claimDepositLootForAsset(
+            bob,
+            vault_b,
+            alpha_token,
+            sender=teller.address,
+        )
+        == 0
+    )
+    assert ledger.globalDepositPoints().ripeStakerPoints == global_before_b_claim
+    assert lootbox.getClaimableDepositLootForAsset(bob, vault_a, alpha_token) > 0
+    assert (
+        lootbox.claimDepositLootForAsset(
+            bob,
+            vault_a,
+            alpha_token,
+            sender=teller.address,
+        )
+        > 0
+    )
+
+
+def test_charlie_can_clear_live_earner_then_zero_allocs_without_starting_gen(
+    setGeneralConfig,
+    setAssetConfig,
+    performDeposit,
+    mock_price_source,
+    alpha_token,
+    alpha_token_whale,
+    stability_pool,
+    ripe_gov_vault,
+    vault_book,
+    lootbox,
+    ledger,
+    teller,
+    switchboard_alpha,
     switchboard_bravo,
     switchboard_charlie,
     mission_control,
     governance,
+    bob,
 ):
-    vault_id = 1
-    assert mission_control.isStabVaultId(vault_id)
+    vault_a = vault_book.getRegId(stability_pool)
+    vault_b = vault_book.getRegId(ripe_gov_vault)
+    assert mission_control.isStabVaultId(vault_a)
+    assert vault_b == mission_control.coreRipeGovVaultId()
+    setGeneralConfig()
     setAssetConfig(
         alpha_token,
-        _vaultIds=[vault_id],
+        _vaultIds=[vault_a, vault_b],
         _stakersPointsAlloc=8,
         _voterPointsAlloc=0,
     )
-    assert mission_control.rewardVaultId(alpha_token) == vault_id
+    mission_control.setRipeGovVaultConfig(
+        alpha_token,
+        100_00,
+        False,
+        (0, 1_000, 100_00, True, 0),
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == vault_a
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        25 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        ripe_gov_vault,
+    )
+    lootbox.updateDepositPoints(
+        bob,
+        vault_b,
+        ripe_gov_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    b_before = ledger.assetDepositPoints(vault_b, alpha_token)
+    assert b_before.lastUpdate != 0
 
     clear_id = switchboard_charlie.setRewardVaultId(
         alpha_token,
         0,
         sender=governance.address,
     )
-    assert _execute(switchboard_charlie, governance, clear_id)
-    assert mission_control.rewardVaultId(alpha_token) == 0
-    config_after_clear = mission_control.getDepositPointsConfig(alpha_token, vault_id)
-    assert config_after_clear.stakersPointsAlloc == 0
-    assert config_after_clear.voterPointsAlloc == 0
-    assert not config_after_clear.shouldFundGenPoints
-
     zero_id = _set_deposit_params(
         switchboard_bravo,
         governance,
         alpha_token,
-        [vault_id],
+        [vault_a, vault_b],
         0,
         0,
     )
-    assert _execute(switchboard_bravo, governance, zero_id)
-    config_after_zero = mission_control.getDepositPointsConfig(alpha_token, vault_id)
+    restore_id = _set_deposit_params(
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        [vault_a, vault_b],
+        8,
+        0,
+    )
+
+    boa.env.time_travel(
+        blocks=max(
+            switchboard_charlie.actionTimeLock(),
+            switchboard_bravo.actionTimeLock(),
+            1,
+        )
+    )
+    assert switchboard_charlie.executePendingAction(
+        clear_id,
+        sender=governance.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 0
+    config_after_clear = mission_control.getDepositPointsConfig(alpha_token, vault_a)
+    assert config_after_clear.stakersPointsAlloc == 0
+    assert config_after_clear.voterPointsAlloc == 0
+    assert not config_after_clear.shouldFundGenPoints
+
+    assert switchboard_bravo.executePendingAction(
+        zero_id,
+        sender=governance.address,
+    )
+    config_after_zero = mission_control.getDepositPointsConfig(alpha_token, vault_a)
     assert config_after_zero.stakersPointsAlloc == 0
     assert config_after_zero.voterPointsAlloc == 0
     assert not config_after_zero.shouldFundGenPoints
+
+    select_id = switchboard_charlie.setRewardVaultId(
+        alpha_token,
+        vault_b,
+        sender=governance.address,
+    )
+    assert _execute(switchboard_charlie, governance, select_id)
+    b_after_select = ledger.assetDepositPoints(vault_b, alpha_token)
+    assert b_after_select.ripeStakerPoints == b_before.ripeStakerPoints
+    assert b_after_select.ripeGenPoints == b_before.ripeGenPoints
+
+    assert switchboard_bravo.executePendingAction(
+        restore_id,
+        sender=governance.address,
+    )
+    config_after_restore = mission_control.getDepositPointsConfig(alpha_token, vault_b)
+    assert config_after_restore.stakersPointsAlloc == 8
+    assert config_after_restore.voterPointsAlloc == 0
+    assert not config_after_restore.shouldFundGenPoints
+    b_after_restore = ledger.assetDepositPoints(vault_b, alpha_token)
+    assert b_after_restore.lastUpdate > b_before.lastUpdate
+    assert b_after_restore.ripeStakerPoints == b_before.ripeStakerPoints
+    assert b_after_restore.ripeGenPoints == b_before.ripeGenPoints
 
 
 def test_charlie_historical_checkpoint_reverts_on_empty_book_or_addr_mismatch(

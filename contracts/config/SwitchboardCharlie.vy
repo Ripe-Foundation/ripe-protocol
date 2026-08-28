@@ -577,11 +577,15 @@ def _assertValidRewardVaultId(_asset: address, _vaultId: uint256, _oldVaultId: u
 
 # Operator retirement / migration:
 # 1. setRewardVaultId(asset, 0) first — checkpoints; turns off staker, voter, and gen.
-#    Allowed while allocs are still live. totalPointsAllocs can look high until step 2.
 # 2. Bravo zeros stakersPointsAlloc / voterPointsAlloc (no gen window; earner is already 0).
 # 3. Move balances / change vaultIds.
 # 4. setRewardVaultId(asset, newVault); new vault must already be in vaultIds.
 # 5. Bravo sets allocs if needed, or leave both 0 for gen only.
+# Execute fences the new row's lastUpdate under the old/zero policy before the write,
+# so a stale Ledger row cannot eat the old earner's interval.
+# Clear and zero are separate delayed actions. Execute the matured Bravo zero in
+# the same block as the Charlie clear when possible. Settlement in the gap can
+# orphan the still-live alloc in global points; that gap is not closed here.
 @external
 def setRewardVaultId(_asset: address, _vaultId: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -1265,13 +1269,13 @@ def _executeRewardVaultId(_missionControl: address, _update: RewardVaultUpdate):
     newVaultAddr: address = self._getRequiredVaultAddr(vaultBook, _update.newVaultId)
 
     lootbox: address = self._getLootboxAddr()
-    if _update.oldVaultId != 0:
-        self._checkpointRewardVault(lootbox, _update.asset, _update.oldVaultId, oldVaultAddr)
-    extcall MissionControl(_missionControl).setRewardVaultId(_update.asset, _update.newVaultId)
-    if _update.oldVaultId != 0:
-        self._checkpointRewardVault(lootbox, _update.asset, _update.oldVaultId, oldVaultAddr)
-    if _update.newVaultId != 0:
-        self._checkpointRewardVault(lootbox, _update.asset, _update.newVaultId, newVaultAddr)
+    for i: uint256 in range(2):
+        if _update.oldVaultId != 0:
+            self._checkpointRewardVault(lootbox, _update.asset, _update.oldVaultId, oldVaultAddr)
+        if _update.newVaultId != 0:
+            self._checkpointRewardVault(lootbox, _update.asset, _update.newVaultId, newVaultAddr)
+        if i == 0:
+            extcall MissionControl(_missionControl).setRewardVaultId(_update.asset, _update.newVaultId)
     log RewardVaultIdSet(asset=_update.asset, oldVaultId=_update.oldVaultId, newVaultId=_update.newVaultId, caller=msg.sender)
 
 
