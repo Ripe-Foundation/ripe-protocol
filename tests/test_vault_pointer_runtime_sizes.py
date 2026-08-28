@@ -7,43 +7,15 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# RipeGov headroom is 460 bytes after the migration, SharesVault, and
-# governance-remediation changes. Any RipeGov edit must remeasure this pin.
-# Composed SwitchboardAlpha headroom is 14 bytes after binding its chain-local
-# Pyth source ID. Teller and CreditEngine retain 24 and 33 bytes respectively at
-# this head. Endaoment retains 1,190 bytes after binding its chain-local Curve
-# source ID. These pins include the deployed immutable data.
-# Lootbox headroom is 74 bytes at the pinned 24,502-byte deployed runtime after
-# adding vault-aware deposit-point lookup and overflow-safe RIPE distribution.
-# Any Lootbox edit, however small, must recompile and remeasure this pin before
-# merge; its `# pragma optimize codesize` (no CLI -O override) is load-bearing.
-# MissionControl is 16,864 bytes after adding vault-aware deposit-point allocs
-# and the Stability claim retirement gate; Ledger remains 13,306 after restoring
-# its deployable interface. DefaultsLocal is 1,200 bytes (points enabled to
-# match production).
-# StabilityPool headroom is 244 bytes after the actual-delivery claim,
-# separate $0.02 full-exit tolerance and $0.05 retention threshold, and
-# redemption hardening, deferred claim checkpoint, claimable-aware retirement,
-# and partial-reservation admission remediations.
-# Any StabilityPool or StabVault edit must recompile and remeasure this pin
-# before merge.
-# SwitchboardBravo retains 47 bytes after head-decoding rewardsConfig.
-# A dead current VaultBook row fail-closes; restore the book, then Bravo.
-# SwitchboardAlpha retains 117 bytes after skipping settle only when
-# Lootbox is paused and the new ripePerBlock is 0.
-# SwitchboardCharlie retains 1,122 bytes after the governor-only historical
-# checkpoint wrapper and the Stability/NFT retirement guards. CreditRedeem
-# retains 16,094 bytes after consuming MissionControl's
-# effective redemption-delivery flag. AuctionHouse retains 12 bytes after the
-# compact effective auction-delivery config; unsupported collateral is delivered
-# externally, while the dedicated auction/redemption flags govern those paths.
-# Deleverage retains 17 bytes. CurvePrices retains 1,170 bytes after switching
-# to codesize optimization for confirmation-time registry snapshot checks.
-# ChainlinkPrices retains 7,588 bytes after qualifying every active dependent
-# route when an ETH/USD or BTC/USD anchor changes.
-# UndyVaultPrices retains 6,270 bytes after confirmation-time metadata
-# binding and checked runtime arithmetic. Any edit to these contracts must
-# recompile and remeasure.
+# Tight EIP-170 headrooms vs 24,576: AuctionHouse 12, Deleverage 17,
+# Teller 24, CreditEngine 33, Bravo 128, Lootbox 283, Alpha 586.
+# Charlie is 21,794 / 2,782 free. MissionControl is 18,598. Ledger is
+# 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
+# Deleverage without remeasuring.
+# Lootbox `# pragma optimize codesize` (no CLI -O override) is load-bearing.
+# Bravo: a dead current VaultBook row fail-closes; restore the book, then Bravo.
+# Alpha always settles ripePerBlock / split writes, including setRipePerBlock(0).
+# Any edit to a pinned contract must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 18598,
     "DefaultsLocal": 1200,
