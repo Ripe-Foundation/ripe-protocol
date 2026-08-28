@@ -1044,8 +1044,6 @@ def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDe
     # dynamic rate boost (depending on pool health)
     rateBoost: uint256 = 0
     if config.maxDynamicRateBoost != 0:
-        if status.dangerTrigger >= HUNDRED_PERCENT:
-            return _baseRate
         dynamicRatio: uint256 = (status.weightedRatio - status.dangerTrigger) * HUNDRED_PERCENT // (HUNDRED_PERCENT - status.dangerTrigger)
         rateMultiplier: uint256 = config.minDynamicRateBoost + dynamicRatio * (config.maxDynamicRateBoost - config.minDynamicRateBoost) // HUNDRED_PERCENT
         rateBoost = _baseRate * rateMultiplier // HUNDRED_PERCENT
