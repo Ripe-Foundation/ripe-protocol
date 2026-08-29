@@ -2,9 +2,25 @@
 
 One sequence. Do these in order.
 
-Replace only: Foxtrot (SB 6), Charlie (SB 3), MissionControl (HQ 5), Lootbox (HQ 16), Alpha (SB 1), Bravo (SB 2), AuctionHouse (HQ 9), Deleverage (HQ 18), CreditRedeem (HQ 19).
+## Contracts being redeployed
 
-**Do not replace Ledger.** Do not run `2026082600`, `2026082601`, or `2026082602` — they deploy a fresh Ledger / RipeGov / VaultBook, bind the *previous* generation (`MC 0xD335…`, `Ledger 0xF1CD5…`), and would wipe the points this plan keeps. Against today’s HQ they revert on `require_slot`; do not “fix” their hardcoded addresses and retry.
+Nine registry replacements. Nothing else.
+
+| Contract | Registry | Slot | Current address (being replaced) |
+|---|---|---|---|
+| SwitchboardFoxtrot | Switchboard | 6 | `0xD11B23b6391e294DF49961E64231bddDE5bB5E89` |
+| SwitchboardCharlie | Switchboard | 3 | `0xc4d4E0EBC6b40FC31893449327E7080feE2CEA20` |
+| MissionControl | RipeHq | 5 | `0xC154F6fCA0788947E49Ffb4AD121F03C8332EFDe` |
+| Lootbox | RipeHq | 16 | `0xc9fD8dFE6a9A0dB2dE53cC56b8E3b2892F33979a` |
+| SwitchboardAlpha | Switchboard | 1 | `0xc36b4E857A6430e0D848eaA3C664B855F804Cc26` |
+| SwitchboardBravo | Switchboard | 2 | `0xd7F1d8BBB1f06879fBbdda695d35C5aa0117394f` |
+| AuctionHouse | RipeHq | 9 | `0x8241b4E94DBd10CEe02712b8b610142c6715E760` |
+| Deleverage | RipeHq | 18 | `0xF98534c300036f7ccC6996eB6D63a5C538B53B2f` |
+| CreditRedeem | RipeHq | 19 | `0x26b8733836aEeb3aa3B8Acee09dBa8E231299A87` |
+
+Also deploy (not a registry slot): `DefaultsRobinhoodLive` — constructor argument for the new MissionControl only.
+
+**Do not replace Ledger.** Ledger stays `0x7E1d751D168f09761b88651A4c78C996354FaeB1` (RipeHq 4). Do not replace Teller, CreditEngine, HumanResources, Delta, Echo, StabVault, RipeGov, VaultBook, PriceDesk, Chainlink, or the reserve engine. Do not run `2026082600`, `2026082601`, or `2026082602` — they deploy a fresh Ledger / RipeGov / VaultBook, bind the *previous* generation (`MC 0xD335…`, `Ledger 0xF1CD5…`), and would wipe the points this plan keeps. Against today’s HQ they revert on `require_slot`; do not “fix” their hardcoded addresses and retry.
 
 Do not deploy the `DefaultsRobinhoodLive.vy` already in the tree (block `46,988,201`, old MC `0xD335…`, 12 assets, wrong rate). Step 4 regenerates it.
 
@@ -213,7 +229,11 @@ Do not flip yet. EIP-170: AuctionHouse 24,564 (12 B free), Deleverage 24,559 (17
 
 ## 6. Flip pointers
 
-One assertion-backed Safe batch (or a helper that reverts if any call returns `false`). `registryChangeTimeLock = 0` so start+confirm can be the same tx. Do **not** treat a `false` confirm as success.
+The **flip itself** (this step) can be one Safe transaction: every registry timelock is 0, every new board `actionTimeLock` is 0, so start+confirm and `setRipePerBlock`+execute are same-block. Deploy + relinquish + flip + step-8 restart can also be that same transaction once the bytecode exists.
+
+The **whole plan cannot**. Step 4 is off-chain (`prepare_defaults` + compile) and must run after step 3 is on a finalized, still-served block. Park / stamp / zero stay in an earlier transaction so the snapshot sees `ripePerBlock == 0`.
+
+One assertion-backed Safe batch (or a helper that reverts if any call returns `false`). `registryChangeTimeLock = 0` so start+confirm can be the same tx. Do **not** treat a `false` confirm as success. Safe MultiSend does not check return data — wrap confirms so `false` reverts. `relinquishGov` must be `msg.sender ==` the board’s `_tempGov`; the Safe cannot be `_tempGov` (LocalGov forbids HQ gov). Use a tiny helper as `_tempGov` and call it from the same batch, or relinquish from the deployer EOA before the Safe flip.
 
 ```
 # auctions: live Charlie has start/pause; live Foxtrot does not; HEAD is the reverse.
