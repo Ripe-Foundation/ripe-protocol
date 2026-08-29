@@ -14,6 +14,31 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "getPoolMonitoringPrice",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_partner",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "getRipePoolState",
     "inputs": [],
     "outputs": [
