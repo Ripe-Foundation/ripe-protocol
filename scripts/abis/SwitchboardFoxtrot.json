@@ -404,65 +404,6 @@
     "type": "event"
   },
   {
-    "name": "PendingAccrualClockArmedAction",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "vaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "shouldArm",
-        "type": "bool",
-        "indexed": false
-      },
-      {
-        "name": "confirmationBlock",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "AccrualClockArmedSet",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "vaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "shouldArm",
-        "type": "bool",
-        "indexed": false
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "indexed": true
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "GreenRefPoolSnapshotAttempted",
     "inputs": [
       {
@@ -1126,31 +1067,6 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "setAccrualClockArmed",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_shouldArm",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
     "name": "setReserveEngineConfig",
     "inputs": [
       {
@@ -1729,41 +1645,6 @@
           },
           {
             "name": "asset",
-            "type": "address"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "pendingAccrualClock",
-    "inputs": [
-      {
-        "name": "arg0",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "asset",
-            "type": "address"
-          },
-          {
-            "name": "vaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "shouldArm",
-            "type": "bool"
-          },
-          {
-            "name": "missionControl",
             "type": "address"
           }
         ]

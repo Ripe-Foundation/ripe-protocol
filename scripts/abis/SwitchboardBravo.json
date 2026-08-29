@@ -94,6 +94,65 @@
     "type": "event"
   },
   {
+    "name": "PendingPromotionalCollection",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "numTesters",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PromotionalCollectionPrepared",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "numTesters",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -816,6 +875,31 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "preparePromotionalCollection",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_testers",
+        "type": "address[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "executePendingAction",
     "inputs": [
       {
@@ -1022,6 +1106,54 @@
             ]
           }
         ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPromotionalCollection",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPromotionalTesters",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
       }
     ]
   },
