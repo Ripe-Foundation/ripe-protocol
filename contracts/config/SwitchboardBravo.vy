@@ -40,7 +40,7 @@ interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
-    def coreRipeGovVaultId() -> uint256: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
@@ -429,8 +429,7 @@ def _isValidAssetDepositParams(
         earner: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
         if earner == 0:
             return False
-        coreVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-        if earner != coreVaultId and not staticcall MissionControl(_missionControl).isStabVaultId(earner):
+        if not staticcall MissionControl(_missionControl).isRipeGovVaultId(earner) and not staticcall MissionControl(_missionControl).isStabVaultId(earner):
             return False
 
     return True

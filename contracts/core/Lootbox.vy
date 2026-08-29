@@ -519,7 +519,7 @@ def _getDepositLootData(
     globalRewards.voters = rewVote
     globalRewards.genDepositors = rewGen
 
-    ap.balancePoints -= up.balancePoints # do first
+    ap.balancePoints -= min(up.balancePoints, ap.balancePoints) # do first
     up.balancePoints = 0
 
     return UserDepositLoot(
