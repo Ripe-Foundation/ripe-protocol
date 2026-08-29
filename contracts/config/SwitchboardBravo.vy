@@ -26,11 +26,9 @@ import interfaces.ConfigStructs as cs
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256): nonpayable
-    def setAccrualActivationNotBeforeBlock(_asset: address, _vaultId: uint256, _notBeforeBlock: uint256): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def rewardVaultId(_asset: address) -> uint256: view
     def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
-    def accrualActivationNotBeforeBlock(_asset: address, _vaultId: uint256) -> uint256: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
@@ -63,7 +61,6 @@ struct AssetUpdate:
 struct RehearsalConclusion:
     asset: address
     vaultId: uint256
-    notBeforeBlock: uint256
 
 struct GlobalDepositPoints:
     lastUsdValue: uint256
@@ -106,7 +103,6 @@ event PendingRehearsalConclusion:
     asset: indexed(address)
     vaultId: uint256
     numTesters: uint256
-    notBeforeBlock: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -114,7 +110,6 @@ event RehearsalConcludedAndArmed:
     asset: indexed(address)
     vaultId: uint256
     numTesters: uint256
-    notBeforeBlock: uint256
     caller: indexed(address)
 
 # pending config changes
@@ -276,7 +271,6 @@ def _setPendingAssetDepositParams(
 def _validateRehearsalConclusion(
     _asset: address,
     _vaultId: uint256,
-    _notBeforeBlock: uint256,
     _missionControl: address,
 ) -> cs.AssetConfig:
     assert _missionControl == self._getMissionControlAddr() # dev: not current mission control
@@ -284,8 +278,6 @@ def _validateRehearsalConclusion(
     assert _vaultId != 0 and staticcall MissionControl(_missionControl).rewardVaultId(_asset) == _vaultId # dev: invalid reward vault
     assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, _asset) # dev: unsupported reward vault
     assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _vaultId) == 0 # dev: accrual clock already armed
-    assert staticcall MissionControl(_missionControl).accrualActivationNotBeforeBlock(_asset, _vaultId) == 0 # dev: promotional start already announced
-    assert _notBeforeBlock != max_value(uint256) # dev: invalid promotional start block
 
     config: cs.AssetConfig = staticcall MissionControl(_missionControl).assetConfig(_asset)
     assert config.debtTerms.ltv == 0 # dev: ltv must be zero
@@ -299,16 +291,14 @@ def concludeRehearsalAndArm(
     _asset: address,
     _vaultId: uint256,
     _testers: DynArray[address, MAX_REHEARSAL_TESTERS],
-    _notBeforeBlock: uint256,
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_testers) != 0 # dev: no testers
-    assert _notBeforeBlock == 0 or _notBeforeBlock > block.number # dev: promotional start must be in the future
     for tester: address in _testers:
         assert tester != empty(address) # dev: invalid tester
 
     mc: address = self._getMissionControlAddr()
-    config: cs.AssetConfig = self._validateRehearsalConclusion(_asset, _vaultId, _notBeforeBlock, mc)
+    config: cs.AssetConfig = self._validateRehearsalConclusion(_asset, _vaultId, mc)
     if config.canDeposit:
         config.canDeposit = False
         extcall MissionControl(mc).setAssetConfig(_asset, config)
@@ -319,14 +309,12 @@ def concludeRehearsalAndArm(
     self.pendingRehearsalConclusion[aid] = RehearsalConclusion(
         asset=_asset,
         vaultId=_vaultId,
-        notBeforeBlock=_notBeforeBlock,
     )
     self.pendingRehearsalTesters[aid] = _testers
     log PendingRehearsalConclusion(
         asset=_asset,
         vaultId=_vaultId,
         numTesters=len(_testers),
-        notBeforeBlock=_notBeforeBlock,
         confirmationBlock=timeLock._getActionConfirmationBlock(aid),
         actionId=aid,
     )
@@ -387,9 +375,6 @@ def _enforceAccrualConfigChange(_asset: address, _prevConfig: cs.AssetConfig, _n
         assert _prevConfig.voterPointsAlloc == 0 # dev: invalid armed voter alloc
         if _newConfig.voterPointsAlloc == 0:
             return
-
-        notBefore: uint256 = staticcall MissionControl(_missionControl).accrualActivationNotBeforeBlock(_asset, vaultId)
-        assert notBefore == 0 or block.number >= notBefore # dev: promotional activation too early
 
         assert _missionControl == self._getMissionControlAddr() # dev: not current mission control
         assert _newConfig.voterPointsAlloc <= HUNDRED_PERCENT # dev: invalid voter alloc
@@ -523,7 +508,7 @@ def executePendingAction(_aid: uint256) -> bool:
     elif actionType == ActionType.CONCLUDE_REHEARSAL_AND_ARM:
         conclusion: RehearsalConclusion = self.pendingRehearsalConclusion[_aid]
         testers: DynArray[address, MAX_REHEARSAL_TESTERS] = self.pendingRehearsalTesters[_aid]
-        config: cs.AssetConfig = self._validateRehearsalConclusion(conclusion.asset, conclusion.vaultId, conclusion.notBeforeBlock, mc)
+        config: cs.AssetConfig = self._validateRehearsalConclusion(conclusion.asset, conclusion.vaultId, mc)
         assert not config.canDeposit # dev: deposits must be disabled
 
         oldVoter: uint256 = config.voterPointsAlloc
@@ -537,10 +522,9 @@ def executePendingAction(_aid: uint256) -> bool:
         assert self._isCleanAssetPoints(conclusion.asset, conclusion.vaultId) # dev: asset points not clean
 
         extcall MissionControl(mc).setAccrualStartBlock(conclusion.asset, conclusion.vaultId, max_value(uint256))
-        extcall MissionControl(mc).setAccrualActivationNotBeforeBlock(conclusion.asset, conclusion.vaultId, conclusion.notBeforeBlock)
         config.canDeposit = True
         extcall MissionControl(mc).setAssetConfig(conclusion.asset, config)
-        log RehearsalConcludedAndArmed(asset=conclusion.asset, vaultId=conclusion.vaultId, numTesters=len(testers), notBeforeBlock=conclusion.notBeforeBlock, caller=msg.sender)
+        log RehearsalConcludedAndArmed(asset=conclusion.asset, vaultId=conclusion.vaultId, numTesters=len(testers), caller=msg.sender)
 
         self.pendingRehearsalConclusion[_aid] = empty(RehearsalConclusion)
         self.pendingRehearsalTesters[_aid] = []

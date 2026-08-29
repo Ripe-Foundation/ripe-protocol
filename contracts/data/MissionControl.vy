@@ -225,7 +225,6 @@ shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 rewardVaultId: public(HashMap[address, uint256]) # asset -> vaultId, 0 = no earner
 accrualStartBlock: public(HashMap[address, HashMap[uint256, uint256]]) # asset -> vaultId -> start; max = armed
-accrualActivationNotBeforeBlock: public(HashMap[address, HashMap[uint256, uint256]])
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -462,13 +461,6 @@ def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint25
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert self == addys._getMissionControlAddr() # dev: not current mission control
     self.accrualStartBlock[_asset][_vaultId] = _startBlock
-
-
-@external
-def setAccrualActivationNotBeforeBlock(_asset: address, _vaultId: uint256, _notBeforeBlock: uint256):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert self == addys._getMissionControlAddr() # dev: not current mission control
-    self.accrualActivationNotBeforeBlock[_asset][_vaultId] = _notBeforeBlock
 
 
 # points allocs
