@@ -1415,7 +1415,7 @@ def test_zero_asset_balance_points_fails_closed_without_deregistering_entitlemen
     assert ledger.isParticipatingInVault(bob, vault_id)
 
 
-def test_user_points_above_asset_total_reverts_atomically(
+def test_user_points_above_asset_total_caps_subtract_and_consumes_ticket(
     bob,
     setGeneralConfig,
     setAssetConfig,
@@ -1457,20 +1457,42 @@ def test_user_points_above_asset_total_reverts_atomically(
         vault_id,
         alpha_token,
         staker_rewards=100,
-        staker_points=100,
-        user_balance_points=101,
+        staker_points=50,
+        user_balance_points=99,
         asset_balance_points=100,
         staker_global_points=100,
     )
     bundle_before = ledger.getDepositPointsBundle(bob, vault_id, alpha_token)
     rewards_before = ledger.getRipeRewardsBundle().ripeRewards
+    user_points = list(bundle_before.userPoints)
+    user_points[0] = bundle_before.assetPoints.balancePoints + 1
+    ledger.setDepositPointsAndRipeRewards(
+        bob,
+        vault_id,
+        alpha_token,
+        user_points,
+        bundle_before.assetPoints,
+        bundle_before.globalPoints,
+        rewards_before,
+        sender=lootbox.address,
+    )
+    inconsistent = ledger.getDepositPointsBundle(bob, vault_id, alpha_token)
+    assert inconsistent.userPoints.balancePoints == 101
+    assert inconsistent.assetPoints == bundle_before.assetPoints
+    assert inconsistent.globalPoints == bundle_before.globalPoints
     supply_before = ripe_token.totalSupply()
 
-    with boa.reverts("external call failed"):
-        teller.claimLoot(bob, False, sender=bob)
-    assert ledger.getDepositPointsBundle(bob, vault_id, alpha_token) == bundle_before
-    assert ledger.getRipeRewardsBundle().ripeRewards == rewards_before
-    assert ripe_token.totalSupply() == supply_before
+    claimed = lootbox.claimDepositLootForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=teller.address,
+    )
+    assert claimed == 50
+    settled = ledger.getDepositPointsBundle(bob, vault_id, alpha_token)
+    assert settled.userPoints.balancePoints == 0
+    assert settled.assetPoints.balancePoints == 0
+    assert ripe_token.totalSupply() == supply_before + claimed
 
 
 def test_one_blocked_asset_does_not_prevent_other_asset_settlement_or_cleanup(

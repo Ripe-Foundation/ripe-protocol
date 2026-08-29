@@ -8,8 +8,8 @@ EIP170_LIMIT = 24_576
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
 # Tight EIP-170 headrooms vs 24,576: AuctionHouse 12, Deleverage 17,
-# Teller 24, CreditEngine 33, Bravo 128, Lootbox 283, Alpha 586.
-# Charlie is 21,794 / 2,782 free. MissionControl is 18,598. Ledger is
+# Teller 24, CreditEngine 33, Bravo 100, Lootbox 266, Alpha 586.
+# Charlie is 21,830 / 2,746 free. MissionControl is 18,644. Ledger is
 # 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
 # Deleverage without remeasuring.
 # Lootbox `# pragma optimize codesize` (no CLI -O override) is load-bearing.
@@ -17,11 +17,11 @@ EIP170_LIMIT = 24_576
 # Alpha always settles ripePerBlock / split writes, including setRipePerBlock(0).
 # Any edit to a pinned contract must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 18598,
+    "MissionControl": 18644,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 23990,
-    "SwitchboardBravo": 24448,
-    "SwitchboardCharlie": 21794,
+    "SwitchboardBravo": 24476,
+    "SwitchboardCharlie": 21830,
     "SwitchboardEcho": 23930,
     "SwitchboardFoxtrot": 11433,
     "VaultMigrator": 15626,
@@ -30,7 +30,7 @@ EXPECTED_RUNTIME_BYTES = {
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
-    "Lootbox": 24293,
+    "Lootbox": 24310,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
     "RipeToken": 8760,
