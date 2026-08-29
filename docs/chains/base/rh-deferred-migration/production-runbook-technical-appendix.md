@@ -157,6 +157,7 @@ packet; use `OP-RG-05A` and `OP-RG-05B`.
 | O-9 governance-seed ingress | `OPEN` |  | Gate 8A |  |
 | O-10 legacy Stability claim-tail disposition | `OPEN` |  | Gate 8A |  |
 | O-11 BondBooster source-divergent posture | `OPEN — PRESERVE LEGACY RECOMMENDED` |  | Gate 1 |  |
+| O-12 Endaoment treasury handoff | `OPEN` |  | Gate 5 |  |
 | `TX-ASSERT` soft-return enforcement | `BLOCKED` |  | Gate 4 / Gate 8B / Gate 9B as applicable |  |
 | `TRANSITION-DEFAULTS` dedicated Base overlay implementation | `BLOCKED` |  | Gate 1 |  |
 | `MC-INACTIVE-STATE` dormant asset/stale-slot disposition | `BLOCKED` |  | Gate 1 |  |
@@ -458,6 +459,11 @@ migrator at any later ID is not a valid substitute.
   replay and Pool-6 pointer rotation.
 - [ ] Every later Stability/RipeGov freeze budget includes the actual Alpha,
   Bravo, Charlie, and lock-term action delays under the selected posture.
+- [ ] Approve a fork-measured target and hard maximum for each migration
+  freeze. Do not use a two-hour target/four-hour maximum: RipeGov has two
+  sequential governed maturities, and a selected `3,600`-block delay consumes
+  at least `7,200` blocks (approximately four hours) before execution and
+  incident reserve.
 
 Because migration may be deferred by days or weeks, the selected architecture
 finalizes normal timelocks after core cutover and pre-stages later actions
@@ -510,6 +516,11 @@ this is fork-proven.
   index, and configuration source.
 - [ ] Approved primary path: temporarily enable/re-register and fully clear
   every row / exact residual exception: ______________________
+- [ ] Recommended default if the fresh state still matches the planning
+  observation: retain mcbETH's exact one raw token unit as a named exception
+  only after the composed fork proves zero share, value, custody, and migration
+  effect. Do not re-register solely to recover that unit unless governance
+  approves the complete mutation lifecycle below.
 - [ ] Classify every temporary MissionControl mutation by its actual control
   path. Enabling a supported asset through Charlie
   `setCanClaimInStabPoolAsset(..., True)` is an immediate `bool`-return
@@ -567,6 +578,17 @@ Preserving the legacy booster is the simplest state-continuity posture, but it
 is an explicit exception to “all latest RH source,” not an invisible
 implementation detail.
 
+### Decision O-12 — Endaoment treasury handoff
+
+- [ ] Bind the exact asset/amount inventory governance transfers into candidate
+  EndaomentFunds after the old treasury sweep: ____________________________
+- [ ] Bind every asset/amount intentionally retained by governance: _________
+- [ ] Require the post-funding candidate balances and governance residuals to
+  match this decision exactly before HQ IDs 14 and 21 confirm.
+
+The freeze-block sweep can be materially large. Sweeping old custody to the
+governance Safe does not itself decide how much should fund the replacement.
+
 ### GATE O — Decision register initialized
 
 - [ ] Every decision has an owner, target gate, due date, and approval/evidence
@@ -576,6 +598,8 @@ implementation detail.
   as a mandatory constraint at Gates 2 and 5.
 - [ ] O-11 closes before Gate 1; its selected Booster identity and compatibility
   proof are immutable inputs to the transition build and candidate dossier.
+- [ ] O-12 closes before Gate 5; its exact inventory controls the candidate
+  EndaomentFunds funding transaction during the core cutover.
 - [ ] `TRANSITION-DEFAULTS` and `MC-INACTIVE-STATE` close before Gate 1; the
   latter includes every ever-touched inactive asset and stale array slot, not
   only the active iterator.
@@ -687,12 +711,24 @@ deployment manifests, composed fork, and payloads from the new state.
 - [ ] Inventory every nonzero `userDelegation` row.
 - [ ] Inventory pending HR, Alpha, Bravo, Charlie, Delta, Echo, PriceDesk, and
   governance state that constructors do not preserve.
+- [ ] Record Switchboard registry delay, every Alpha–Echo child delay, and
+  preserved PriceDesk registry delay. The planning read was `0` for each.
+  Every replacement board/registry must receive its approved nonzero production
+  delay; PriceDesk is preserved and receives no core-cutover write.
+- [ ] Record PriceDesk children including the empty ID 3 slot; planning state
+  was Curve ID 2, empty ID 3, and Pyth ID 4, and the empty slot must remain
+  empty unless a separately approved change says otherwise.
 - [ ] Record all asset `vaultIds`, staker/voter allocations, debt terms,
   liquidation flags, and `specialStabPoolId` values.
 - [ ] Record `priorityStabVaults`, `priorityLiqAssetVaults`, and priority price
   sources.
 - [ ] Record `preferredStabVaultId`, `coreRipeGovVaultId`, and historical vault
   classifications.
+- [ ] Record the active-asset count and every `specialStabPoolId`. At Base
+  block `50,467,473`, all 27 active assets read `0` and none read `1`; this is a
+  refreshable observation, not authority to skip the production scan.
+- [ ] Record EndaomentPSM pause, `canMint`, and `canRedeem`. The planning state
+  was unpaused with both flags `true`.
 - [ ] Record reward parameters, including
   `stabPoolRipePerDollarClaimed`.
 
@@ -756,6 +792,18 @@ row names the exact write/readback that establishes it.
   historical contributor mappings are covered.
 - [ ] Active auctions, liquidation state held in Ledger, and residual custody
   held by replaced departments are covered.
+
+Read-only planning observations from the August 25–26 snapshot, all subject to
+the Gate-0 refresh: CreditEngine `undyVaulDiscount / buybackRatio` was
+`5,000 / 2,000`; Lootbox was enabled with interval `43,200`, deposit/yield
+rewards `25 / 150 RIPE`, and `lastUnderscoreSend = 50,463,734`; Deleverage
+`minDeleverageBps / deleverageBuffer / deleverageCooldown /
+underscoreSafeSpreadBps` was `0 / 0 / 0 / 100`; and EndaomentPSM was unpaused
+with mint/redeem enabled. The EndaomentFunds census contained five nonzero
+ERC-20s—RIPE, GREEN/USDC LP, GREEN, USDC, and undyEURC—so production must use
+the complete freeze-block census rather than this list or any earlier
+USDC/GREEN-only estimate.
+
 - [ ] Every department's pause, mint authority, governance owner, temporary
   governor, and relinquishment state is covered.
 - [ ] Independent comparison finds no replaced storage field without an
@@ -798,7 +846,11 @@ transition configuration an exact live snapshot.
 - [ ] GREEN/USDC LP `vaultIds` is exactly `[6]`.
 - [ ] `priorityStabVaults` is exactly `[(6, LP), (6, sGREEN)]`, subject to the
   owner-approved asset order.
-- [ ] Every `specialStabPoolId` is 0 or 6 and none is 1.
+- [ ] Enumerate every active asset and require each `specialStabPoolId` to be
+  0 or an explicitly approved 6; none may be 1. Because the pinned 27-asset
+  planning snapshot was all 0, no current special-route write is planned. If
+  the fresh snapshot drifts, bind the complete Bravo asset-liquidation-config
+  write and verify it before reopen.
 - [ ] RIPE `vaultIds` remains exactly `[2]`.
 - [ ] RIPE/LP `vaultIds` remains exactly `[2]`.
 - [ ] RipeGov lock terms remain unchanged.
@@ -916,10 +968,12 @@ setup write receives its own deterministic child ID and manifest row.
 - [ ] Start and confirm the exact live VaultBook rows in live ID order 1→5.
   Require each typed confirmation result to equal its expected ID and read
   back that ID/address before advancing.
-- [ ] Before building the clone, read every live ID-1–5 version and require it
-  to be exactly 1. A fresh append initializes version 1 and has no explicit
-  version input; if any live row is above 1, exact version cloning by append is
-  impossible and the architecture must be replanned.
+- [ ] Before building the clone, read every live ID-1–5 version as provenance.
+  A fresh append initializes version 1 and does not copy the source registry's
+  update-history counter. Protocol contracts do not consume that counter, so a
+  source version above 1 is not by itself a redesign condition. Address,
+  description, order, enabled state, and pending-state drift still require a
+  fresh bind and review.
 - [ ] IDs 1–5 map to the exact current legacy vault addresses and names in the
   same order, and every candidate row reads back version 1.
 - [ ] Immediately after cloning IDs 1–5, read both counters:
@@ -947,8 +1001,10 @@ repair the clone with address updates or carry it into a payload.
 Read-only feasibility observation: at Base block `50,460,701`, hash
 `0xb52810cead12b2734deaa91f1b00b898de448d7af5a68f212bf3f9276a3f5d15`,
 active VaultBook `0xb758e30c14825519b895Fd9928d5d8748A71a944` reported version 1 for IDs
-1–5. This makes exact append cloning feasible at that historical pin; it is
-not Gate-0 production evidence, and any later version drift is a stop.
+1–5. That is provenance, not the reason append cloning is feasible; feasibility
+depends on binding the exact current address/description/order. This is not
+Gate-0 production evidence. Later version drift is recorded as provenance;
+later address/order/enabled/pending-state drift is a stop until rebound.
 
 ### 6.2 Replacement MissionControl and Switchboards
 
@@ -1259,7 +1315,8 @@ addresses, runtimes, pause states, or authorities can satisfy this phase.
 - [ ] Rehearse the pre-activation candidate pauses through the still-active
   legacy Charlie, then prove candidate AuctionHouse and RipeGov 7 are paused
   before the one HQ-ID-6 Switchboard-registry replacement removes legacy-board
-  authority.
+  authority. Pause calls are state-conditional: an already-paused candidate is
+  asserted, not sent a no-op `pause(True)` call that would revert.
 - [ ] In one assertion-capable atomic child, confirm HQ 5 MissionControl first
   and exactly one replacement HQ 6 Switchboard registry second, then read both
   back before the closed department allowlist. Do not update Alpha–Echo
@@ -1332,7 +1389,9 @@ evidence.
   - [ ] auction fallback and residual accounting.
 - [ ] Confirm every swap-enabled asset has `shouldAuctionInstantly = True` at
   the bound block or stop.
-- [ ] Confirm every `specialStabPoolId` is 0 or 6.
+- [ ] Enumerate every active asset and confirm each `specialStabPoolId` is 0 or
+  an explicitly approved 6, and none is 1. The pinned planning scan was all 0;
+  any drift requires the bound Bravo configuration path and a fresh fork.
 - [ ] Confirm GREEN/sGREEN burn routes and Endaoment-transfer routes are tested
   separately from Stability swaps.
 
@@ -1436,6 +1495,24 @@ or append initiation.
   been executed or cancelled, bind its exact target/value, confirmation and
   expiry blocks, authority after the HQ swaps, and target resolution after
   replacement MissionControl activation.
+- [ ] Fresh-read active Echo `actionTimeLock` and census every native/ERC-20
+  balance held by old Endaoment, EndaomentFunds, and EndaomentPSM, including
+  yield custody. The planning Funds census had five nonzero ERC-20s, so no
+  two-token or hardcoded asset list is acceptable.
+- [ ] Derive the unique ERC-20 set expected in old EndaomentFunds after PSM
+  unwind and direct-balance consolidation. Exclude burnable PSM/yield tokens
+  consumed by disposition. Require decoded
+  `PriceDesk.getUsdValue(asset, fullAmount, false) > 0` for every planned
+  Endaoment transfer; a zero/reverting result is a stop/replan.
+- [ ] If the active Echo delay is nonzero, initiate the applicable
+  `setPsmCanMint(false)` and/or `setPsmCanRedeem(false)` action plus one
+  `performEndaomentTransfer(asset, MAX_UINT)` action for every nonzero predicted
+  post-unwind Funds ERC-20 early enough to mature during the RipeHQ wait.
+  Record every action ID, maturity, and expiry. If the delay is zero, leave
+  these actions uninitiated until the complete freeze. At freeze, execute only
+  actions still required by fresh state; cancel and clear every no-change,
+  zero-balance, missing-maturity, or otherwise unexecuted old-Echo action
+  before HQ 6 changes.
 - [ ] Re-simulate the exact confirmation payload against current state.
 - [ ] Through the still-active legacy Charlie, confirm the separately
   authorized candidate AuctionHouse and RipeGov-7 pause calls have executed
@@ -1492,14 +1569,58 @@ authorization.
 - [ ] Disable BondRoom auto-stake/deposits.
 - [ ] Block externally reachable Lootbox claim/auto-stake producer entrypoints
   without pausing the Lootbox functions required for point accounting.
+- [ ] Record old Lootbox `hasUnderscoreRewards`, `lastUnderscoreSend`, and
+  `underscoreSendInterval`. If enabled, require old Charlie
+  `setHasUnderscoreRewards(false) == True` and read it back false. This freezes
+  Underscore distribution without pausing deposit-point accounting; retain the
+  pre-disable tuple for the ID-16 continuity check.
 - [ ] Block CreditEngine/CreditRedeem borrow, redeem, and trusted-deposit
   producer entrypoints without pausing `CreditEngine.updateDebtForUser`.
 - [ ] Disable every other `_isValidRipeAddr` trusted producer.
+- [ ] End with Teller, AuctionHouse, HumanResources, BondRoom, CreditRedeem,
+  Deleverage, every claim/auto-stake route, and every other upstream producer
+  paused or disabled. CreditEngine and Lootbox remain unpaused only so
+  `updateDebtForUser` and deposit-point accounting are callable.
 - [ ] Apply the same entrypoint-level controls to every candidate generation
   address before it becomes the active HQ row. Keep both the legacy and
   candidate generations blocked through their handoff; for each, separately
   prove the exact Lootbox/CreditEngine/price/housekeeping calls that must remain
   callable.
+- [ ] Freeze every producer capable of refilling old department custody before
+  the terminal custody sweep. For each pre-staged PSM action, fresh-read its
+  flag: if still true and mature, execute and require `True`; if already false,
+  cancel the action and require it cleared. If a flag remains true without a
+  mature action, cancel any old action, pause old EndaomentPSM through active
+  Charlie (or assert it already paused), and bind post-HQ6 recovery. Read back
+  both flags/pause state. User mint/redeem/deposit/withdraw entrypoints remain
+  blocked in every branch.
+- [ ] If old EndaomentPSM mint/redeem are disabled, while it is still unpaused call
+  `withdrawFromYieldInPsm(MAX_UINT, true, true)` or the exact fresh-census
+  equivalent, then `transferUsdcToEndaomentFundsInPsm(MAX_UINT)` if any USDC
+  remains. Reconcile yield tokens and USDC, then pause the old PSM. If the PSM
+  is paused under the recovery branch, defer all of this work to §10.3.
+- [ ] If any nonzero Endaoment/Funds sweep is required and old Endaoment is
+  paused, unpause it only inside the atomic disposition. If old Endaoment has
+  direct native/ERC-20 holdings, move them with one or more nonempty
+  `transferFundsToVaultInEndaoment(assets)` calls, each containing at most 10
+  assets; otherwise assert all direct balances zero and skip. After
+  consolidation, call `convertEthToWethInEndaoment(MAX_UINT)` only if native
+  ETH is nonzero; otherwise assert zero and skip.
+- [ ] For each pre-staged Endaoment transfer, fresh-read its Funds balance: if
+  nonzero and mature, execute and require `True`; if zero, cancel the action and
+  require it cleared. Cancel every unavailable old-Echo action selected for
+  post-HQ6 recovery. Defer only a still-nonzero asset to §10.3. If nothing is
+  deferred, require every old balance/allowance zero or approved, pause old
+  Endaoment if open (otherwise assert paused), then apply the O-12 candidate-
+  Funds inventory.
+  Otherwise do not pause or fund until §10.3 closes the final item.
+- [ ] After the complete producer freeze, re-read every old department's
+  native/ERC-20 balance, allowance, custody position, and pending local action.
+  Before `OP-CORE-04`, require zero/approved residual for every completed
+  component. For each explicitly deferred PSM/Endaoment item, bind its exact
+  frozen custody and allowance values and require them unchanged through
+  `OP-CORE-04` and `OP-CORE-05`; mandatory zero/residual closure occurs before
+  confirming HQ IDs 14, 21, or 22. A pre-freeze balance snapshot does not pass.
 - [ ] Wait for the required later action-block boundary.
 - [ ] Prove source position counts and balances stop changing before the first
   confirmation and after each generation handoff.
@@ -1530,9 +1651,35 @@ dated child ID.
   posture before confirming any department or replaying configuration. A raw
   MultiSend or separated 5/6 swap is not selected; either would require a new
   gap-specific authority/freeze proof.
+- [ ] Require every unexecuted old-Echo PSM/Endaoment action cancelled and
+  cleared before HQ 6 changed; never carry an immature legacy action across
+  the authority handoff. For still-required work, use the new boards while
+  their setup delays are zero and close it before department confirmations. A
+  PSM recovery is one reverting atomic child: new Charlie
+  unpauses old PSM if paused; new Echo initiates and executes the applicable
+  `setPsmCanMint(false)` and/or `setPsmCanRedeem(false)` action; both flags are
+  asserted false; Echo unwinds/transfers every fresh-census custody item; new
+  Charlie re-pauses old PSM; every call and final readback is asserted. For
+  each nonzero final-Funds asset without an executed transfer, conditionally
+  unpause old Endaoment,
+  require `getUsdValue(asset, fullAmount, false) > 0`, initiate/execute its
+  `MAX_UINT` transfer with typed success, then pause old Endaoment if open
+  (otherwise assert paused).
+  Old IDs 14, 21, and 22 still resolve during this branch; do not confirm any
+  until the custody proof closes and candidate Funds receives only the approved
+  O-12 post-sweep inventory.
 - [ ] Confirm exactly the remaining §6.5 `REPLACE` rows—HQ IDs 9–22—while
   AuctionHouse remains paused. Require the typed `True`, event, and exact
   address/version readback for each child operation before marking it complete.
+- [ ] Immediately before ID 16, verify old Lootbox distribution remains
+  disabled and its recorded `lastUnderscoreSend`/interval did not change. In
+  one reverting atomic child, confirm HQ ID 16; if candidate
+  `hasUnderscoreRewards` is true, require new Charlie
+  `setHasUnderscoreRewards(false) == True`; then assert false. Keep it false
+  through OP-CORE-06, pointer rotation, timelock finalization, and OP-CORE-09.
+- [ ] Exclude the pre-freeze Lootbox enabled flag from any blind OP-CORE-06
+  replay. Replay interval/reward settings without changing the false flag,
+  then read it back again immediately before OP-CORE-09.
 - [ ] Immediately before each ID 9–22 confirmation, prove the specific
   candidate's externally reachable ingress is blocked; immediately afterward,
   prove both its replaced legacy address and newly active candidate address
@@ -1566,6 +1713,13 @@ dated child ID.
   it is already expired or permanently non-executable and its exact target is
   fork-proven harmless. Mere intent not to call it is not cancellation.
 - [ ] Read back every replayed row.
+- [ ] Before `OP-CORE-09`, require Teller, AuctionHouse, HumanResources,
+  BondRoom, CreditRedeem, Deleverage, every claim/auto-stake route, and every
+  other upstream trusted-deposit producer to remain paused or disabled. Leave
+  CreditEngine and Lootbox unpaused only to prove
+  `CreditEngine.updateDebtForUser` and Lootbox deposit-point accounting are
+  callable. Do not re-pause either dependency after configuration replay or
+  the Pool-6 seed deposit will revert.
 - [ ] Under `OP-CORE-07`, verify Pool 6 is unpaused immediately before Charlie
   initiation and again immediately before execution.
 - [ ] Initiate and execute Charlie `preferredStabVaultId = 6` while
@@ -1607,7 +1761,11 @@ around the governance delay.
 - [ ] Read back sGREEN `vaultIds == [6]`.
 - [ ] Read back LP `vaultIds == [6]`.
 - [ ] Read back `priorityStabVaults` contains only ID 6.
-- [ ] Read back every `specialStabPoolId` is 0 or 6.
+- [ ] Enumerate every active asset and read back each `specialStabPoolId` is 0
+  or an explicitly approved 6; none is 1. The pinned planning snapshot had 27
+  active assets and all were 0, so no current special-route write is planned.
+  If the fresh state differs, complete and verify the bound Bravo
+  asset-liquidation-config action before continuing.
 - [ ] Read back `preferredStabVaultId == 6`.
 - [ ] Read back `isStabVaultId(1) == True`.
 - [ ] Read back `isStabVaultId(6) == True`.
@@ -1615,6 +1773,8 @@ around the governance delay.
 - [ ] Keep AuctionHouse paused.
 - [ ] Confirm Ledger, CreditEngine housekeeping, Lootbox point accounting,
   PriceDesk, and every required price source are callable.
+- [ ] Confirm Lootbox `hasUnderscoreRewards == false` throughout OP-CORE-09;
+  Underscore distribution does not reopen during the seed bundle.
 - [ ] If Decision O-1 requires funding, atomically unpause Teller, deposit each
   approved seed asset into explicit `vaultId = 6`, and re-pause Teller.
 - [ ] Treat each first deposit as that asset's Pool-6 registration; do not
@@ -1650,6 +1810,16 @@ fallback cases must pass instead.
 - [ ] All configuration/state readbacks match the approved post-cutover
   manifest.
 - [ ] Seed or accepted fallback posture matches Decision O-1.
+- [ ] Read back active Lootbox `hasUnderscoreRewards == false`; any other state
+  before the reopen bundle is a stop.
+- [ ] Immediately before reopening, compute
+  `desiredEnabled = recordedEnabled && block.number > recordedLastUnderscoreSend + recordedInterval`.
+  In the same reverting reopen bundle, call new Charlie
+  `setHasUnderscoreRewards(desiredEnabled)` only if the current false flag must
+  become true; assert the final flag equals `desiredEnabled`. If recorded
+  enabled but immature, governance may enable only after the threshold; if
+  recorded disabled, preserve that policy until separately approved. Never
+  hardcode the planning block.
 - [ ] Unpause RH Teller.
 - [ ] Execute the approved bounded Pool-6 deposit canary, or record `N/A` if
   the owner-approved empty-pool posture prohibits funding.
@@ -2092,6 +2262,8 @@ from an earlier block.
   frozen terminal-claim state; no migration child starts before it passes.
 - [ ] Unpause VaultMigrator for the controlled window.
 - [ ] Confirm Teller remains paused.
+- [ ] Immediately before the canary and again before every later batch, require
+  `Ledger.badDebt() == 0`; a nonzero value is a hard stop.
 - [ ] Confirm source and target classification both report Stability.
 - [ ] Execute through the approved SwitchboardEcho route; do not call
   VaultMigrator directly from an EOA.
@@ -2492,6 +2664,10 @@ child per measured batch.
   canary: Teller paused; VaultMigrator unpaused; source ID 2 unpaused; target
   ID 7 paused; Ledger, CreditEngine, Lootbox, pricing, and housekeeping
   dependencies callable; all trusted producers frozen.
+- [ ] Immediately before the canary and again before every later batch, require
+  `Ledger.badDebt() == 0`. Both active legacy RipeGov assets have
+  `shouldFreezeWhenBadDebt = True`; a nonzero value makes the source withdrawal
+  revert and is a hard stop, not a skippable user condition.
 - [ ] Execute a canary batch through the approved SwitchboardEcho legacy route.
 - [ ] Do not call VaultMigrator directly from an EOA.
 - [ ] Reconcile exact source debit and target receipt for each asset.
@@ -2666,7 +2842,8 @@ Stop and obtain a newly approved disposition if any of the following occurs:
   not match the approved manifest.
 - Ledger address or semantics differ from the bound original.
 - RipeHQ or VaultBook ID topology differs from the approved sequence.
-- Any live VaultBook ID 1–5 version is not exactly 1 at the clone pin.
+- Any live VaultBook ID 1–5 address, description, order, enabled state, or
+  pending registry state differs from the approved clone pin.
 - A sequentially assigned candidate VaultBook or Switchboard child receives an
   unexpected ID, typed return, event, counter, or address binding.
 - VaultMigrator is not registered at exactly RipeHQ ID 25.
