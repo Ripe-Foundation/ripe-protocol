@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "SimpleErc20Secondary": {
+      "address": "0xABc93b41fB9B7f03F63d93e0e80e149F201D4b36",
+      "file": "contracts/vaults/SimpleErc20.vy"
+    }
+  }
+}

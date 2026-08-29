@@ -49,7 +49,7 @@ Switchboard `0xA1872467AC4fb442aeA341163A65263915ce178a`
 | SB 6 Foxtrot | `0xD11B23b6391e294DF49961E64231bddDE5bB5E89` (Aug 25 reserve-engine; **no** auction selectors) |
 | Contributor template | `0x619DcD2d3a4Ef3146f0A9B132bF72A333B916E68` |
 
-`registryChangeTimeLock = 0` and every board `actionTimeLock = 0`, so start→confirm and set→execute are same-transaction. HQ/SB `confirmAddressUpdateToRegistry` returns **`False` without reverting** if the pending update is invalid — Safe MultiSend still sees success. Every confirm in this plan goes through the step-6 helper so `false` reverts.
+`registryChangeTimeLock = 0` and every board `actionTimeLock = 0`, so start→confirm and set→execute are same-transaction. HQ/SB `confirmAddressUpdateToRegistry` returns **`False` without reverting** if the pending update is invalid — Safe MultiSend still sees success. Step 7 therefore reads every slot back before the separate restart transaction.
 
 `current-manifest.json` MissionControl / Ledger must equal `hq.getAddr(5)` / `hq.getAddr(4)` before step 4. Today they match (`0xC154…` / `0x7E1d…`). The manifest `UniswapV2Prices` row may disagree with live PriceDesk 3; `prepare_defaults` / `verify_defaults` do not read that row.
 
@@ -271,17 +271,9 @@ Foxtrot.relinquishGov()
 
 Read back `governance() == 0x0` on all four. After this, only the Safe can govern them.
 
-Also deploy the confirm helper (not a registry slot; abandon after the flip):
-
-```
-# ConfirmRegistryUpdate.vy — compile with the repo Vyper, deploy once
-interface Registry:
-    def confirmAddressUpdateToRegistry(_regId: uint256) -> bool: nonpayable
-
-@external
-def confirm(_registry: address, _regId: uint256):
-    assert extcall Registry(_registry).confirmAddressUpdateToRegistry(_regId)
-```
+No helper contract is part of the cutover. The Safe calls each registry
+confirmation directly from governance. The read-only migration in step 7 is
+the authoritative slot and parked-state check before any restart is allowed.
 
 Do not flip yet. EIP-170: AuctionHouse 24,564 (12 B free), Deleverage 24,559 (17 B). Remeasure if those two sources moved after `42fec6da`. Bravo / Charlie / MC / Lootbox moved in #222; they are not the tight pair.
 
@@ -293,7 +285,11 @@ The **flip itself** (this step) can be one Safe transaction: every registry time
 
 The **whole plan cannot**. Step 4 is off-chain (`prepare_defaults` + compile) and must run after step 3 is on a finalized, still-served block. Park / stamp / zero stay in an earlier transaction so the snapshot sees `ripePerBlock == 0`.
 
-Safe MultiSend does not check return data. Call `Helper.confirm(registry, id)` — never `registry.confirmAddressUpdateToRegistry` from the Safe directly. With `registryChangeTimeLock = 0`, start+helper-confirm in the same tx is valid for a fresh contract (`_isValidNewAddress`: is contract and `addrToRegId == 0`). The `false` branch is then near-unreachable; keep the helper anyway.
+Safe MultiSend does not check the boolean return data from
+`confirmAddressUpdateToRegistry`. The Safe calls it directly because both
+registries require governance as `msg.sender`. With `registryChangeTimeLock =
+0`, start+confirm in the same transaction is valid for each fresh contract.
+Do not append the restart: step 7 must read every slot back first.
 
 Same-tx start+confirm+`newCharlie.updateRipeRewards()` (new Charlie is already SB 3; new MC should have `ripePerBlock == 0`):
 
@@ -303,30 +299,29 @@ Same-tx start+confirm+`newCharlie.updateRipeRewards()` (new Charlie is already S
 # ⇒ AuctionHouse has no registered board that can start/pause.
 
 Switchboard.startAddressUpdateToRegistry(6, newFoxtrot)
-Helper.confirm(Switchboard, 6)
+Switchboard.confirmAddressUpdateToRegistry(6)
 Switchboard.startAddressUpdateToRegistry(3, newCharlie)
-Helper.confirm(Switchboard, 3)
+Switchboard.confirmAddressUpdateToRegistry(3)
 
 # Bravo calls rewardVaultId — live MC does not have that selector.
 # Flip MC before Bravo.
 RipeHq.startAddressUpdateToRegistry(5, newMissionControl)
-Helper.confirm(RipeHq, 5)
+RipeHq.confirmAddressUpdateToRegistry(5)
 RipeHq.startAddressUpdateToRegistry(16, newLootbox)
-Helper.confirm(RipeHq, 16)
+RipeHq.confirmAddressUpdateToRegistry(16)
 newCharlie.updateRipeRewards()
-newCharlie.pause(newLootbox, true)
 
 Switchboard.startAddressUpdateToRegistry(1, newAlpha)
-Helper.confirm(Switchboard, 1)
+Switchboard.confirmAddressUpdateToRegistry(1)
 Switchboard.startAddressUpdateToRegistry(2, newBravo)
-Helper.confirm(Switchboard, 2)
+Switchboard.confirmAddressUpdateToRegistry(2)
 
 RipeHq.startAddressUpdateToRegistry(9, newAuctionHouse)
-Helper.confirm(RipeHq, 9)
+RipeHq.confirmAddressUpdateToRegistry(9)
 RipeHq.startAddressUpdateToRegistry(18, newDeleverage)
-Helper.confirm(RipeHq, 18)
+RipeHq.confirmAddressUpdateToRegistry(18)
 RipeHq.startAddressUpdateToRegistry(19, newCreditRedeem)
-Helper.confirm(RipeHq, 19)
+RipeHq.confirmAddressUpdateToRegistry(19)
 ```
 
 AH / Deleverage / CreditRedeem are settlement-math only — they do not ABI-brick if left mixed with the new MC. Still flip them in this session so the 100% LTV / overshoot patch is live.
@@ -350,7 +345,7 @@ totalPointsAllocs.voters             0
 RipeReserveEngine.canAcquireRipe     false
 RipeReserveEngine.isRunning          true
 RipeReserveVesting.isPaused          true
-new Lootbox.isPaused                 true
+new Lootbox.isPaused                 false
 ```
 
 `rewardVaultId` (constructor-seeded; `verify_defaults` does not check this):
@@ -374,7 +369,6 @@ Restore the rate recorded in step 3, then reopen the parked paths. Walked live r
 new Alpha.setRipePerBlock(41666666666666666)
 new Alpha.executePendingAction(aid)
 new Charlie.pause(teller, false)
-new Charlie.pause(newLootbox, false)
 new Charlie.pause(ripeReserveVesting, false)
 new Foxtrot.setCanAcquireRipe(true)
 ```

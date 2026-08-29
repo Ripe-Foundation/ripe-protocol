@@ -5,26 +5,26 @@
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 46988201
+# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 48799076
 #
 # Snapshot provenance:
 #   repository: ripe-foundation/ripe-protocol
 #   generator: scripts/prepare_defaults.py
 #   generator sha256: 8c78d41e99a690947b0baebecb2ee6d46e0aa01f01789d3f77a7deee54ee8226
-#   manifest sha256: 87231a2fafd33c55de6c4cecc16a10ed3d86808e0a1bba982937c8a062cb3f86
+#   manifest sha256: 1735b2ca6bf9a1cc126cfa83c1082345daaafd9913a78b01709ee6d91d627c9d
 #   Vyper compiler: 0.4.3+commit.bff19ea2
 #   Vyper compiler identity sha256: 208c7c41102f13ea781980bf0647dd003d334d34fb02b48f043459c8584aafe0
-#   MissionControl compiler-input integrity: 10167cbb9016c440323c8add751b667ab94b75343a58ca2c904812f6b5d2a9cd
-#   MissionControl canonical ABI sha256: a73af57f1e4bcd70d2b98a2f2b9c4d17ecd4d1a516996eced359c36c171ef089
+#   MissionControl compiler-input integrity: 31134f0b0b6252753b6ff6f10b5653e2a393e6156387846d84331dc07fcfa3ba
+#   MissionControl canonical ABI sha256: 3cd3b9ff45f3315509458335cc2a432b2b0610b45b5141fe4e900fe027d1e407
 #   Ledger compiler-input integrity: 266f985b2ae1049342bac32e9bcd6d0f330ced7e55fcb5cb2456b53da8646e04
 #   Ledger canonical ABI sha256: 2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c
 #   chain id: 4663
-#   snapshot block: 46988201
-#   snapshot block hash: 0x7db301f6909a256b4ac0a73675edf94505735d4b7c3d36aa7d8b936cf3de02bd
+#   snapshot block: 48799076
+#   snapshot block hash: 0x11f3b782f8a82dbd5845673d3bb933c446be047c20c6fd2e50c7c0c470c6623e
 #   snapshot finality: verified against the provider finalized tag
-#   MissionControl: 0xD335373E59cA2F07FC3B779F2B456972C7EfDb29
-#   MissionControl code sha256: bdf0a45855f5c5d2ee2d02507c1224d104460d72cc71f26511ed0e35a1251891
-#   Ledger: 0xF1CD5BE4288b744913d33F55370793ca833D08d7
+#   MissionControl: 0xC154F6fCA0788947E49Ffb4AD121F03C8332EFDe
+#   MissionControl code sha256: 469f57c859dc2d424992001d336c528596e03987de10f312ec1410c9ff8704e6
+#   Ledger: 0x7E1d751D168f09761b88651A4c78C996354FaeB1
 #   Ledger code sha256: ec685ddaccc1ae0a7a2547ad886ec66d4e8a3a816062ce75ce8f61e6f950561b
 #
 # This is the defaults contract for REPLACING a MissionControl or Ledger that
@@ -68,6 +68,7 @@ AAPL: constant(address) = 0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9
 GOOGL: constant(address) = 0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3
 GME: constant(address) = 0x1b0E319c6A659F002271B69dB8A7df2F911c153E
 RIPE_WETH_LP: constant(address) = 0xba6F6CBa1a4104000847d4fdccB676E99166CEcE
+UNI_V2: constant(address) = 0x9b8537bE0FD5cf9B2AD495C5A85130D5bAe4769D
 USDG: constant(address) = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
 TRAINING_WHEELS: constant(address) = 0x987DEa46AEfA442B67Faa5Db6F71024e5be01406
 CONTRIB_TEMPLATE: immutable(address)
@@ -103,11 +104,11 @@ def genConfig() -> cs.GenConfig:
 @external
 def genDebtConfig() -> cs.GenDebtConfig:
     return cs.GenDebtConfig(
-        perUserDebtLimit=50000000000000000000,
-        globalDebtLimit=500000000000000000000,
+        perUserDebtLimit=1000000000000000000000,
+        globalDebtLimit=20000000000000000000000,
         minDebtAmount=1000000000000000000,
-        numAllowedBorrowers=20,
-        maxBorrowPerInterval=25000000000000000000,
+        numAllowedBorrowers=1000,
+        maxBorrowPerInterval=1000000000000000000000,
         numBlocksPerInterval=7200,
         minDynamicRateBoost=10000,
         maxDynamicRateBoost=50000,
@@ -132,7 +133,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
 @view
 @external
 def ripeAvailForRewards() -> uint256:
-    return 999831170800000000000000
+    return 999659992866666666668286
 
 
 @view
@@ -168,7 +169,7 @@ def ripeBondConfig() -> cs.RipeBondConfig:
 def rewardsConfig() -> cs.RipeRewardsConfig:
     return cs.RipeRewardsConfig(
         arePointsEnabled=True,
-        ripePerBlock=900000000000000,
+        ripePerBlock=0,
         borrowersAlloc=1000,
         stakersAlloc=9000,
         votersAlloc=0,
@@ -187,7 +188,7 @@ def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
             asset=RIPE_TOKEN,
             config=cs.RipeGovVaultConfig(
                 lockTerms=cs.LockTerms(
-                    minLockDuration=7200,
+                    minLockDuration=0,
                     maxLockDuration=7884000,
                     maxLockBoost=20000,
                     canExit=True,
@@ -201,7 +202,21 @@ def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
             asset=RIPE_WETH_LP,
             config=cs.RipeGovVaultConfig(
                 lockTerms=cs.LockTerms(
-                    minLockDuration=7200,
+                    minLockDuration=0,
+                    maxLockDuration=7884000,
+                    maxLockBoost=20000,
+                    canExit=True,
+                    exitFee=8000,
+                ),
+                assetWeight=15000,
+                shouldFreezeWhenBadDebt=True,
+            ),
+        ),
+        cs.RipeGovVaultConfigEntry(
+            asset=UNI_V2,
+            config=cs.RipeGovVaultConfig(
+                lockTerms=cs.LockTerms(
+                    minLockDuration=0,
                     maxLockDuration=7884000,
                     maxLockBoost=20000,
                     canExit=True,
@@ -289,7 +304,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # RipeToken
         cs.AssetConfigEntry(asset=RIPE_TOKEN, config=cs.AssetConfig(
             vaultIds=[2],
-            stakersPointsAlloc=1500,
+            stakersPointsAlloc=1000,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
@@ -326,7 +341,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # SavingsGreen
         cs.AssetConfigEntry(asset=SGREEN_TOKEN, config=cs.AssetConfig(
             vaultIds=[1],
-            stakersPointsAlloc=1500,
+            stakersPointsAlloc=1000,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
@@ -400,7 +415,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # GreenUsdgPool
         cs.AssetConfigEntry(asset=GREEN_USDG_LP, config=cs.AssetConfig(
             vaultIds=[1],
-            stakersPointsAlloc=2500,
+            stakersPointsAlloc=4500,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
@@ -659,7 +674,44 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # RIPE_WETH_LP
         cs.AssetConfigEntry(asset=RIPE_WETH_LP, config=cs.AssetConfig(
             vaultIds=[2],
-            stakersPointsAlloc=4500,
+            stakersPointsAlloc=0,
+            voterPointsAlloc=0,
+            perUserDepositLimit=100000000000000000000000000,
+            globalDepositLimit=1000000000000000000000000000,
+            minDepositBalance=1000000000000000,
+            debtTerms=cs.DebtTerms(
+                ltv=0,
+                redemptionThreshold=0,
+                liqThreshold=0,
+                liqFee=0,
+                borrowRate=0,
+                daowry=0,
+            ),
+            shouldBurnAsPayment=False,
+            shouldTransferToEndaoment=False,
+            shouldSwapInStabPools=False,
+            shouldAuctionInstantly=False,
+            canDeposit=False,
+            canWithdraw=True,
+            canRedeemCollateral=False,
+            canRedeemInStabPool=True,
+            canBuyInAuction=True,
+            canClaimInStabPool=True,
+            specialStabPoolId=0,
+            customAuctionParams=cs.AuctionParams(
+                hasParams=False,
+                startDiscount=0,
+                maxDiscount=0,
+                delay=0,
+                duration=0,
+            ),
+            whitelist=empty(address),
+            isNft=False,
+        )),
+        # UNI-V2
+        cs.AssetConfigEntry(asset=UNI_V2, config=cs.AssetConfig(
+            vaultIds=[2],
+            stakersPointsAlloc=2500,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
