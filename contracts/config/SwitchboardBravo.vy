@@ -522,6 +522,21 @@ def executePendingAction(_aid: uint256) -> bool:
         assert self._arePromotionalPointsCleared(collection.asset, collection.vaultId) # dev: promotional points not clear
 
         extcall MissionControl(mc).setAccrualStartBlock(collection.asset, collection.vaultId, max_value(uint256))
+
+        vaultBook: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
+        assert staticcall VaultBook(vaultBook).isValidRegId(collection.vaultId) # dev: invalid vault id
+        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(collection.vaultId)
+        assert vaultAddr != empty(address) # dev: invalid vault
+        selectedIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = [collection.vaultId]
+        selectedAddrs: DynArray[address, MAX_VAULTS_PER_ASSET] = [vaultAddr]
+        self._checkpointSelectedRows(collection.asset, selectedIds, selectedAddrs, lootbox)
+
+        assetPoints: AssetDepositPoints = staticcall Ledger(
+            staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+        ).assetDepositPoints(collection.vaultId, collection.asset)
+        assert assetPoints.lastUsdValue == 0 # dev: promotional gen funding weight not clear
+        assert self._arePromotionalPointsCleared(collection.asset, collection.vaultId) # dev: promotional points not clear
+
         log PromotionalCollectionPrepared(asset=collection.asset, vaultId=collection.vaultId, numTesters=len(testers), caller=msg.sender)
 
         self.pendingPromotionalCollection[_aid] = empty(PromotionalCollection)
