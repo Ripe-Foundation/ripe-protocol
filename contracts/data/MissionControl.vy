@@ -456,25 +456,11 @@ def setRewardVaultId(_asset: address, _vaultId: uint256):
     self.rewardVaultId[_asset] = _vaultId
 
 
-event AccrualStartBlockSet:
-    asset: indexed(address)
-    vaultId: uint256
-    prevStartBlock: uint256
-    startBlock: uint256
-
-
 @external
 def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert self == addys._getMissionControlAddr() # dev: not current mission control
-    prevStartBlock: uint256 = self.accrualStartBlock[_asset][_vaultId]
     self.accrualStartBlock[_asset][_vaultId] = _startBlock
-    log AccrualStartBlockSet(
-        asset=_asset,
-        vaultId=_vaultId,
-        prevStartBlock=prevStartBlock,
-        startBlock=_startBlock,
-    )
 
 
 # points allocs

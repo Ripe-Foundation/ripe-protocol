@@ -9,7 +9,7 @@ EIP170_LIMIT = 24_576
 # are load-bearing for these numbers — bumping either is a deploy event.
 # Tight EIP-170 headrooms vs 24,576: AuctionHouse 12, Deleverage 17,
 # Teller 24, CreditEngine 33, Lootbox 165, Alpha 586, Golf 3,644.
-# Charlie is 22,317 / 2,259 free. MissionControl is 19,046. Ledger is
+# Charlie is 22,317 / 2,259 free. MissionControl is 18,948. Ledger is
 # 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
 # Deleverage without remeasuring.
 # Lootbox `# pragma optimize codesize` (no CLI -O override) is load-bearing.
@@ -17,7 +17,7 @@ EIP170_LIMIT = 24_576
 # Alpha always settles ripePerBlock / split writes, including setRipePerBlock(0).
 # Any edit to a pinned contract must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 19046,
+    "MissionControl": 18948,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 23990,
     "SwitchboardBravo": 11732,

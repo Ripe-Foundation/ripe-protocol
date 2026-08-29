@@ -81,39 +81,6 @@ def _prepare_promotional_asset(
     assert mission_control.accrualStartBlock(asset, vault_id) == 0
 
 
-def test_accrual_clock_event_is_observable(
-    mission_control,
-    switchboard_bravo,
-    bravo_token,
-    simple_erc20_vault,
-    vault_book,
-):
-    vault_id = vault_book.getRegId(simple_erc20_vault)
-    mission_control.setAccrualStartBlock(
-        bravo_token,
-        vault_id,
-        MAX_UINT256,
-        sender=switchboard_bravo.address,
-    )
-    armed = _last_clock_event(mission_control)
-    assert armed.asset == bravo_token.address
-    assert armed.vaultId == vault_id
-    assert armed.prevStartBlock == 0
-    assert armed.startBlock == MAX_UINT256
-
-    mission_control.setAccrualStartBlock(
-        bravo_token,
-        vault_id,
-        0,
-        sender=switchboard_bravo.address,
-    )
-    disarmed = _last_clock_event(mission_control)
-    assert disarmed.asset == bravo_token.address
-    assert disarmed.vaultId == vault_id
-    assert disarmed.prevStartBlock == MAX_UINT256
-    assert disarmed.startBlock == 0
-
-
 def _set_deposit_allocs(switchboard_bravo, governance, mission_control, asset, stakers, voter):
     live = mission_control.assetConfig(asset)
     action_id = switchboard_bravo.setAssetDepositParams(
@@ -129,10 +96,47 @@ def _set_deposit_allocs(switchboard_bravo, governance, mission_control, asset, s
     _execute(switchboard_bravo, governance, action_id)
 
 
-def _last_clock_event(mission_control):
-    logs = filter_logs(mission_control, "AccrualStartBlockSet")
-    assert len(logs) >= 1
-    return logs[-1]
+def test_foxtrot_emits_accrual_clock_events(
+    switchboard_golf,
+    switchboard_foxtrot,
+    governance,
+    mission_control,
+    bravo_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    _arm_promotional_asset(
+        switchboard_foxtrot,
+        governance,
+        bravo_token,
+        vault_id,
+    )
+    armed = filter_logs(switchboard_foxtrot, "AccrualClockArmedSet")
+    assert len(armed) >= 1
+    assert armed[-1].asset == bravo_token.address
+    assert armed[-1].vaultId == vault_id
+    assert armed[-1].shouldArm
+
+    _arm_promotional_asset(
+        switchboard_foxtrot,
+        governance,
+        bravo_token,
+        vault_id,
+        False,
+    )
+    disarmed = filter_logs(switchboard_foxtrot, "AccrualClockArmedSet")
+    assert len(disarmed) >= 1
+    assert disarmed[-1].asset == bravo_token.address
+    assert disarmed[-1].vaultId == vault_id
+    assert not disarmed[-1].shouldArm
 
 
 def test_promotional_clock_can_cancel_only_before_collection_opens(
