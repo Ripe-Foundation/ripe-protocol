@@ -121,6 +121,19 @@ def _execute(switchboard, governance, action_id):
     return switchboard.executePendingAction(action_id, sender=governance.address)
 
 
+def _register_vault(vault_book, governance, vault, description):
+    assert vault_book.startAddNewAddressToRegistry(
+        vault.address,
+        description,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    return vault_book.confirmNewAddressToRegistry(
+        vault.address,
+        sender=governance.address,
+    )
+
+
 def _set_deposit_params(
     switchboard_bravo,
     governance,
@@ -386,15 +399,17 @@ def test_bravo_refuses_nonzero_allocs_without_an_earner(
     setAssetConfig,
     alpha_token,
     simple_erc20_vault,
+    rebase_erc20_vault,
     vault_book,
     switchboard_bravo,
     mission_control,
     governance,
 ):
-    vault_id = vault_book.getRegId(simple_erc20_vault)
+    vault_a = vault_book.getRegId(simple_erc20_vault)
+    vault_b = vault_book.getRegId(rebase_erc20_vault)
     setAssetConfig(
         alpha_token,
-        _vaultIds=[vault_id],
+        _vaultIds=[vault_a, vault_b],
         _stakersPointsAlloc=0,
         _voterPointsAlloc=0,
     )
@@ -403,7 +418,7 @@ def test_bravo_refuses_nonzero_allocs_without_an_earner(
         switchboard_bravo,
         governance,
         alpha_token,
-        [vault_id],
+        [vault_a, vault_b],
         0,
         5,
     )
@@ -532,6 +547,74 @@ def test_charlie_refuses_plain_earner_while_stakers_are_live(
             plain_vault_id,
             sender=governance.address,
         )
+
+
+def test_historical_ripe_gov_earner_remains_writable_after_core_pointer_rotation(
+    setAssetConfig,
+    ripe_token,
+    alternate_ripe_gov_vault,
+    vault_book,
+    switchboard_bravo,
+    switchboard_charlie,
+    mission_control,
+    governance,
+):
+    old_vault_id = mission_control.coreRipeGovVaultId()
+    assert mission_control.isRipeGovVaultId(old_vault_id)
+    new_vault_id = _register_vault(
+        vault_book,
+        governance,
+        alternate_ripe_gov_vault,
+        "Historical RipeGov class",
+    )
+    setAssetConfig(
+        ripe_token,
+        _vaultIds=[old_vault_id, new_vault_id],
+        _stakersPointsAlloc=5,
+        _voterPointsAlloc=0,
+        _perUserDepositLimit=2_000 * EIGHTEEN_DECIMALS,
+        _globalDepositLimit=20_000 * EIGHTEEN_DECIMALS,
+    )
+    config = mission_control.assetConfig(ripe_token)
+    assert config.stakersPointsAlloc != 0
+    assert mission_control.rewardVaultId(ripe_token) == old_vault_id
+
+    core_action = switchboard_charlie.setCoreRipeGovVaultId(
+        new_vault_id,
+        sender=governance.address,
+    )
+    assert _execute(switchboard_charlie, governance, core_action)
+    assert mission_control.coreRipeGovVaultId() == new_vault_id
+    assert mission_control.isRipeGovVaultId(old_vault_id)
+    assert mission_control.isRipeGovVaultId(new_vault_id)
+    assert mission_control.rewardVaultId(ripe_token) == old_vault_id
+
+    deposit_action = _set_deposit_params(
+        switchboard_bravo,
+        governance,
+        ripe_token,
+        [old_vault_id, new_vault_id],
+        config.stakersPointsAlloc,
+        config.voterPointsAlloc,
+    )
+    assert _execute(switchboard_bravo, governance, deposit_action)
+    assert mission_control.rewardVaultId(ripe_token) == old_vault_id
+
+    rotate_new_action = switchboard_charlie.setRewardVaultId(
+        ripe_token,
+        new_vault_id,
+        sender=governance.address,
+    )
+    assert _execute(switchboard_charlie, governance, rotate_new_action)
+    assert mission_control.rewardVaultId(ripe_token) == new_vault_id
+
+    rotate_old_action = switchboard_charlie.setRewardVaultId(
+        ripe_token,
+        old_vault_id,
+        sender=governance.address,
+    )
+    assert _execute(switchboard_charlie, governance, rotate_old_action)
+    assert mission_control.rewardVaultId(ripe_token) == old_vault_id
 
 
 def test_charlie_rotation_fences_initialized_new_earner_history(

@@ -1183,6 +1183,83 @@ def test_execute_add_asset(switchboard_bravo, mission_control, governance, alpha
     assert not switchboard_bravo.hasPendingAction(action_id)
 
 
+def test_add_new_seeds_singleton_earner_without_reseeding_later_writes(
+    switchboard_bravo,
+    switchboard_charlie,
+    mission_control,
+    governance,
+    alpha_token,
+    bravo_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+):
+    vault_a = vault_book.getRegId(simple_erc20_vault)
+    vault_b = vault_book.getRegId(rebase_erc20_vault)
+    assert not mission_control.isSupportedAsset(alpha_token)
+    assert not mission_control.isSupportedAsset(bravo_token)
+
+    singleton_action = _add_asset(
+        switchboard_bravo,
+        governance,
+        alpha_token,
+        [vault_a],
+        0,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, singleton_action)
+    assert mission_control.rewardVaultId(alpha_token) == vault_a
+    assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == 0
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 0
+
+    limits_action = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        [vault_a],
+        0,
+        0,
+        2_000,
+        20_000,
+        0,
+        sender=governance.address,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, limits_action)
+    assert mission_control.rewardVaultId(alpha_token) == vault_a
+
+    clear_action = switchboard_charlie.setRewardVaultId(
+        alpha_token,
+        0,
+        sender=governance.address,
+    )
+    _execute_after_timelock(switchboard_charlie, governance, clear_action)
+    assert mission_control.rewardVaultId(alpha_token) == 0
+
+    second_limits_action = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
+        [vault_a],
+        0,
+        0,
+        3_000,
+        30_000,
+        0,
+        sender=governance.address,
+    )
+    _execute_after_timelock(
+        switchboard_bravo,
+        governance,
+        second_limits_action,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 0
+
+    multi_vault_action = _add_asset(
+        switchboard_bravo,
+        governance,
+        bravo_token,
+        [vault_a, vault_b],
+        0,
+    )
+    _execute_after_timelock(switchboard_bravo, governance, multi_vault_action)
+    assert mission_control.rewardVaultId(bravo_token) == 0
+
+
 def test_asset_deposit_params_validation(
     switchboard_bravo,
     governance,
@@ -1924,7 +2001,7 @@ def test_execute_all_action_types(switchboard_bravo, mission_control, governance
     
     # Add asset first
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 0, 0, 1000, 10000, 0,
+        alpha_token, [2, 3], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
