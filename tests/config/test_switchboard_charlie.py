@@ -2076,10 +2076,10 @@ def test_switchboard_three_underscore_rewards_cancellation(
 ###################################
 
 
-def test_flag_setter_enable_disable_permissions(switchboard_bravo, switchboard_charlie, governance, bob, alpha_token):
+def test_flag_setter_enable_disable_permissions(switchboard_golf, switchboard_charlie, governance, bob, alpha_token):
     """Test enable/disable permissions for asset flags"""
     # Add an asset first (need to execute it) - use valid config
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False,  # shouldBurnAsPayment
@@ -2097,8 +2097,8 @@ def test_flag_setter_enable_disable_permissions(switchboard_bravo, switchboard_c
     )
 
     # Time travel and execute to add the asset
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Non-governance cannot enable
     with boa.reverts("no perms"):
@@ -2114,17 +2114,17 @@ def test_flag_setter_enable_disable_permissions(switchboard_bravo, switchboard_c
         switchboard_charlie.setCanDepositAsset(alpha_token, True, sender=bob)
 
 
-def test_flag_setter_asset_enable_disable_flags(switchboard_bravo, switchboard_charlie, mission_control, governance, alpha_token):
+def test_flag_setter_asset_enable_disable_flags(switchboard_golf, switchboard_charlie, mission_control, governance, alpha_token):
     """Test asset enable/disable flag functions"""
     # First add the asset with canDeposit=False to test enabling
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False, False, False, True, False, True, False, True, True, True, 0,  # canDeposit=False
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Test enabling deposits (asset starts with canDeposit=False)
     assert switchboard_charlie.setCanDepositAsset(alpha_token, True, sender=governance.address)
@@ -2143,17 +2143,17 @@ def test_flag_setter_asset_enable_disable_flags(switchboard_bravo, switchboard_c
         switchboard_charlie.setCanDepositAsset(alpha_token, False, sender=governance.address)
 
 
-def test_flag_setter_all_asset_enable_disable_functions(switchboard_bravo, switchboard_charlie, governance, alpha_token):
+def test_flag_setter_all_asset_enable_disable_functions(switchboard_golf, switchboard_charlie, governance, alpha_token):
     """Test all asset enable/disable functions"""
     # First add the asset with varied initial states to avoid "already set" errors
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False, False, False, True, True, False, False, False, False, False, 0,  # varied states
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Test all enable/disable functions (except redeem collateral which requires LTV)
     functions = [
@@ -2171,34 +2171,34 @@ def test_flag_setter_all_asset_enable_disable_functions(switchboard_bravo, switc
         assert func(alpha_token, False, sender=governance.address)
 
 
-def test_flag_setter_validation_redeem_collateral(switchboard_bravo, switchboard_charlie, governance, alpha_token):
+def test_flag_setter_validation_redeem_collateral(switchboard_golf, switchboard_charlie, governance, alpha_token):
     """Test special validation for redeem collateral flag"""
     # Add asset with no LTV (cannot redeem collateral)
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 80_00, 0, 0, 0),  # zero LTV
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Should fail to enable redeem collateral for asset with no LTV
     with boa.reverts("invalid redeem collateral config"):
         switchboard_charlie.setCanRedeemCollateralAsset(alpha_token, True, sender=governance.address)
 
 
-def test_flag_setter_permission_can_disable_logic(switchboard_bravo, switchboard_charlie, switchboard_alpha, governance, bob, alpha_token):
+def test_flag_setter_permission_can_disable_logic(switchboard_golf, switchboard_charlie, switchboard_alpha, governance, bob, alpha_token):
     """Test permission logic for users with canDisable permission"""
     # First add the asset
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),  # empty debt terms
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Give bob canDisable permission via switchboard_alpha
     action_id = switchboard_alpha.setCanPerformLiteAction(bob, True, sender=governance.address)
@@ -2212,26 +2212,26 @@ def test_flag_setter_permission_can_disable_logic(switchboard_bravo, switchboard
         switchboard_charlie.setCanDepositAsset(alpha_token, True, sender=bob)  # enable not allowed
 
 
-def test_flag_setter_enable_redeem_collateral_validation(switchboard_bravo, switchboard_charlie, governance, alpha_token):
+def test_flag_setter_enable_redeem_collateral_validation(switchboard_golf, switchboard_charlie, governance, alpha_token):
     """Test special validation for enabling redeem collateral flag"""
     # Add asset with LTV so we can test enabling redeem collateral
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),  # with LTV
         False, False, True, True, True, True, False, True, True, True, 0,  # canRedeemCollateral=False
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Should be able to enable redeem collateral since asset has LTV
     assert switchboard_charlie.setCanRedeemCollateralAsset(alpha_token, True, sender=governance.address)
 
 
-def test_flag_setter_endaoment_transfer_restrictions(switchboard_bravo, switchboard_charlie, governance, alpha_token):
+def test_flag_setter_endaoment_transfer_restrictions(switchboard_golf, switchboard_charlie, governance, alpha_token):
     """Test endaoment transfer restrictions for stable assets"""
     # Add asset with shouldTransferToEndaoment=True
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),  # with LTV
         False,  # shouldBurnAsPayment
@@ -2247,8 +2247,8 @@ def test_flag_setter_endaoment_transfer_restrictions(switchboard_bravo, switchbo
         0,      # specialStabPoolId
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Should not be able to enable redeem collateral for assets that transfer to endaoment
     with boa.reverts("invalid redeem collateral config"):
@@ -2268,7 +2268,7 @@ def test_flag_setter_unsupported_asset_validation(switchboard_charlie, governanc
 
 
 def test_flag_setter_on_new_mission_control(
-    switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     new_mission_control,
@@ -2276,7 +2276,7 @@ def test_flag_setter_on_new_mission_control(
 ):
     """Test flag setters targeting a new MissionControl not registered in RipeHq"""
     # First add asset to new MC with canDeposit=False
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         bravo_token.address,   # _asset
         [1],                   # _vaultIds
         0,                     # _stakersPointsAlloc
@@ -2302,8 +2302,8 @@ def test_flag_setter_on_new_mission_control(
         new_mission_control.address,  # _missionControl - TARGET NEW MC
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Verify asset is on new MC, not registered MC
     assert new_mission_control.isSupportedAsset(bravo_token.address)
@@ -2332,7 +2332,7 @@ def test_flag_setter_on_new_mission_control(
 
 
 def test_multiple_flag_operations_on_new_mission_control(
-    switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     new_mission_control,
@@ -2340,7 +2340,7 @@ def test_multiple_flag_operations_on_new_mission_control(
 ):
     """Test multiple flag setter operations on new MissionControl"""
     # Add asset with varied initial flags (all disabled)
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         bravo_token.address,   # _asset
         [1],                   # _vaultIds
         0,                     # _stakersPointsAlloc
@@ -2366,8 +2366,8 @@ def test_multiple_flag_operations_on_new_mission_control(
         new_mission_control.address,  # _missionControl
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Enable multiple flags using new MC
     mc_addr = new_mission_control.address
@@ -2388,7 +2388,7 @@ def test_multiple_flag_operations_on_new_mission_control(
 
 
 def test_resolve_mission_control_validation_charlie(
-    switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     mission_control,
@@ -2396,14 +2396,14 @@ def test_resolve_mission_control_validation_charlie(
 ):
     """Test that passing current MC address reverts with proper message on flag setters"""
     # First add asset to the registered MC (using default/empty _missionControl)
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Should revert when passing the currently registered MC address explicitly
     with boa.reverts("use empty for current mission control"):
@@ -2416,7 +2416,7 @@ def test_resolve_mission_control_validation_charlie(
 
 
 def test_flag_setter_new_mc_does_not_affect_registered_mc(
-    switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     new_mission_control,
@@ -2425,7 +2425,7 @@ def test_flag_setter_new_mc_does_not_affect_registered_mc(
 ):
     """Test that changes to new MC don't affect the registered MC"""
     # Add asset to new MC only
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         bravo_token.address,   # _asset
         [1],                   # _vaultIds
         0,                     # _stakersPointsAlloc
@@ -2451,8 +2451,8 @@ def test_flag_setter_new_mc_does_not_affect_registered_mc(
         new_mission_control.address,  # _missionControl
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Verify asset is on new MC but NOT on registered MC
     assert new_mission_control.isSupportedAsset(bravo_token.address)
@@ -2555,18 +2555,18 @@ def test_deregister_asset_parameter_validation(switchboard_charlie, governance):
 
 
 def test_deregister_asset_creates_timelock(
-    switchboard_bravo, switchboard_charlie, governance, alpha_token
+    switchboard_golf, switchboard_charlie, governance, alpha_token
 ):
     """Test deregisterAsset creates timelock action correctly"""
     # First add the asset
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Create pending deregister action
     aid = switchboard_charlie.deregisterAsset(alpha_token.address, sender=governance.address)
@@ -2589,18 +2589,18 @@ def test_deregister_asset_creates_timelock(
 
 
 def test_deregister_asset_execute_success(
-    switchboard_bravo, switchboard_charlie, governance, mission_control, alpha_token
+    switchboard_golf, switchboard_charlie, governance, mission_control, alpha_token
 ):
     """Test executing pending deregister asset action"""
     # First add the asset
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         alpha_token, [1], 0, 0, 1000, 10000, 0,
         (50_00, 60_00, 70_00, 10_00, 5_00, 0),
         False, False, False, True, True, True, True, True, True, True, 0,
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     # Verify asset is registered
     assert mission_control.isSupportedAsset(alpha_token.address)
@@ -2834,13 +2834,13 @@ def test_deregister_asset_requires_whitelist_cleared_at_execution(
 
 
 def test_deregister_asset_execute_rejects_already_unregistered(
-    switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     mission_control,
     alpha_token,
 ):
-    add_action = switchboard_bravo.addAsset(
+    add_action = switchboard_golf.addAsset(
         alpha_token,
         [1],
         0,
@@ -2862,8 +2862,8 @@ def test_deregister_asset_execute_rejects_already_unregistered(
         0,
         sender=governance.address,
     )
-    _advance_to_confirmation(switchboard_bravo, add_action)
-    assert switchboard_bravo.executePendingAction(
+    _advance_to_confirmation(switchboard_golf, add_action)
+    assert switchboard_golf.executePendingAction(
         add_action,
         sender=governance.address,
     )
@@ -2924,10 +2924,10 @@ def test_deregister_asset_execute_rejects_already_unregistered(
 
 
 def test_deregister_asset_on_new_mission_control(
-    switchboard_bravo, switchboard_charlie, governance, new_mission_control, mission_control, bravo_token
+    switchboard_golf, switchboard_charlie, governance, new_mission_control, mission_control, bravo_token
 ):
     """Dark-MC deregister may queue; execute requires the HQ-current MissionControl."""
-    action_id = switchboard_bravo.addAsset(
+    action_id = switchboard_golf.addAsset(
         bravo_token.address, [1], 0, 0, 1000, 10000, 0,
         (50_00, 60_00, 70_00, 10_00, 5_00, 0),
         False, False, False, True, True, True, True, True, True, True, 0,
@@ -2935,8 +2935,8 @@ def test_deregister_asset_on_new_mission_control(
         new_mission_control.address,
         sender=governance.address
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    switchboard_golf.executePendingAction(action_id, sender=governance.address)
 
     assert new_mission_control.isSupportedAsset(bravo_token.address)
     assert not mission_control.isSupportedAsset(bravo_token.address)
@@ -2959,13 +2959,14 @@ def test_deregister_asset_on_new_mission_control(
 
 def test_live_allocations_can_be_zeroed_then_retired(
     switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     mission_control,
     vault_book,
     alpha_token,
 ):
-    add_action = switchboard_bravo.addAsset(
+    add_action = switchboard_golf.addAsset(
         alpha_token.address,
         [1],
         0,
@@ -2987,8 +2988,8 @@ def test_live_allocations_can_be_zeroed_then_retired(
         0,
         sender=governance.address,
     )
-    _advance_to_confirmation(switchboard_bravo, add_action)
-    assert switchboard_bravo.executePendingAction(
+    _advance_to_confirmation(switchboard_golf, add_action)
+    assert switchboard_golf.executePendingAction(
         add_action,
         sender=governance.address,
     )
@@ -3114,7 +3115,7 @@ def test_live_allocations_can_be_zeroed_then_retired(
             sender=governance.address,
         )
 
-    readd_action = switchboard_bravo.addAsset(
+    readd_action = switchboard_golf.addAsset(
         alpha_token.address,
         [1],
         0,
@@ -3136,8 +3137,8 @@ def test_live_allocations_can_be_zeroed_then_retired(
         0,
         sender=governance.address,
     )
-    _advance_to_confirmation(switchboard_bravo, readd_action)
-    assert switchboard_bravo.executePendingAction(
+    _advance_to_confirmation(switchboard_golf, readd_action)
+    assert switchboard_golf.executePendingAction(
         readd_action,
         sender=governance.address,
     )
@@ -3153,13 +3154,13 @@ def test_live_allocations_can_be_zeroed_then_retired(
 
 
 def test_deregister_asset_rechecks_points_allocs_at_execution(
-    switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     mission_control,
     bravo_token,
 ):
-    add_action = switchboard_bravo.addAsset(
+    add_action = switchboard_golf.addAsset(
         bravo_token.address,
         [1],
         0,
@@ -3181,8 +3182,8 @@ def test_deregister_asset_rechecks_points_allocs_at_execution(
         0,
         sender=governance.address,
     )
-    _advance_to_confirmation(switchboard_bravo, add_action)
-    assert switchboard_bravo.executePendingAction(
+    _advance_to_confirmation(switchboard_golf, add_action)
+    assert switchboard_golf.executePendingAction(
         add_action,
         sender=governance.address,
     )
@@ -3197,7 +3198,7 @@ def test_deregister_asset_rechecks_points_allocs_at_execution(
     mission_control.setAssetConfig(
         bravo_token.address,
         drifted_config,
-        sender=switchboard_bravo.address,
+        sender=switchboard_golf.address,
     )
     live_before = mission_control.assetConfig(bravo_token.address)
     totals_before = mission_control.totalPointsAllocs()
@@ -4530,13 +4531,13 @@ def test_checkpoint_asset_deposit_points_at_ignores_stored_points_enabled(
 
 
 def test_flag_setters_preserve_allocation_totals(
-    switchboard_bravo,
+    switchboard_golf,
     switchboard_charlie,
     governance,
     mission_control,
     alpha_token,
 ):
-    add_action = switchboard_bravo.addAsset(
+    add_action = switchboard_golf.addAsset(
         alpha_token.address,
         [1],
         0,
@@ -4558,8 +4559,8 @@ def test_flag_setters_preserve_allocation_totals(
         0,
         sender=governance.address,
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    assert switchboard_bravo.executePendingAction(add_action, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_golf.actionTimeLock())
+    assert switchboard_golf.executePendingAction(add_action, sender=governance.address)
 
     seeded = list(mission_control.assetConfig(alpha_token.address))
     seeded[1] = 25_00
@@ -4567,7 +4568,7 @@ def test_flag_setters_preserve_allocation_totals(
     mission_control.setAssetConfig(
         alpha_token.address,
         seeded,
-        sender=switchboard_bravo.address,
+        sender=switchboard_golf.address,
     )
     totals_before = mission_control.totalPointsAllocs()
     allocs_before = (
