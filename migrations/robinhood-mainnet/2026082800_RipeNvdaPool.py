@@ -6,6 +6,10 @@ getRipeUsdMonitoringPrice() integration continues to work without a new ABI.
 
 The deployer does not mutate protocol configuration.  Governance performs the
 complete reward/deposit rotation through the readable Safe batch printed last.
+
+Run this batch only after the PR 223 flip: Golf must be registered and Bravo
+no longer has addAsset. Re-read live Bravo / Charlie / Teller / MC addresses
+at execution; the literals below are pre-223.
 """
 
 from scripts.utils import log
@@ -105,6 +109,10 @@ def print_safe_batch(monitor):
         f'const bravo = c.Ripe_RH_SwitchboardBravo.at("{SWITCHBOARD_BRAVO}")'
     )
     log.info(
+        "const golf = c.Ripe_RH_SwitchboardGolf.at("
+        '"<switchboard.getAddr(7) after PR 223>")'
+    )
+    log.info(
         f'const charlie = c.Ripe_RH_SwitchboardCharlie.at("{SWITCHBOARD_CHARLIE}")'
     )
     log.info(f'const teller = c.Ripe_RH_Teller.at("{TELLER}")')
@@ -112,6 +120,7 @@ def print_safe_batch(monitor):
         f'const ripeNvdaLp = c.UniswapV2Pair.at("{RIPE_NVDA_POOL}")'
     )
     log.info("const firstBravoActionId = await bravo.actionId()")
+    log.info("const firstGolfActionId = await golf.actionId()")
     log.info("const alphaActionId = await alpha.actionId()")
     log.info("const zeroDebtTerms = [0n, 0n, 0n, 0n, 0n, 0n]")
     log.info("")
@@ -141,7 +150,8 @@ def print_safe_batch(monitor):
     log.info("")
 
     log.info("// 4. Add RIPE/NVDA to RipeGov, initially with zero rewards")
-    log.info("await bravo.addAsset(")
+    log.info("// After PR 223 Bravo has no addAsset. Singleton vault 2 auto-selects the earner.")
+    log.info("await golf.addAsset(")
     log.info(f'    "{RIPE_NVDA_POOL}",')
     log.info(f"    [{RIPE_GOV_VAULT_ID}n],")
     log.info("    0n, 0n,")
@@ -153,7 +163,7 @@ def print_safe_batch(monitor):
     log.info("    false, false, false, false,")
     log.info("    true, true, false")
     log.info(")")
-    log.info("await bravo.executePendingAction(firstBravoActionId + 1n)")
+    log.info("await golf.executePendingAction(firstGolfActionId)")
     log.info("")
 
     log.info("// 5. Give RIPE/NVDA the old LP's lock and weighting terms")
@@ -180,7 +190,7 @@ def print_safe_batch(monitor):
         f"{REWARD_ALLOCATION}n, 0n, {PER_USER_DEPOSIT_LIMIT}n, "
         f"{GLOBAL_DEPOSIT_LIMIT}n, {MIN_DEPOSIT_BALANCE}n)"
     )
-    log.info("await bravo.executePendingAction(firstBravoActionId + 2n)")
+    log.info("await bravo.executePendingAction(firstBravoActionId + 1n)")
 
 
 def address(value):

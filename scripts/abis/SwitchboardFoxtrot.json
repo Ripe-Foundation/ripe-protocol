@@ -404,6 +404,33 @@
     "type": "event"
   },
   {
+    "name": "GreenRefPoolSnapshotAttempted",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "priceSourceId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "priceSourceAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "didUpdate",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -1348,6 +1375,23 @@
     "inputs": [
       {
         "name": "_aid",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addGreenRefPoolSnapshot",
+    "inputs": [
+      {
+        "name": "_curvePricesId",
         "type": "uint256"
       }
     ],

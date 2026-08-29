@@ -834,8 +834,8 @@ def test_shortfall_checkpoints_each_normalized_user_share_and_leaves_healthy_ass
 
 @pytest.mark.parametrize(
     ("stakers_alloc", "voter_alloc"),
-    ((0, 20), (10, 20)),
-    ids=("general-and-voter", "staker-and-voter"),
+    ((0, 0), (10, 20)),
+    ids=("general", "staker-and-voter"),
 )
 def test_reward_updates_keep_configured_allocations_during_quarantine(
     stakers_alloc,
@@ -884,11 +884,12 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
     user_before = ledger.userDepositPoints(bob, 3, stock_token)
     global_before = ledger.globalDepositPoints()
     assert user_before.lastBalance > 0
-    assert before.ripeVotePoints > 0
     if stakers_alloc == 0:
         assert before.ripeGenPoints > 0
+        assert before.ripeVotePoints == 0
     else:
         assert before.ripeStakerPoints > 0
+        assert before.ripeVotePoints > 0
     configured_before = mission_control.getDepositPointsConfig(stock_token, 3)
 
     _create_custody_shortfall(stock_token, simple_erc20_vault, deploy3r)
@@ -919,14 +920,16 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
         # this first asset-specific update, then refresh it to zero.
         assert quarantined.ripeGenPoints > before.ripeGenPoints
         assert global_quarantined.ripeGenPoints > global_before.ripeGenPoints
+        assert quarantined.ripeVotePoints == before.ripeVotePoints
+        assert global_quarantined.ripeVotePoints == global_before.ripeVotePoints
     else:
         assert quarantined.ripeStakerPoints > before.ripeStakerPoints
         assert global_quarantined.ripeStakerPoints > global_before.ripeStakerPoints
         assert quarantined.ripeGenPoints == before.ripeGenPoints
         assert global_quarantined.ripeGenPoints == global_before.ripeGenPoints
-    assert quarantined.ripeVotePoints > before.ripeVotePoints
+        assert quarantined.ripeVotePoints > before.ripeVotePoints
+        assert global_quarantined.ripeVotePoints > global_before.ripeVotePoints
     assert quarantined.lastUsdValue == 0
-    assert global_quarantined.ripeVotePoints > global_before.ripeVotePoints
     assert mission_control.getDepositPointsConfig(stock_token, 3) == configured_before
 
     stock_token.mint(simple_erc20_vault, 1, sender=deploy3r)
@@ -951,11 +954,12 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
     assert recovered_user.lastBalance == (
         simple_erc20_vault.userBalances(bob, stock_token) // recovered.precision
     )
-    assert recovered.ripeVotePoints > quarantined.ripeVotePoints
     if stakers_alloc == 0:
         assert recovered.ripeGenPoints > quarantined.ripeGenPoints
+        assert recovered.ripeVotePoints == quarantined.ripeVotePoints
     else:
         assert recovered.ripeStakerPoints > quarantined.ripeStakerPoints
+        assert recovered.ripeVotePoints > quarantined.ripeVotePoints
 
 
 def test_unrelated_reward_update_preserves_shortfall_asset_fixed_allocation_state(

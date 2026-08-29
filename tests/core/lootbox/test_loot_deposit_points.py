@@ -180,7 +180,7 @@ def test_loot_deposit_points_first_save(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setAssetConfig(bravo_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
     setRipeRewardsConfig(True)
 
@@ -319,7 +319,7 @@ def test_loot_deposit_points_multiple_assets(
     teller,
 ):
     # voter allocs
-    alpha_voter_alloc = 20
+    alpha_voter_alloc = 0
     bravo_voter_alloc = 20
     total_voter_alloc = alpha_voter_alloc + bravo_voter_alloc
 
@@ -400,7 +400,7 @@ def test_loot_deposit_points_points_disabled(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(False)  # Points disabled
 
     # set mock prices
@@ -426,7 +426,7 @@ def test_loot_deposit_points_points_disabled(
     gp = ledger.globalDepositPoints()
     assert gp.lastUsdValue == deposit_amount // EIGHTEEN_DECIMALS
     assert gp.ripeStakerPoints == 0
-    assert gp.ripeVotePoints == 20 * elapsed
+    assert gp.ripeVotePoints == 0
     assert gp.ripeGenPoints == (deposit_amount // EIGHTEEN_DECIMALS) * elapsed
     assert gp.lastUpdate == boa.env.evm.patch.block_number
 
@@ -435,7 +435,7 @@ def test_loot_deposit_points_points_disabled(
     assert ap.lastBalance == deposit_amount // ap.precision
     assert ap.lastUsdValue == deposit_amount // EIGHTEEN_DECIMALS
     assert ap.ripeStakerPoints == 0
-    assert ap.ripeVotePoints == 20 * elapsed
+    assert ap.ripeVotePoints == 0
     assert ap.ripeGenPoints == (deposit_amount // EIGHTEEN_DECIMALS) * elapsed
     assert ap.lastUpdate == boa.env.evm.patch.block_number
     assert ap.precision == 10 ** 9
@@ -590,7 +590,7 @@ def test_loot_deposit_points_multiple_users(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)  # Only voter points
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)  # Only gen points
     setRipeRewardsConfig(True)
 
     # set mock prices
@@ -656,8 +656,8 @@ def test_loot_deposit_points_different_precisions(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)  # 18 decimals
-    setAssetConfig(delta_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)  # 8 decimals (like WBTC)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)  # 18 decimals
+    setAssetConfig(delta_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)  # 8 decimals (like WBTC)
     setRipeRewardsConfig(True)
 
     # set mock prices
@@ -727,8 +727,8 @@ def test_loot_deposit_points_smaller_precisions(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)  # 18 decimals
-    setAssetConfig(charlie_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)  # 6 decimals (like USDC)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)  # 18 decimals
+    setAssetConfig(charlie_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)  # 6 decimals (like USDC)
     setRipeRewardsConfig(True)
 
     # set mock prices
@@ -796,7 +796,7 @@ def test_loot_deposit_points_zero_balance(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(True)
 
     # set mock prices
@@ -871,7 +871,7 @@ def test_loot_deposit_points_ledger_updates(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(True)
 
     # set mock prices
@@ -1015,7 +1015,7 @@ def test_loot_deposit_points_allocation_changes(
     # Check results
     ap = ledger.assetDepositPoints(vault_id, alpha_token)
     assert ap.ripeStakerPoints == 10 * elapsed2  # New staker points
-    assert ap.ripeVotePoints == 20 * elapsed1 + 10 * elapsed2  # Old + new voter points
+    assert ap.ripeVotePoints == 20 * elapsed1 + 10 * elapsed2
 
 
 def test_loot_deposit_points_large_numbers(
@@ -1035,7 +1035,7 @@ def test_loot_deposit_points_large_numbers(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(True)
 
     # set mock prices - very high price
@@ -1083,7 +1083,7 @@ def test_loot_deposit_points_complex_scenario(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)  # 18 decimals
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)  # 18 decimals
     setAssetConfig(delta_token, _stakersPointsAlloc=10, _voterPointsAlloc=10)  # 8 decimals, staker points
     setRipeRewardsConfig(True)
 
@@ -1128,14 +1128,14 @@ def test_loot_deposit_points_complex_scenario(
     total_alpha = bob_alpha_deposit + alice_alpha_deposit
     assert ap_alpha.lastBalance == total_alpha // ap_alpha.precision
     assert ap_alpha.lastUsdValue == total_alpha // EIGHTEEN_DECIMALS
-    assert ap_alpha.ripeVotePoints == 20 * elapsed
+    assert ap_alpha.ripeVotePoints == 0
     assert ap_alpha.ripeStakerPoints == 0
 
     # Bravo token
     ap_bravo = ledger.assetDepositPoints(vault_id, delta_token)
     total_bravo = bob_delta_deposit + alice_delta_deposit
     assert ap_bravo.lastBalance == total_bravo // ap_bravo.precision
-    assert ap_bravo.lastUsdValue == total_bravo * delta_price // EIGHTEEN_DECIMALS // EIGHTEEN_DECIMALS
+    assert ap_bravo.lastUsdValue == 0
     assert ap_bravo.ripeVotePoints == 10 * elapsed
     assert ap_bravo.ripeStakerPoints == 10 * elapsed
 
@@ -1152,11 +1152,11 @@ def test_loot_deposit_points_complex_scenario(
 
     # Check global points
     gp = ledger.globalDepositPoints()
-    total_usd_value = (total_alpha + total_bravo * delta_price // EIGHTEEN_DECIMALS) // EIGHTEEN_DECIMALS
+    total_usd_value = total_alpha // EIGHTEEN_DECIMALS
     assert gp.lastUsdValue == total_usd_value
     assert gp.ripeGenPoints == total_usd_value * elapsed
     assert gp.ripeStakerPoints == 10 * elapsed  # Only from bravo token
-    assert gp.ripeVotePoints == 30 * elapsed  # 20 from alpha + 10 from bravo
+    assert gp.ripeVotePoints == 10 * elapsed
 
 
 def test_loot_deposit_points_nft_asset(
@@ -1337,7 +1337,7 @@ def test_loot_deposit_points_multiple_vaults(
         vault_id1,
         sender=switchboard_bravo.address,
     )
-    setAssetConfig(alpha_token, _vaultIds=[vault_id1, vault_id2], _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _vaultIds=[vault_id1, vault_id2], _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(True)
 
     # set mock prices
@@ -1368,7 +1368,7 @@ def test_loot_deposit_points_multiple_vaults(
     assert ap1.lastBalance == deposit_amount // ap1.precision
     assert ap1.balancePoints == (deposit_amount // ap1.precision) * elapsed
     assert ap1.lastUsdValue == deposit_amount // EIGHTEEN_DECIMALS
-    assert ap1.ripeVotePoints == 20 * elapsed
+    assert ap1.ripeVotePoints == 0
     assert ap1.ripeGenPoints == (deposit_amount // EIGHTEEN_DECIMALS) * elapsed
 
     # Second vault
@@ -1389,7 +1389,7 @@ def test_loot_deposit_points_multiple_vaults(
     gp = ledger.globalDepositPoints()
     total_usd_value = deposit_amount // EIGHTEEN_DECIMALS
     assert gp.lastUsdValue == total_usd_value
-    assert gp.ripeVotePoints == 20 * elapsed
+    assert gp.ripeVotePoints == 0
     assert gp.ripeGenPoints == total_usd_value * elapsed
 
 
@@ -1410,7 +1410,7 @@ def test_loot_deposit_points_price_source_failures(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(True)
 
     # initial price
@@ -1470,7 +1470,7 @@ def test_loot_deposit_points_concurrent_updates(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(True)
 
     # set mock prices
@@ -1575,7 +1575,7 @@ def test_loot_deposit_points_extreme_elapsed(
 ):
     # basic setup
     setGeneralConfig()
-    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     setRipeRewardsConfig(True)
 
     # set mock prices

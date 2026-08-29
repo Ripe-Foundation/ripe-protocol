@@ -68,6 +68,7 @@ interface MissionControl:
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def rewardVaultId(_asset: address) -> uint256: view
+    def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
 
 interface StabilityPool:
     def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
@@ -504,6 +505,10 @@ def _getLedgerAddr() -> address:
 @view
 @internal
 def _assertValidRewardVaultId(_asset: address, _vaultId: uint256, _oldVaultId: uint256, _missionControl: address):
+    if _oldVaultId != 0 and _vaultId != _oldVaultId:
+        # A live promotional clock and its points history share this row identity.
+        # Retargeting requires an explicit checkpointed points/clock migration.
+        assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _oldVaultId) == 0 # dev: promotional reward row migration required
     checkVaultId: uint256 = _oldVaultId if _vaultId == 0 else _vaultId
     assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(checkVaultId, _asset) # dev: unsupported reward vault
     if _vaultId != 0:
@@ -891,6 +896,10 @@ def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAdd
     bookAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
     assert bookAddr == _vaultAddr # dev: vault addr mismatch
 
+    mc: address = self._getMissionControlAddr()
+    if staticcall MissionControl(mc).rewardVaultId(_asset) == _vaultId:
+        assert staticcall MissionControl(mc).accrualStartBlock(_asset, _vaultId) != max_value(uint256) # dev: cannot checkpoint armed promotional row
+
     extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
     log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)
     return True
@@ -900,6 +909,7 @@ def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAdd
 def updateManyDepositPoints(_users: DynArray[address, MAX_CLAIM_USERS], _vaultId: uint256, _asset: address) -> bool:
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
 
+    assert empty(address) not in _users # dev: invalid user
     vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
     assert vaultAddr != empty(address) # dev: invalid vault
 
@@ -981,6 +991,9 @@ def deregisterAsset(_asset: address, _missionControl: address = empty(address)) 
 @view
 @internal
 def _validateAssetDeregistration(_asset: address, _missionControl: address):
+    rewardVault: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
+    if rewardVault != 0:
+        assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, rewardVault) == 0 # dev: promotional campaign cannot deregister
     config: AssetRetirementConfig = staticcall MissionControl(_missionControl).getAssetRetirementConfig(_asset)
     assert config.isSupported # dev: invalid asset
     assert (

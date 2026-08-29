@@ -50,6 +50,15 @@ interface AuctionHouse:
     def startAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: nonpayable
     def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
 
+interface MissionControl:
+    def canPerformLiteAction(_user: address) -> bool: view
+
+interface PriceDesk:
+    def getAddr(_regId: uint256) -> address: view
+
+interface CurvePrices:
+    def addGreenRefPoolSnapshot() -> bool: nonpayable
+
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
@@ -175,6 +184,12 @@ event PauseAuctionExecuted:
 event PauseManyAuctionsExecuted:
     numAuctionsPaused: uint256
 
+event GreenRefPoolSnapshotAttempted:
+    caller: indexed(address)
+    priceSourceId: indexed(uint256)
+    priceSourceAddr: indexed(address)
+    didUpdate: bool
+
 # pending actions
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingEngineConfig: public(HashMap[uint256, ReserveEngineConfig]) # aid -> config
@@ -184,6 +199,8 @@ pendingStartManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionCon
 pendingPauseAuctionActions: public(HashMap[uint256, FungAuctionConfig])
 pendingPauseManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
 
+MISSION_CONTROL_ID: constant(uint256) = 5
+PRICE_DESK_ID: constant(uint256) = 7
 RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
 RIPE_RESERVE_VESTING_ID: constant(uint256) = 27
 AUCTION_HOUSE_ID: constant(uint256) = 9
@@ -224,6 +241,12 @@ def _getRipeReserveVestingAddr() -> address:
 @internal
 def _getAuctionHouseAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(AUCTION_HOUSE_ID)
+
+
+@view
+@internal
+def _getMissionControlAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
 
 
 #########################
@@ -561,3 +584,29 @@ def _cancelPendingAction(_aid: uint256):
         raise "invalid action"
 
     self.actionType[_aid] = empty(ActionType)
+
+
+###########################
+# GREEN Ref Pool Snapshot #
+###########################
+
+
+@external
+def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
+    if not gov._canGovern(msg.sender):
+        assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
+
+    priceDesk: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
+    assert priceDesk != empty(address) # dev: missing price desk
+
+    priceSourceAddr: address = staticcall PriceDesk(priceDesk).getAddr(_curvePricesId)
+    assert priceSourceAddr != empty(address) # dev: invalid price source id
+
+    didUpdate: bool = extcall CurvePrices(priceSourceAddr).addGreenRefPoolSnapshot()
+    log GreenRefPoolSnapshotAttempted(
+        caller=msg.sender,
+        priceSourceId=_curvePricesId,
+        priceSourceAddr=priceSourceAddr,
+        didUpdate=didUpdate,
+    )
+    return didUpdate
