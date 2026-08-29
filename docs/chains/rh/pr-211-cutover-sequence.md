@@ -32,8 +32,8 @@ Do not Bravo `addAsset`. Do not Charlie `setRewardVaultId`. Do not `Foxtrot.star
 
 ## Live pin (re-read at execution)
 
-RipeHq `0xD4e82AE1De673bba3B53386A2D2C630AE6630940`  
-HQ governance (Safe) `0xE488a42d33B3af5D3E5cd5680938D8369716D1bF`  
+RipeHq `0xD4e82AE1De673bba3B53386A2D2C630AE6630940`<br>
+HQ governance (Safe) `0xE488a42d33B3af5D3E5cd5680938D8369716D1bF`<br>
 Switchboard `0xA1872467AC4fb442aeA341163A65263915ce178a`
 
 | slot | now |
