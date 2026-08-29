@@ -1,11 +1,92 @@
-# PR #223 promotional collection and reward launch runbook
+# PR #223 cutover
 
-This runbook begins after the PR #223 contracts have been deployed, registered,
-and verified. It covers the transition from the completed rehearsal on the
-existing asset and vault rows to public deposit collection and the final reward
-launch.
+Two parts:
 
-It does **not** require a new asset, a new vault, or a virgin Ledger row.
+1. Install the PR #223 contracts onto the live 211 HQ.
+2. Run the promotional collection and reward launch on the existing asset and
+   vault rows.
+
+This does **not** require a new asset, a new vault, or a virgin Ledger row.
+
+---
+
+## Part 1 — contract install
+
+This is not a normal one-board replace. Live 211 Bravo still has `addAsset`.
+Live 211 MissionControl / Lootbox do not speak the promotional-clock ABI.
+Golf is not installed.
+
+### What moves
+
+| Contract | Action |
+|---|---|
+| Ledger | Do not replace. |
+| MissionControl | Replace. Copy every live asset, vault, reward-vault, alloc, whitelist, and rewards field. The new `accrualStartBlock` mapping starts at `0` for every row. That is correct for this first 223 MissionControl. |
+| Lootbox | Replace after MissionControl, same session. |
+| SwitchboardGolf | Register as a new Switchboard board before Bravo is confirmed. |
+| SwitchboardBravo | Replace after Golf is a live Switchboard and after MissionControl. 223 Bravo has no `addAsset`. |
+| SwitchboardCharlie | Replace in the same session. It blocks reward-vault retarget and deregister once a clock is nonzero. |
+| SwitchboardFoxtrot | Optional. 223 Foxtrot has no promotional path. Flip it only if you also want this branch's reserve/auction bytecode. |
+| Alpha, Teller, VaultBook, PriceDesk, reserve engine | Do not replace for this PR. |
+
+Do not flip MissionControl with launch Defaults or `prepare_defaults`. Those
+do not copy live state and do not carry clocks.
+
+After any row reaches `max` or `B`, do not replace MissionControl again. There
+is no clock carry.
+
+### ABI
+
+Regenerate Bravo and Foxtrot ABIs from this branch before building Safe
+transactions. The checked-in JSON does not yet match these contracts:
+`preparePromotionalCollection` is missing, and Foxtrot still exports the
+removed `setAccrualClockArmed`.
+
+### Before the flip
+
+Cancel every pending action on a board you are about to replace. Old action IDs
+do not survive the new bytecode. Do not execute a leftover 211 Bravo
+`setAssetDepositParams` after the new Bravo is live.
+
+### Install order
+
+Same session. Fatal if reordered:
+
+1. Register Golf on Switchboard. Confirm it before Bravo.
+2. RipeHq MissionControl, then confirm.
+3. RipeHq Lootbox, then confirm.
+4. Switchboard Charlie, then confirm.
+5. Switchboard Bravo, then confirm.
+
+MissionControl must precede Lootbox. New Lootbox cannot decode old
+`getDepositPointsConfig`; old Lootbox cannot decode the new struct that
+includes `accrualStartBlock`. Do not leave those mixed.
+
+MissionControl must precede Bravo. Bravo reads `accrualStartBlock`.
+
+Golf must precede Bravo. Confirming 223 Bravo without Golf removes `addAsset`
+from the protocol.
+
+### After the flip, before any `prepare`
+
+Verify onchain:
+
+- Ledger address is unchanged.
+- Copied MissionControl asset configs, `vaultIds`, `rewardVaultId`, allocs, and
+  whitelist match the pre-flip values.
+- `accrualStartBlock(asset, vaultId) == 0` for every launch asset.
+- `Golf.addAsset` exists.
+- `Bravo.preparePromotionalCollection` exists.
+- `Bravo.addAsset` does not exist.
+
+Existing live assets stay ordinary (`clock = 0`) until `prepare`. Do not
+`prepare` an asset that still has nonzero LTV or a staker allocation.
+
+---
+
+## Part 2 — promotional collection and reward launch
+
+Do not start this part until Part 1 is registered and verified.
 
 ## Public sequence
 
@@ -55,7 +136,7 @@ creating Safe transactions:
 |---|---|
 | Asset | Existing supported asset address. |
 | Reward vault ID | Existing nonzero `rewardVaultId` for the asset; the asset must already be supported in this vault. |
-| Tester list | Every address with rehearsal `balancePoints` that must be cleared; maximum 40, unique, and nonzero. An empty list is allowed only if aggregate `balancePoints` is already zero. |
+| Tester list | Every address with rehearsal `balancePoints` that must be cleared; maximum 40, unique, and nonzero. An empty list is allowed only if aggregate `balancePoints` is already zero. Anyone still deposited at `B` earns from `B`, including leftover testers. |
 | Public whitelist | Exact production whitelist address, or `address(0)` if the intended production configuration is unrestricted. |
 | Vault IDs | Exact production `vaultIds` array to preserve in the final Bravo action. |
 | Staker allocation | Must remain `0`. |
@@ -66,13 +147,14 @@ creating Safe transactions:
 For calls with the optional `_missionControl` argument, omit it or pass
 `address(0)` to target the current MissionControl.
 
-## Phase 0: deployment and state prerequisites
+## Phase 0: launch prerequisites
 
-Do not start the launch sequence until all of these are true:
+Part 1 must already be done. Do not start the launch sequence until all of
+these are true:
 
-- The intended PR #223 Bravo, Charlie, and Golf contracts are registered.
-- MissionControl, Lootbox, Ledger, and VaultBook resolve to the reviewed
-  deployment addresses.
+- The intended PR #223 Bravo, Charlie, Golf, MissionControl, and Lootbox
+  contracts are the live registry pointers from Part 1.
+- Ledger and VaultBook still resolve to the pre-223 addresses.
 - The asset and reward vault are already registered and supported.
 - `rewardVaultId(asset)` equals the intended reward vault ID.
 - `accrualStartBlock(asset, vaultId) == 0`.
@@ -285,11 +367,14 @@ The countdown is not enforced onchain. A governor can execute a confirmable
 action early, so Safe policy and transaction review are the launch guard.
 
 If Bravo's configured delay is longer than the intended countdown, announce a
-longer countdown. Alternatively, execute preparation and queue the voter action
-in an earlier private Safe transaction while deposits remain disabled, then open
+longer countdown.
+
+**Alternate timing path.** Execute preparation and queue the voter action in an
+earlier private Safe transaction while deposits remain disabled, then open
 deposits and announce only when the action's remaining delay fits the public
-window. Never queue the voter action before preparation, and never promise a
-start before the action can be confirmed.
+window. This is not a second reading of Phase 3: never queue the voter action
+before preparation has executed, and never promise a start before the action
+can be confirmed.
 
 ## Phase 5: pre-reward-launch checks
 
@@ -396,6 +481,9 @@ runbook.
 
 ## Permanent operational restrictions
 
+- Never confirm 223 Bravo before Golf is a live Switchboard.
+- Never confirm 223 Lootbox against the pre-223 MissionControl, or leave the
+  pre-223 Lootbox against the 223 MissionControl.
 - Never execute Golf whitelist or Charlie deposit-opening calls before the Bravo
   preparation execution.
 - Never execute an old rehearsal voter-allocation action as the launch action.
