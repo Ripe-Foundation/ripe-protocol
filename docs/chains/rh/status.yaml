@@ -335,14 +335,14 @@ decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
   snapshot_contract: This list is a historical or intentionally refreshed snapshot; the canonical register controls, exact per-PR parity is not required, and final release preparation reconciles the snapshot once.
   in_flight_coordination:
-    checked_on: 2026-08-15
+    checked_on: 2026-08-29
     sc12_reserved_id: RH-D035
-    integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036] }
-    open_pr_allocations: { PR_145: [RH-D038], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043] }
-    open_prs_with_no_new_decision: [PR_163]
-    inherited_not_new: { PR_152: [RH-D033, RH-D034] }
-    external_collision: none_detected_by_fail_closed_integration_allocator
-    scope: PR 145 records the live target and six open remediation PR heads checked on 2026-08-15; it does not edit, renumber, approve, or reject another branch.
+    integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036], PR_145: [RH-D038], PR_157: [RH-D043] }
+    open_pr_allocations: { PR_211: [RH-D044, RH-D045, RH-D046], PR_224: [RH-D047] }
+    open_prs_with_no_new_decision: [PR_181, PR_223]
+    inherited_not_new: { PR_223: [RH-D044, RH-D045, RH-D046] }
+    external_collision: none_detected_by_live_pr_heading_check
+    scope: The 2026-08-29 refresh checked the live rh-targeted and dependent PR 181, PR 211, PR 223, and PR 224 set; it does not edit, renumber, approve, or reject another branch.
 
 sc12_activation_state:
   source: docs/chains/rh/smart-contract-changes/ripe-gov.md
@@ -475,20 +475,23 @@ owner_priority_overlay:
       state: parked_nonblocking
       blocker_effect: nonblocking
       instruction: >
-        The stripped UniswapV2Prices replacement is a stateless RIPE/WETH
-        monitor. Its PriceSource interface is permanently inert, while its
-        explicitly named monitoring views expose a manipulable spot-reserve
-        observation. Pair provenance and minimum-liquidity policy remain
-        operational monitoring concerns. It remains unregistered,
-        unconfigured, non-admitted,
-        undeployed, unactivated, and unavailable for protocol accounting. Do
-        not add a checkpoint service, PriceDesk
-        registration, Chainlink fallback, pool address, liquidity amount,
-        funding or custody authority, migration, deployment-plan dependency,
-        configuration, admission, deployment, or activation. No Uniswap launch
-        price source is required; the current migration candidate configures
-        PriceDesk priority source IDs [1, 2]. An optional externally held RIPE/WETH V2
-        liquidity canary remains operational preparation, not protocol oracle
+        RH-D047 authorizes the stripped UniswapV2Prices source candidate for
+        direct offchain monitoring through its constructor-bound RIPE/WETH
+        views and stateless getPoolMonitoringPrice(asset, pool, partner) view.
+        Its PriceSource interface is permanently inert. Generic tuple
+        provenance, token behavior, liquidity, manipulation exposure, partner
+        pricing, and typed-call error handling remain operator responsibilities.
+        It remains unconfigured, non-admitted, undeployed, unactivated, and
+        unavailable for protocol accounting. Do not add a checkpoint service,
+        PriceDesk registration, Chainlink fallback, onchain factory allowlist,
+        liquidity floor, pool configuration, funding or custody authority,
+        migration logic, deployment-plan dependency, configuration, admission,
+        deployment, or activation. Existing source-driven migrations would
+        compile this candidate if separately authorized and executed; this
+        source authorization grants neither phase. No Uniswap launch price
+        source is required; the current migration candidate configures
+        PriceDesk priority source IDs [1, 2]. Optional externally held V2
+        monitoring tuples remain operational observations, not protocol oracle
         authority.
       reopen_condition: Approved security-relevant RIPE-price consumer plus separate owner, risk, security, custody, and exposure decisions.
     - id: PARK-SITES-RECOVERY
@@ -1213,6 +1216,7 @@ decisions:
   - { id: RH-D036, title: "AuctionHouse conservation exact waiver at 22 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact SC-01, SC-02, and SC-08 conservation artifact, AuctionHouse deploys at 24,554 bytes including 96 immutable bytes, leaving 22 bytes. The owner accepted that technically deployable margin and the explicit SC-08 policy: the Stability spread is a legacy discount rate, an empty first pass permanently waives episode fees, and fee-free retry liveness depends on a bound protocol-operated monitor or keeper. Source, runtime template, exact deployed size, and deterministic immutable-bound deployed hashes are pinned. The waiver permits zero growth and reopens on any source, compiler, dependency, constructor-input, or compiler-output change; it does not authorize deployment or activation.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D038, title: "SC-07/SC-09 Deleverage remediation is reopened and bounded", status: "owner_authorized_draft_pr_145_candidate", summary: "The owner reopened only the exact SC-07 stale-settlement and SC-09 optional Stability Pool availability remediation in draft PR #145. Broad and withdrawal-assist probes skip unavailable cohorts while direct and processing-time paths remain fail-closed. The final 24,309-byte deployed runtime leaves 267 bytes and uses the ordinary 200-byte floor without a waiver; all cooldown, Underscore, deferred-control, fork, deployment, configuration, activation, and release work remains parked.", source: "docs/chains/rh/deleverage-sc07-sc09-security-decision.md"}
   - { id: RH-D043, title: "Curve snapshot remediation uses confirmation-anchored continuity", status: "owner_accepted_ancestor_clock_review_ready_activation_blocked", summary: "The owner accepted native block.number on Robinhood as repeating/jumping ancestor-block progression, with the recorded 7200-stale/720-cadence calibration, for the reviewed Curve source. The exact-source SHA-256 condition was retired on 2026-08-16: the artifact.curve_prices_source_sha256 and artifact.curve_prices_abi_sha256 launch inputs, the RH_CURVE_ARTIFACT_DRIFT validator, and the generator's real-file hashing were removed because they failed unrelated pull requests on any legitimate Curve edit. Semantic Curve configuration, recursion, permission, route, and deployment-policy checks are controlling; a future Curve source change will no longer flag that a different artifact was approved. Duration-weighted danger and confirmation-anchored classification/freshness transitions are accepted; GREEN reference snapshots and dynamic rates remain inactive pending separate deployment and activation authority.", source: "docs/chains/rh/evidence/curve-snapshot-remediation.md"}
+  - { id: RH-D047, title: "Generic Uniswap V2 monitoring is source-authorized and non-admitted", status: "owner_authorized_source_candidate_monitoring_only_admission_parked", summary: "Authorize the stateless getPoolMonitoringPrice(asset,pool,partner) source and ABI candidate for direct offchain monitoring while keeping every PriceSource entrypoint inert. Operators own tuple provenance, token behavior, liquidity, manipulation exposure, partner pricing, and typed-call error handling. The live instance lacks the selector; existing source-driven migrations would deploy the changed runtime if separately authorized and executed. This decision grants no migration execution, deployment, replacement, registration, configuration, admission, activation, or value-bearing use.", source: "docs/chains/rh/smart-contract-changes/uniswap-v2-prices.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}

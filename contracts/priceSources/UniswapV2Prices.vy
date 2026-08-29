@@ -49,8 +49,9 @@ def __init__(
     ripeIsToken1: bool = token0 == _wethToken and token1 == _ripeToken
     assert ripeIsToken0 or ripeIsToken1 # dev: not ripe weth pool
 
-    # This monitor is deliberately specific to the canonical 18-decimal
-    # RIPE/WETH pair. It is not a generic Uniswap V2 asset adapter.
+    # These immutables define the canonical RIPE/WETH convenience views. The
+    # generic view below accepts other caller-supplied asset/pool/partner tuples;
+    # this constructor does not qualify those pools or tokens.
     assert staticcall TokenDecimals(_ripeToken).decimals() == 18 # dev: invalid ripe decimals
     assert staticcall TokenDecimals(_wethToken).decimals() == 18 # dev: invalid weth decimals
 
@@ -61,9 +62,9 @@ def __init__(
     RIPE_IS_TOKEN0 = ripeIsToken0
 
 
-#########################
-# RIPE monitoring views #
-#########################
+####################
+# Monitoring views #
+####################
 
 
 @view
@@ -74,12 +75,68 @@ def isMonitoringOnly() -> bool:
 
 @view
 @external
+def getPoolMonitoringPrice(
+    _asset: address,
+    _pool: address,
+    _partner: address,
+) -> uint256:
+    # This generic view is intentionally stateless. Off-chain monitoring config
+    # supplies and independently qualifies each asset/pool/partner tuple,
+    # including factory provenance and acceptable liquidity. Decoded invalid
+    # state returns zero; typed-call failures from a pool, token, RipeHq, or
+    # PriceDesk propagate to the caller.
+    if empty(address) in [_asset, _pool, _partner] or _asset == _partner:
+        return 0
+
+    token0: address = staticcall IUniswapV2Pair(_pool).token0()
+    token1: address = staticcall IUniswapV2Pair(_pool).token1()
+    assetIsToken0: bool = token0 == _asset and token1 == _partner
+    assetIsToken1: bool = token0 == _partner and token1 == _asset
+    if not assetIsToken0 and not assetIsToken1:
+        return 0
+
+    valid: bool = False
+    assetReserve: uint256 = 0
+    partnerReserve: uint256 = 0
+    na: uint256 = 0
+    valid, assetReserve, partnerReserve, na = self._readPoolState(_pool, assetIsToken0)
+    if not valid or assetReserve == 0 or partnerReserve == 0:
+        return 0
+
+    assetDecimals: uint256 = staticcall TokenDecimals(_asset).decimals()
+    partnerDecimals: uint256 = staticcall TokenDecimals(_partner).decimals()
+    if assetDecimals > 18 or partnerDecimals > 18:
+        return 0
+
+    # Partner units per whole asset, normalized to 18 decimals. The uint112
+    # reserve bounds and <=18-decimal constraint keep the numerator in uint256.
+    partnerPerAsset: uint256 = (
+        partnerReserve * (10 ** assetDecimals) * EIGHTEEN_DECIMALS
+        // assetReserve
+        // (10 ** partnerDecimals)
+    )
+
+    if partnerPerAsset == 0:
+        return 0
+
+    partnerUsdPrice: uint256 = self._readPartnerUsdPrice(_partner)
+    if partnerUsdPrice == 0:
+        return 0
+
+    didMultiply: bool = False
+    assetUsdPrice: uint256 = 0
+    didMultiply, assetUsdPrice = self._mulDivOne(partnerPerAsset, partnerUsdPrice)
+    return assetUsdPrice if didMultiply else 0
+
+
+@view
+@external
 def getRipePoolState() -> (uint256, uint256, uint256):
     valid: bool = False
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
     lastUpdate: uint256 = 0
-    valid, ripeReserve, wethReserve, lastUpdate = self._readPoolState()
+    valid, ripeReserve, wethReserve, lastUpdate = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)
     if not valid:
         return 0, 0, 0
     return ripeReserve, wethReserve, lastUpdate
@@ -92,7 +149,7 @@ def getRipeWethMonitoringPrice() -> uint256:
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
     na: uint256 = 0
-    valid, ripeReserve, wethReserve, na = self._readPoolState()
+    valid, ripeReserve, wethReserve, na = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)
     if not valid or ripeReserve == 0 or wethReserve == 0:
         return 0
     return wethReserve * EIGHTEEN_DECIMALS // ripeReserve
@@ -105,7 +162,7 @@ def getRipeUsdMonitoringPrice() -> uint256:
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
     na: uint256 = 0
-    valid, ripeReserve, wethReserve, na = self._readPoolState()
+    valid, ripeReserve, wethReserve, na = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)
     if not valid or ripeReserve == 0 or wethReserve == 0:
         return 0
 
@@ -122,15 +179,15 @@ def getRipeUsdMonitoringPrice() -> uint256:
 
 @view
 @internal
-def _readPoolState() -> (bool, uint256, uint256, uint256):
+def _readPoolState(_pool: address, _assetIsToken0: bool) -> (bool, uint256, uint256, uint256):
     reserve0: uint256 = 0
     reserve1: uint256 = 0
     lastUpdate: uint256 = 0
-    reserve0, reserve1, lastUpdate = staticcall IUniswapV2Pair(RIPE_WETH_POOL).getReserves()
+    reserve0, reserve1, lastUpdate = staticcall IUniswapV2Pair(_pool).getReserves()
     if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:
         return False, 0, 0, 0
 
-    if RIPE_IS_TOKEN0:
+    if _assetIsToken0:
         return True, reserve0, reserve1, lastUpdate
     return True, reserve1, reserve0, lastUpdate
 
@@ -138,12 +195,18 @@ def _readPoolState() -> (bool, uint256, uint256, uint256):
 @view
 @internal
 def _readWethUsdPrice() -> uint256:
+    return self._readPartnerUsdPrice(WETH_TOKEN)
+
+
+@view
+@internal
+def _readPartnerUsdPrice(_partner: address) -> uint256:
     # Resolve PriceDesk dynamically so a registry rotation does not stale this
     # direct monitoring view. Neither this read nor its result is a feed.
     priceDesk: address = staticcall RipeHq(RIPE_HQ).getAddr(PRICE_DESK_ID)
     if priceDesk == empty(address):
         return 0
-    return staticcall PriceDesk(priceDesk).getPrice(WETH_TOKEN, False)
+    return staticcall PriceDesk(priceDesk).getPrice(_partner, False)
 
 
 @view
