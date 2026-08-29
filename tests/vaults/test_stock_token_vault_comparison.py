@@ -2088,7 +2088,7 @@ def test_lootbox_points_update_after_donation_and_total_loss(
         stock_token,
         _vaultIds=[vault_id],
         _stakersPointsAlloc=0,
-        _voterPointsAlloc=20,
+        _voterPointsAlloc=0,
         _debtTerms=createDebtTerms(
             _ltv=50_00,
             _redemptionThreshold=60_00,

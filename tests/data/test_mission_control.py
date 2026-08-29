@@ -1725,7 +1725,18 @@ def test_mission_control_get_deposit_points_config(mission_control, switchboard_
     assert non_member.voterPointsAlloc == 0
     assert not non_member.shouldFundGenPoints
     member = mission_control.getDepositPointsConfig(alpha_token.address, 1)
+    assert not member.shouldFundGenPoints
+
+    zero_alloc_config = list(zero_staker_config)
+    zero_alloc_config[2] = 0
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(zero_alloc_config),
+        sender=switchboard_alpha.address,
+    )
+    member = mission_control.getDepositPointsConfig(alpha_token.address, 1)
     assert member.shouldFundGenPoints
+    assert member.accrualStartBlock == 0
 
 def test_mission_control_get_price_config(mission_control, switchboard_alpha, sample_gen_config):
     """Test getting price configuration."""

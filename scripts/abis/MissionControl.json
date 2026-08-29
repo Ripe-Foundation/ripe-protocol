@@ -849,6 +849,26 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "setAccrualStartBlock",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_startBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "setCoreRipeGovVaultId",
     "inputs": [
       {
@@ -1887,6 +1907,10 @@
           {
             "name": "shouldFundGenPoints",
             "type": "bool"
+          },
+          {
+            "name": "accrualStartBlock",
+            "type": "uint256"
           }
         ]
       }
@@ -2973,6 +2997,27 @@
       {
         "name": "arg0",
         "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "accrualStartBlock",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
       }
     ],
     "outputs": [

@@ -1002,6 +1002,13 @@ def test_raw_reward_setters_revert_on_non_current_mission_control(
             1,
             sender=switchboard_bravo.address,
         )
+    with boa.reverts("not current mission control"):
+        candidate.setAccrualStartBlock(
+            alpha_token,
+            1,
+            0,
+            sender=switchboard_bravo.address,
+        )
 
 
 def test_clocks_move_when_stored_are_points_enabled_is_false(

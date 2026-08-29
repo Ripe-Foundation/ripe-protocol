@@ -215,17 +215,17 @@ def _ring_state(curve):
     )
 
 
-def _logs_from_wrapper(switchboard_bravo, event_name, computation=None):
+def _logs_from_wrapper(switchboard_foxtrot, event_name, computation=None):
     # Child logs live on the wrapper computation. Later Curve view calls
     # replace curve.get_logs(), so read them from Bravo immediately.
     # Bravo events use boa's default strict=True. The Alpha regression below
     # still uses filter_logs(..., _strict=False), the repo helper.
-    entries = switchboard_bravo.get_logs(strict=True, computation=computation)
+    entries = switchboard_foxtrot.get_logs(strict=True, computation=computation)
     return [entry for entry in entries if type(entry).__name__ == event_name]
 
 
-def _assert_bravo_event(switchboard_bravo, caller, source_id, source_addr, did_update):
-    logs = _logs_from_wrapper(switchboard_bravo, "GreenRefPoolSnapshotAttempted")
+def _assert_bravo_event(switchboard_foxtrot, caller, source_id, source_addr, did_update):
+    logs = _logs_from_wrapper(switchboard_foxtrot, "GreenRefPoolSnapshotAttempted")
     assert len(logs) == 1
     log = logs[0]
     assert log.caller == caller
@@ -234,8 +234,8 @@ def _assert_bravo_event(switchboard_bravo, caller, source_id, source_addr, did_u
     assert log.didUpdate is did_update
 
 
-def _assert_curve_snapshot_added(switchboard_bravo, pool, green_balance=None):
-    logs = _logs_from_wrapper(switchboard_bravo, "GreenRefPoolSnapshotAdded")
+def _assert_curve_snapshot_added(switchboard_foxtrot, pool, green_balance=None):
+    logs = _logs_from_wrapper(switchboard_foxtrot, "GreenRefPoolSnapshotAdded")
     assert len(logs) == 1
     assert logs[0].pool == pool
     if green_balance is not None:
@@ -244,7 +244,7 @@ def _assert_curve_snapshot_added(switchboard_bravo, pool, green_balance=None):
 
 def _load_candidate_bravo(mock_hq, temp_gov, name):
     return boa.load(
-        "contracts/config/SwitchboardBravo.vy",
+        "contracts/config/SwitchboardFoxtrot.vy",
         mock_hq,
         temp_gov,
         1,
@@ -335,23 +335,23 @@ def configured_green_ref(local_green_ref_curve, price_desk, governance, green_to
 
 def test_governance_can_call_specialized_wrapper(
     configured_green_ref,
-    switchboard_bravo,
+    switchboard_foxtrot,
     governance,
 ):
     curve = configured_green_ref["curve"]
     source_id = configured_green_ref["source_id"]
     before = _ring_state(curve)
 
-    assert switchboard_bravo.addGreenRefPoolSnapshot(
+    assert switchboard_foxtrot.addGreenRefPoolSnapshot(
         source_id,
         sender=governance.address,
     )
     _assert_curve_snapshot_added(
-        switchboard_bravo,
+        switchboard_foxtrot,
         configured_green_ref["pool"].address,
     )
     _assert_bravo_event(
-        switchboard_bravo,
+        switchboard_foxtrot,
         governance.address,
         source_id,
         curve.address,
@@ -366,7 +366,7 @@ def test_governance_can_call_specialized_wrapper(
 
 def test_lite_signer_can_call_wrapper_but_not_curve_directly(
     configured_green_ref,
-    switchboard_bravo,
+    switchboard_foxtrot,
     switchboard_alpha,
     mission_control,
     governance,
@@ -385,12 +385,12 @@ def test_lite_signer_can_call_wrapper_but_not_curve_directly(
         curve.addGreenRefPoolSnapshot(sender=lite_signer)
 
     before = _ring_state(curve)
-    assert switchboard_bravo.addGreenRefPoolSnapshot(source_id, sender=lite_signer)
+    assert switchboard_foxtrot.addGreenRefPoolSnapshot(source_id, sender=lite_signer)
     after = _ring_state(curve)
     assert after[0][2] > before[0][2]
     assert after[2] == before[2] + 1
     _assert_bravo_event(
-        switchboard_bravo,
+        switchboard_foxtrot,
         lite_signer,
         source_id,
         curve.address,
@@ -400,7 +400,7 @@ def test_lite_signer_can_call_wrapper_but_not_curve_directly(
 
 def test_lite_signer_revocation_is_honored_immediately(
     configured_green_ref,
-    switchboard_bravo,
+    switchboard_foxtrot,
     switchboard_alpha,
     mission_control,
     governance,
@@ -408,17 +408,17 @@ def test_lite_signer_revocation_is_honored_immediately(
 ):
     source_id = configured_green_ref["source_id"]
     _enable_lite_signer(switchboard_alpha, mission_control, governance, bob)
-    assert switchboard_bravo.addGreenRefPoolSnapshot(source_id, sender=bob)
+    assert switchboard_foxtrot.addGreenRefPoolSnapshot(source_id, sender=bob)
 
     switchboard_alpha.setCanPerformLiteAction(bob, False, sender=governance.address)
     assert not mission_control.canPerformLiteAction(bob)
     with boa.reverts("no perms"):
-        switchboard_bravo.addGreenRefPoolSnapshot(source_id, sender=bob)
+        switchboard_foxtrot.addGreenRefPoolSnapshot(source_id, sender=bob)
 
 
-def test_unauthorized_eoa_reverts_no_perms(configured_green_ref, switchboard_bravo, alice):
+def test_unauthorized_eoa_reverts_no_perms(configured_green_ref, switchboard_foxtrot, alice):
     with boa.reverts("no perms"):
-        switchboard_bravo.addGreenRefPoolSnapshot(
+        switchboard_foxtrot.addGreenRefPoolSnapshot(
             configured_green_ref["source_id"],
             sender=alice,
         )
@@ -426,7 +426,7 @@ def test_unauthorized_eoa_reverts_no_perms(configured_green_ref, switchboard_bra
 
 def test_invalid_and_disabled_ids_revert_before_external_write(
     configured_green_ref,
-    switchboard_bravo,
+    switchboard_foxtrot,
     price_desk,
     governance,
 ):
@@ -442,11 +442,11 @@ def test_invalid_and_disabled_ids_revert_before_external_write(
 
     for invalid_id in (0, 999, 2_000):
         with boa.reverts("invalid price source id"):
-            switchboard_bravo.addGreenRefPoolSnapshot(
+            switchboard_foxtrot.addGreenRefPoolSnapshot(
                 invalid_id,
                 sender=governance.address,
             )
-        failed = switchboard_bravo._computation
+        failed = switchboard_foxtrot._computation
         assert _count_selector_calls(failed, SPECIALIZED_SELECTOR) == 0
         assert _count_calls(failed, counter.address, SPECIALIZED_SELECTOR) == 0
         assert _count_calls(failed, curve.address, SPECIALIZED_SELECTOR) == 0
@@ -466,11 +466,11 @@ def test_invalid_and_disabled_ids_revert_before_external_write(
     assert price_desk.getAddr(counter_id) == ZERO_ADDRESS
 
     with boa.reverts("invalid price source id"):
-        switchboard_bravo.addGreenRefPoolSnapshot(
+        switchboard_foxtrot.addGreenRefPoolSnapshot(
             counter_id,
             sender=governance.address,
         )
-    failed = switchboard_bravo._computation
+    failed = switchboard_foxtrot._computation
     assert _count_selector_calls(failed, SPECIALIZED_SELECTOR) == 0
     assert _count_calls(failed, counter.address, SPECIALIZED_SELECTOR) == 0
     assert _count_calls(failed, price_desk.address, GET_ADDR_SELECTOR) == 1
@@ -480,25 +480,25 @@ def test_invalid_and_disabled_ids_revert_before_external_write(
 
 def test_successful_specialized_call_updates_ring_and_emits(
     configured_green_ref,
-    switchboard_bravo,
+    switchboard_foxtrot,
     governance,
 ):
     curve = configured_green_ref["curve"]
     source_id = configured_green_ref["source_id"]
     before = _ring_state(curve)
 
-    did_update = switchboard_bravo.addGreenRefPoolSnapshot(
+    did_update = switchboard_foxtrot.addGreenRefPoolSnapshot(
         source_id,
         sender=governance.address,
     )
     assert did_update is True
     _assert_curve_snapshot_added(
-        switchboard_bravo,
+        switchboard_foxtrot,
         configured_green_ref["pool"].address,
         10_000 * EIGHTEEN_DECIMALS,
     )
     _assert_bravo_event(
-        switchboard_bravo,
+        switchboard_foxtrot,
         governance.address,
         source_id,
         curve.address,
@@ -513,10 +513,10 @@ def test_successful_specialized_call_updates_ring_and_emits(
     assert after != before
 
 
-def test_alpha_generic_snapshot_leaves_green_ring_for_bravo(
+def test_alpha_generic_snapshot_leaves_green_ring_for_foxtrot(
     configured_green_ref,
     switchboard_alpha,
-    switchboard_bravo,
+    switchboard_foxtrot,
     governance,
     green_token,
 ):
@@ -534,7 +534,7 @@ def test_alpha_generic_snapshot_leaves_green_ring_for_bravo(
     assert len(alpha_logs) == 1
     assert alpha_logs[0].didUpdate is False
 
-    assert switchboard_bravo.addGreenRefPoolSnapshot(
+    assert switchboard_foxtrot.addGreenRefPoolSnapshot(
         source_id,
         sender=governance.address,
     )
@@ -543,7 +543,7 @@ def test_alpha_generic_snapshot_leaves_green_ring_for_bravo(
     assert after[2] == before[2] + 1
     assert after != before
     _assert_bravo_event(
-        switchboard_bravo,
+        switchboard_foxtrot,
         governance.address,
         source_id,
         curve.address,
@@ -553,37 +553,37 @@ def test_alpha_generic_snapshot_leaves_green_ring_for_bravo(
 
 def test_same_block_duplicate_returns_false_without_state_change(
     configured_green_ref,
-    switchboard_bravo,
+    switchboard_foxtrot,
     governance,
 ):
     curve = configured_green_ref["curve"]
     source_id = configured_green_ref["source_id"]
 
-    assert switchboard_bravo.addGreenRefPoolSnapshot(
+    assert switchboard_foxtrot.addGreenRefPoolSnapshot(
         source_id,
         sender=governance.address,
     )
     after_first = _ring_state(curve)
 
-    did_update = switchboard_bravo.addGreenRefPoolSnapshot(
+    did_update = switchboard_foxtrot.addGreenRefPoolSnapshot(
         source_id,
         sender=governance.address,
     )
     assert did_update is False
     assert _ring_state(curve) == after_first
     _assert_bravo_event(
-        switchboard_bravo,
+        switchboard_foxtrot,
         governance.address,
         source_id,
         curve.address,
         False,
     )
-    assert _logs_from_wrapper(switchboard_bravo, "GreenRefPoolSnapshotAdded") == []
+    assert _logs_from_wrapper(switchboard_foxtrot, "GreenRefPoolSnapshotAdded") == []
 
 
 def test_paused_curve_returns_false_and_logs_no_update(
     configured_green_ref,
-    switchboard_bravo,
+    switchboard_foxtrot,
     switchboard_alpha,
     governance,
 ):
@@ -592,36 +592,36 @@ def test_paused_curve_returns_false_and_logs_no_update(
     before = _ring_state(curve)
 
     curve.pause(True, sender=switchboard_alpha.address)
-    did_update = switchboard_bravo.addGreenRefPoolSnapshot(
+    did_update = switchboard_foxtrot.addGreenRefPoolSnapshot(
         source_id,
         sender=governance.address,
     )
     assert did_update is False
     assert _ring_state(curve) == before
     _assert_bravo_event(
-        switchboard_bravo,
+        switchboard_foxtrot,
         governance.address,
         source_id,
         curve.address,
         False,
     )
-    assert _logs_from_wrapper(switchboard_bravo, "GreenRefPoolSnapshotAdded") == []
+    assert _logs_from_wrapper(switchboard_foxtrot, "GreenRefPoolSnapshotAdded") == []
 
 
 def test_reverting_registered_target_reverts_wrapper_without_event(
     configured_green_ref,
     price_desk,
-    switchboard_bravo,
+    switchboard_foxtrot,
     governance,
 ):
     curve = configured_green_ref["curve"]
     good_id = configured_green_ref["source_id"]
-    assert switchboard_bravo.addGreenRefPoolSnapshot(
+    assert switchboard_foxtrot.addGreenRefPoolSnapshot(
         good_id,
         sender=governance.address,
     )
     successful_logs = _logs_from_wrapper(
-        switchboard_bravo,
+        switchboard_foxtrot,
         "GreenRefPoolSnapshotAttempted",
     )
     assert len(successful_logs) == 1
@@ -639,14 +639,14 @@ def test_reverting_registered_target_reverts_wrapper_without_event(
     )
 
     with boa.reverts("snapshot failure"):
-        switchboard_bravo.addGreenRefPoolSnapshot(
+        switchboard_foxtrot.addGreenRefPoolSnapshot(
             source_id,
             sender=governance.address,
         )
-    failed = switchboard_bravo._computation
+    failed = switchboard_foxtrot._computation
     assert _count_calls(failed, target.address, SPECIALIZED_SELECTOR) == 1
     assert _logs_from_wrapper(
-        switchboard_bravo,
+        switchboard_foxtrot,
         "GreenRefPoolSnapshotAttempted",
         computation=failed,
     ) == []
@@ -753,7 +753,7 @@ def test_wrapper_reads_current_price_desk_and_mission_control(alice, bob, sally)
     assert _count_calls(candidate._computation, first_desk.address, GET_ADDR_SELECTOR) == 0
 
 
-def test_only_curve_prices_exposes_specialized_green_snapshot(switchboard_bravo):
+def test_only_curve_prices_exposes_specialized_green_snapshot(switchboard_foxtrot):
     assert SPECIALIZED_SELECTOR_HEX == "0x7cdb0a4d"
     assert WRAPPER_SELECTOR_HEX == "0xd9948a29"
 
@@ -791,7 +791,7 @@ def test_only_curve_prices_exposes_specialized_green_snapshot(switchboard_bravo)
 
     bravo_fns = [
         item
-        for item in switchboard_bravo.abi
+        for item in switchboard_foxtrot.abi
         if item.get("type") == "function"
     ]
     bravo_selectors = {_fn_selector(fn): fn for fn in bravo_fns}
@@ -802,7 +802,7 @@ def test_only_curve_prices_exposes_specialized_green_snapshot(switchboard_bravo)
     assert [item["type"] for item in wrapper["inputs"]] == ["uint256"]
     assert [item["type"] for item in wrapper["outputs"]] == ["bool"]
 
-    exported = json.loads((ABI_DIR / "SwitchboardBravo.json").read_text())
+    exported = json.loads((ABI_DIR / "SwitchboardFoxtrot.json").read_text())
     exported_wrapper = next(
         item
         for item in exported
@@ -811,7 +811,7 @@ def test_only_curve_prices_exposes_specialized_green_snapshot(switchboard_bravo)
     )
     assert _fn_selector(exported_wrapper) == WRAPPER_SELECTOR
     event = _event_named(exported, "GreenRefPoolSnapshotAttempted")
-    live_event = _event_named(switchboard_bravo.abi, "GreenRefPoolSnapshotAttempted")
+    live_event = _event_named(switchboard_foxtrot.abi, "GreenRefPoolSnapshotAttempted")
     for candidate in (event, live_event):
         assert [
             (item["name"], item["type"], item["indexed"])

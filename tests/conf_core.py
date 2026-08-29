@@ -590,7 +590,17 @@ def switchboard_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bravo, switchboard_charlie, switchboard_echo, switchboard_foxtrot, switchboard_delta):
+def switchboard(
+    switchboard_deploy,
+    deploy3r,
+    switchboard_alpha,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_echo,
+    switchboard_foxtrot,
+    switchboard_golf,
+    switchboard_delta,
+):
 
     # alpha
     assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_alpha, "Alpha", sender=deploy3r)
@@ -616,6 +626,10 @@ def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bra
     assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_foxtrot, "Foxtrot", sender=deploy3r)
     assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_foxtrot, sender=deploy3r) == 6
 
+    # golf
+    assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_golf, "Golf", sender=deploy3r)
+    assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_golf, sender=deploy3r) == 7
+
     # finish setup
     assert switchboard_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
 
@@ -626,6 +640,7 @@ def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bra
     assert switchboard_delta.setActionTimeLockAfterSetup(sender=deploy3r)
     assert switchboard_echo.setActionTimeLockAfterSetup(sender=deploy3r)
     assert switchboard_foxtrot.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert switchboard_golf.setActionTimeLockAfterSetup(sender=deploy3r)
 
     return switchboard_deploy
 
@@ -720,6 +735,21 @@ def switchboard_foxtrot(ripe_hq_deploy, fork):
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_foxtrot",
+    )
+
+
+# switchboard golf
+
+
+@pytest.fixture(scope="session")
+def switchboard_golf(ripe_hq_deploy, fork):
+    return boa.load(
+        "contracts/config/SwitchboardGolf.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        name="switchboard_golf",
     )
 
 
