@@ -9,6 +9,7 @@
     "BondBooster.json": "a5a30187302b2944f453ba557bb2d3f8daac98fe60d8192e9de2a9c895db65eb",
     "BondRoom.json": "067da4c079d2e3e52a4e57dee87b2a09e8be9647f6d3e42fc5aaac250ce0ed48",
     "ChainlinkPrices.json": "f942122c0ea7c8767b716833dac6054fab893050c8cee7c80ce39103b418b086",
+    "ConfirmRegistryUpdate.json": "0bca0b9f0ff2def71844126a9dc024f85d0176c6de78082507cd65c2a43b5246",
     "Contributor.json": "eb34dfaf326320e7660a702f35e3fd4cf76d794a7c610a52a89b5500a7d6d19f",
     "CreditEngine.json": "3a9c5d77abbd094b7ee7ffc2d0324463e9036f1cdeb17f501fab50f16ad078be",
     "CreditRedeem.json": "a05878daef85273d072b4b8e730986f1bbb59ad890828f627c9a45e45bfc16a2",
@@ -53,7 +54,7 @@
     "TellerUtils.json": "728a02157129e67eaa9567c587e2869586b8fc5de5d1542a83ed69432d295d3f",
     "TrainingWheels.json": "40bc45b2009537815ec384b0e8be4cd780df89f67276bda8be7a7e6c4c86399e",
     "UndyVaultPrices.json": "0f6015463ed388a4f1057aad559bcd5299fce9289d8f004d1d1c03f9e8feb0b3",
-    "UniswapV2Prices.json": "a261e469c5b7118a6e3c44ef371b4815af9c7380fb46a13326a444c0b52fe0c3",
+    "UniswapV2Prices.json": "9e55f5cad53e85de597895d23490fcf72fe3390ac4fdd0cec21ad05fe325d043",
     "VaultBook.json": "a8850130074fb9ab75effaf5ae74d6d49c1ce7da74c3164d401372d0831cda22",
     "VaultMigrator.json": "c78888ed7dc2356fb3b70812544d1abe881710ed39795d840a9ac6ee4b00e789",
     "wsuperOETHbPrices.json": "154e353c87778735cc32176288499393910bdb12a32e6f46d065187b5fb1c906"
