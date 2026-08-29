@@ -61,15 +61,73 @@ def __init__(
     RIPE_IS_TOKEN0 = ripeIsToken0
 
 
-#########################
-# RIPE monitoring views #
-#########################
+####################
+# Monitoring views #
+####################
 
 
 @view
 @external
 def isMonitoringOnly() -> bool:
     return True
+
+
+@view
+@external
+def getPoolMonitoringData(
+    _asset: address,
+    _pool: address,
+    _partner: address,
+) -> (uint256, uint256, uint256, uint256, uint256):
+    # This generic view is intentionally stateless. Off-chain monitoring config
+    # supplies one asset/pool/partner tuple per observed market.
+    assert empty(address) not in [_asset, _pool, _partner] # dev: invalid monitoring config
+    assert _asset != _partner # dev: invalid monitoring tokens
+
+    token0: address = staticcall IUniswapV2Pair(_pool).token0()
+    token1: address = staticcall IUniswapV2Pair(_pool).token1()
+    assetIsToken0: bool = token0 == _asset and token1 == _partner
+    assetIsToken1: bool = token0 == _partner and token1 == _asset
+    assert assetIsToken0 or assetIsToken1 # dev: invalid monitoring pool
+
+    reserve0: uint256 = 0
+    reserve1: uint256 = 0
+    lastUpdate: uint256 = 0
+    reserve0, reserve1, lastUpdate = staticcall IUniswapV2Pair(_pool).getReserves()
+    if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:
+        return 0, 0, 0, 0, 0
+
+    assetReserve: uint256 = reserve0 if assetIsToken0 else reserve1
+    partnerReserve: uint256 = reserve1 if assetIsToken0 else reserve0
+    if assetReserve == 0 or partnerReserve == 0:
+        return assetReserve, partnerReserve, lastUpdate, 0, 0
+
+    assetDecimals: uint256 = staticcall TokenDecimals(_asset).decimals()
+    partnerDecimals: uint256 = staticcall TokenDecimals(_partner).decimals()
+    assert assetDecimals <= 18 and partnerDecimals <= 18 # dev: unsupported monitoring decimals
+
+    # Partner units per whole asset, normalized to 18 decimals. The uint112
+    # reserve bounds and <=18-decimal constraint keep both branches in uint256.
+    partnerPerAsset: uint256 = 0
+    scaleFactor: uint256 = 0
+    if assetDecimals >= partnerDecimals:
+        scaleFactor = 10 ** (assetDecimals - partnerDecimals)
+        partnerPerAsset = partnerReserve * EIGHTEEN_DECIMALS * scaleFactor // assetReserve
+    else:
+        scaleFactor = 10 ** (partnerDecimals - assetDecimals)
+        partnerPerAsset = partnerReserve * EIGHTEEN_DECIMALS // (assetReserve * scaleFactor)
+
+    if partnerPerAsset == 0:
+        return assetReserve, partnerReserve, lastUpdate, 0, 0
+
+    partnerUsdPrice: uint256 = self._readPartnerUsdPrice(_partner)
+    if partnerUsdPrice == 0:
+        return assetReserve, partnerReserve, lastUpdate, partnerPerAsset, 0
+
+    didMultiply: bool = False
+    assetUsdPrice: uint256 = 0
+    didMultiply, assetUsdPrice = self._mulDivOne(partnerPerAsset, partnerUsdPrice)
+    return assetReserve, partnerReserve, lastUpdate, partnerPerAsset, assetUsdPrice if didMultiply else 0
 
 
 @view
@@ -138,12 +196,18 @@ def _readPoolState() -> (bool, uint256, uint256, uint256):
 @view
 @internal
 def _readWethUsdPrice() -> uint256:
+    return self._readPartnerUsdPrice(WETH_TOKEN)
+
+
+@view
+@internal
+def _readPartnerUsdPrice(_partner: address) -> uint256:
     # Resolve PriceDesk dynamically so a registry rotation does not stale this
     # direct monitoring view. Neither this read nor its result is a feed.
     priceDesk: address = staticcall RipeHq(RIPE_HQ).getAddr(PRICE_DESK_ID)
     if priceDesk == empty(address):
         return 0
-    return staticcall PriceDesk(priceDesk).getPrice(WETH_TOKEN, False)
+    return staticcall PriceDesk(priceDesk).getPrice(_partner, False)
 
 
 @view
