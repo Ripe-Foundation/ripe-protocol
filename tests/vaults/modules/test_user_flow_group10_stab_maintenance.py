@@ -338,7 +338,7 @@ def test_low_quote_live_prune_does_not_move_value_between_existing_and_new_share
     """
     PILE = 100 * EIGHTEEN_DECIMALS
     DEPOSIT = 100 * EIGHTEEN_DECIMALS
-    LOW_QUOTE = 4 * 10**14  # pile -> $0.04, below RETENTION
+    LOW_QUOTE = 10**14  # pile -> $0.01, below RETENTION
 
     def _setup():
         _seed_stab(stability_pool, alpha_token, alpha_token_whale, bob, teller,

@@ -53,6 +53,7 @@ interface MissionControl:
     def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def indexOfAsset(_asset: address) -> uint256: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
@@ -237,6 +238,7 @@ def borrowForUser(
     # get borrow data (debt terms for user)
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), isUndyVault, False, a)
     assert not bt.hasQuarantinedAsset # dev: quarantined asset
+    assert bt.highestLtv <= HUNDRED_PERCENT # dev: unsupported asset
 
     # get config
     config: BorrowConfig = staticcall MissionControl(a.missionControl).getBorrowConfig(_user, _caller)
@@ -398,7 +400,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
     if bt.hasQuarantinedAsset:
         return 0
     availDebtPerLtv: uint256 = 0
-    if bt.totalMaxDebt > userDebt.amount:
+    if bt.highestLtv <= HUNDRED_PERCENT and bt.totalMaxDebt > userDebt.amount:
         availDebtPerLtv = bt.totalMaxDebt - userDebt.amount
     newBorrowAmount: uint256 = availDebtPerLtv
 
@@ -558,9 +560,10 @@ def _repayDebt(
         isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
         bt = self._getUserBorrowTerms(_user, _numUserVaults, _repayType != RepayType.STANDARD, 0, empty(address), isUndyVault, _repayType == RepayType.STANDARD, _a)
 
-        # highestLtv 0 = no eligible debt-bearing collateral; max_value = non-strict valuation saw amount without a usable price.
-        # Keep stored terms in both cases; conservative capacity still controls this repayment's health result.
-        if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT:
+        # preserve stored terms only for no eligible collateral (0) or an
+        # unavailable-price sentinel (maxuint). Priced unsupported collateral
+        # remains exit-only, but repayment must still refresh its debt terms.
+        if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT + 1:
             userDebt.debtTerms = bt.debtTerms
         hasGoodDebtHealth = userDebt.amount <= bt.totalMaxDebt
 
@@ -692,8 +695,6 @@ def _getUserBorrowTerms(
     if _numUserVaults == 0:
         return empty(UserBorrowTerms)
 
-    hasSkip: bool = (_skipVaultId != 0 and _skipAsset != empty(address))
-
     # sum vars
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     bt.lowestLtv = max_value(uint256)
@@ -737,17 +738,20 @@ def _getUserBorrowTerms(
 
             # collateral value, max debt
             collateralVal: uint256 = 0
-            hasNominalBalance: bool = False
+            hasBalance: bool = amount != 0
             if amount == 0:
-                hasNominalBalance = staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset)
-                # Quarantine only when a remaining nominal balance has no vault-wide usable amount.
+                hasBalance = staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset)
+                # quarantine only when a remaining nominal balance has no vault-wide usable amount.
                 # Share-rounding dust keeps a nominal balance in a non-empty vault and is not quarantined.
-                if hasNominalBalance:
+                if hasBalance:
                     if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
                         bt.hasQuarantinedAsset = True
-            else:
+            if amount != 0:
+                if staticcall MissionControl(_a.missionControl).indexOfAsset(asset) == 0:
+                    if bt.highestLtv < HUNDRED_PERCENT + 1:
+                        bt.highestLtv = HUNDRED_PERCENT + 1
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
-                # A positive debt-bearing balance without a usable price
+                # a positive debt-bearing balance without a usable price
                 # cannot safely contribute to account health decisions.
                 if collateralVal == 0:
                     bt.hasQuarantinedAsset = True
@@ -767,16 +771,16 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # Meaningful capacity sets the unwind target. amount == 0 with no remaining balance is withdrawn-to-zero and keeps the conservative floor (BasicVault-only: SharesVault returns empty(address) at 0 shares, so a fully withdrawn rebase registration is skipped and never floors).
+            # meaningful capacity sets the unwind target. amount == 0 with no remaining balance is withdrawn-to-zero and keeps the conservative floor (basic vault-only: shares vault returns empty(address) at 0 shares, so a fully withdrawn rebase registration is skipped and never floors).
             # amount == 0 with a remaining balance is share-rounding dust and must not drag lowestLtv. Positive-amount dust with maxDebt == 0 also does not participate.
-            if maxDebt != 0 or (amount == 0 and not hasNominalBalance):
+            if maxDebt != 0 or (amount == 0 and not hasBalance):
                 bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
 
             # highest ltv
             bt.highestLtv = max(bt.highestLtv, debtTerms.ltv)
 
             # totals
-            if not (hasSkip and asset == _skipAsset and vaultId == _skipVaultId):
+            if not (_skipVaultId != 0 and _skipAsset != empty(address) and asset == _skipAsset and vaultId == _skipVaultId):
                 bt.collateralVal += collateralVal
                 bt.totalMaxDebt += maxDebt
 
@@ -1041,23 +1045,18 @@ def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDe
     rateBoost: uint256 = 0
     if config.maxDynamicRateBoost != 0:
         dynamicRatio: uint256 = (status.weightedRatio - status.dangerTrigger) * HUNDRED_PERCENT // (HUNDRED_PERCENT - status.dangerTrigger)
-        rateMultiplier: uint256 = self._calcDynamicRateBoost(dynamicRatio, config.minDynamicRateBoost, config.maxDynamicRateBoost)
+        rateMultiplier: uint256 = config.minDynamicRateBoost + dynamicRatio * (config.maxDynamicRateBoost - config.minDynamicRateBoost) // HUNDRED_PERCENT
         rateBoost = _baseRate * rateMultiplier // HUNDRED_PERCENT
 
     # danger boost (longer pool health imbalanced, higher rate keeps getting)
-    dangerBoost: uint256 = 0
-    if status.numBlocksInDanger != 0 and config.increasePerDangerBlock != 0:
-        dangerBoost = (config.increasePerDangerBlock * status.numBlocksInDanger) * HUNDRED_PERCENT // DANGER_BLOCKS_DENOMINATOR
-
-    return min(_baseRate + rateBoost + dangerBoost, config.maxBorrowRate)
-
-
-@pure
-@internal
-def _calcDynamicRateBoost(_ratio: uint256, _minBoost: uint256, _maxBoost: uint256) -> uint256:
-    if _ratio == 0:
-        return _minBoost
-    return _minBoost + _ratio * (_maxBoost - _minBoost) // HUNDRED_PERCENT
+    # both operands are capped at maxBorrowRate * 100 before multiplication.
+    return min(
+        _baseRate + rateBoost + unsafe_mul(
+            min(config.increasePerDangerBlock, unsafe_mul(config.maxBorrowRate, 100)),
+            min(status.numBlocksInDanger, unsafe_mul(config.maxBorrowRate, 100)),
+        ) // 100,
+        config.maxBorrowRate,
+    )
 
 
 ##############

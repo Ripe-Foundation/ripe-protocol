@@ -5,27 +5,27 @@
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 42563001
+# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 46988201
 #
 # Snapshot provenance:
 #   repository: ripe-foundation/ripe-protocol
 #   generator: scripts/prepare_defaults.py
-#   generator sha256: 3cde50cbfa9ae90bdc008bff6f512c9d54acdb38977083d4e5e2b89487ef6659
-#   manifest sha256: 7c447715fce4c58e3e05ce94fe2bf3e80369cd13dc43d9995dab6c4795cfa7bf
+#   generator sha256: 8c78d41e99a690947b0baebecb2ee6d46e0aa01f01789d3f77a7deee54ee8226
+#   manifest sha256: 87231a2fafd33c55de6c4cecc16a10ed3d86808e0a1bba982937c8a062cb3f86
 #   Vyper compiler: 0.4.3+commit.bff19ea2
 #   Vyper compiler identity sha256: 208c7c41102f13ea781980bf0647dd003d334d34fb02b48f043459c8584aafe0
-#   MissionControl compiler-input integrity: e2289aa22fb374456f4e2c74119ed084180c40d085007db3a414199e940b50b0
-#   MissionControl canonical ABI sha256: 9778661b26a575626b7319a95f81281d39be6d4d081250f27be26f32de138903
-#   Ledger compiler-input integrity: 1f19f2370f430fc10611425f4c4b81cc6f2cd9d87d25cd30843a96adefd57476
+#   MissionControl compiler-input integrity: 10167cbb9016c440323c8add751b667ab94b75343a58ca2c904812f6b5d2a9cd
+#   MissionControl canonical ABI sha256: a73af57f1e4bcd70d2b98a2f2b9c4d17ecd4d1a516996eced359c36c171ef089
+#   Ledger compiler-input integrity: 266f985b2ae1049342bac32e9bcd6d0f330ced7e55fcb5cb2456b53da8646e04
 #   Ledger canonical ABI sha256: 2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c
 #   chain id: 4663
-#   snapshot block: 42563001
-#   snapshot block hash: 0x9e99f47a4f3d7063150fe69b81e909865e299f61deae423118c15e4a3662ba42
+#   snapshot block: 46988201
+#   snapshot block hash: 0x7db301f6909a256b4ac0a73675edf94505735d4b7c3d36aa7d8b936cf3de02bd
 #   snapshot finality: verified against the provider finalized tag
-#   MissionControl: 0x5B8b85cD2f56D1a99691de784FB50c0bf2FA3baC
-#   MissionControl code sha256: b2a7de7b9bff3ce544576a9988fff25ea5fca5119f2047d5931b1e9536b59a99
-#   Ledger: 0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d
-#   Ledger code sha256: 915e54b1263edf468241d8b1a90682385004d4cca0a0f42536a1b21ba2640f70
+#   MissionControl: 0xD335373E59cA2F07FC3B779F2B456972C7EfDb29
+#   MissionControl code sha256: bdf0a45855f5c5d2ee2d02507c1224d104460d72cc71f26511ed0e35a1251891
+#   Ledger: 0xF1CD5BE4288b744913d33F55370793ca833D08d7
+#   Ledger code sha256: ec685ddaccc1ae0a7a2547ad886ec66d4e8a3a816062ce75ce8f61e6f950561b
 #
 # This is the defaults contract for REPLACING a MissionControl or Ledger that
 # already exists. DefaultsRobinhood.vy remains the launch config for a
@@ -37,8 +37,11 @@
 # override, allowing future clones to use the replacement generation.
 # MissionControl and Ledger copy these values into storage at construction.
 #
-# MissionControl state that Defaults has no slot for -- userConfig and
+# MissionControl per-user state that Defaults has no slot for -- userConfig and
 # userDelegation -- does NOT survive the redeploy and is not represented here.
+# Vault pointers and historical vault classifications are also not carried;
+# verify_defaults.py must exact-match their observable live state before this
+# contract is used for a replacement.
 #
 # Percentages are basis points (100_00 == 100%). Durations are in
 # `block.number`, which on this Arbitrum L2 advances roughly every 12s -- it
@@ -129,7 +132,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
 @view
 @external
 def ripeAvailForRewards() -> uint256:
-    return 999857828800000000000000
+    return 999831170800000000000000
 
 
 @view

@@ -4,11 +4,18 @@ from boa.contracts.base_evm_contract import BoaError
 from eth_utils import to_checksum_address
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import assert_reverted_call, claim_from_stability_pool, filter_logs
+from conf_utils import (
+    assert_reverted_call,
+    claim_from_stability_pool,
+    filter_logs,
+    install_lootbox_user_checkpoint_trap,
+    sync_deployed_token,
+)
 
 
 ARB_SYS = to_checksum_address("0x0000000000000000000000000000000000000064")
 LEDGER_ID = 4
+FULL_EXIT_TOLERANCE_USD = 2 * 10**16
 
 
 def _replace_ledger_with_arb_source(
@@ -53,6 +60,215 @@ def arbBlockNumber() -> uint256:
 
 def _set_claim_many_child_identity(child_identity):
     boa.env.set_storage(ARB_SYS, 0, child_identity)
+
+
+@pytest.mark.parametrize(
+    "token_kind,claim_price,second_deposit",
+    (
+        (
+            "delta",
+            90_000 * EIGHTEEN_DECIMALS,
+            37 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            "charlie",
+            203 * EIGHTEEN_DECIMALS // 100,
+            3 * EIGHTEEN_DECIMALS,
+        ),
+    ),
+    ids=("8dp-90000", "6dp-2.03"),
+)
+def test_stab_claim_coarse_asset_can_empty_cohort(
+    token_kind,
+    claim_price,
+    second_deposit,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    delta_token,
+    delta_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    alice,
+    governance,
+    teller,
+    auction_house,
+    mock_price_source,
+    price_desk,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    claim_token = delta_token if token_kind == "delta" else charlie_token
+    claim_token_whale = (
+        delta_token_whale if token_kind == "delta" else charlie_token_whale
+    )
+    setGeneralConfig()
+    setAssetConfig(claim_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(claim_token, claim_price)
+
+    bob_deposit = 100 * EIGHTEEN_DECIMALS
+    total_deposit = bob_deposit + second_deposit
+    alpha_token.transfer(stability_pool, bob_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, bob_deposit, sender=teller.address
+    )
+    alpha_token.transfer(stability_pool, second_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        alice, alpha_token, second_deposit, sender=teller.address
+    )
+
+    claim_amount = price_desk.getAssetAmount(claim_token, total_deposit)
+    claim_token.transfer(stability_pool, claim_amount, sender=claim_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        total_deposit,
+        claim_token,
+        claim_amount,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+    bob_value_before = stability_pool.getTotalUserValue(bob, alpha_token)
+    bob_claimed = claim_from_stability_pool(
+        teller, vault_id, alpha_token, claim_token, sender=bob
+    )
+    bob_amount = claim_token.balanceOf(bob)
+    assert 10**12 <= bob_value_before - bob_claimed < FULL_EXIT_TOLERANCE_USD
+    assert bob_claimed == price_desk.getUsdValue(claim_token, bob_amount)
+    assert stability_pool.userBalances(bob, alpha_token) == 0
+
+    alice_claimed = claim_from_stability_pool(
+        teller, vault_id, alpha_token, claim_token, sender=alice
+    )
+    alice_amount = claim_token.balanceOf(alice)
+    assert alice_claimed == price_desk.getUsdValue(claim_token, alice_amount)
+    assert stability_pool.userBalances(alice, alpha_token) == 0
+    assert stability_pool.totalBalances(alpha_token) == 0
+
+    residual = claim_amount - bob_amount - alice_amount
+    assert stability_pool.claimableBalances(alpha_token, claim_token) == residual
+    assert stability_pool.totalClaimableBalances(claim_token) == residual
+    assert claim_token.balanceOf(stability_pool) == residual
+    if residual != 0:
+        assert price_desk.getUsdValue(claim_token, residual) < FULL_EXIT_TOLERANCE_USD
+
+
+def test_stab_claim_covering_finite_max_does_not_overflow(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    governance,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, amount, sender=teller.address
+    )
+    bravo_token.transfer(stability_pool, amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        amount,
+        bravo_token,
+        amount,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    claimed = claim_from_stability_pool(
+        teller,
+        vault_book.getRegId(stability_pool),
+        alpha_token,
+        bravo_token,
+        2**250,
+        sender=bob,
+    )
+    assert claimed == amount
+    assert bravo_token.balanceOf(bob) == amount
+    assert stability_pool.userBalances(bob, alpha_token) == 0
+    assert stability_pool.totalBalances(alpha_token) == 0
+
+
+def test_stab_claim_partial_large_values_does_not_overflow(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    governance,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1)
+
+    deposit_amount = 10**30
+    alpha_token.mint(alpha_token_whale, deposit_amount, sender=governance.address)
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+
+    claim_amount = deposit_amount * EIGHTEEN_DECIMALS
+    bravo_token.mint(bravo_token_whale, claim_amount, sender=governance.address)
+    bravo_token.transfer(stability_pool, claim_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claim_amount,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    partial_usd_value = deposit_amount // 2
+    claimed = claim_from_stability_pool(
+        teller,
+        vault_book.getRegId(stability_pool),
+        alpha_token,
+        bravo_token,
+        partial_usd_value,
+        sender=bob,
+    )
+    assert claimed == partial_usd_value
+    assert bravo_token.balanceOf(bob) == partial_usd_value * EIGHTEEN_DECIMALS
+    assert stability_pool.userBalances(bob, alpha_token) != 0
 
 
 def test_stab_vault_claims_full(
@@ -108,6 +324,295 @@ def test_stab_vault_claims_full(
     assert stability_pool.getTotalValue(alpha_token) <= 1
 
     _test(claimable_amount, bravo_token.balanceOf(bob))
+
+
+def test_stab_claim_credits_forward_value_of_zero_decimal_delivery(
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Token",
+        "COARSE",
+        0,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    coarse_token.transfer(stability_pool, 1, sender=governance.address)
+    recipient_balance_before = alpha_token.balanceOf(governance)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        3 * EIGHTEEN_DECIMALS,
+        coarse_token,
+        1,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    assert alpha_token.balanceOf(governance) - recipient_balance_before == (
+        3 * EIGHTEEN_DECIMALS
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+    claimed_value = claim_from_stability_pool(
+        teller,
+        vault_id,
+        alpha_token,
+        coarse_token,
+        5 * EIGHTEEN_DECIMALS,
+        sender=bob,
+    )
+
+    assert claimed_value == 3 * EIGHTEEN_DECIMALS
+    log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
+    assert log.claimAmount == 1
+    assert log.claimUsdValue == 3 * EIGHTEEN_DECIMALS
+    assert coarse_token.balanceOf(bob) == 1
+
+
+def test_stab_claim_coarse_full_quote_preserves_unpaid_share_value(
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Coarse Full Claim",
+        "CFC",
+        0,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
+
+    deposit_amount = 5 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    coarse_token.transfer(stability_pool, 1, sender=governance.address)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        3 * EIGHTEEN_DECIMALS,
+        coarse_token,
+        1,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == deposit_amount
+
+    vault_id = vault_book.getRegId(stability_pool)
+    claimed_value = claim_from_stability_pool(
+        teller,
+        vault_id,
+        alpha_token,
+        coarse_token,
+        deposit_amount,
+        sender=bob,
+    )
+
+    assert claimed_value == 3 * EIGHTEEN_DECIMALS
+    assert coarse_token.balanceOf(bob) == 1
+    assert stability_pool.userBalances(bob, alpha_token) != 0
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == (
+        2 * EIGHTEEN_DECIMALS
+    )
+    log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
+    assert not log.isDepleted
+
+
+def test_stab_claim_retains_three_cent_shortfall_above_full_exit_tolerance(
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Two Cent Boundary",
+        "TCB",
+        2,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(coarse_token, 4 * EIGHTEEN_DECIMALS)
+
+    bob_deposit = 7 * 10**16
+    alice_deposit = 5 * 10**16
+    alpha_token.transfer(stability_pool, bob_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, bob_deposit, sender=teller.address
+    )
+    alpha_token.transfer(stability_pool, alice_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        alice, alpha_token, alice_deposit, sender=teller.address
+    )
+
+    coarse_token.transfer(stability_pool, 3, sender=governance.address)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        bob_deposit + alice_deposit,
+        coarse_token,
+        3,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == bob_deposit
+
+    claimed_value = claim_from_stability_pool(
+        teller,
+        vault_book.getRegId(stability_pool),
+        alpha_token,
+        coarse_token,
+        sender=bob,
+    )
+
+    assert claimed_value == 4 * 10**16
+    assert stability_pool.userBalances(bob, alpha_token) != 0
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == 3 * 10**16
+    log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
+    assert not log.isDepleted
+
+
+@pytest.mark.parametrize(
+    ("shortfall", "expect_full_exit"),
+    (
+        (FULL_EXIT_TOLERANCE_USD - 1, True),
+        (FULL_EXIT_TOLERANCE_USD, False),
+    ),
+    ids=("one-wei-below-tolerance", "at-tolerance"),
+)
+def test_stab_claim_full_exit_tolerance_boundary(
+    shortfall,
+    expect_full_exit,
+    governance,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    coarse_token = boa.load(
+        "contracts/mock/MockErc20.vy",
+        governance,
+        "Full Exit Tolerance Boundary",
+        "FETB",
+        2,
+        1,
+    )
+    sync_deployed_token(coarse_token)
+    setGeneralConfig()
+    setAssetConfig(coarse_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    claim_unit_usd = 4 * 10**16
+    mock_price_source.setPrice(coarse_token, 4 * EIGHTEEN_DECIMALS)
+
+    bob_deposit = claim_unit_usd + shortfall
+    total_deposit = 3 * claim_unit_usd
+    alice_deposit = total_deposit - bob_deposit
+    alpha_token.transfer(stability_pool, bob_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        bob_deposit,
+        sender=teller.address,
+    )
+    alpha_token.transfer(stability_pool, alice_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        alice,
+        alpha_token,
+        alice_deposit,
+        sender=teller.address,
+    )
+    coarse_token.transfer(stability_pool, 3, sender=governance.address)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        total_deposit,
+        coarse_token,
+        3,
+        governance,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    claimed_value = claim_from_stability_pool(
+        teller,
+        vault_book.getRegId(stability_pool),
+        alpha_token,
+        coarse_token,
+        sender=bob,
+    )
+
+    assert claimed_value == claim_unit_usd
+    assert (stability_pool.userBalances(bob, alpha_token) == 0) is expect_full_exit
+    log = filter_logs(teller, "AssetClaimedInStabilityPool")[0]
+    assert log.isDepleted is expect_full_exit
+    if not expect_full_exit:
+        assert stability_pool.getTotalUserValue(bob, alpha_token) == shortfall
 
 
 def test_stability_claim_checkpoints_deposit_points_after_share_burn(
@@ -295,7 +800,7 @@ def test_stability_claim_checkpoint_failure_rolls_back_batch(
     savings_green,
     lootbox,
     ledger,
-    switchboard_alpha,
+    ripe_hq,
     setGeneralConfig,
     setAssetConfig,
     setRipeRewardsConfig,
@@ -329,8 +834,8 @@ def test_stability_claim_checkpoint_failure_rolls_back_batch(
         ledger.userDepositPoints(bob, vault_id, alpha_token),
     )
 
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    with boa.reverts():
         claim_from_stability_pool(
             teller, vault_id, alpha_token, bravo_token, sender=bob
         )
@@ -690,10 +1195,15 @@ def test_stab_vault_claims_multiple_assets(
     # Claim charlie tokens  
     claim_from_stability_pool(teller, vault_id, alpha_token, charlie_token, sender=bob)
     charlie_claimed = charlie_token.balanceOf(bob)
-    _test(charlie_amount, charlie_claimed)
+    assert charlie_claimed == charlie_amount - 1
+    assert stability_pool.claimableBalances(alpha_token, charlie_token) == 1
 
-    # User should be fully depleted
-    assert stability_pool.getTotalUserValue(bob, alpha_token) <= 1
+    # The last raw 6-decimal unit is worth one micro-dollar. Before the strict
+    # sub-micro-dollar exit tolerance, virtual-share rounding left the user one
+    # USD wei below that unit with nonzero shares, while a retry quoted zero
+    # tokens and reverted `nothing claimed`.
+    assert stability_pool.userBalances(bob, alpha_token) == 0
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == 0
 
 
 def test_claim_after_effects_guard_rejection_rolls_back_second_claim(
@@ -3908,8 +4418,8 @@ def test_stab_vault_claims_meaningful_live_residual_stays_listed(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.26, leaving $0.04.
-    claim_usd_value = 26 * 10 ** 16
+    # Claim $0.29, leaving $0.01.
+    claim_usd_value = 29 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Shares remain and the leftover is well above P // 10**10, so the row stays listed.
@@ -3939,7 +4449,7 @@ def test_stab_vault_claims_no_dust_removal_above_threshold(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that claimable asset stays active at or above $0.05."""
+    """Test that claimable asset stays active at or above the $0.05 retention floor."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -4020,8 +4530,8 @@ def test_stab_vault_claims_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.26, leaving a $0.04 residual that stays ACTIVE: below $0.05 but not microscopic.
-    claim_usd_value = 26 * 10 ** 16
+    # Claim $0.29, leaving a $0.01 residual that stays ACTIVE: below $0.05 but not microscopic.
+    claim_usd_value = 29 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
@@ -4080,7 +4590,7 @@ def test_stab_vault_claims_receipt_accumulates_on_listed_live_residual(
     vault_id = vault_book.getRegId(stability_pool)
 
     # Claim to leave dust
-    claim_usd_value = 11 * 10 ** 16
+    claim_usd_value = 14 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
@@ -4205,8 +4715,8 @@ def test_stab_vault_claims_dust_different_price_levels(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.26 to leave $0.04 below the retention threshold.
-    claim_usd_value = 26 * 10 ** 16
+    # Claim $0.29 to leave $0.01 below the retention threshold.
+    claim_usd_value = 29 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
@@ -5128,6 +5638,11 @@ def _clone_reward_source(
             source_mission_control.assetConfig(asset),
             sender=switchboard_alpha.address,
         )
+        target_mission_control.setRewardVaultId(
+            asset,
+            source_mission_control.rewardVaultId(asset),
+            sender=switchboard_alpha.address,
+        )
 
 
 def test_stab_reward_lock_follows_the_active_mission_control_source(
@@ -5181,6 +5696,7 @@ def test_stab_reward_lock_follows_the_active_mission_control_source(
         name="second_mission_control",
         override_address=boa.env.generate_address(),
     )
+    _swap_mission_control(ripe_hq_deploy, governance, second_mission_control)
     _clone_reward_source(
         mission_control,
         second_mission_control,
@@ -5191,7 +5707,6 @@ def test_stab_reward_lock_follows_the_active_mission_control_source(
         min_lock=200,
         max_lock=1_200,
     )
-    _swap_mission_control(ripe_hq_deploy, governance, second_mission_control)
 
     _claim_for_stab_rewards(
         stability_pool, alpha_token, bravo_token, alpha_token_whale,

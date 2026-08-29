@@ -335,14 +335,16 @@ decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
   snapshot_contract: This list is a historical or intentionally refreshed snapshot; the canonical register controls, exact per-PR parity is not required, and final release preparation reconciles the snapshot once.
   in_flight_coordination:
-    checked_on: 2026-08-15
+    checked_on: 2026-08-26
     sc12_reserved_id: RH-D035
     integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036] }
-    open_pr_allocations: { PR_145: [RH-D038], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043] }
+    open_pr_allocations: { PR_145: [RH-D038], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043], PR_211: [RH-D044, RH-D045, RH-D046] }
+    proposed_unapproved: {}
+    owner_accepted: { PR_211: [RH-D044, RH-D045, RH-D046] }
     open_prs_with_no_new_decision: [PR_163]
     inherited_not_new: { PR_152: [RH-D033, RH-D034] }
     external_collision: none_detected_by_fail_closed_integration_allocator
-    scope: PR 145 records the live target and six open remediation PR heads checked on 2026-08-15; it does not edit, renumber, approve, or reject another branch.
+    scope: This scoped refresh records RH-D044 and RH-D045 as previously owner-authorized and RH-D046 plus the disclosed PR_211 residuals as owner-accepted on 2026-08-26. It grants no integration, deployment, configuration, activation, or release authority.
 
 sc12_activation_state:
   source: docs/chains/rh/smart-contract-changes/ripe-gov.md

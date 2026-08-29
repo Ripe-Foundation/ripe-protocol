@@ -889,7 +889,7 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
         assert before.ripeGenPoints > 0
     else:
         assert before.ripeStakerPoints > 0
-    configured_before = mission_control.getDepositPointsConfig(stock_token)
+    configured_before = mission_control.getDepositPointsConfig(stock_token, 3)
 
     _create_custody_shortfall(stock_token, simple_erc20_vault, deploy3r)
     assert simple_erc20_vault.getUserLootBoxShare(bob, stock_token) == 0
@@ -927,7 +927,7 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
     assert quarantined.ripeVotePoints > before.ripeVotePoints
     assert quarantined.lastUsdValue == 0
     assert global_quarantined.ripeVotePoints > global_before.ripeVotePoints
-    assert mission_control.getDepositPointsConfig(stock_token) == configured_before
+    assert mission_control.getDepositPointsConfig(stock_token, 3) == configured_before
 
     stock_token.mint(simple_erc20_vault, 1, sender=deploy3r)
     boa.env.time_travel(blocks=10)
@@ -1029,7 +1029,7 @@ def test_unrelated_reward_update_preserves_shortfall_asset_fixed_allocation_stat
         sender=teller.address,
     )
     stock_before = ledger.assetDepositPoints(3, stock_token)
-    configured_before = mission_control.getDepositPointsConfig(stock_token)
+    configured_before = mission_control.getDepositPointsConfig(stock_token, 3)
 
     _create_custody_shortfall(stock_token, simple_erc20_vault, deploy3r)
     boa.env.time_travel(blocks=10)
@@ -1058,7 +1058,7 @@ def test_unrelated_reward_update_preserves_shortfall_asset_fixed_allocation_stat
     assert stock_after.ripeVotePoints > stock_before.ripeVotePoints
     assert stock_after.ripeGenPoints == stock_before.ripeGenPoints
     assert stock_after.lastUsdValue == 0
-    assert mission_control.getDepositPointsConfig(stock_token) == configured_before
+    assert mission_control.getDepositPointsConfig(stock_token, 3) == configured_before
 
 
 def test_mixed_deleverage_batch_skips_quarantine_and_one_element_batch_replaces_singular_api(

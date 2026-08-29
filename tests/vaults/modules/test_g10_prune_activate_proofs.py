@@ -189,6 +189,74 @@ def _seed_dormant_then_empty_activate(
     return tokens
 
 
+@pytest.mark.parametrize(
+    ("remaining_usd", "expected_state"),
+    (
+        (RETENTION_THRESHOLD - 1, CLAIM_ASSET_DORMANT),
+        (RETENTION_THRESHOLD, CLAIM_ASSET_ACTIVE),
+    ),
+    ids=("one-wei-below-retention", "at-retention"),
+)
+def test_g10_prune_retention_threshold_boundary(
+    remaining_usd,
+    expected_state,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    switchboard_alpha,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    claim_amount = RETENTION_THRESHOLD
+    _seed_dormant_then_empty_activate(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        ((bravo_token, bravo_token_whale, claim_amount),),
+        auction_house,
+        green_token,
+        savings_green,
+        switchboard_alpha,
+        alice,
+    )
+    stability_pool.pause(False, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(
+        bravo_token,
+        remaining_usd * EIGHTEEN_DECIMALS // claim_amount,
+    )
+
+    stability_pool.pruneClaimableAssets(
+        alpha_token,
+        [bravo_token],
+        sender=alice,
+    )
+
+    logs = _dust_logs(stability_pool, bravo_token)
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == expected_state
+    if expected_state == CLAIM_ASSET_DORMANT:
+        assert len(logs) == 1
+        assert logs[0].reason == DEACTIVATION_DUST
+    else:
+        assert logs == []
+
+
 def test_g10_can_activate_is_not_exported_on_stability_pool(stability_pool):
     abi_names = {
         entry["name"]
@@ -341,7 +409,7 @@ def test_g10_prune_source_zero_retains_and_continues_batch(
     bravo_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
     mock_price_source.setPrice(bravo_token, 0)
     mock_price_source.setShouldRevert(bravo_token, True)
-    mock_price_source.setPrice(charlie_token, 4 * 10**17)
+    mock_price_source.setPrice(charlie_token, 2 * 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token, charlie_token], sender=sally)
     logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
     assert len(logs) == 1
@@ -383,7 +451,7 @@ def test_g10_prune_swap_and_pop_middle_last_only_and_moved_tail(
 
     # After A is removed, C has moved into A's index. Later request must still remove C.
     for token in (a, c):
-        mock_price_source.setPrice(token, 4 * 10**17)
+        mock_price_source.setPrice(token, 10**17)
     mock_price_source.setPrice(b, EIGHTEEN_DECIMALS)
     stability_pool.pruneClaimableAssets(alpha_token, [a, c], sender=sally)
     logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
@@ -399,7 +467,7 @@ def test_g10_prune_swap_and_pop_middle_last_only_and_moved_tail(
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 1
 
     # Last / only-row: empty list is num==1, active count 0, slot zeroed.
-    mock_price_source.setPrice(b, 4 * 10**17)
+    mock_price_source.setPrice(b, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [b], sender=sally)
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
     assert stability_pool.numClaimableAssets(alpha_token) == 1
@@ -479,7 +547,7 @@ def test_g10_prune_two_stabs_share_one_claim_asset(
     stability_pool.pause(False, sender=switchboard_alpha.address)
     b_pair = stability_pool.claimableBalances(charlie_token, bravo_token)
     global_liability = stability_pool.totalClaimableBalances(bravo_token)
-    mock_price_source.setPrice(bravo_token, 4 * 10**17)
+    mock_price_source.setPrice(bravo_token, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=sally)
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
     assert stability_pool.getClaimAssetState(charlie_token, bravo_token) == CLAIM_ASSET_ACTIVE
@@ -558,7 +626,7 @@ def test_g10_1a_dust_prune_must_not_reenable_nav_with_custody_deficit(
     with boa.reverts("claim custody deficit"):
         stability_pool.withdrawTokensFromVault(bob, alpha_token, EIGHTEEN_DECIMALS, bob, sender=teller.address)
 
-    mock_price_source.setPrice(bravo_token, 4 * 10**15)
+    mock_price_source.setPrice(bravo_token, 10**15)
     pair = stability_pool.claimableBalances(alpha_token, bravo_token)
     liability = stability_pool.totalClaimableBalances(bravo_token)
     custody = bravo_token.balanceOf(stability_pool.address)
@@ -595,13 +663,13 @@ def test_g10_1a_full_custody_dust_prune_allows_nav(
         stability_pool, alpha_token, bravo_token, bravo_token_whale,
         10 * EIGHTEEN_DECIMALS, bob, auction_house, green_token, savings_green,
     )
-    mock_price_source.setPrice(bravo_token, 4 * 10**15)
+    mock_price_source.setPrice(bravo_token, 10**15)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=sally)
     # Live-share full-custody dust prune is a no-op; the pair stays on NAV.
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
     assert stability_pool.getTotalValue(alpha_token) == (
         alpha_token.balanceOf(stability_pool.address)
-        + stability_pool.claimableBalances(alpha_token, bravo_token) * 4 * 10**15 // EIGHTEEN_DECIMALS
+        + stability_pool.claimableBalances(alpha_token, bravo_token) * 10**15 // EIGHTEEN_DECIMALS
     )
     alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
     assert stability_pool.depositTokensInVault(
@@ -999,7 +1067,7 @@ def test_g10_activate_capacity_order_and_persistence(
     assert not stability_pool.canAcceptLiquidationAsset(alpha_token, extra)
 
     # Free a slot by dust-pruning the occupying row, then activate the loser.
-    mock_price_source.setPrice(low, 4 * 10**17)
+    mock_price_source.setPrice(low, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [low], sender=sally)
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 19
     assert stability_pool.canAcceptLiquidationAsset(alpha_token, extra)
@@ -1106,7 +1174,7 @@ def test_g10_1a_empty_full_custody_dust_prune_delists(
         auction_house, green_token, savings_green, switchboard_alpha, sally,
         donate_stab=0,
     )
-    mock_price_source.setPrice(bravo_token, 4 * 10**17)
+    mock_price_source.setPrice(bravo_token, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=sally)
     logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
     assert len(logs) == 1
@@ -1141,7 +1209,7 @@ def test_g10_1a_empty_custody_deficit_dust_prune_keeps_active(
     )
     stability_pool.pause(False, sender=switchboard_alpha.address)
     bravo_token.transfer(alice, 1, sender=stability_pool.address)
-    mock_price_source.setPrice(bravo_token, 4 * 10**17)
+    mock_price_source.setPrice(bravo_token, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=sally)
     assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
@@ -1181,8 +1249,8 @@ def test_g10_1a_empty_batch_short_row_skips_safe_row_continues(
     )
     stability_pool.pause(False, sender=switchboard_alpha.address)
     a.transfer(alice, 1, sender=stability_pool.address)
-    mock_price_source.setPrice(a, 4 * 10**17)
-    mock_price_source.setPrice(b, 4 * 10**17)
+    mock_price_source.setPrice(a, 10**17)
+    mock_price_source.setPrice(b, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [a, b], sender=sally)
     logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
     assert len(logs) == 1
@@ -1228,7 +1296,7 @@ def test_g10_1a_empty_cross_cohort_global_deficit_blocks_prune(
     stability_pool.pause(False, sender=switchboard_alpha.address)
     # One wei short against the shared global liability.
     bravo_token.transfer(alice, 1, sender=stability_pool.address)
-    mock_price_source.setPrice(bravo_token, 4 * 10**17)
+    mock_price_source.setPrice(bravo_token, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=sally)
     assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
@@ -1271,7 +1339,7 @@ def test_g10_live_cap_blocks_21st_and_empty_dust_prune_frees_slot(
                 stability_pool, alpha_token, extra, alice, ACTIVATION_THRESHOLD,
                 bob, auction_house, green_token, savings_green,
             )
-        mock_price_source.setPrice(occupants[0], 4 * 10**17)
+        mock_price_source.setPrice(occupants[0], 10**17)
         stability_pool.pruneClaimableAssets(alpha_token, [occupants[0]], sender=sally)
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == 20
         assert not stability_pool.canAcceptLiquidationAsset(alpha_token, extra)
@@ -1296,7 +1364,7 @@ def test_g10_live_cap_blocks_21st_and_empty_dust_prune_frees_slot(
         stability_pool.activateClaimAssets(alpha_token, occupants[:15], sender=sally)
         stability_pool.activateClaimAssets(alpha_token, occupants[15:], sender=sally)
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == 20
-        mock_price_source.setPrice(occupants[0], 4 * 10**17)
+        mock_price_source.setPrice(occupants[0], 10**17)
         stability_pool.pruneClaimableAssets(alpha_token, [occupants[0]], sender=sally)
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == 19
         stability_pool.pause(False, sender=switchboard_alpha.address)
@@ -1337,7 +1405,7 @@ def test_g10_partial_claim_wrong_low_quote_keeps_row_active(
         stability_pool, alpha_token, bravo_token, bravo_token_whale,
         pile, bob, auction_house, green_token, savings_green,
     )
-    mock_price_source.setPrice(bravo_token, 4 * 10**15)
+    mock_price_source.setPrice(bravo_token, 2 * 10**15)
     vault_id = vault_book.getRegId(stability_pool)
     sliver_usd = 10**16
     claim_from_stability_pool(
@@ -1376,7 +1444,7 @@ def test_g10_partial_redeem_wrong_low_quote_keeps_row_active(
         stability_pool, alpha_token, bravo_token, bravo_token_whale,
         pile, bob, auction_house, green_token, savings_green,
     )
-    mock_price_source.setPrice(bravo_token, 4 * 10**15)
+    mock_price_source.setPrice(bravo_token, 2 * 10**15)
     vault_id = vault_book.getRegId(stability_pool)
     payment = 10**16
     green_token.transfer(bob, payment, sender=whale)
@@ -1411,7 +1479,7 @@ def test_g10_partial_claim_then_deposit_does_not_capture(
 
     Attack claims at a wrong-low quote so implied remaining USD is dust
     (old `_claimFromStabilityPool` would unlist). Control claims the same
-    token sliver at a non-unlisting quote (remaining USD above $0.05).
+    token sliver at a non-unlisting quote (remaining USD at or above $0.05).
     A pre-claim stab donation on the control arm (no shares minted) equalizes
     valueToShares. After the claim, the attack arm receives the same
     25-stab top-up so pool stab custody matches. Alice then deposits,
@@ -1927,7 +1995,7 @@ def test_g10_usd_below_retention_without_microscopic_ratio_stays_listed(
         stability_pool, alpha_token, bravo_token, bravo_token_whale,
         pile, bob, auction_house, green_token, savings_green,
     )
-    leftover = 4 * 10**16
+    leftover = RETENTION_THRESHOLD - 1
     consume = pile - leftover
     vault_id = vault_book.getRegId(stability_pool)
     green_token.transfer(bob, consume, sender=whale)
@@ -1957,7 +2025,7 @@ def test_g10_microscopic_ratio_at_retention_usd_stays_listed(
     savings_green,
     credit_engine,
 ):
-    pile = 5 * 10**26
+    pile = RETENTION_THRESHOLD * LIVE_RESIDUAL_DIVISOR
     leftover = pile // LIVE_RESIDUAL_DIVISOR
     assert leftover == RETENTION_THRESHOLD
     green_token.mint(whale, pile, sender=credit_engine.address)
@@ -2246,7 +2314,7 @@ def test_g10_empty_cohort_partial_redemption_dust_unlists(
     pile = dormant + top_up
     assert pile == 30 * 10**16
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
-    leftover = 4 * 10**16
+    leftover = RETENTION_THRESHOLD - 1
     consume = pile - leftover
     vault_id = vault_book.getRegId(stability_pool)
     green_token.transfer(bob, consume, sender=whale)

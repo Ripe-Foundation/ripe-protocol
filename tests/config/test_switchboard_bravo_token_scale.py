@@ -70,8 +70,8 @@ def _add_fungible(switchboard_bravo, governance, asset, mission_control=ZERO_ADD
     return switchboard_bravo.addAsset(
         asset,
         [1],
-        50_00,
-        30_00,
+        0,
+        0,
         1000,
         10000,
         0,
@@ -99,8 +99,8 @@ def _add_nft(switchboard_bravo, governance, asset):
     return switchboard_bravo.addAsset(
         asset,
         [1],
-        50_00,
-        30_00,
+        0,
+        0,
         1000,
         10000,
         0,
@@ -306,9 +306,9 @@ def test_non_add_new_actions_do_not_change_scale(
 
     deposit_id = switchboard_bravo.setAssetDepositParams(
         token,
-        [2, 3],
-        40_00,
-        35_00,
+        [1],
+        0,
+        0,
         2000,
         20000,
         0,

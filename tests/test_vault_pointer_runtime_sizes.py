@@ -1,3 +1,5 @@
+import boa
+
 EIP170_LIMIT = 24_576
 
 # Exact deployed runtimes at this head (boa, including immutables).
@@ -5,54 +7,45 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# RipeGov headroom is 460 bytes after the migration, SharesVault, and
-# governance-remediation changes. Any RipeGov edit must remeasure this pin.
-# Composed SwitchboardAlpha headroom is 14 bytes after binding its chain-local
-# Pyth source ID. Teller and CreditEngine retain 33 and 39 bytes respectively
-# after binding their chain-local Curve source IDs. Endaoment retains 1,190
-# bytes after the same change. These pins include the deployed immutable data.
-# Lootbox headroom is exactly 120 bytes at the pinned 24,456-byte deployed
-# runtime. Any Lootbox edit, however small, must recompile and remeasure this
-# pin before merge; its `# pragma optimize codesize` (no CLI -O override) is
-# load-bearing.
-# StabilityPool headroom is 279 bytes after the deferred claim checkpoint,
-# exact-payment, claimable-aware retirement, and partial-reservation admission
-# remediations.
-# Any StabilityPool or StabVault edit must recompile and remeasure this pin
-# before merge.
-# SwitchboardBravo retains only 26 bytes of headroom. CurvePrices retains 1,170
-# bytes after switching to codesize optimization for confirmation-time registry
-# snapshot checks. UndyVaultPrices retains 6,270 bytes after confirmation-time
-# metadata binding and checked runtime arithmetic. Any edit to these contracts
-# must recompile and remeasure.
+# Tight EIP-170 headrooms vs 24,576: AuctionHouse 12, Deleverage 17,
+# Teller 24, CreditEngine 33, Bravo 100, Lootbox 266, Alpha 586.
+# Charlie is 21,830 / 2,746 free. MissionControl is 18,644. Ledger is
+# 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
+# Deleverage without remeasuring.
+# Lootbox `# pragma optimize codesize` (no CLI -O override) is load-bearing.
+# Bravo: a dead current VaultBook row fail-closes; restore the book, then Bravo.
+# Alpha always settles ripePerBlock / split writes, including setRipePerBlock(0).
+# Any edit to a pinned contract must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16143,
-    "SwitchboardAlpha": 24562,
-    "SwitchboardBravo": 24550,
-    "SwitchboardCharlie": 23873,
+    "MissionControl": 18644,
+    "DefaultsLocal": 1200,
+    "SwitchboardAlpha": 23990,
+    "SwitchboardBravo": 24476,
+    "SwitchboardCharlie": 21830,
     "SwitchboardEcho": 23930,
+    "SwitchboardFoxtrot": 11433,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
-    "Teller": 24543,
+    "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
-    "Lootbox": 24456,
+    "Lootbox": 24310,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
     "RipeToken": 8760,
     "RebaseErc20": 11602,
     "RipeGov": 24116,
-    "HumanResources": 14777,
-    "AuctionHouse": 24566,
-    "CreditEngine": 24537,
-    "CreditRedeem": 8415,
+    "HumanResources": 14932,
+    "AuctionHouse": 24564,
+    "CreditEngine": 24543,
+    "CreditRedeem": 8504,
     "Endaoment": 23386,
     "PriceDesk": 17742,
-    "Deleverage": 24459,
-    "StabilityPool": 24297,
+    "Deleverage": 24559,
+    "StabilityPool": 24332,
     "BlueChipYieldPrices": 20857,
-    "ChainlinkPrices": 16436,
+    "ChainlinkPrices": 16988,
     "CurvePrices": 23406,
     "PythPrices": 16055,
     "RedStone": 15325,
@@ -68,6 +61,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     switchboard_bravo,
     switchboard_charlie,
     switchboard_echo,
+    switchboard_foxtrot,
     vault_migrator,
     vault_book,
     teller,
@@ -97,8 +91,10 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     undy_vault_prices,
     wsuper_oethb_prices,
 ):
+    defaults_local = boa.load("contracts/config/DefaultsLocal.vy")
     deployed_runtime_bytes = {
         "MissionControl": len(mission_control.env.get_code(mission_control.address)),
+        "DefaultsLocal": len(defaults_local.env.get_code(defaults_local.address)),
         "SwitchboardAlpha": len(
             switchboard_alpha.env.get_code(switchboard_alpha.address)
         ),
@@ -110,6 +106,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         ),
         "SwitchboardEcho": len(
             switchboard_echo.env.get_code(switchboard_echo.address)
+        ),
+        "SwitchboardFoxtrot": len(
+            switchboard_foxtrot.env.get_code(switchboard_foxtrot.address)
         ),
         "VaultMigrator": len(vault_migrator.env.get_code(vault_migrator.address)),
         "VaultBook": len(vault_book.env.get_code(vault_book.address)),

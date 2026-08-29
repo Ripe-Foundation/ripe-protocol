@@ -36,26 +36,35 @@ interface StabilityPool:
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def rewardVaultId(_asset: address) -> uint256: view
+    def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
-    def coreRipeGovVaultId() -> uint256: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
     def getRipeHq() -> address: view
+
+interface PriceDesk:
+    def tokenScale(_asset: address) -> uint256: view
+    def syncTokenScale(_asset: address): nonpayable
+    def getAddr(_regId: uint256) -> address: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 
-interface PriceDesk:
-    def tokenScale(_asset: address) -> uint256: view
-    def syncTokenScale(_asset: address): nonpayable
+interface Lootbox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
 
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
+
+interface CurvePrices:
+    def addGreenRefPoolSnapshot() -> bool: nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -182,6 +191,12 @@ event WhitelistAssetSet:
     asset: indexed(address)
     whitelist: indexed(address)
 
+event GreenRefPoolSnapshotAttempted:
+    caller: indexed(address)
+    priceSourceId: indexed(uint256)
+    priceSourceAddr: indexed(address)
+    didUpdate: bool
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingAssetConfig: public(HashMap[uint256, AssetUpdate]) # aid -> asset
@@ -193,10 +208,12 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 
 GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
+LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 SWITCHBOARD_ID: constant(uint256) = 6
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
+LOOTBOX_ID: constant(uint256) = 16
 SWITCHBOARD_ALPHA_ID: constant(uint256) = 1
 
 
@@ -408,19 +425,11 @@ def _isValidAssetDepositParams(
         if not staticcall VaultBook(vaultBook).isValidRegId(vaultId):
             return False
     
-    # staker allocs must be with staker vaults
     if _stakersPointsAlloc != 0:
-        coreRipeGovVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-
-        hasStakerVault: bool = False
-        for vaultId: uint256 in _vaultIds:
-            if coreRipeGovVaultId != 0 and vaultId == coreRipeGovVaultId:
-                hasStakerVault = True
-                break
-            if staticcall MissionControl(_missionControl).isStabVaultId(vaultId):
-                hasStakerVault = True
-                break
-        if not hasStakerVault:
+        earner: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
+        if earner == 0:
+            return False
+        if not staticcall MissionControl(_missionControl).isRipeGovVaultId(earner) and not staticcall MissionControl(_missionControl).isStabVaultId(earner):
             return False
 
     return True
@@ -798,6 +807,100 @@ def _isValidRedeemCollateralConfig(
     return True
 
 
+# asset config write
+
+
+@view
+@internal
+def _vaultIdsEqual(
+    _a: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _b: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+) -> bool:
+    if len(_a) != len(_b):
+        return False
+    for i: uint256 in range(len(_a), bound=MAX_VAULTS_PER_ASSET):
+        if _a[i] != _b[i]:
+            return False
+    return True
+
+
+@view
+@internal
+def _assertAssetAllocStructure(
+    _asset: address,
+    _missionControl: address,
+    _isAddNew: bool,
+    _oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _newVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _oldStakers: uint256,
+    _oldVoter: uint256,
+    _newStakers: uint256,
+    _newVoter: uint256,
+):
+    if _isAddNew:
+        assert _newStakers == 0 and _newVoter == 0 # dev: new asset must start at zero allocs
+    membershipChanged: bool = not self._vaultIdsEqual(_oldVaultIds, _newVaultIds)
+    allocsChanged: bool = _oldStakers != _newStakers or _oldVoter != _newVoter
+    assert not (membershipChanged and allocsChanged) # dev: cannot change membership and allocs together
+    earner: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
+    if membershipChanged:
+        assert _oldStakers == 0 and _oldVoter == 0 and _newStakers == 0 and _newVoter == 0 # dev: membership change requires zero allocs
+        assert earner == 0 or earner in _newVaultIds # dev: cannot drop reward vault
+    if _newStakers != 0 or _newVoter != 0:
+        assert earner != 0 # dev: active allocs require reward vault
+
+
+@internal
+def _checkpointSelectedRows(
+    _asset: address,
+    _vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _vaultAddrs: DynArray[address, MAX_VAULTS_PER_ASSET],
+    _lootbox: address,
+):
+    for i: uint256 in range(len(_vaultIds), bound=MAX_VAULTS_PER_ASSET):
+        extcall Lootbox(_lootbox).updateDepositPoints(empty(address), _vaultIds[i], _vaultAddrs[i], _asset)
+
+
+@internal
+def _writeAssetConfig(
+    _asset: address,
+    _config: cs.AssetConfig,
+    _mc: address,
+    _actionType: ActionType,
+    _oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _oldStakers: uint256,
+    _oldVoter: uint256,
+):
+    if _actionType == ActionType.ASSET_ADD_NEW or _actionType == ActionType.ASSET_DEPOSIT_PARAMS:
+        self._assertAssetAllocStructure(_asset, _mc, _actionType == ActionType.ASSET_ADD_NEW, _oldVaultIds, _config.vaultIds, _oldStakers, _oldVoter, _config.stakersPointsAlloc, _config.voterPointsAlloc)
+    assert self._isValidAssetConfig(_asset, _config, _mc) # dev: invalid asset config
+
+    needCkpt: bool = (
+        _actionType == ActionType.ASSET_DEPOSIT_PARAMS
+        and _mc == self._getMissionControlAddr()
+        and (_oldStakers != _config.stakersPointsAlloc or _oldVoter != _config.voterPointsAlloc)
+    )
+    selectedIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = []
+    selectedAddrs: DynArray[address, MAX_VAULTS_PER_ASSET] = []
+    lootbox: address = empty(address)
+    if needCkpt:
+        ripeHq: address = gov._getRipeHqFromGov()
+        vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
+        lootbox = staticcall RipeHq(ripeHq).getAddr(LOOTBOX_ID)
+        earner: uint256 = staticcall MissionControl(_mc).rewardVaultId(_asset)
+        if earner != 0:
+            vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(earner)
+            assert vaultAddr != empty(address) # dev: invalid vault
+            selectedIds.append(earner)
+            selectedAddrs.append(vaultAddr)
+        self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
+
+    extcall MissionControl(_mc).setAssetConfig(_asset, _config)
+
+    if needCkpt and (_oldStakers == 0) != (_config.stakersPointsAlloc == 0):
+        self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
+
+
 #############
 # Execution #
 #############
@@ -817,12 +920,12 @@ def executePendingAction(_aid: uint256) -> bool:
     mc: address = self.pendingMissionControl[_aid]
     if mc == empty(address):
         mc = self._getMissionControlAddr()
+    p: AssetUpdate = self.pendingAssetConfig[_aid]
 
     if actionType == ActionType.ASSET_ADD_NEW:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
         assert not staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: must be new asset
-        assert self._isValidAssetConfig(p.asset, p.config, mc) # dev: invalid asset config
-        extcall MissionControl(mc).setAssetConfig(p.asset, p.config)
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
+        self._writeAssetConfig(p.asset, p.config, mc, ActionType.ASSET_ADD_NEW, [], 0, 0)
         if not p.config.isNft:
             priceDesk: address = staticcall RipeHq(staticcall MissionControl(mc).getRipeHq()).getAddr(PRICE_DESK_ID)
             assert priceDesk != empty(address) # dev: missing price desk
@@ -831,20 +934,23 @@ def executePendingAction(_aid: uint256) -> bool:
         log AssetAdded(asset=p.asset)
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert mc == self._getMissionControlAddr() # dev: not current mission control
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
+        oldVaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = config.vaultIds
+        oldStakers: uint256 = config.stakersPointsAlloc
+        oldVoter: uint256 = config.voterPointsAlloc
         config.vaultIds = p.config.vaultIds
         config.stakersPointsAlloc = p.config.stakersPointsAlloc
         config.voterPointsAlloc = p.config.voterPointsAlloc
         config.perUserDepositLimit = p.config.perUserDepositLimit
         config.globalDepositLimit = p.config.globalDepositLimit
         config.minDepositBalance = p.config.minDepositBalance
-        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
-        extcall MissionControl(mc).setAssetConfig(p.asset, config)
+        self._writeAssetConfig(p.asset, config, mc, ActionType.ASSET_DEPOSIT_PARAMS, oldVaultIds, oldStakers, oldVoter)
         log AssetDepositParamsSet(asset=p.asset, numVaultIds=len(p.config.vaultIds), stakersPointsAlloc=p.config.stakersPointsAlloc, voterPointsAlloc=p.config.voterPointsAlloc, perUserDepositLimit=p.config.perUserDepositLimit, globalDepositLimit=p.config.globalDepositLimit, minDepositBalance=p.config.minDepositBalance)
 
     elif actionType == ActionType.ASSET_LIQ_CONFIG:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.shouldBurnAsPayment = p.config.shouldBurnAsPayment
         config.shouldTransferToEndaoment = p.config.shouldTransferToEndaoment
@@ -852,28 +958,28 @@ def executePendingAction(_aid: uint256) -> bool:
         config.shouldAuctionInstantly = p.config.shouldAuctionInstantly
         config.specialStabPoolId = p.config.specialStabPoolId
         config.customAuctionParams = p.config.customAuctionParams
-        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
-        extcall MissionControl(mc).setAssetConfig(p.asset, config)
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
+        self._writeAssetConfig(p.asset, config, mc, ActionType.ASSET_LIQ_CONFIG, [], 0, 0)
         log AssetLiqConfigSet(asset=p.asset, shouldBurnAsPayment=p.config.shouldBurnAsPayment, shouldTransferToEndaoment=p.config.shouldTransferToEndaoment, shouldSwapInStabPools=p.config.shouldSwapInStabPools, shouldAuctionInstantly=p.config.shouldAuctionInstantly, specialStabPoolId=p.config.specialStabPoolId, auctionStartDiscount=p.config.customAuctionParams.startDiscount, auctionMaxDiscount=p.config.customAuctionParams.maxDiscount, auctionDelay=p.config.customAuctionParams.delay, auctionDuration=p.config.customAuctionParams.duration)
 
     elif actionType == ActionType.ASSET_DEBT_TERMS:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         previousTerms: cs.DebtTerms = config.debtTerms
         pendingTerms: cs.DebtTerms = p.config.debtTerms
         maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
         self._assertDebtTermsWithinMaxStep(pendingTerms, previousTerms, maxDeviation)
         config.debtTerms = pendingTerms
-        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
-        extcall MissionControl(mc).setAssetConfig(p.asset, config)
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
+        self._writeAssetConfig(p.asset, config, mc, ActionType.ASSET_DEBT_TERMS, [], 0, 0)
         log AssetDebtTermsSet(asset=p.asset, ltv=pendingTerms.ltv, redemptionThreshold=pendingTerms.redemptionThreshold, liqThreshold=pendingTerms.liqThreshold, liqFee=pendingTerms.liqFee, borrowRate=pendingTerms.borrowRate, daowry=pendingTerms.daowry)
 
     elif actionType == ActionType.ASSET_WHITELIST:
-        p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: invalid asset
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.whitelist = p.config.whitelist
-        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
-        extcall MissionControl(mc).setAssetConfig(p.asset, config)
+        # Empty old alloc/vault args are unused: structure and needCkpt gate on action type.
+        self._writeAssetConfig(p.asset, config, mc, ActionType.ASSET_WHITELIST, [], 0, 0)
         log WhitelistAssetSet(asset=p.asset, whitelist=p.config.whitelist)
 
     self.actionType[_aid] = empty(ActionType)
@@ -896,3 +1002,29 @@ def _cancelPendingAction(_aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.actionType[_aid] = empty(ActionType)
     self.pendingMissionControl[_aid] = empty(address)
+
+
+###########################
+# GREEN Ref Pool Snapshot #
+###########################
+
+
+@external
+def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
+    if not gov._canGovern(msg.sender):
+        assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
+
+    priceDesk: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
+    assert priceDesk != empty(address) # dev: missing price desk
+
+    priceSourceAddr: address = staticcall PriceDesk(priceDesk).getAddr(_curvePricesId)
+    assert priceSourceAddr != empty(address) # dev: invalid price source id
+
+    didUpdate: bool = extcall CurvePrices(priceSourceAddr).addGreenRefPoolSnapshot()
+    log GreenRefPoolSnapshotAttempted(
+        caller=msg.sender,
+        priceSourceId=_curvePricesId,
+        priceSourceAddr=priceSourceAddr,
+        didUpdate=didUpdate,
+    )
+    return didUpdate

@@ -461,7 +461,7 @@ def test_g10_high_quote_live_activation_does_not_inflate_dormant_pile_into_nav(
     assert pool.getTotalValue(stab) == 100 * EIGHTEEN - 1
 
     # wrong high quote: live-share activate must not seat the dormant pile
-    mock_price_source.setPrice(claim, EIGHTEEN * 2000)  # $100 for 0.05 tokens
+    mock_price_source.setPrice(claim, EIGHTEEN * 2000)  # $40 for 0.02 tokens
     pool.pause(True, sender=switchboard_alpha.address)
     pool.activateClaimAssets(stab, [claim], sender=alice)
     pool.pause(False, sender=switchboard_alpha.address)
@@ -589,7 +589,9 @@ def test_g10_can_activate_helper_not_exported_and_source_semantics(
     usd = mock_price_source.getPrice(bravo_token) * pair // EIGHTEEN
     assert (state == CLAIM_DORMANT and usd >= ACTIVATION
             and active < MAX_ACTIVE) is False  # usd is $0.05 here
-    mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN)
+    mock_price_source.setPrice(
+        bravo_token, ACTIVATION * EIGHTEEN // RETENTION,
+    )
     usd = mock_price_source.getPrice(bravo_token) * pair // EIGHTEEN
     # Live book: keeper preflight must also require an empty cohort.
     assert not (
@@ -640,10 +642,11 @@ def test_g10_activate_capacity_last_slot_first_come_first_served(
     pool.pause(False, sender=switchboard_alpha.address)
     assert pool.getNumActiveClaimAssets(stab) == 19
 
-    # both candidates quote $0.20 (>= $0.10); order decides
+    # Both candidates quote exactly $0.10; order decides.
     pool.pause(True, sender=switchboard_alpha.address)
-    mock_price_source.setPrice(low, 2 * EIGHTEEN)
-    mock_price_source.setPrice(high, 2 * EIGHTEEN)
+    activation_price = ACTIVATION * EIGHTEEN // RETENTION
+    mock_price_source.setPrice(low, activation_price)
+    mock_price_source.setPrice(high, activation_price)
     pool.activateClaimAssets(stab, [low, high], sender=alice)
     assert pool.getNumActiveClaimAssets(stab) == 20
     assert pool.getClaimAssetState(stab, low) == CLAIM_ACTIVE
@@ -702,7 +705,9 @@ def test_g10_cross_cohort_custody_deficit_blocks_activate_on_other_stab(
     claim.transfer(alice, 1, sender=pool.address)
 
     pool.pause(True, sender=switchboard_alpha.address)
-    mock_price_source.setPrice(claim, 2 * EIGHTEEN)  # B's pair quotes $0.10+
+    mock_price_source.setPrice(
+        claim, ACTIVATION * EIGHTEEN // RETENTION,
+    )  # B's pair quotes exactly $0.10
     with boa.reverts("claim custody deficit"):
         pool.activateClaimAssets(stab_b, [claim], sender=alice)
 
