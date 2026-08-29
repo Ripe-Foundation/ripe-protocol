@@ -21,8 +21,9 @@ def migrate(migration: Migration):
 
     log.h1("Deploying UniswapV2Prices")
 
-    # The source implements PriceSource only as an inert compatibility shell.
-    # Its only functional methods are explicitly named RIPE monitoring views.
+    # PriceSource remains an inert compatibility shell. The source also exposes
+    # constructor-bound RIPE views and a generic stateless offchain monitoring
+    # view; editing this source does not authorize execution of this module.
     uniswap = migration.deploy(
         "UniswapV2Prices",
         hq,

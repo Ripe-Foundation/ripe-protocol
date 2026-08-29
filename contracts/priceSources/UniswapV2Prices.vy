@@ -49,8 +49,9 @@ def __init__(
     ripeIsToken1: bool = token0 == _wethToken and token1 == _ripeToken
     assert ripeIsToken0 or ripeIsToken1 # dev: not ripe weth pool
 
-    # This monitor is deliberately specific to the canonical 18-decimal
-    # RIPE/WETH pair. It is not a generic Uniswap V2 asset adapter.
+    # These immutables define the canonical RIPE/WETH convenience views. The
+    # generic view below accepts other caller-supplied asset/pool/partner tuples;
+    # this constructor does not qualify those pools or tokens.
     assert staticcall TokenDecimals(_ripeToken).decimals() == 18 # dev: invalid ripe decimals
     assert staticcall TokenDecimals(_wethToken).decimals() == 18 # dev: invalid weth decimals
 
@@ -80,7 +81,10 @@ def getPoolMonitoringPrice(
     _partner: address,
 ) -> uint256:
     # This generic view is intentionally stateless. Off-chain monitoring config
-    # supplies one asset/pool/partner tuple per observed market.
+    # supplies and independently qualifies each asset/pool/partner tuple,
+    # including factory provenance and acceptable liquidity. Decoded invalid
+    # state returns zero; typed-call failures from a pool, token, RipeHq, or
+    # PriceDesk propagate to the caller.
     if empty(address) in [_asset, _pool, _partner] or _asset == _partner:
         return 0
 

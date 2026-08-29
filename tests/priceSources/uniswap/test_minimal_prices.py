@@ -185,6 +185,11 @@ def test_monitor_reports_only_the_ripe_weth_pool_state_and_spot_prices(
     )
     assert fixture.source.getRipeWethMonitoringPrice() == EIGHTEEN_DECIMALS // 10
     assert fixture.source.getRipeUsdMonitoringPrice() == 200 * EIGHTEEN_DECIMALS
+    assert fixture.source.getPoolMonitoringPrice(
+        fixture.ripe.address,
+        fixture.pair.address,
+        fixture.weth.address,
+    ) == fixture.source.getRipeUsdMonitoringPrice()
 
 
 @pytest.mark.parametrize("asset_is_token0", [True, False])
@@ -214,6 +219,22 @@ def test_monitor_reports_only_the_ripe_weth_pool_state_and_spot_prices(
             1_000 * 10**6,
             EIGHTEEN_DECIMALS,
             20 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            6,
+            6,
+            100 * 10**6,
+            10 * 10**6,
+            2_000 * EIGHTEEN_DECIMALS,
+            200 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            8,
+            6,
+            2 * 10**8,
+            120_000 * 10**6,
+            EIGHTEEN_DECIMALS,
+            60_000 * EIGHTEEN_DECIMALS,
         ),
         (
             0,
@@ -319,12 +340,17 @@ def test_one_source_monitors_multiple_assets_and_prices_each_partner(
     assert source.getPricedAssets() == []
 
 
+@pytest.mark.parametrize("asset_is_token0", [True, False])
 def test_generic_monitoring_price_rejects_invalid_config_without_asserting(
     uniswap_v2_factories,
     uniswap_v2_monitor_builder,
+    asset_is_token0,
 ):
     monitor = uniswap_v2_monitor_builder()
-    pool = _deploy_generic_pool(uniswap_v2_factories)
+    pool = _deploy_generic_pool(
+        uniswap_v2_factories,
+        asset_is_token0=asset_is_token0,
+    )
     other = uniswap_v2_factories["token"].deploy(18)
     values = [pool.asset.address, pool.pair.address, pool.partner.address]
 
@@ -357,6 +383,47 @@ def test_generic_monitoring_price_rejects_invalid_config_without_asserting(
         )
         == 0
     )
+
+
+def test_generic_monitoring_price_reverts_for_non_contract_or_non_pair_pool(
+    uniswap_v2_factories,
+    uniswap_v2_monitor_builder,
+):
+    monitor = uniswap_v2_monitor_builder()
+    asset = uniswap_v2_factories["token"].deploy(18)
+    partner = uniswap_v2_factories["token"].deploy(18)
+    invalid_pools = [
+        boa.env.generate_address("uniswap-eoa-pool"),
+        asset.address,
+    ]
+
+    for invalid_pool in invalid_pools:
+        with boa.reverts():
+            monitor.source.getPoolMonitoringPrice(
+                asset.address,
+                invalid_pool,
+                partner.address,
+            )
+
+
+def test_generic_monitoring_price_reverts_for_invalid_ripe_hq(
+    uniswap_v2_factories,
+):
+    pool = _deploy_generic_pool(uniswap_v2_factories)
+    invalid_hq = boa.env.generate_address("uniswap-eoa-hq")
+    source = uniswap_v2_factories["source"].deploy(
+        invalid_hq,
+        pool.pair.address,
+        pool.asset.address,
+        pool.partner.address,
+    )
+
+    with boa.reverts():
+        source.getPoolMonitoringPrice(
+            pool.asset.address,
+            pool.pair.address,
+            pool.partner.address,
+        )
 
 
 @pytest.mark.parametrize(

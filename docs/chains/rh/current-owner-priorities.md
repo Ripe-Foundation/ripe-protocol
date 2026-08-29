@@ -137,24 +137,30 @@ the SC-07/SC-09 remediation in draft PR #145.
 
 ### 4. Uniswap V2 price-source admission and activation are parked
 
-The stripped `UniswapV2Prices` replacement is a stateless RIPE/WETH monitor.
-Its PriceSource interface is permanently inert, while its explicitly named
-monitoring views expose a manipulable spot-reserve observation. Pair
-provenance and minimum-liquidity policy remain operational monitoring concerns,
-not oracle-admission work. The replacement is not registered, configured,
-admitted, deployed, or activated and is unavailable for protocol accounting.
-No Uniswap launch price source is required; bounded launch behavior and
-PriceDesk priority source IDs `[1, 2]` remain unchanged.
+The owner authorizes the stripped `UniswapV2Prices` source candidate to expose
+both its constructor-bound RIPE/WETH convenience views and the stateless
+`getPoolMonitoringPrice(asset, pool, partner)` view for direct offchain
+monitoring. Its PriceSource interface remains permanently inert. This
+authorization does not qualify any generic tuple: pool provenance, token
+behavior, acceptable liquidity, manipulation exposure, partner pricing, and
+typed-call error handling remain operator responsibilities.
+
+The replacement is not configured, admitted, deployed, or activated and is
+unavailable for protocol accounting. No Uniswap launch price source is
+required; bounded launch behavior and PriceDesk priority source IDs `[1, 2]`
+remain unchanged.
 
 - Do not add a checkpoint service, PriceDesk registration, Chainlink fallback,
-  pool address, liquidity amount, funding or custody authority, migration,
-  deployment-plan dependency, configuration, admission, deployment, or
-  activation.
-- An optional externally held RIPE/WETH V2 liquidity canary is operational
-  preparation, not protocol oracle authority.
-- Reopen work beyond candidate hardening only after an approved
-  security-relevant RIPE-price consumer and separate owner, risk, security,
-  custody, and exposure decisions exist.
+  onchain factory allowlist, liquidity floor, pool configuration, funding or
+  custody authority, migration logic, deployment-plan dependency,
+  configuration, admission, deployment, or activation.
+- Existing source-driven migrations would compile this candidate if separately
+  authorized and executed; this source authorization does not authorize either
+  phase.
+- Optional externally held RIPE/WETH or other V2 monitoring tuples are
+  operational observations, not protocol oracle authority.
+- Reopen value-bearing use only after an approved security-relevant consumer
+  and separate owner, risk, security, custody, and exposure decisions exist.
 
 ### 5. Sites account/workspace recovery is parked
 
@@ -194,7 +200,8 @@ integrated into `rh`.
 ## Non-authorization
 
 This directive authorizes deployment preparation within its separately
-controlled implementation lanes. It does not authorize production-contract
-edits, testnet or production actions, RPC or
-account access, signer selection, signing, broadcasting, migration execution,
+controlled implementation lanes and the exact RH-D047 Uniswap monitoring
+source candidate described above. It does not authorize further
+production-contract edits, testnet or production actions, RPC or account
+access, signer selection, signing, broadcasting, migration execution,
 deployment, configuration, registration, activation, or release.
