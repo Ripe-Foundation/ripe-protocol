@@ -1,0 +1,12 @@
+{
+  "contracts": {
+    "UniswapV2PricesNvda": {
+      "address": "0xE21f8C319B6a61d771B5111d1cADF2110cFc8ae7",
+      "file": "contracts/priceSources/UniswapV2Prices.vy"
+    },
+    "RebaseErc20": {
+      "address": "0x1B86b48392a1EfF0b866832D3a311c215c4Ef015",
+      "file": "contracts/vaults/RebaseErc20.vy"
+    }
+  }
+}

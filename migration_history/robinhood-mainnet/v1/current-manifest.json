@@ -73277,7 +73277,7 @@
       "file": "contracts/config/SwitchboardFoxtrot.vy"
     },
     "UniswapV2PricesNvda": {
-      "address": "0x6CA83A04BCF7651fFB0D2D1ab4376E8EC3b91d89",
+      "address": "0xE21f8C319B6a61d771B5111d1cADF2110cFc8ae7",
       "abi": [
         {
           "stateMutability": "view",
@@ -73288,6 +73288,31 @@
             {
               "name": "",
               "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getPoolMonitoringPrice",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_pool",
+              "type": "address"
+            },
+            {
+              "name": "_partner",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
             }
           ]
         },
@@ -73895,8 +73920,8 @@
             "sha256sum": "7530b4cb747dc9b6fab3207ac23a05050bf93bccdbbc65d018089f644ef06c77"
           },
           "contracts/priceSources/UniswapV2Prices.vy": {
-            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2026\n\n# @version 0.4.3\n\nimplements: PriceSource\n\nimport interfaces.PriceSource as PriceSource\n\ninterface IUniswapV2Pair:\n    def getReserves() -> (uint256, uint256, uint256): view\n    def token0() -> address: view\n    def token1() -> address: view\n\ninterface PriceDesk:\n    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view\n\ninterface RipeHq:\n    def getAddr(_id: uint256) -> address: view\n\ninterface TokenDecimals:\n    def decimals() -> uint256: view\n\nPRICE_DESK_ID: constant(uint256) = 7\nEIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18\nMAX_UINT112: constant(uint256) = 2 ** 112 - 1\nMAX_UINT32: constant(uint256) = 2 ** 32 - 1\n\nRIPE_HQ: public(immutable(address))\nRIPE_WETH_POOL: public(immutable(address))\nRIPE_TOKEN: public(immutable(address))\nWETH_TOKEN: public(immutable(address))\nRIPE_IS_TOKEN0: public(immutable(bool))\n\n\n@deploy\ndef __init__(\n    _ripeHq: address,\n    _ripeWethPool: address,\n    _ripeToken: address,\n    _wethToken: address,\n):\n    assert empty(address) not in [_ripeHq, _ripeWethPool, _ripeToken, _wethToken] # dev: invalid monitoring config\n    assert _ripeToken != _wethToken # dev: invalid monitoring tokens\n\n    token0: address = staticcall IUniswapV2Pair(_ripeWethPool).token0()\n    token1: address = staticcall IUniswapV2Pair(_ripeWethPool).token1()\n    ripeIsToken0: bool = token0 == _ripeToken and token1 == _wethToken\n    ripeIsToken1: bool = token0 == _wethToken and token1 == _ripeToken\n    assert ripeIsToken0 or ripeIsToken1 # dev: not ripe weth pool\n\n    # This monitor is deliberately specific to the canonical 18-decimal\n    # RIPE/WETH pair. It is not a generic Uniswap V2 asset adapter.\n    assert staticcall TokenDecimals(_ripeToken).decimals() == 18 # dev: invalid ripe decimals\n    assert staticcall TokenDecimals(_wethToken).decimals() == 18 # dev: invalid weth decimals\n\n    RIPE_HQ = _ripeHq\n    RIPE_WETH_POOL = _ripeWethPool\n    RIPE_TOKEN = _ripeToken\n    WETH_TOKEN = _wethToken\n    RIPE_IS_TOKEN0 = ripeIsToken0\n\n\n#########################\n# RIPE monitoring views #\n#########################\n\n\n@view\n@external\ndef isMonitoringOnly() -> bool:\n    return True\n\n\n@view\n@external\ndef getRipePoolState() -> (uint256, uint256, uint256):\n    valid: bool = False\n    ripeReserve: uint256 = 0\n    wethReserve: uint256 = 0\n    lastUpdate: uint256 = 0\n    valid, ripeReserve, wethReserve, lastUpdate = self._readPoolState()\n    if not valid:\n        return 0, 0, 0\n    return ripeReserve, wethReserve, lastUpdate\n\n\n@view\n@external\ndef getRipeWethMonitoringPrice() -> uint256:\n    valid: bool = False\n    ripeReserve: uint256 = 0\n    wethReserve: uint256 = 0\n    na: uint256 = 0\n    valid, ripeReserve, wethReserve, na = self._readPoolState()\n    if not valid or ripeReserve == 0 or wethReserve == 0:\n        return 0\n    return wethReserve * EIGHTEEN_DECIMALS // ripeReserve\n\n\n@view\n@external\ndef getRipeUsdMonitoringPrice() -> uint256:\n    valid: bool = False\n    ripeReserve: uint256 = 0\n    wethReserve: uint256 = 0\n    na: uint256 = 0\n    valid, ripeReserve, wethReserve, na = self._readPoolState()\n    if not valid or ripeReserve == 0 or wethReserve == 0:\n        return 0\n\n    wethUsdPrice: uint256 = self._readWethUsdPrice()\n    if wethUsdPrice == 0:\n        return 0\n\n    ripeWethPrice: uint256 = wethReserve * EIGHTEEN_DECIMALS // ripeReserve\n    didMultiply: bool = False\n    ripeUsdPrice: uint256 = 0\n    didMultiply, ripeUsdPrice = self._mulDivOne(ripeWethPrice, wethUsdPrice)\n    return ripeUsdPrice if didMultiply else 0\n\n\n@view\n@internal\ndef _readPoolState() -> (bool, uint256, uint256, uint256):\n    reserve0: uint256 = 0\n    reserve1: uint256 = 0\n    lastUpdate: uint256 = 0\n    reserve0, reserve1, lastUpdate = staticcall IUniswapV2Pair(RIPE_WETH_POOL).getReserves()\n    if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:\n        return False, 0, 0, 0\n\n    if RIPE_IS_TOKEN0:\n        return True, reserve0, reserve1, lastUpdate\n    return True, reserve1, reserve0, lastUpdate\n\n\n@view\n@internal\ndef _readWethUsdPrice() -> uint256:\n    # Resolve PriceDesk dynamically so a registry rotation does not stale this\n    # direct monitoring view. Neither this read nor its result is a feed.\n    priceDesk: address = staticcall RipeHq(RIPE_HQ).getAddr(PRICE_DESK_ID)\n    if priceDesk == empty(address):\n        return 0\n    return staticcall PriceDesk(priceDesk).getPrice(WETH_TOKEN, False)\n\n\n@view\n@internal\ndef _mulDivOne(_a: uint256, _b: uint256) -> (bool, uint256):\n    whole: uint256 = _a // EIGHTEEN_DECIMALS\n    remainder: uint256 = _a % EIGHTEEN_DECIMALS\n    if whole != 0 and _b > max_value(uint256) // whole:\n        return False, 0\n    wholeProduct: uint256 = whole * _b\n    if remainder != 0 and _b > max_value(uint256) // remainder:\n        return False, 0\n    remainderProduct: uint256 = remainder * _b // EIGHTEEN_DECIMALS\n    if wholeProduct > max_value(uint256) - remainderProduct:\n        return False, 0\n    return True, wholeProduct + remainderProduct\n\n\n#############################\n# Inert PriceSource surface #\n#############################\n\n\n@view\n@external\ndef getPrice(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> uint256:\n    return 0\n\n\n@view\n@external\ndef getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> (uint256, bool):\n    return 0, False\n\n\n@view\n@external\ndef hasPriceFeed(_asset: address) -> bool:\n    return False\n\n\n@view\n@external\ndef hasPendingPriceFeedUpdate(_asset: address) -> bool:\n    return False\n\n\n@view\n@external\ndef getPricedAssets() -> DynArray[address, 50]:\n    return empty(DynArray[address, 50])\n\n\n@external\ndef addPriceSnapshot(_asset: address) -> bool:\n    return False\n\n\n@external\ndef confirmNewPriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef cancelNewPendingPriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef confirmPriceFeedUpdate(_asset: address) -> bool:\n    return False\n\n\n@external\ndef cancelPriceFeedUpdate(_asset: address) -> bool:\n    return False\n\n\n@external\ndef disablePriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef confirmDisablePriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef cancelDisablePriceFeed(_asset: address) -> bool:\n    return False\n\n\n@view\n@external\ndef actionTimeLock() -> uint256:\n    return 0\n\n\n@view\n@external\ndef hasPendingAction(_actionId: uint256) -> bool:\n    return False\n\n\n@view\n@external\ndef getActionConfirmationBlock(_actionId: uint256) -> uint256:\n    return 0\n\n\n@external\ndef setActionTimeLock(_numBlocks: uint256) -> bool:\n    return False\n\n\n@external\ndef setActionTimeLockAfterSetup(_numBlocks: uint256 = 0) -> bool:\n    return False\n\n\n@view\n@external\ndef isPaused() -> bool:\n    return False\n\n\n@external\ndef pause(_shouldPause: bool):\n    raise \"monitoring only\"\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    raise \"monitoring only\"\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):\n    raise \"monitoring only\"\n",
-            "sha256sum": "02a69eecac0e8cd12ce7581815017685fbddc628121d0bd1aa84de7af80ab51d"
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2026\n\n# @version 0.4.3\n\nimplements: PriceSource\n\nimport interfaces.PriceSource as PriceSource\n\ninterface IUniswapV2Pair:\n    def getReserves() -> (uint256, uint256, uint256): view\n    def token0() -> address: view\n    def token1() -> address: view\n\ninterface PriceDesk:\n    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view\n\ninterface RipeHq:\n    def getAddr(_id: uint256) -> address: view\n\ninterface TokenDecimals:\n    def decimals() -> uint256: view\n\nPRICE_DESK_ID: constant(uint256) = 7\nEIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18\nMAX_UINT112: constant(uint256) = 2 ** 112 - 1\nMAX_UINT32: constant(uint256) = 2 ** 32 - 1\n\nRIPE_HQ: public(immutable(address))\nRIPE_WETH_POOL: public(immutable(address))\nRIPE_TOKEN: public(immutable(address))\nWETH_TOKEN: public(immutable(address))\nRIPE_IS_TOKEN0: public(immutable(bool))\n\n\n@deploy\ndef __init__(\n    _ripeHq: address,\n    _ripeWethPool: address,\n    _ripeToken: address,\n    _wethToken: address,\n):\n    assert empty(address) not in [_ripeHq, _ripeWethPool, _ripeToken, _wethToken] # dev: invalid monitoring config\n    assert _ripeToken != _wethToken # dev: invalid monitoring tokens\n\n    token0: address = staticcall IUniswapV2Pair(_ripeWethPool).token0()\n    token1: address = staticcall IUniswapV2Pair(_ripeWethPool).token1()\n    ripeIsToken0: bool = token0 == _ripeToken and token1 == _wethToken\n    ripeIsToken1: bool = token0 == _wethToken and token1 == _ripeToken\n    assert ripeIsToken0 or ripeIsToken1 # dev: not ripe weth pool\n\n    # These immutables define the canonical RIPE/WETH convenience views. The\n    # generic view below accepts other caller-supplied asset/pool/partner tuples;\n    # this constructor does not qualify those pools or tokens.\n    assert staticcall TokenDecimals(_ripeToken).decimals() == 18 # dev: invalid ripe decimals\n    assert staticcall TokenDecimals(_wethToken).decimals() == 18 # dev: invalid weth decimals\n\n    RIPE_HQ = _ripeHq\n    RIPE_WETH_POOL = _ripeWethPool\n    RIPE_TOKEN = _ripeToken\n    WETH_TOKEN = _wethToken\n    RIPE_IS_TOKEN0 = ripeIsToken0\n\n\n####################\n# Monitoring views #\n####################\n\n\n@view\n@external\ndef isMonitoringOnly() -> bool:\n    return True\n\n\n@view\n@external\ndef getPoolMonitoringPrice(\n    _asset: address,\n    _pool: address,\n    _partner: address,\n) -> uint256:\n    # This generic view is intentionally stateless. Off-chain monitoring config\n    # supplies and independently qualifies each asset/pool/partner tuple,\n    # including factory provenance and acceptable liquidity. Decoded invalid\n    # state returns zero; typed-call failures from a pool, token, RipeHq, or\n    # PriceDesk propagate to the caller.\n    if empty(address) in [_asset, _pool, _partner] or _asset == _partner:\n        return 0\n\n    token0: address = staticcall IUniswapV2Pair(_pool).token0()\n    token1: address = staticcall IUniswapV2Pair(_pool).token1()\n    assetIsToken0: bool = token0 == _asset and token1 == _partner\n    assetIsToken1: bool = token0 == _partner and token1 == _asset\n    if not assetIsToken0 and not assetIsToken1:\n        return 0\n\n    valid: bool = False\n    assetReserve: uint256 = 0\n    partnerReserve: uint256 = 0\n    na: uint256 = 0\n    valid, assetReserve, partnerReserve, na = self._readPoolState(_pool, assetIsToken0)\n    if not valid or assetReserve == 0 or partnerReserve == 0:\n        return 0\n\n    assetDecimals: uint256 = staticcall TokenDecimals(_asset).decimals()\n    partnerDecimals: uint256 = staticcall TokenDecimals(_partner).decimals()\n    if assetDecimals > 18 or partnerDecimals > 18:\n        return 0\n\n    # Partner units per whole asset, normalized to 18 decimals. The uint112\n    # reserve bounds and <=18-decimal constraint keep the numerator in uint256.\n    partnerPerAsset: uint256 = (\n        partnerReserve * (10 ** assetDecimals) * EIGHTEEN_DECIMALS\n        // assetReserve\n        // (10 ** partnerDecimals)\n    )\n\n    if partnerPerAsset == 0:\n        return 0\n\n    partnerUsdPrice: uint256 = self._readPartnerUsdPrice(_partner)\n    if partnerUsdPrice == 0:\n        return 0\n\n    didMultiply: bool = False\n    assetUsdPrice: uint256 = 0\n    didMultiply, assetUsdPrice = self._mulDivOne(partnerPerAsset, partnerUsdPrice)\n    return assetUsdPrice if didMultiply else 0\n\n\n@view\n@external\ndef getRipePoolState() -> (uint256, uint256, uint256):\n    valid: bool = False\n    ripeReserve: uint256 = 0\n    wethReserve: uint256 = 0\n    lastUpdate: uint256 = 0\n    valid, ripeReserve, wethReserve, lastUpdate = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)\n    if not valid:\n        return 0, 0, 0\n    return ripeReserve, wethReserve, lastUpdate\n\n\n@view\n@external\ndef getRipeWethMonitoringPrice() -> uint256:\n    valid: bool = False\n    ripeReserve: uint256 = 0\n    wethReserve: uint256 = 0\n    na: uint256 = 0\n    valid, ripeReserve, wethReserve, na = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)\n    if not valid or ripeReserve == 0 or wethReserve == 0:\n        return 0\n    return wethReserve * EIGHTEEN_DECIMALS // ripeReserve\n\n\n@view\n@external\ndef getRipeUsdMonitoringPrice() -> uint256:\n    valid: bool = False\n    ripeReserve: uint256 = 0\n    wethReserve: uint256 = 0\n    na: uint256 = 0\n    valid, ripeReserve, wethReserve, na = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)\n    if not valid or ripeReserve == 0 or wethReserve == 0:\n        return 0\n\n    wethUsdPrice: uint256 = self._readWethUsdPrice()\n    if wethUsdPrice == 0:\n        return 0\n\n    ripeWethPrice: uint256 = wethReserve * EIGHTEEN_DECIMALS // ripeReserve\n    didMultiply: bool = False\n    ripeUsdPrice: uint256 = 0\n    didMultiply, ripeUsdPrice = self._mulDivOne(ripeWethPrice, wethUsdPrice)\n    return ripeUsdPrice if didMultiply else 0\n\n\n@view\n@internal\ndef _readPoolState(_pool: address, _assetIsToken0: bool) -> (bool, uint256, uint256, uint256):\n    reserve0: uint256 = 0\n    reserve1: uint256 = 0\n    lastUpdate: uint256 = 0\n    reserve0, reserve1, lastUpdate = staticcall IUniswapV2Pair(_pool).getReserves()\n    if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:\n        return False, 0, 0, 0\n\n    if _assetIsToken0:\n        return True, reserve0, reserve1, lastUpdate\n    return True, reserve1, reserve0, lastUpdate\n\n\n@view\n@internal\ndef _readWethUsdPrice() -> uint256:\n    return self._readPartnerUsdPrice(WETH_TOKEN)\n\n\n@view\n@internal\ndef _readPartnerUsdPrice(_partner: address) -> uint256:\n    # Resolve PriceDesk dynamically so a registry rotation does not stale this\n    # direct monitoring view. Neither this read nor its result is a feed.\n    priceDesk: address = staticcall RipeHq(RIPE_HQ).getAddr(PRICE_DESK_ID)\n    if priceDesk == empty(address):\n        return 0\n    return staticcall PriceDesk(priceDesk).getPrice(_partner, False)\n\n\n@view\n@internal\ndef _mulDivOne(_a: uint256, _b: uint256) -> (bool, uint256):\n    whole: uint256 = _a // EIGHTEEN_DECIMALS\n    remainder: uint256 = _a % EIGHTEEN_DECIMALS\n    if whole != 0 and _b > max_value(uint256) // whole:\n        return False, 0\n    wholeProduct: uint256 = whole * _b\n    if remainder != 0 and _b > max_value(uint256) // remainder:\n        return False, 0\n    remainderProduct: uint256 = remainder * _b // EIGHTEEN_DECIMALS\n    if wholeProduct > max_value(uint256) - remainderProduct:\n        return False, 0\n    return True, wholeProduct + remainderProduct\n\n\n#############################\n# Inert PriceSource surface #\n#############################\n\n\n@view\n@external\ndef getPrice(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> uint256:\n    return 0\n\n\n@view\n@external\ndef getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> (uint256, bool):\n    return 0, False\n\n\n@view\n@external\ndef hasPriceFeed(_asset: address) -> bool:\n    return False\n\n\n@view\n@external\ndef hasPendingPriceFeedUpdate(_asset: address) -> bool:\n    return False\n\n\n@view\n@external\ndef getPricedAssets() -> DynArray[address, 50]:\n    return empty(DynArray[address, 50])\n\n\n@external\ndef addPriceSnapshot(_asset: address) -> bool:\n    return False\n\n\n@external\ndef confirmNewPriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef cancelNewPendingPriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef confirmPriceFeedUpdate(_asset: address) -> bool:\n    return False\n\n\n@external\ndef cancelPriceFeedUpdate(_asset: address) -> bool:\n    return False\n\n\n@external\ndef disablePriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef confirmDisablePriceFeed(_asset: address) -> bool:\n    return False\n\n\n@external\ndef cancelDisablePriceFeed(_asset: address) -> bool:\n    return False\n\n\n@view\n@external\ndef actionTimeLock() -> uint256:\n    return 0\n\n\n@view\n@external\ndef hasPendingAction(_actionId: uint256) -> bool:\n    return False\n\n\n@view\n@external\ndef getActionConfirmationBlock(_actionId: uint256) -> uint256:\n    return 0\n\n\n@external\ndef setActionTimeLock(_numBlocks: uint256) -> bool:\n    return False\n\n\n@external\ndef setActionTimeLockAfterSetup(_numBlocks: uint256 = 0) -> bool:\n    return False\n\n\n@view\n@external\ndef isPaused() -> bool:\n    return False\n\n\n@external\ndef pause(_shouldPause: bool):\n    raise \"monitoring only\"\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    raise \"monitoring only\"\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):\n    raise \"monitoring only\"\n",
+            "sha256sum": "c414aa2adaecd5c3ef187231b64172a4ad7628639a1d8c0481f1afc99a371cda"
           }
         },
         "settings": {
@@ -73910,7 +73935,7 @@
           ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
-        "integrity": "04e11eb591964bb7ddf53bce3969c7ab2e22c2c93060ae6c74abd914414fbe65"
+        "integrity": "14cff25e3f7ac0f408a19127dbe58d591452e950d129d90c4b3dedbeb3340bf6"
       },
       "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000009b8537be0fd5cf9b2ad495c5a85130d5bae4769d0000000000000000000000004d3f37a965b21ab4122e92dd41d2693e742c883b000000000000000000000000d0601ce157db5bdc3162bbac2a2c8af5320d9eec",
       "file": "contracts/priceSources/UniswapV2Prices.vy"
@@ -75083,6 +75108,1240 @@
       },
       "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
       "file": "contracts/vaults/SimpleErc20.vy"
+    },
+    "RebaseErc20": {
+      "address": "0x1B86b48392a1EfF0b866832D3a311c215c4Ef015",
+      "abi": [
+        {
+          "name": "RebaseErc20VaultDeposit",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "asset",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "shares",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RebaseErc20VaultWithdrawal",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "asset",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "isDepleted",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "shares",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RebaseErc20VaultTransfer",
+          "inputs": [
+            {
+              "name": "fromUser",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "toUser",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "asset",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "transferAmount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "isFromUserDepleted",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "transferShares",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "VaultPauseModified",
+          "inputs": [
+            {
+              "name": "isPaused",
+              "type": "bool",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "VaultFundsRecovered",
+          "inputs": [
+            {
+              "name": "asset",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "recipient",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "balance",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getAddys",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hq",
+                  "type": "address"
+                },
+                {
+                  "name": "greenToken",
+                  "type": "address"
+                },
+                {
+                  "name": "savingsGreen",
+                  "type": "address"
+                },
+                {
+                  "name": "ripeToken",
+                  "type": "address"
+                },
+                {
+                  "name": "ledger",
+                  "type": "address"
+                },
+                {
+                  "name": "missionControl",
+                  "type": "address"
+                },
+                {
+                  "name": "switchboard",
+                  "type": "address"
+                },
+                {
+                  "name": "priceDesk",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultBook",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouse",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouseNft",
+                  "type": "address"
+                },
+                {
+                  "name": "boardroom",
+                  "type": "address"
+                },
+                {
+                  "name": "bondRoom",
+                  "type": "address"
+                },
+                {
+                  "name": "creditEngine",
+                  "type": "address"
+                },
+                {
+                  "name": "endaoment",
+                  "type": "address"
+                },
+                {
+                  "name": "humanResources",
+                  "type": "address"
+                },
+                {
+                  "name": "lootbox",
+                  "type": "address"
+                },
+                {
+                  "name": "teller",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRipeHq",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isUserInVaultAsset",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "doesUserHaveBalance",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deregisterUserAsset",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isSupportedVaultAsset",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deregisterVaultAsset",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "doesVaultHaveAnyFunds",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getNumUserAssets",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getNumVaultAssets",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "pause",
+          "inputs": [
+            {
+              "name": "_shouldPause",
+              "type": "bool"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "recoverFunds",
+          "inputs": [
+            {
+              "name": "_recipient",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "recoverFundsMany",
+          "inputs": [
+            {
+              "name": "_recipient",
+              "type": "address"
+            },
+            {
+              "name": "_assets",
+              "type": "address[]"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isPaused",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "userBalances",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            },
+            {
+              "name": "arg1",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "totalBalances",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "userAssets",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "indexOfUserAsset",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            },
+            {
+              "name": "arg1",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "numUserAssets",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "vaultAssets",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "indexOfAsset",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "numAssets",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "amountToShares",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "name": "_shouldRoundUp",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "sharesToAmount",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_shares",
+              "type": "uint256"
+            },
+            {
+              "name": "_shouldRoundUp",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "depositTokensInVault",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "depositTokensInVault",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "name": "_a",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hq",
+                  "type": "address"
+                },
+                {
+                  "name": "greenToken",
+                  "type": "address"
+                },
+                {
+                  "name": "savingsGreen",
+                  "type": "address"
+                },
+                {
+                  "name": "ripeToken",
+                  "type": "address"
+                },
+                {
+                  "name": "ledger",
+                  "type": "address"
+                },
+                {
+                  "name": "missionControl",
+                  "type": "address"
+                },
+                {
+                  "name": "switchboard",
+                  "type": "address"
+                },
+                {
+                  "name": "priceDesk",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultBook",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouse",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouseNft",
+                  "type": "address"
+                },
+                {
+                  "name": "boardroom",
+                  "type": "address"
+                },
+                {
+                  "name": "bondRoom",
+                  "type": "address"
+                },
+                {
+                  "name": "creditEngine",
+                  "type": "address"
+                },
+                {
+                  "name": "endaoment",
+                  "type": "address"
+                },
+                {
+                  "name": "humanResources",
+                  "type": "address"
+                },
+                {
+                  "name": "lootbox",
+                  "type": "address"
+                },
+                {
+                  "name": "teller",
+                  "type": "address"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "withdrawTokensFromVault",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "name": "_recipient",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "withdrawTokensFromVault",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "name": "_recipient",
+              "type": "address"
+            },
+            {
+              "name": "_a",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hq",
+                  "type": "address"
+                },
+                {
+                  "name": "greenToken",
+                  "type": "address"
+                },
+                {
+                  "name": "savingsGreen",
+                  "type": "address"
+                },
+                {
+                  "name": "ripeToken",
+                  "type": "address"
+                },
+                {
+                  "name": "ledger",
+                  "type": "address"
+                },
+                {
+                  "name": "missionControl",
+                  "type": "address"
+                },
+                {
+                  "name": "switchboard",
+                  "type": "address"
+                },
+                {
+                  "name": "priceDesk",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultBook",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouse",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouseNft",
+                  "type": "address"
+                },
+                {
+                  "name": "boardroom",
+                  "type": "address"
+                },
+                {
+                  "name": "bondRoom",
+                  "type": "address"
+                },
+                {
+                  "name": "creditEngine",
+                  "type": "address"
+                },
+                {
+                  "name": "endaoment",
+                  "type": "address"
+                },
+                {
+                  "name": "humanResources",
+                  "type": "address"
+                },
+                {
+                  "name": "lootbox",
+                  "type": "address"
+                },
+                {
+                  "name": "teller",
+                  "type": "address"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "transferBalanceWithinVault",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_fromUser",
+              "type": "address"
+            },
+            {
+              "name": "_toUser",
+              "type": "address"
+            },
+            {
+              "name": "_transferAmount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "transferBalanceWithinVault",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_fromUser",
+              "type": "address"
+            },
+            {
+              "name": "_toUser",
+              "type": "address"
+            },
+            {
+              "name": "_transferAmount",
+              "type": "uint256"
+            },
+            {
+              "name": "_a",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hq",
+                  "type": "address"
+                },
+                {
+                  "name": "greenToken",
+                  "type": "address"
+                },
+                {
+                  "name": "savingsGreen",
+                  "type": "address"
+                },
+                {
+                  "name": "ripeToken",
+                  "type": "address"
+                },
+                {
+                  "name": "ledger",
+                  "type": "address"
+                },
+                {
+                  "name": "missionControl",
+                  "type": "address"
+                },
+                {
+                  "name": "switchboard",
+                  "type": "address"
+                },
+                {
+                  "name": "priceDesk",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultBook",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouse",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouseNft",
+                  "type": "address"
+                },
+                {
+                  "name": "boardroom",
+                  "type": "address"
+                },
+                {
+                  "name": "bondRoom",
+                  "type": "address"
+                },
+                {
+                  "name": "creditEngine",
+                  "type": "address"
+                },
+                {
+                  "name": "endaoment",
+                  "type": "address"
+                },
+                {
+                  "name": "humanResources",
+                  "type": "address"
+                },
+                {
+                  "name": "lootbox",
+                  "type": "address"
+                },
+                {
+                  "name": "teller",
+                  "type": "address"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getVaultDataOnDeposit",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hasPosition",
+                  "type": "bool"
+                },
+                {
+                  "name": "numAssets",
+                  "type": "uint256"
+                },
+                {
+                  "name": "userBalance",
+                  "type": "uint256"
+                },
+                {
+                  "name": "totalBalance",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getUserLootBoxShare",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getUserAssetAndAmountAtIndex",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_index",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            },
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getUserAssetAtIndexAndHasBalance",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_index",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            },
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getTotalAmountForUser",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getTotalAmountForVault",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "constructor",
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        }
+      ],
+      "solc_json": {
+        "language": "Vyper",
+        "sources": {
+          "contracts/modules/Addys.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2026\n\n# @version 0.4.3\n\ninterface RipeHq:\n    def isValidAddr(_addr: address) -> bool: view\n    def getAddr(_regId: uint256) -> address: view\n\ninterface Switchboard:\n    def isSwitchboardAddr(_addr: address) -> bool: view\n\ninterface VaultBook:\n    def isVaultBookAddr(_addr: address) -> bool: view\n\nstruct Addys:\n    hq: address\n    greenToken: address\n    savingsGreen: address\n    ripeToken: address\n    ledger: address\n    missionControl: address\n    switchboard: address\n    priceDesk: address\n    vaultBook: address\n    auctionHouse: address\n    auctionHouseNft: address\n    boardroom: address\n    bondRoom: address\n    creditEngine: address\n    endaoment: address\n    humanResources: address\n    lootbox: address\n    teller: address\n\n# hq\nRIPE_HQ_FOR_ADDYS: immutable(address)\n\n# core addys\nGREEN_TOKEN_ID: constant(uint256) = 1\nSAVINGS_GREEN_ID: constant(uint256) = 2\nRIPE_TOKEN_ID: constant(uint256) = 3\nLEDGER_ID: constant(uint256) = 4\nMISSION_CONTROL_ID: constant(uint256) = 5\nSWITCHBOARD_ID: constant(uint256) = 6\nPRICE_DESK_ID: constant(uint256) = 7\nVAULT_BOOK_ID: constant(uint256) = 8\nAUCTION_HOUSE_ID: constant(uint256) = 9\nAUCTION_HOUSE_NFT_ID: constant(uint256) = 10\nBOARDROOM_ID: constant(uint256) = 11\nBOND_ROOM_ID: constant(uint256) = 12\nCREDIT_ENGINE_ID: constant(uint256) = 13\nENDAOMENT_ID: constant(uint256) = 14\nHUMAN_RESOURCES_ID: constant(uint256) = 15\nLOOTBOX_ID: constant(uint256) = 16\nTELLER_ID: constant(uint256) = 17\nDELEVERAGE_ID: constant(uint256) = 18\nCREDIT_REDEEM_ID: constant(uint256) = 19\nTELLER_UTILS_ID: constant(uint256) = 20\nENDAOMENT_FUNDS_ID: constant(uint256) = 21\nENDAOMENT_PSM_ID: constant(uint256) = 22\nRIPE_CCIP_POOL_ID: constant(uint256) = 23\nGREEN_CCIP_POOL_ID: constant(uint256) = 24\nVAULT_MIGRATOR_ID: constant(uint256) = 25\nRIPE_RESERVE_ENGINE_ID: constant(uint256) = 26\nRIPE_RESERVE_VESTING_ID: constant(uint256) = 27\n\n\n@deploy\ndef __init__(_ripeHq: address):\n    assert _ripeHq != empty(address) # dev: invalid ripe hq\n    RIPE_HQ_FOR_ADDYS = _ripeHq\n\n\n########\n# Core #\n########\n\n\n@view\n@external\ndef getAddys() -> Addys:\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _getAddys(_addys: Addys = empty(Addys)) -> Addys:\n    if _addys.hq != empty(address):\n        return _addys\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _generateAddys() -> Addys:\n    hq: address = RIPE_HQ_FOR_ADDYS\n    return Addys(\n        hq=hq,\n        greenToken=staticcall RipeHq(hq).getAddr(GREEN_TOKEN_ID),\n        savingsGreen=staticcall RipeHq(hq).getAddr(SAVINGS_GREEN_ID),\n        ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),\n        ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),\n        missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),\n        switchboard=staticcall RipeHq(hq).getAddr(SWITCHBOARD_ID),\n        priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),\n        vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),\n        auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),\n        auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),\n        boardroom=staticcall RipeHq(hq).getAddr(BOARDROOM_ID),\n        bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),\n        creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),\n        endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),\n        humanResources=staticcall RipeHq(hq).getAddr(HUMAN_RESOURCES_ID),\n        lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),\n        teller=staticcall RipeHq(hq).getAddr(TELLER_ID),\n    )\n\n\n##########\n# Tokens #\n##########\n\n\n@view\n@internal\ndef _getGreenToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(GREEN_TOKEN_ID)\n\n\n@view\n@internal\ndef _getSavingsGreen() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SAVINGS_GREEN_ID)\n\n\n@view\n@internal\ndef _getRipeToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_TOKEN_ID)\n\n\n###########\n# Helpers #\n###########\n\n\n# ripe hq\n\n\n@view\n@external\ndef getRipeHq() -> address:\n    return self._getRipeHq()\n\n\n@view\n@internal\ndef _getRipeHq() -> address:\n    return RIPE_HQ_FOR_ADDYS\n\n\n# utils\n\n\n@view\n@internal\ndef _isValidRipeAddr(_addr: address) -> bool:\n    hq: address = RIPE_HQ_FOR_ADDYS\n    \n    # core departments\n    if staticcall RipeHq(hq).isValidAddr(_addr):\n        return True\n\n    # vault book\n    vaultBook: address = staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID)\n    if vaultBook != empty(address) and staticcall VaultBook(vaultBook).isVaultBookAddr(_addr):\n        return True\n\n    # switchboard config\n    switchboard: address = staticcall RipeHq(hq).getAddr(SWITCHBOARD_ID)\n    if switchboard != empty(address) and staticcall Switchboard(switchboard).isSwitchboardAddr(_addr):\n        return True\n\n    return False\n\n\n@view\n@internal\ndef _isSwitchboardAddr(_addr: address) -> bool:\n    switchboard: address = staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ID)\n    if switchboard == empty(address):\n        return False\n    return staticcall Switchboard(switchboard).isSwitchboardAddr(_addr)\n\n\n###############\n# Departments #\n###############\n\n\n# ledger\n\n\n@view\n@internal\ndef _getLedgerId() -> uint256:\n    return LEDGER_ID\n\n\n@view\n@internal\ndef _getLedgerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LEDGER_ID)\n\n\n# mission control\n\n\n@view\n@internal\ndef _getMissionControlId() -> uint256:\n    return MISSION_CONTROL_ID\n\n\n@view\n@internal\ndef _getMissionControlAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)\n\n\n# switchboard\n\n\n@view\n@internal\ndef _getSwitchboardId() -> uint256:\n    return SWITCHBOARD_ID\n\n\n@view\n@internal\ndef _getSwitchboardAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ID)\n\n\n# price desk\n\n\n@view\n@internal\ndef _getPriceDeskId() -> uint256:\n    return PRICE_DESK_ID\n\n\n@view\n@internal\ndef _getPriceDeskAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(PRICE_DESK_ID)\n\n\n# vault book\n\n\n@view\n@internal\ndef _getVaultBookId() -> uint256:\n    return VAULT_BOOK_ID\n\n\n@view\n@internal\ndef _getVaultBookAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_BOOK_ID)\n\n\n# auction house\n\n\n@view\n@internal\ndef _getAuctionHouseId() -> uint256:\n    return AUCTION_HOUSE_ID\n\n\n@view\n@internal\ndef _getAuctionHouseAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_ID)\n\n\n# auction house nft\n\n\n@view\n@internal\ndef _getAuctionHouseNftId() -> uint256:\n    return AUCTION_HOUSE_NFT_ID\n\n\n@view\n@internal\ndef _getAuctionHouseNftAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_NFT_ID)\n\n\n# boardroom\n\n\n@view\n@internal\ndef _getBoardroomId() -> uint256:\n    return BOARDROOM_ID\n\n\n@view\n@internal\ndef _getBoardroomAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOARDROOM_ID)\n\n\n# bond room\n\n\n@view\n@internal\ndef _getBondRoomId() -> uint256:\n    return BOND_ROOM_ID\n\n\n@view\n@internal\ndef _getBondRoomAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOND_ROOM_ID)\n\n\n# credit engine\n\n\n@view\n@internal\ndef _getCreditEngineId() -> uint256:\n    return CREDIT_ENGINE_ID\n\n\n@view\n@internal\ndef _getCreditEngineAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_ENGINE_ID)\n\n\n# endaoment\n\n\n@view\n@internal\ndef _getEndaomentId() -> uint256:\n    return ENDAOMENT_ID\n\n\n@view\n@internal\ndef _getEndaomentAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_ID)\n\n\n# human resources\n\n\n@view\n@internal\ndef _getHumanResourcesId() -> uint256:\n    return HUMAN_RESOURCES_ID\n\n\n@view\n@internal\ndef _getHumanResourcesAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(HUMAN_RESOURCES_ID)\n\n\n# lootbox\n\n\n@view\n@internal\ndef _getLootboxId() -> uint256:\n    return LOOTBOX_ID\n\n\n@view\n@internal\ndef _getLootboxAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LOOTBOX_ID)\n\n\n# teller\n\n\n@view\n@internal\ndef _getTellerId() -> uint256:\n    return TELLER_ID\n\n\n@view\n@internal\ndef _getTellerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)\n\n\n# deleverage\n\n\n@view\n@internal\ndef _getDeleverageId() -> uint256:\n    return DELEVERAGE_ID\n\n\n@view\n@internal\ndef _getDeleverageAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(DELEVERAGE_ID)\n\n\n# creditRedeem\n\n\n@view\n@internal\ndef _getCreditRedeemId() -> uint256:\n    return CREDIT_REDEEM_ID\n\n\n@view\n@internal\ndef _getCreditRedeemAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_REDEEM_ID)\n\n\n# teller utils\n\n\n@view\n@internal\ndef _getTellerUtilsId() -> uint256:\n    return TELLER_UTILS_ID\n\n\n@view\n@internal\ndef _getTellerUtilsAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_UTILS_ID)\n\n\n# endaoment funds\n\n\n@view\n@internal\ndef _getEndaomentFundsId() -> uint256:\n    return ENDAOMENT_FUNDS_ID\n\n\n@view\n@internal\ndef _getEndaomentFundsAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_FUNDS_ID)\n\n\n# endaoment psm\n\n\n@view\n@internal\ndef _getEndaomentPsmId() -> uint256:\n    return ENDAOMENT_PSM_ID\n\n\n@view\n@internal\ndef _getEndaomentPsmAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_PSM_ID)\n\n\n# vault migrator\n\n\n@view\n@internal\ndef _getVaultMigratorId() -> uint256:\n    return VAULT_MIGRATOR_ID\n\n\n@view\n@internal\ndef _getVaultMigratorAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_MIGRATOR_ID)\n\n\n# ripe reserve engine\n\n\n@view\n@internal\ndef _getRipeReserveEngineId() -> uint256:\n    return RIPE_RESERVE_ENGINE_ID\n\n\n@view\n@internal\ndef _getRipeReserveEngineAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_RESERVE_ENGINE_ID)\n\n\n# ripe reserve vesting\n\n\n@view\n@internal\ndef _getRipeReserveVestingId() -> uint256:\n    return RIPE_RESERVE_VESTING_ID\n\n\n@view\n@internal\ndef _getRipeReserveVestingAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_RESERVE_VESTING_ID)\n",
+            "sha256sum": "db23f14c93f6897fae890575d24fe9766e726df65b3f8b63343bb430060ccdf4"
+          },
+          "interfaces/Vault.vyi": {
+            "content": "# @version 0.4.3\n\nimport contracts.modules.Addys as addys\n\nstruct VaultDataOnDeposit:\n    hasPosition: bool\n    numAssets: uint256\n    userBalance: uint256\n    totalBalance: uint256\n\n\n########\n# Core #\n########\n\n\n@external\ndef depositTokensInVault(\n    _user: address,\n    _asset: address,\n    _amount: uint256,\n    _a: addys.Addys = empty(addys.Addys),\n) -> uint256:\n    ...\n\n\n@external\ndef withdrawTokensFromVault(\n    _user: address,\n    _asset: address,\n    _amount: uint256,\n    _recipient: address,\n    _a: addys.Addys = empty(addys.Addys),\n) -> (uint256, bool):\n    ...\n\n\n@external\ndef transferBalanceWithinVault(\n    _asset: address,\n    _fromUser: address,\n    _toUser: address,\n    _transferAmount: uint256,\n    _a: addys.Addys = empty(addys.Addys),\n) -> (uint256, bool):\n    ...\n\n\n####################\n# Needs For Others #\n####################\n\n\n@view\n@external\ndef numUserAssets(_user: address) -> uint256:\n    # used in AuctionHouse.vy\n    ...\n\n\n@view\n@external\ndef userAssets(_user: address, _index: uint256) -> address:\n    # used in Lootbox.vy\n    ...\n\n\n@view\n@external\ndef getVaultDataOnDeposit(_user: address, _asset: address) -> VaultDataOnDeposit:\n    # used in Teller.vy\n    ...\n\n\n@view\n@external\ndef getUserLootBoxShare(_user: address, _asset: address) -> uint256:\n    # used in Lootbox.vy\n    ...\n\n\n@view\n@external\ndef getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):\n    # used in CreditEngine.vy\n    ...\n\n\n@view\n@external\ndef getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):\n    # used in Lootbox.vy and AuctionHouse.vy\n    ...\n\n\n###############\n# Other Utils #\n###############\n\n\n@view\n@external\ndef getTotalAmountForUser(_user: address, _asset: address) -> uint256:\n    ...\n\n\n@view\n@external\ndef getTotalAmountForVault(_asset: address) -> uint256:\n    ...\n\n\n########\n# Data #\n########\n\n\n@view\n@external\ndef isUserInVaultAsset(_user: address, _asset: address) -> bool:\n    ...\n\n\n@view\n@external\ndef doesUserHaveBalance(_user: address, _asset: address) -> bool:\n    ...\n\n\n@view\n@external\ndef isSupportedVaultAsset(_asset: address) -> bool:\n    ...\n\n\n# remove data\n\n\n@external\ndef deregisterUserAsset(_user: address, _asset: address) -> bool:\n    ...\n\n\n@external\ndef deregisterVaultAsset(_asset: address) -> bool:\n    ...\n\n\n# utils\n\n\n@view\n@external\ndef getNumUserAssets(_user: address) -> uint256:\n    ...\n\n\n@view\n@external\ndef getNumVaultAssets() -> uint256:\n    ...\n\n\n@view\n@external\ndef doesVaultHaveAnyFunds() -> bool:\n    ...\n\n\n########\n# Ripe #\n########\n\n\n@view\n@external\ndef isPaused() -> bool:\n    ...\n\n\n@external\ndef pause(_shouldPause: bool):\n    ...\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    ...\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):\n    ...",
+            "sha256sum": "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"
+          },
+          "contracts/vaults/modules/VaultData.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2026\n\n# @version 0.4.3\n\nuses: addys\n\nimport contracts.modules.Addys as addys\nfrom ethereum.ercs import IERC20\n\nevent VaultPauseModified:\n    isPaused: bool\n\nevent VaultFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# config\nisPaused: public(bool)\n\n# balances (may be shares or actual balance)\nuserBalances: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> balance\ntotalBalances: public(HashMap[address, uint256]) # asset -> balance\n\n# user assets (iterable)\nuserAssets: public(HashMap[address, HashMap[uint256, address]]) # user -> index -> asset\nindexOfUserAsset: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> index\nnumUserAssets: public(HashMap[address, uint256]) # user -> num assets\n\n# vault assets (iterable)\nvaultAssets: public(HashMap[uint256, address]) # index -> asset\nindexOfAsset: public(HashMap[address, uint256]) # asset -> index\nnumAssets: public(uint256) # num assets\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(_shouldPause: bool):\n    self.isPaused = _shouldPause\n\n\n###################\n# Balance Changes #\n###################\n\n\n# deposit\n\n\n@internal\ndef _addBalanceOnDeposit(\n    _user: address,\n    _asset: address,\n    _depositBal: uint256,\n    _shouldUpdateTotal: bool,\n):\n    # update balances\n    self.userBalances[_user][_asset] += _depositBal\n    if _shouldUpdateTotal:\n        self.totalBalances[_asset] += _depositBal\n\n    # register user asset (if necessary)\n    if self.indexOfUserAsset[_user][_asset] == 0:\n        self._registerUserAsset(_user, _asset)\n\n    # register vault asset (if necessary)\n    if self.indexOfAsset[_asset] == 0:\n        self._registerVaultAsset(_asset)\n\n\n# withdrawal\n\n\n@internal\ndef _reduceBalanceOnWithdrawal(\n    _user: address,\n    _asset: address,\n    _withdrawBal: uint256,\n    _shouldUpdateTotal: bool,\n) -> (uint256, bool):\n    assert self.indexOfUserAsset[_user][_asset] != 0 # dev: user does not have this asset\n\n    currentBal: uint256 = self.userBalances[_user][_asset]\n    withdrawBal: uint256 = min(_withdrawBal, currentBal)\n    assert withdrawBal != 0 # dev: nothing to withdraw\n\n    # update balances\n    currentBal -= withdrawBal\n    self.userBalances[_user][_asset] = currentBal\n    if _shouldUpdateTotal:\n        self.totalBalances[_asset] -= withdrawBal\n\n    return withdrawBal, currentBal == 0\n\n\n###############\n# User Assets #\n###############\n\n\n@view\n@external\ndef isUserInVaultAsset(_user: address, _asset: address) -> bool:\n    return self.indexOfUserAsset[_user][_asset] != 0\n\n\n@view\n@external\ndef doesUserHaveBalance(_user: address, _asset: address) -> bool:\n    return self.userBalances[_user][_asset] != 0\n\n\n@internal\ndef _registerUserAsset(_user: address, _asset: address):\n    aid: uint256 = self.numUserAssets[_user]\n    if aid == 0:\n        aid = 1 # not using 0 index\n    self.userAssets[_user][aid] = _asset\n    self.indexOfUserAsset[_user][_asset] = aid\n    self.numUserAssets[_user] = aid + 1\n\n\n@external\ndef deregisterUserAsset(_user: address, _asset: address) -> bool:\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n\n    if self.userBalances[_user][_asset] != 0:\n        return True\n\n    numUserAssets: uint256 = self.numUserAssets[_user]\n    if numUserAssets == 0:\n        return False\n\n    targetIndex: uint256 = self.indexOfUserAsset[_user][_asset]\n    if targetIndex == 0:\n        return numUserAssets > 1\n\n    # update data\n    lastIndex: uint256 = numUserAssets - 1\n    self.numUserAssets[_user] = lastIndex\n    self.indexOfUserAsset[_user][_asset] = 0\n\n    # get last item, replace the removed item\n    if targetIndex != lastIndex:\n        lastItem: address = self.userAssets[_user][lastIndex]\n        self.userAssets[_user][targetIndex] = lastItem\n        self.indexOfUserAsset[_user][lastItem] = targetIndex\n\n    return lastIndex > 1\n\n\n################\n# Vault Assets #\n################\n\n\n@view\n@external\ndef isSupportedVaultAsset(_asset: address) -> bool:\n    return self.indexOfAsset[_asset] != 0\n\n\n@internal\ndef _registerVaultAsset(_asset: address):\n    aid: uint256 = self.numAssets\n    if aid == 0:\n        aid = 1 # not using 0 index\n    self.vaultAssets[aid] = _asset\n    self.indexOfAsset[_asset] = aid\n    self.numAssets = aid + 1\n\n\n@external\ndef deregisterVaultAsset(_asset: address) -> bool:\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    return self._deregisterVaultAsset(_asset)\n\n\n@internal\ndef _deregisterVaultAsset(_asset: address) -> bool:\n\n    if self.totalBalances[_asset] != 0:\n        return False\n\n    numAssets: uint256 = self.numAssets\n    if numAssets == 0:\n        return False\n\n    targetIndex: uint256 = self.indexOfAsset[_asset]\n    if targetIndex == 0:\n        return False\n\n    # update data\n    lastIndex: uint256 = numAssets - 1\n    self.numAssets = lastIndex\n    self.indexOfAsset[_asset] = 0\n\n    # get last item, replace the removed item\n    if targetIndex != lastIndex:\n        lastItem: address = self.vaultAssets[lastIndex]\n        self.vaultAssets[targetIndex] = lastItem\n        self.indexOfAsset[lastItem] = targetIndex\n\n    return True\n\n\n##############\n# Data Utils #\n##############\n\n\n# any vault funds\n\n\n@view\n@external\ndef doesVaultHaveAnyFunds() -> bool:\n    numAssets: uint256 = self.numAssets\n    if numAssets == 0:\n        return False\n    for i: uint256 in range(1, numAssets, bound=max_value(uint256)):\n        asset: address = self.vaultAssets[i]\n        if self.totalBalances[asset] != 0:\n            return True\n    return False\n\n\n# num user assets\n\n\n@view\n@external\ndef getNumUserAssets(_user: address) -> uint256:\n    return self._getNumUserAssets(_user)\n\n\n@view\n@internal\ndef _getNumUserAssets(_user: address) -> uint256:\n    numAssets: uint256 = self.numUserAssets[_user]\n    if numAssets == 0:\n        return 0\n    return numAssets - 1\n\n\n# num vault assets\n\n\n@view\n@external\ndef getNumVaultAssets() -> uint256:\n    return self._getNumVaultAssets()\n\n\n@view\n@internal\ndef _getNumVaultAssets() -> uint256:\n    numAssets: uint256 = self.numAssets\n    if numAssets == 0:\n        return 0\n    return numAssets - 1\n\n\n########\n# Ripe #\n########\n\n\n# activate\n\n\n@external\ndef pause(_shouldPause: bool):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    assert _shouldPause != self.isPaused # dev: no change\n    self.isPaused = _shouldPause\n    log VaultPauseModified(isPaused=_shouldPause)\n\n\n# recover funds\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    # cannot recover funds from a registered asset with a balance\n    assert self.indexOfAsset[_asset] == 0 and self.totalBalances[_asset] == 0 # dev: invalid recovery\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log VaultFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)\n",
+            "sha256sum": "2b6a2a377605223e6b8393e2c536ae75569714c4b68d79ede60f047ef2f5a5ad"
+          },
+          "contracts/vaults/modules/SharesVault.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2026\n\n# @version 0.4.3\n\nuses: vaultData\nimport contracts.vaults.modules.VaultData as vaultData\n\nfrom interfaces import Vault\nfrom ethereum.ercs import IERC20\n\nDECIMAL_OFFSET: constant(uint256) = 10 ** 8\nMAX_TRANSFER_DELTA: constant(uint256) = 2\n\n\n@deploy\ndef __init__():\n    pass\n\n\n########\n# Core #\n########\n\n\n@internal\ndef _depositTokensInVault(\n    _user: address,\n    _asset: address,\n    _amount: uint256,\n) -> (uint256, uint256):\n    assert not vaultData.isPaused # dev: contract paused\n\n    # validation\n    assert empty(address) not in [_user, _asset] # dev: invalid user or asset\n    totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    depositAmount: uint256 = min(_amount, totalAssetBalance)\n    assert depositAmount != 0 # dev: invalid deposit amount\n\n    # calc shares\n    prevTotalBalance: uint256 = totalAssetBalance - depositAmount # remove the deposited amount to calc shares accurately\n    newShares: uint256 = self._amountToShares(depositAmount, vaultData.totalBalances[_asset], prevTotalBalance, False)\n    assert newShares != 0 # dev: cannot receive 0 shares\n\n    # add balance on deposit\n    vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)\n\n    return depositAmount, newShares\n\n\n@internal\ndef _withdrawTokensFromVault(\n    _user: address,\n    _asset: address,\n    _amount: uint256,\n    _recipient: address,\n) -> (uint256, uint256, bool):\n    assert not vaultData.isPaused # dev: contract paused\n    assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient\n    assert _recipient != self # dev: invalid recipient\n\n    requestedShares: uint256 = 0\n    requestedAmount: uint256 = 0\n    requestedShares, requestedAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount, True)\n\n    totalSharesBefore: uint256 = vaultData.totalBalances[_asset]\n    userSharesBefore: uint256 = vaultData.userBalances[_user][_asset]\n    vaultBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)\n\n    assert extcall IERC20(_asset).transfer(_recipient, requestedAmount, default_return_value=True) # dev: token transfer failed\n\n    vaultAfter: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    recipientAfter: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)\n    assert vaultAfter <= vaultBefore # dev: invalid vault outflow\n    assert recipientAfter >= recipientBefore # dev: invalid recipient delivery\n\n    actualOutflow: uint256 = vaultBefore - vaultAfter\n    actualDelivery: uint256 = recipientAfter - recipientBefore\n    assert self._isWithinTransferDelta(actualOutflow, requestedAmount) # dev: invalid vault outflow\n    assert self._isWithinTransferDelta(actualDelivery, requestedAmount) # dev: invalid recipient delivery\n\n    creditedAmount: uint256 = min(requestedAmount, min(actualOutflow, actualDelivery))\n    assert creditedAmount != 0 # dev: no credited withdrawal amount\n\n    withdrawalShares: uint256 = requestedShares\n    if actualOutflow != requestedAmount:\n        withdrawalShares = self._amountToShares(\n            actualOutflow,\n            totalSharesBefore,\n            vaultBefore,\n            True,\n        )\n        if withdrawalShares > userSharesBefore:\n            assert userSharesBefore == totalSharesBefore # dev: remaining holder loss\n            withdrawalShares = userSharesBefore\n    assert withdrawalShares != 0 # dev: cannot withdraw 0 shares\n\n    isDepleted: bool = False\n    withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(\n        _user,\n        _asset,\n        withdrawalShares,\n        True,\n    )\n\n    return creditedAmount, withdrawalShares, isDepleted\n\n\n@pure\n@internal\ndef _isWithinTransferDelta(\n    _actual: uint256,\n    _requested: uint256,\n) -> bool:\n    if _actual >= _requested:\n        return _actual - _requested <= MAX_TRANSFER_DELTA\n    return _requested - _actual <= MAX_TRANSFER_DELTA\n\n\n@internal\ndef _transferBalanceWithinVault(\n    _asset: address,\n    _fromUser: address,\n    _toUser: address,\n    _transferAmount: uint256,\n) -> (uint256, uint256, bool):\n    assert not vaultData.isPaused # dev: contract paused\n    assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset\n\n    # calc shares + amount to transfer\n    transferShares: uint256 = 0\n    transferAmount: uint256 = 0\n    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount, False)\n\n    if transferAmount == 0:\n        return 0, 0, False\n\n    # transfer shares\n    isFromUserDepleted: bool = False\n    transferShares, isFromUserDepleted = vaultData._reduceBalanceOnWithdrawal(_fromUser, _asset, transferShares, False)\n    vaultData._addBalanceOnDeposit(_toUser, _asset, transferShares, False)\n\n    return transferAmount, transferShares, isFromUserDepleted\n\n\n####################\n# Needs For Others #\n####################\n\n\n@view\n@internal\ndef _getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:\n    # used in Teller.vy\n    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    return Vault.VaultDataOnDeposit(\n        hasPosition=vaultData.indexOfUserAsset[_user][_asset] != 0,\n        numAssets=vaultData._getNumUserAssets(_user),\n        userBalance=self._getTotalAmountForUserWithTotalBal(_user, _asset, totalBalance),\n        totalBalance=totalBalance,\n    )\n\n\n@view\n@internal\ndef _getUserLootBoxShare(_user: address, _asset: address) -> uint256:\n    # used in Lootbox.vy\n    return vaultData.userBalances[_user][_asset] // DECIMAL_OFFSET\n\n\n@view\n@internal\ndef _getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):\n    # used in CreditEngine.vy\n    asset: address = vaultData.userAssets[_user][_index]\n    if asset == empty(address):\n        return empty(address), 0\n    userShares: uint256 = vaultData.userBalances[_user][asset]\n    if userShares == 0:\n        return empty(address), 0\n    return asset, self._sharesToAmount(userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)\n\n\n@view\n@internal\ndef _getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):\n    # used in Lootbox.vy and AuctionHouse.vy\n    asset: address = vaultData.userAssets[_user][_index]\n    if asset == empty(address):\n        return empty(address), False\n    return asset, vaultData.userBalances[_user][asset] != 0\n\n\n###############\n# Other Utils #\n###############\n\n\n@view\n@internal\ndef _getTotalAmountForUser(_user: address, _asset: address) -> uint256:\n    return self._getTotalAmountForUserWithTotalBal(_user, _asset, staticcall IERC20(_asset).balanceOf(self))\n\n\n@view\n@internal\ndef _getTotalAmountForUserWithTotalBal(_user: address, _asset: address, _totalBalance: uint256) -> uint256:\n    userShares: uint256 = vaultData.userBalances[_user][_asset]\n    return self._sharesToAmount(userShares, vaultData.totalBalances[_asset], _totalBalance, False)\n\n\n@view\n@internal\ndef _getTotalAmountForVault(_asset: address) -> uint256:\n    return staticcall IERC20(_asset).balanceOf(self)\n\n\n##########\n# Shares #\n##########\n\n\n@view\n@internal\ndef _calcWithdrawalSharesAndAmount(\n    _user: address,\n    _asset: address,\n    _amount: uint256,\n    _shouldRoundUpShares: bool = True,\n) -> (uint256, uint256):\n    assert _amount != 0 # dev: no withdrawal amount\n\n    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert totalBalance != 0 # dev: no asset to withdraw\n\n    totalShares: uint256 = vaultData.totalBalances[_asset]\n\n    # user shares\n    withdrawalShares: uint256 = vaultData.userBalances[_user][_asset]\n    assert withdrawalShares != 0 # dev: user has no shares\n\n    # calc amount + shares to withdraw\n    withdrawalAmount: uint256 = min(totalBalance, self._sharesToAmount(withdrawalShares, totalShares, totalBalance, False))\n    if _amount < withdrawalAmount:\n        withdrawalShares = min(withdrawalShares, self._amountToShares(_amount, totalShares, totalBalance, _shouldRoundUpShares))\n        if not _shouldRoundUpShares:\n            if withdrawalShares == 0:\n                return 0, 0\n            withdrawalAmount = self._sharesToAmount(withdrawalShares, totalShares, totalBalance, False)\n            if withdrawalAmount == 0:\n                return 0, 0\n        else:\n            withdrawalAmount = _amount\n\n    assert withdrawalAmount != 0 # dev: no withdrawal amount\n    return withdrawalShares, withdrawalAmount\n\n\n# amount -> shares\n\n\n@view\n@external\ndef amountToShares(_asset: address, _amount: uint256, _shouldRoundUp: bool) -> uint256:\n    totalShares: uint256 = vaultData.totalBalances[_asset]\n    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    return self._amountToShares(_amount, totalShares, totalBalance, _shouldRoundUp)\n\n\n@view\n@internal\ndef _amountToShares(\n    _amount: uint256,\n    _totalShares: uint256,\n    _totalBalance: uint256,\n    _shouldRoundUp: bool,\n) -> uint256:\n    totalBalance: uint256 = _totalBalance\n\n    # dead shares / decimal offset -- preventing donation attacks\n    totalBalance += 1\n    totalShares: uint256 = _totalShares + DECIMAL_OFFSET\n\n    shares: uint256 = self._mulDiv(_amount, totalShares, totalBalance)\n    if _shouldRoundUp and (uint256_mulmod(_amount, totalShares, totalBalance) != 0):\n        shares += 1\n\n    return shares\n\n\n# shares -> amount\n\n\n@view\n@external\ndef sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256:\n    totalShares: uint256 = vaultData.totalBalances[_asset]\n    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    return self._sharesToAmount(_shares, totalShares, totalBalance, _shouldRoundUp)\n\n\n@view\n@internal\ndef _sharesToAmount(\n    _shares: uint256,\n    _totalShares: uint256,\n    _totalBalance: uint256,\n    _shouldRoundUp: bool,\n) -> uint256:\n    totalBalance: uint256 = _totalBalance\n\n    # dead shares / decimal offset -- preventing donation attacks\n    totalBalance += 1\n    totalShares: uint256 = _totalShares + DECIMAL_OFFSET\n\n    amount: uint256 = self._mulDiv(_shares, totalBalance, totalShares)\n    if _shouldRoundUp and (uint256_mulmod(_shares, totalBalance, totalShares) != 0):\n        amount += 1\n\n    return amount\n\n\n# safe math\n\n\n@view\n@internal\ndef _mulDiv(_x: uint256, _y: uint256, _d: uint256) -> uint256:\n    assert _d != 0 # dev: zero denominator\n\n    lo: uint256 = unsafe_mul(_x, _y)\n    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))\n    hi: uint256 = unsafe_sub(\n        unsafe_sub(mm, lo),\n        convert(mm < lo, uint256),\n    )\n\n    if hi == 0:\n        return lo // _d\n\n    assert _d > hi # dev: result overflows\n\n    rem: uint256 = uint256_mulmod(_x, _y, _d)\n    hi = unsafe_sub(hi, convert(rem > lo, uint256))\n    lo = unsafe_sub(lo, rem)\n\n    tz: uint256 = unsafe_sub(0, _d) & _d\n    d2: uint256 = _d // tz\n    lo = lo // tz\n    lo |= unsafe_mul(\n        hi,\n        unsafe_add(\n            unsafe_div(unsafe_sub(0, tz), tz),\n            1,\n        ),\n    )\n\n    inv: uint256 = unsafe_mul(3, d2) ^ 2\n    for i: uint256 in range(6):\n        inv = unsafe_mul(\n            inv,\n            unsafe_sub(2, unsafe_mul(d2, inv)),\n        )\n\n    return unsafe_mul(lo, inv)\n",
+            "sha256sum": "eb9f3f87a255f31f9d57995339d6c300cae9699478f9d07f8fa6777354f6e4b4"
+          },
+          "contracts/vaults/RebaseErc20.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2026\n\n# @version 0.4.3\n\nimplements: Vault\n\nexports: addys.__interface__\nexports: vaultData.__interface__\nexports: sharesVault.__interface__\n\ninitializes: addys\ninitializes: vaultData[addys := addys]\ninitializes: sharesVault[vaultData := vaultData]\n\nfrom interfaces import Vault\nimport contracts.modules.Addys as addys\nimport contracts.vaults.modules.VaultData as vaultData\nimport contracts.vaults.modules.SharesVault as sharesVault\n\nevent RebaseErc20VaultDeposit:\n    user: indexed(address)\n    asset: indexed(address)\n    amount: uint256\n    shares: uint256\n\nevent RebaseErc20VaultWithdrawal:\n    user: indexed(address)\n    asset: indexed(address)\n    amount: uint256\n    isDepleted: bool\n    shares: uint256\n\nevent RebaseErc20VaultTransfer:\n    fromUser: indexed(address)\n    toUser: indexed(address)\n    asset: indexed(address)\n    transferAmount: uint256\n    isFromUserDepleted: bool\n    transferShares: uint256\n\n\n@deploy\ndef __init__(_ripeHq: address):\n    addys.__init__(_ripeHq)\n    vaultData.__init__(False)\n    sharesVault.__init__()\n\n\n########\n# Core #\n########\n\n\n@nonreentrant\n@external\ndef depositTokensInVault(\n    _user: address,\n    _asset: address,\n    _amount: uint256,\n    _a: addys.Addys = empty(addys.Addys),\n) -> uint256:\n    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed\n\n    depositAmount: uint256 = 0\n    newShares: uint256 = 0\n    depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)\n    log RebaseErc20VaultDeposit(user=_user, asset=_asset, amount=depositAmount, shares=newShares)\n    return depositAmount\n\n\n@nonreentrant\n@external\ndef withdrawTokensFromVault(\n    _user: address,\n    _asset: address,\n    _amount: uint256,\n    _recipient: address,\n    _a: addys.Addys = empty(addys.Addys),\n) -> (uint256, bool):\n    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed\n\n    withdrawalAmount: uint256 = 0\n    withdrawalShares: uint256 = 0\n    isDepleted: bool = False\n    withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)\n    log RebaseErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)\n    return withdrawalAmount, isDepleted\n\n\n@nonreentrant\n@external\ndef transferBalanceWithinVault(\n    _asset: address,\n    _fromUser: address,\n    _toUser: address,\n    _transferAmount: uint256,\n    _a: addys.Addys = empty(addys.Addys),\n) -> (uint256, bool):\n    assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed\n\n    transferAmount: uint256 = 0\n    transferShares: uint256 = 0\n    isFromUserDepleted: bool = False\n    transferAmount, transferShares, isFromUserDepleted = sharesVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount)\n    log RebaseErc20VaultTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)\n    return transferAmount, isFromUserDepleted\n\n\n####################\n# Needs For Others #\n####################\n\n\n@view\n@external\ndef getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:\n    # used in Teller.vy\n    return sharesVault._getVaultDataOnDeposit(_user, _asset)\n\n\n@view\n@external\ndef getUserLootBoxShare(_user: address, _asset: address) -> uint256:\n    # used in Lootbox.vy\n    return sharesVault._getUserLootBoxShare(_user, _asset)\n\n\n@view\n@external\ndef getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):\n    # used in CreditEngine.vy\n    return sharesVault._getUserAssetAndAmountAtIndex(_user, _index)\n\n\n@view\n@external\ndef getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):\n    # used in Lootbox.vy and AuctionHouse.vy\n    return sharesVault._getUserAssetAtIndexAndHasBalance(_user, _index)\n\n\n###############\n# Other Utils #\n###############\n\n\n@view\n@external\ndef getTotalAmountForUser(_user: address, _asset: address) -> uint256:\n    return sharesVault._getTotalAmountForUser(_user, _asset)\n\n\n@view\n@external\ndef getTotalAmountForVault(_asset: address) -> uint256:\n    return sharesVault._getTotalAmountForVault(_asset)\n",
+            "sha256sum": "5e448fb6ebfed4d4632af0e1926e05140025387033f397148a8f072da7f5dd82"
+          }
+        },
+        "settings": {
+          "outputSelection": {
+            "contracts/vaults/RebaseErc20.vy": [
+              "*"
+            ]
+          },
+          "search_paths": [
+            "."
+          ]
+        },
+        "compiler_version": "v0.4.3+commit.bff19ea2",
+        "integrity": "547c634cf0fbfb7d302c310efebc4eee2c1a82ff7a8ada78eec3f812dbdb759f"
+      },
+      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
+      "file": "contracts/vaults/RebaseErc20.vy"
     }
   }
 }
