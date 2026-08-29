@@ -445,6 +445,61 @@ def test_mission_control_set_asset_config(mission_control, switchboard_alpha, al
     assert mission_control.isSupportedAsset(alpha_token.address)
     assert mission_control.getNumAssets() == 1
 
+
+def test_first_register_seeds_singleton_earner_without_overwriting_and_reseeds_after_readd(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    sample_asset_config,
+):
+    singleton_config = list(sample_asset_config)
+    singleton_config[0] = [1]
+    singleton_config[1] = 0
+    singleton_config[2] = 0
+    mission_control.setAssetConfig(
+        alpha_token,
+        singleton_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 1
+
+    mission_control.setRewardVaultId(
+        alpha_token,
+        2,
+        sender=switchboard_alpha.address,
+    )
+    updated_config = list(singleton_config)
+    updated_config[3] += 1
+    mission_control.setAssetConfig(
+        alpha_token,
+        updated_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 2
+
+    multi_vault_config = list(singleton_config)
+    multi_vault_config[0] = [1, 2]
+    mission_control.setAssetConfig(
+        bravo_token,
+        multi_vault_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(bravo_token) == 0
+
+    assert mission_control.deregisterAsset(
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 0
+    mission_control.setAssetConfig(
+        alpha_token,
+        singleton_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 1
+
+
 def test_mission_control_set_asset_config_unauthorized(mission_control, alice, alpha_token, sample_asset_config):
     """Test that only Switchboard can set asset config."""
     with boa.reverts("no perms"):

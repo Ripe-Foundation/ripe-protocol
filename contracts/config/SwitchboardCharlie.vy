@@ -66,6 +66,7 @@ interface MissionControl:
     def coreRipeGovVaultId() -> uint256: view
     def assetStakersPointsAlloc(_asset: address) -> uint256: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def rewardVaultId(_asset: address) -> uint256: view
 
 interface StabilityPool:
@@ -507,7 +508,7 @@ def _assertValidRewardVaultId(_asset: address, _vaultId: uint256, _oldVaultId: u
     assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(checkVaultId, _asset) # dev: unsupported reward vault
     if _vaultId != 0:
         if staticcall MissionControl(_missionControl).assetStakersPointsAlloc(_asset) != 0:
-            assert _vaultId == staticcall MissionControl(_missionControl).coreRipeGovVaultId() or staticcall MissionControl(_missionControl).isStabVaultId(_vaultId) # dev: staker vault class
+            assert staticcall MissionControl(_missionControl).isRipeGovVaultId(_vaultId) or staticcall MissionControl(_missionControl).isStabVaultId(_vaultId) # dev: staker vault class
 
 
 # Operator retirement / migration:

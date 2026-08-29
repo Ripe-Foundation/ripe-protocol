@@ -261,9 +261,7 @@ def __init__(_ripeHq: address, _defaults: address):
         assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()
         for entry: cs.AssetConfigEntry in assetConfigs:
             self._setAssetConfig(entry.asset, entry.config)
-            if len(entry.config.vaultIds) == 1:
-                self.rewardVaultId[entry.asset] = entry.config.vaultIds[0]
-            else:
+            if len(entry.config.vaultIds) != 1:
                 assert entry.config.stakersPointsAlloc == 0 and entry.config.voterPointsAlloc == 0 # dev: multi-vault defaults cannot have allocs
 
         # priority lists
@@ -332,6 +330,8 @@ def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     # register asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
         self._registerAsset(_asset)
+        if len(_config.vaultIds) == 1:
+            self.rewardVaultId[_asset] = _config.vaultIds[0]
 
 
 # asset registration
