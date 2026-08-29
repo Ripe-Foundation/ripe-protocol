@@ -200,6 +200,7 @@ def test_uniswap_v2_abi_is_independently_byte_current_and_old_abi_is_absent():
     }
     assert {
         "isMonitoringOnly",
+        "getPoolMonitoringPrice",
         "getRipePoolState",
         "getRipeWethMonitoringPrice",
         "getRipeUsdMonitoringPrice",
