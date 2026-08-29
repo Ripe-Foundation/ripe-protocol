@@ -896,6 +896,10 @@ def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAdd
     bookAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
     assert bookAddr == _vaultAddr # dev: vault addr mismatch
 
+    mc: address = self._getMissionControlAddr()
+    if staticcall MissionControl(mc).rewardVaultId(_asset) == _vaultId:
+        assert staticcall MissionControl(mc).accrualStartBlock(_asset, _vaultId) != max_value(uint256) # dev: cannot checkpoint armed promotional row
+
     extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
     log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)
     return True
@@ -905,6 +909,7 @@ def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAdd
 def updateManyDepositPoints(_users: DynArray[address, MAX_CLAIM_USERS], _vaultId: uint256, _asset: address) -> bool:
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
 
+    assert empty(address) not in _users # dev: invalid user
     vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
     assert vaultAddr != empty(address) # dev: invalid vault
 

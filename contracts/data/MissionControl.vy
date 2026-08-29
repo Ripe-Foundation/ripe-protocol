@@ -369,7 +369,10 @@ def deregisterAsset(_asset: address) -> bool:
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
     self.indexOfAsset[_asset] = 0
+    rewardVault: uint256 = self.rewardVaultId[_asset]
     self.rewardVaultId[_asset] = 0
+    if rewardVault != 0:
+        self.accrualStartBlock[_asset][rewardVault] = 0
 
     # get last item, replace the removed item
     if targetIndex != lastIndex:
@@ -453,10 +456,25 @@ def setRewardVaultId(_asset: address, _vaultId: uint256):
     self.rewardVaultId[_asset] = _vaultId
 
 
+event AccrualStartBlockSet:
+    asset: indexed(address)
+    vaultId: uint256
+    prevStartBlock: uint256
+    startBlock: uint256
+
+
 @external
 def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    prevStartBlock: uint256 = self.accrualStartBlock[_asset][_vaultId]
     self.accrualStartBlock[_asset][_vaultId] = _startBlock
+    log AccrualStartBlockSet(
+        asset=_asset,
+        vaultId=_vaultId,
+        prevStartBlock=prevStartBlock,
+        startBlock=_startBlock,
+    )
 
 
 # points allocs
@@ -1018,13 +1036,14 @@ def getRewardsConfig() -> RewardsConfig:
 @external
 def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    startBlock: uint256 = self.accrualStartBlock[_asset][_vaultId]
     if self.indexOfAsset[_asset] == 0:
         return DepositPointsConfig(
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
             isNft=assetConfig.isNft,
             shouldFundGenPoints=False,
-            accrualStartBlock=self.accrualStartBlock[_asset][_vaultId],
+            accrualStartBlock=startBlock,
         )
     earner: uint256 = self.rewardVaultId[_asset]
     isEarner: bool = earner != 0 and _vaultId == earner
@@ -1034,8 +1053,8 @@ def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsC
         stakersPointsAlloc=stakers,
         voterPointsAlloc=voters,
         isNft=assetConfig.isNft,
-        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 and self.accrualStartBlock[_asset][_vaultId] == 0,
-        accrualStartBlock=self.accrualStartBlock[_asset][_vaultId],
+        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 and startBlock == 0,
+        accrualStartBlock=startBlock,
     )
 
 

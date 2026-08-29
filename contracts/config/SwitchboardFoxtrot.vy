@@ -61,7 +61,6 @@ interface MissionControl:
     def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
 
 interface Ledger:
-    def globalDepositPoints() -> GlobalDepositPoints: view
     def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
 
 interface PriceDesk:
@@ -81,13 +80,6 @@ flag ActionType:
     PAUSE_AUCTION
     PAUSE_MANY_AUCTIONS
     SET_ACCRUAL_CLOCK_ARMED
-
-struct GlobalDepositPoints:
-    lastUsdValue: uint256
-    ripeStakerPoints: uint256
-    ripeVotePoints: uint256
-    ripeGenPoints: uint256
-    lastUpdate: uint256
 
 struct AssetDepositPoints:
     balancePoints: uint256
@@ -255,7 +247,6 @@ RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
 RIPE_RESERVE_VESTING_ID: constant(uint256) = 27
 AUCTION_HOUSE_ID: constant(uint256) = 9
 MAX_AUCTIONS: constant(uint256) = 20
-HUNDRED_PERCENT: constant(uint256) = 100_00
 
 
 @deploy
@@ -314,10 +305,11 @@ def _getLedgerAddr() -> address:
 @view
 @internal
 def _isPristineAssetPoints(_asset: address, _vaultId: uint256) -> bool:
+    # Economically empty. lastUpdate may be set by an empty checkpoint or a
+    # fully unwound deposit; that touch must not brick arm or abort.
     points: AssetDepositPoints = staticcall Ledger(self._getLedgerAddr()).assetDepositPoints(_vaultId, _asset)
     return (
-        points.lastUpdate == 0
-        and points.lastBalance == 0
+        points.lastBalance == 0
         and points.balancePoints == 0
         and points.ripeStakerPoints == 0
         and points.ripeVotePoints == 0

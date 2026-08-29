@@ -897,7 +897,7 @@ def _getLatestDepositPoints(
         assetPoints.lastBalance += userLootShare
         userPoints.lastBalance = userLootShare
 
-    # general-depositor funding follows the asset-level staker allocation, independent of this row's membership.
+    # general-depositor funding follows shouldFundGenPoints (earner, no staker/voter alloc, clock off), independent of this row's membership.
     # value is aggregate (`lastBalance * precision`), never the caller rate.
     # round down, cap at custody. exact-32-byte sharesToAmount is sharesvault-compatible even if 0; failed matching probe is only nominal.
     newAssetUsdValue: uint256 = 0

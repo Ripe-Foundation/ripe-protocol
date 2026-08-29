@@ -1,5 +1,32 @@
 [
   {
+    "name": "AccrualStartBlockSet",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "prevStartBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "startBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "DepartmentPauseModified",
     "inputs": [
       {

@@ -336,23 +336,38 @@ def _writeAssetConfig(
     selectedIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = []
     selectedAddrs: DynArray[address, MAX_VAULTS_PER_ASSET] = []
     lootbox: address = empty(address)
+    earner: uint256 = 0
+    startBefore: uint256 = 0
     if needCkpt:
         ripeHq: address = gov._getRipeHqFromGov()
         vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
         lootbox = staticcall RipeHq(ripeHq).getAddr(LOOTBOX_ID)
-        earner: uint256 = staticcall MissionControl(_mc).rewardVaultId(_asset)
+        earner = staticcall MissionControl(_mc).rewardVaultId(_asset)
         if earner != 0:
             vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(earner)
             assert vaultAddr != empty(address) # dev: invalid vault
             selectedIds.append(earner)
             selectedAddrs.append(vaultAddr)
+            startBefore = staticcall MissionControl(_mc).accrualStartBlock(_asset, earner)
         self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
 
     self._enforceAccrualConfigChange(_asset, prevConfig, _config, _mc)
     extcall MissionControl(_mc).setAssetConfig(_asset, _config)
 
-    if needCkpt and (_oldStakers == 0) != (_config.stakersPointsAlloc == 0):
-        self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
+    if needCkpt:
+        startAfter: uint256 = 0
+        if earner != 0:
+            startAfter = staticcall MissionControl(_mc).accrualStartBlock(_asset, earner)
+        # Same classification as MissionControl.getDepositPointsConfig.shouldFundGenPoints.
+        oldFundGen: bool = earner != 0 and _oldStakers == 0 and _oldVoter == 0 and startBefore == 0
+        newFundGen: bool = (
+            earner != 0
+            and _config.stakersPointsAlloc == 0
+            and _config.voterPointsAlloc == 0
+            and startAfter == 0
+        )
+        if oldFundGen != newFundGen:
+            self._checkpointSelectedRows(_asset, selectedIds, selectedAddrs, lootbox)
 
 
 #############
