@@ -3712,6 +3712,7 @@ def _count_mc_writes(computation, mission_control):
 def test_consolidated_writer_parity_for_each_bravo_branch(
     action_kind,
     switchboard_bravo,
+    switchboard_charlie,
     governance,
     mission_control,
     alpha_token,
@@ -3722,6 +3723,14 @@ def test_consolidated_writer_parity_for_each_bravo_branch(
     asset = bravo_token if action_kind == "add" else alpha_token
     if action_kind != "add":
         _seed_binding_asset(mission_control, switchboard_bravo, asset)
+    if action_kind == "deposit" and mission_control.rewardVaultId(asset) != 0:
+        clear_id = switchboard_charlie.setRewardVaultId(
+            asset,
+            0,
+            sender=governance.address,
+        )
+        _execute_after_timelock(switchboard_charlie, governance, clear_id)
+        assert mission_control.rewardVaultId(asset) == 0
 
     scale_before = price_desk.tokenScale(asset)
     action_id = _queue_binding_action(

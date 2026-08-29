@@ -306,7 +306,7 @@ def test_non_add_new_actions_do_not_change_scale(
 
     deposit_id = switchboard_bravo.setAssetDepositParams(
         token,
-        [2, 3],
+        [1],
         0,
         0,
         2000,

@@ -46,6 +46,19 @@ def _advance_to_confirmation(switchboard, action_id):
         boa.env.time_travel(blocks=confirmation_block - current_block)
 
 
+def _clear_earner(switchboard_charlie, governance, mission_control, asset):
+    if mission_control.rewardVaultId(asset) == 0:
+        return
+    aid = switchboard_charlie.setRewardVaultId(
+        asset,
+        0,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_charlie, aid)
+    assert switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert mission_control.rewardVaultId(asset) == 0
+
+
 def _register_vault(vault_book, governance, vault, description):
     assert vault_book.startAddNewAddressToRegistry(
         vault.address,
@@ -2591,6 +2604,7 @@ def test_deregister_asset_execute_success(
 
     # Verify asset is registered
     assert mission_control.isSupportedAsset(alpha_token.address)
+    _clear_earner(switchboard_charlie, governance, mission_control, alpha_token)
 
     # Create pending deregister action
     aid = switchboard_charlie.deregisterAsset(alpha_token.address, sender=governance.address)
@@ -2691,6 +2705,7 @@ def test_deregister_asset_execute_allows_only_applicable_debt_exits(
         tuple(config),
         sender=switchboard_bravo.address,
     )
+    _clear_earner(switchboard_charlie, governance, mission_control, alpha_token)
     action = switchboard_charlie.deregisterAsset(
         alpha_token,
         sender=governance.address,
@@ -2788,6 +2803,7 @@ def test_deregister_asset_requires_whitelist_cleared_at_execution(
         tuple(config),
         sender=switchboard_bravo.address,
     )
+    _clear_earner(switchboard_charlie, governance, mission_control, alpha_token)
     retire_action = switchboard_charlie.deregisterAsset(
         alpha_token,
         sender=governance.address,
@@ -2851,6 +2867,7 @@ def test_deregister_asset_execute_rejects_already_unregistered(
         add_action,
         sender=governance.address,
     )
+    _clear_earner(switchboard_charlie, governance, mission_control, alpha_token)
     first_action = switchboard_charlie.deregisterAsset(
         alpha_token.address,
         sender=governance.address,

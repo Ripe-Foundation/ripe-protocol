@@ -167,6 +167,36 @@ def _execute(switchboard, governance, action_id):
     assert switchboard.executePendingAction(action_id, sender=governance.address)
 
 
+def _charlie_clear_if_set(switchboard_charlie, governance, mission_control, asset):
+    if mission_control.rewardVaultId(asset) == 0:
+        return
+    clear_id = switchboard_charlie.setRewardVaultId(
+        asset,
+        0,
+        sender=governance.address,
+    )
+    _execute(switchboard_charlie, governance, clear_id)
+    assert mission_control.rewardVaultId(asset) == 0
+
+
+def _charlie_select_if_needed(
+    switchboard_charlie,
+    governance,
+    mission_control,
+    asset,
+    vault_id,
+):
+    if mission_control.rewardVaultId(asset) == vault_id:
+        return
+    select_id = switchboard_charlie.setRewardVaultId(
+        asset,
+        vault_id,
+        sender=governance.address,
+    )
+    _execute(switchboard_charlie, governance, select_id)
+    assert mission_control.rewardVaultId(asset) == vault_id
+
+
 def _queue_deposit_params(
     switchboard_bravo,
     governance,
@@ -524,12 +554,13 @@ def test_charlie_current_row_activation_then_bravo_zero_crossing_post_pass(
     )
     mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
     assert ledger.assetDepositPoints(2, ripe_token).lastUpdate == 0
-    select_id = switchboard_charlie.setRewardVaultId(
+    _charlie_select_if_needed(
+        switchboard_charlie,
+        governance,
+        mission_control,
         ripe_token,
         2,
-        sender=governance.address,
     )
-    _execute(switchboard_charlie, governance, select_id)
     action_id = _queue_deposit_params(
         switchboard_bravo,
         governance,
@@ -727,16 +758,23 @@ def _prepare_historical_row_with_current_ripe_gov(
         (100, 1_000, 100_00, False, 0),
         sender=switchboard_alpha.address,
     )
+    _charlie_clear_if_set(
+        switchboard_charlie,
+        governance,
+        mission_control,
+        alpha_token,
+    )
     move_id = _queue_deposit_params(
         switchboard_bravo, governance, alpha_token, [2], 0, 0
     )
     _execute(switchboard_bravo, governance, move_id)
-    select_id = switchboard_charlie.setRewardVaultId(
+    _charlie_select_if_needed(
+        switchboard_charlie,
+        governance,
+        mission_control,
         alpha_token,
         2,
-        sender=governance.address,
     )
-    _execute(switchboard_charlie, governance, select_id)
     return vault_a
 
 
