@@ -420,7 +420,7 @@ def test_voter_allocation_activates_and_permanently_protects_campaign(
         )
 
 
-def test_empty_checkpoint_does_not_block_arm(
+def test_empty_checkpoint_blocks_arm(
     switchboard_charlie,
     switchboard_foxtrot,
     switchboard_golf,
@@ -453,13 +453,13 @@ def test_empty_checkpoint_does_not_block_arm(
     assert points.ripeGenPoints == 0
     assert points.lastUsdValue == 0
 
-    _arm_promotional_asset(
-        switchboard_foxtrot,
-        governance,
-        bravo_token,
-        vault_id,
-    )
-    assert mission_control.accrualStartBlock(bravo_token, vault_id) == MAX_UINT256
+    with boa.reverts("asset points not pristine"):
+        switchboard_foxtrot.setAccrualClockArmed(
+            bravo_token,
+            vault_id,
+            True,
+            sender=governance.address,
+        )
 
 
 def test_update_many_rejects_zero_address(
@@ -566,7 +566,7 @@ def test_deregister_clears_reward_row_clock(
     assert mission_control.accrualStartBlock(bravo_token, vault_id) == 0
 
 
-def test_deposit_then_full_withdraw_can_disarm(
+def test_deposit_then_full_withdraw_cannot_disarm(
     switchboard_charlie,
     switchboard_foxtrot,
     switchboard_golf,
@@ -632,21 +632,13 @@ def test_deposit_then_full_withdraw_can_disarm(
         sender=governance.address,
     )
 
-    _arm_promotional_asset(
-        switchboard_foxtrot,
-        governance,
-        bravo_token,
-        vault_id,
-        False,
-    )
-    assert mission_control.accrualStartBlock(bravo_token, vault_id) == 0
-    _arm_promotional_asset(
-        switchboard_foxtrot,
-        governance,
-        bravo_token,
-        vault_id,
-    )
-    assert mission_control.accrualStartBlock(bravo_token, vault_id) == MAX_UINT256
+    with boa.reverts("asset points not pristine"):
+        switchboard_foxtrot.setAccrualClockArmed(
+            bravo_token,
+            vault_id,
+            False,
+            sender=governance.address,
+        )
 
 
 def test_accrued_gen_points_still_block_arm(
@@ -862,3 +854,200 @@ def test_voter_zero_crossing_settles_gen_usd(
     assert global_later.ripeGenPoints == global_on.ripeGenPoints + (
         global_on.lastUsdValue * elapsed
     )
+
+
+def test_staggered_depositors_share_post_activation_elapsed(
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_foxtrot,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    alice,
+    simple_erc20_vault,
+    vault_book,
+    performDeposit,
+    lootbox,
+    ledger,
+    teller,
+    setGeneralConfig,
+):
+    setGeneralConfig()
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    _arm_promotional_asset(
+        switchboard_foxtrot,
+        governance,
+        bravo_token,
+        vault_id,
+    )
+    assert switchboard_charlie.setCanDepositAsset(
+        bravo_token,
+        True,
+        sender=governance.address,
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        amount,
+        bravo_token,
+        bravo_token_whale,
+        simple_erc20_vault,
+    )
+    boa.env.time_travel(blocks=15)
+    performDeposit(
+        alice,
+        amount,
+        bravo_token,
+        bravo_token_whale,
+        simple_erc20_vault,
+    )
+    boa.env.time_travel(blocks=10)
+
+    _set_deposit_allocs(
+        switchboard_bravo,
+        governance,
+        mission_control,
+        bravo_token,
+        0,
+        20,
+    )
+    start_block = mission_control.accrualStartBlock(bravo_token, vault_id)
+    assert start_block not in (0, MAX_UINT256)
+    bob_before = ledger.userDepositPoints(bob, vault_id, bravo_token)
+    alice_before = ledger.userDepositPoints(alice, vault_id, bravo_token)
+    assert bob_before.lastUpdate < start_block
+    assert alice_before.lastUpdate < start_block
+    assert bob_before.lastUpdate < alice_before.lastUpdate
+    assert bob_before.balancePoints == 0
+    assert alice_before.balancePoints == 0
+
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        simple_erc20_vault,
+        bravo_token,
+        sender=teller.address,
+    )
+    lootbox.updateDepositPoints(
+        alice,
+        vault_id,
+        simple_erc20_vault,
+        bravo_token,
+        sender=teller.address,
+    )
+    bob_after = ledger.userDepositPoints(bob, vault_id, bravo_token)
+    alice_after = ledger.userDepositPoints(alice, vault_id, bravo_token)
+    asset_after = ledger.assetDepositPoints(vault_id, bravo_token)
+    assert bob_after.balancePoints == alice_after.balancePoints
+    assert bob_after.balancePoints == bob_after.lastBalance * elapsed
+    assert alice_after.balancePoints == alice_after.lastBalance * elapsed
+    assert (
+        bob_after.balancePoints + alice_after.balancePoints
+        <= asset_after.balancePoints
+    )
+    assert asset_after.balancePoints == asset_after.lastBalance * elapsed
+
+
+def test_priced_armed_and_live_row_does_not_fund_gen(
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_foxtrot,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    simple_erc20_vault,
+    vault_book,
+    performDeposit,
+    lootbox,
+    ledger,
+    teller,
+    setGeneralConfig,
+    mock_price_source,
+):
+    setGeneralConfig()
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    _arm_promotional_asset(
+        switchboard_foxtrot,
+        governance,
+        bravo_token,
+        vault_id,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    assert switchboard_charlie.setCanDepositAsset(
+        bravo_token,
+        True,
+        sender=governance.address,
+    )
+    global_before = ledger.globalDepositPoints()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        bravo_token,
+        bravo_token_whale,
+        simple_erc20_vault,
+    )
+    boa.env.time_travel(blocks=12)
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        simple_erc20_vault,
+        bravo_token,
+        sender=teller.address,
+    )
+    armed_points = ledger.assetDepositPoints(vault_id, bravo_token)
+    armed_global = ledger.globalDepositPoints()
+    assert armed_points.lastBalance > 0
+    assert armed_points.lastUsdValue == 0
+    assert armed_points.ripeGenPoints == 0
+    assert armed_points.ripeVotePoints == 0
+    assert armed_global.lastUsdValue == global_before.lastUsdValue
+
+    _set_deposit_allocs(
+        switchboard_bravo,
+        governance,
+        mission_control,
+        bravo_token,
+        0,
+        20,
+    )
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        simple_erc20_vault,
+        bravo_token,
+        sender=teller.address,
+    )
+    live_points = ledger.assetDepositPoints(vault_id, bravo_token)
+    live_global = ledger.globalDepositPoints()
+    assert live_points.balancePoints > 0
+    assert live_points.ripeVotePoints > 0
+    assert live_points.ripeGenPoints == 0
+    assert live_points.lastUsdValue == 0
+    assert live_global.lastUsdValue == global_before.lastUsdValue
+    assert not mission_control.getDepositPointsConfig(
+        bravo_token,
+        vault_id,
+    ).shouldFundGenPoints

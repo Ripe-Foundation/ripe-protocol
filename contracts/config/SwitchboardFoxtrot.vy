@@ -305,11 +305,10 @@ def _getLedgerAddr() -> address:
 @view
 @internal
 def _isPristineAssetPoints(_asset: address, _vaultId: uint256) -> bool:
-    # Economically empty. lastUpdate may be set by an empty checkpoint or a
-    # fully unwound deposit; that touch must not brick arm or abort.
     points: AssetDepositPoints = staticcall Ledger(self._getLedgerAddr()).assetDepositPoints(_vaultId, _asset)
     return (
-        points.lastBalance == 0
+        points.lastUpdate == 0
+        and points.lastBalance == 0
         and points.balancePoints == 0
         and points.ripeStakerPoints == 0
         and points.ripeVotePoints == 0
