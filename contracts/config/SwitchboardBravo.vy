@@ -29,6 +29,7 @@ interface MissionControl:
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def rewardVaultId(_asset: address) -> uint256: view
     def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
+    def accrualActivationNotBeforeBlock(_asset: address, _vaultId: uint256) -> uint256: view
     def isSupportedAsset(_asset: address) -> bool: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
@@ -291,6 +292,9 @@ def _enforceAccrualConfigChange(_asset: address, _prevConfig: cs.AssetConfig, _n
         assert _prevConfig.voterPointsAlloc == 0 # dev: invalid armed voter alloc
         if _newConfig.voterPointsAlloc == 0:
             return
+
+        notBefore: uint256 = staticcall MissionControl(_missionControl).accrualActivationNotBeforeBlock(_asset, vaultId)
+        assert notBefore == 0 or block.number >= notBefore # dev: promotional activation too early
 
         assert _missionControl == self._getMissionControlAddr() # dev: not current mission control
         assert _newConfig.voterPointsAlloc <= HUNDRED_PERCENT # dev: invalid voter alloc

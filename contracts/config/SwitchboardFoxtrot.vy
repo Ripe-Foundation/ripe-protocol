@@ -53,12 +53,14 @@ interface AuctionHouse:
 
 interface MissionControl:
     def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256): nonpayable
+    def setAccrualActivationNotBeforeBlock(_asset: address, _vaultId: uint256, _notBeforeBlock: uint256): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def canPerformLiteAction(_user: address) -> bool: view
     def rewardVaultId(_asset: address) -> uint256: view
     def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
+    def accrualActivationNotBeforeBlock(_asset: address, _vaultId: uint256) -> uint256: view
 
 interface Ledger:
     def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
@@ -80,6 +82,7 @@ flag ActionType:
     PAUSE_AUCTION
     PAUSE_MANY_AUCTIONS
     SET_ACCRUAL_CLOCK_ARMED
+    ANNOUNCE_PROMOTIONAL_START
 
 struct AssetDepositPoints:
     balancePoints: uint256
@@ -118,6 +121,12 @@ struct AccrualClockUpdate:
     asset: address
     vaultId: uint256
     shouldArm: bool
+    missionControl: address
+
+struct PromotionalStartAnnouncement:
+    asset: address
+    vaultId: uint256
+    notBeforeBlock: uint256
     missionControl: address
 
 event PendingReserveEngineConfigSet:
@@ -224,6 +233,19 @@ event AccrualClockArmedSet:
     shouldArm: bool
     caller: indexed(address)
 
+event PendingPromotionalStartAnnouncement:
+    asset: indexed(address)
+    vaultId: uint256
+    notBeforeBlock: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PromotionalStartAnnounced:
+    asset: indexed(address)
+    vaultId: uint256
+    notBeforeBlock: uint256
+    caller: indexed(address)
+
 event GreenRefPoolSnapshotAttempted:
     caller: indexed(address)
     priceSourceId: indexed(uint256)
@@ -239,6 +261,7 @@ pendingStartManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionCon
 pendingPauseAuctionActions: public(HashMap[uint256, FungAuctionConfig])
 pendingPauseManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
 pendingAccrualClock: public(HashMap[uint256, AccrualClockUpdate])
+pendingPromotionalStart: public(HashMap[uint256, PromotionalStartAnnouncement])
 
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
@@ -304,11 +327,10 @@ def _getLedgerAddr() -> address:
 
 @view
 @internal
-def _isPristineAssetPoints(_asset: address, _vaultId: uint256) -> bool:
+def _isCleanAssetPoints(_asset: address, _vaultId: uint256) -> bool:
     points: AssetDepositPoints = staticcall Ledger(self._getLedgerAddr()).assetDepositPoints(_vaultId, _asset)
     return (
-        points.lastUpdate == 0
-        and points.lastBalance == 0
+        points.lastBalance == 0
         and points.balancePoints == 0
         and points.ripeStakerPoints == 0
         and points.ripeVotePoints == 0
@@ -330,11 +352,12 @@ def _validateAccrualClockTransition(_asset: address, _vaultId: uint256, _shouldA
     assert config.debtTerms.ltv == 0 # dev: ltv must be zero
     assert config.stakersPointsAlloc == 0 and config.voterPointsAlloc == 0 # dev: allocations must be zero
     current: uint256 = staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _vaultId)
+    assert staticcall MissionControl(_missionControl).accrualActivationNotBeforeBlock(_asset, _vaultId) == 0 # dev: promotional start already announced
     if _shouldArm:
         assert current == 0 # dev: invalid accrual clock transition
     else:
         assert current == max_value(uint256) # dev: invalid accrual clock transition
-    assert self._isPristineAssetPoints(_asset, _vaultId) # dev: asset points not pristine
+    assert self._isCleanAssetPoints(_asset, _vaultId) # dev: asset points not clean
 
 
 @external
@@ -350,6 +373,54 @@ def setAccrualClockArmed(_asset: address, _vaultId: uint256, _shouldArm: bool) -
         asset=_asset,
         vaultId=_vaultId,
         shouldArm=_shouldArm,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
+
+
+@view
+@internal
+def _validatePromotionalStartAnnouncement(
+    _asset: address,
+    _vaultId: uint256,
+    _notBeforeBlock: uint256,
+    _missionControl: address,
+):
+    assert _missionControl == self._getMissionControlAddr() # dev: not current mission control
+    assert staticcall MissionControl(_missionControl).isSupportedAsset(_asset) # dev: invalid asset
+    assert _vaultId != 0 and staticcall MissionControl(_missionControl).rewardVaultId(_asset) == _vaultId # dev: invalid reward vault
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, _asset) # dev: unsupported reward vault
+    assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _vaultId) == max_value(uint256) # dev: accrual clock not armed
+    assert staticcall MissionControl(_missionControl).accrualActivationNotBeforeBlock(_asset, _vaultId) == 0 # dev: promotional start already announced
+
+    config: cs.AssetConfig = staticcall MissionControl(_missionControl).assetConfig(_asset)
+    assert not config.canDeposit # dev: deposits must be disabled
+    assert config.debtTerms.ltv == 0 # dev: ltv must be zero
+    assert config.stakersPointsAlloc == 0 and config.voterPointsAlloc == 0 # dev: allocations must be zero
+    assert self._isCleanAssetPoints(_asset, _vaultId) # dev: asset points not clean
+    assert _notBeforeBlock > block.number # dev: promotional start must be in the future
+    assert _notBeforeBlock != max_value(uint256) # dev: invalid promotional start block
+
+
+@external
+def announcePromotionalStart(_asset: address, _vaultId: uint256, _notBeforeBlock: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    mc: address = self._getMissionControlAddr()
+    self._validatePromotionalStartAnnouncement(_asset, _vaultId, _notBeforeBlock, mc)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.ANNOUNCE_PROMOTIONAL_START
+    self.pendingPromotionalStart[aid] = PromotionalStartAnnouncement(
+        asset=_asset,
+        vaultId=_vaultId,
+        notBeforeBlock=_notBeforeBlock,
+        missionControl=mc,
+    )
+    log PendingPromotionalStartAnnouncement(
+        asset=_asset,
+        vaultId=_vaultId,
+        notBeforeBlock=_notBeforeBlock,
         confirmationBlock=timeLock._getActionConfirmationBlock(aid),
         actionId=aid,
     )
@@ -658,6 +729,13 @@ def executePendingAction(_aid: uint256) -> bool:
         self.pendingAccrualClock[_aid] = empty(AccrualClockUpdate)
         log AccrualClockArmedSet(asset=p.asset, vaultId=p.vaultId, shouldArm=p.shouldArm, caller=msg.sender)
 
+    elif actionType == ActionType.ANNOUNCE_PROMOTIONAL_START:
+        p: PromotionalStartAnnouncement = self.pendingPromotionalStart[_aid]
+        self._validatePromotionalStartAnnouncement(p.asset, p.vaultId, p.notBeforeBlock, p.missionControl)
+        extcall MissionControl(p.missionControl).setAccrualActivationNotBeforeBlock(p.asset, p.vaultId, p.notBeforeBlock)
+        self.pendingPromotionalStart[_aid] = empty(PromotionalStartAnnouncement)
+        log PromotionalStartAnnounced(asset=p.asset, vaultId=p.vaultId, notBeforeBlock=p.notBeforeBlock, caller=msg.sender)
+
     else:
         raise "invalid action"
 
@@ -696,6 +774,8 @@ def _cancelPendingAction(_aid: uint256):
         pass
     elif actionType == ActionType.SET_ACCRUAL_CLOCK_ARMED:
         self.pendingAccrualClock[_aid] = empty(AccrualClockUpdate)
+    elif actionType == ActionType.ANNOUNCE_PROMOTIONAL_START:
+        self.pendingPromotionalStart[_aid] = empty(PromotionalStartAnnouncement)
     else:
         raise "invalid action"
 
