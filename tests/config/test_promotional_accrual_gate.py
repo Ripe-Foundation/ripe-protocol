@@ -396,6 +396,46 @@ def test_prepare_collection_cancel_leaves_deposits_off(
     assert mission_control.accrualStartBlock(bravo_token, vault_id) == 0
 
 
+def test_prepare_collection_expiry_leaves_deposits_off(
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    _open_deposits(switchboard_charlie, governance, bravo_token)
+
+    action_id = switchboard_bravo.preparePromotionalCollection(
+        bravo_token,
+        vault_id,
+        [],
+        sender=governance.address,
+    )
+    assert not mission_control.assetConfig(bravo_token).canDeposit
+    boa.env.time_travel(
+        blocks=switchboard_bravo.actionTimeLock() + switchboard_bravo.expiration()
+    )
+    assert switchboard_bravo.isExpired(action_id)
+    assert not switchboard_bravo.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    assert not switchboard_bravo.hasPendingAction(action_id)
+    assert not mission_control.assetConfig(bravo_token).canDeposit
+    assert mission_control.accrualStartBlock(bravo_token, vault_id) == 0
+
+
 def test_prepare_collection_is_idempotent_when_deposits_already_off(
     switchboard_bravo,
     switchboard_golf,
@@ -425,6 +465,104 @@ def test_prepare_collection_is_idempotent_when_deposits_already_off(
     assert not mission_control.assetConfig(bravo_token).canDeposit
     _execute(switchboard_bravo, governance, action_id)
     assert mission_control.accrualStartBlock(bravo_token, vault_id) == MAX_UINT256
+
+
+def test_update_many_rejects_zero_address(
+    switchboard_charlie,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+
+    with boa.reverts("invalid user"):
+        switchboard_charlie.updateManyDepositPoints(
+            [ZERO_ADDRESS],
+            vault_id,
+            bravo_token,
+            sender=governance.address,
+        )
+    assert ledger.assetDepositPoints(vault_id, bravo_token).lastUpdate == 0
+
+
+def test_armed_reward_row_rejects_empty_checkpoint(
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    _prepare_collection(
+        switchboard_bravo,
+        governance,
+        bravo_token,
+        vault_id,
+    )
+
+    with boa.reverts("cannot checkpoint armed promotional row"):
+        switchboard_charlie.checkpointAssetDepositPointsAt(
+            bravo_token,
+            vault_id,
+            simple_erc20_vault,
+            sender=governance.address,
+        )
+
+
+def test_deregister_clears_reward_row_clock(
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    simple_erc20_vault,
+    vault_book,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    mission_control.setAccrualStartBlock(
+        bravo_token,
+        vault_id,
+        MAX_UINT256,
+        sender=switchboard_bravo.address,
+    )
+    assert mission_control.accrualStartBlock(bravo_token, vault_id) == MAX_UINT256
+
+    assert mission_control.deregisterAsset(
+        bravo_token,
+        sender=switchboard_charlie.address,
+    )
+    assert not mission_control.isSupportedAsset(bravo_token)
+    assert mission_control.rewardVaultId(bravo_token) == 0
+    assert mission_control.accrualStartBlock(bravo_token, vault_id) == 0
 
 
 def test_prepare_collection_clears_post_arm_usd_weight(
@@ -936,6 +1074,78 @@ def test_voter_allocation_is_permanent_after_activation(
     assert config.stakersPointsAlloc == 0
 
 
+def test_activation_protects_reward_vault_and_asset_registration(
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    simple_erc20_vault,
+    vault_book,
+    performDeposit,
+    setGeneralConfig,
+    mock_price_source,
+):
+    setGeneralConfig()
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    _prepare_collection(
+        switchboard_bravo,
+        governance,
+        bravo_token,
+        vault_id,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _open_deposits(switchboard_charlie, governance, bravo_token)
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        bravo_token,
+        bravo_token_whale,
+        simple_erc20_vault,
+    )
+    _set_deposit_allocs(
+        switchboard_bravo,
+        governance,
+        mission_control,
+        bravo_token,
+        0,
+        20,
+    )
+    assert mission_control.accrualStartBlock(bravo_token, vault_id) not in (
+        0,
+        MAX_UINT256,
+    )
+
+    with boa.reverts("promotional reward row migration required"):
+        switchboard_charlie.setRewardVaultId(
+            bravo_token,
+            0,
+            sender=governance.address,
+        )
+
+    action_id = switchboard_charlie.deregisterAsset(
+        bravo_token,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    with boa.reverts("promotional campaign cannot deregister"):
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(bravo_token)
+
+
 def test_zero_voter_bravo_write_works_while_armed(
     switchboard_bravo,
     switchboard_golf,
@@ -977,6 +1187,121 @@ def test_zero_voter_bravo_write_works_while_armed(
     assert config.perUserDepositLimit == new_per_user_limit
     assert config.voterPointsAlloc == 0
     assert mission_control.accrualStartBlock(bravo_token, vault_id) == MAX_UINT256
+
+
+def test_production_config_precedes_open_and_activation_reuses_membership(
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_golf,
+    governance,
+    mission_control,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+    performDeposit,
+    setGeneralConfig,
+    mock_price_source,
+):
+    setGeneralConfig()
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    additional_vault_id = vault_book.getRegId(rebase_erc20_vault)
+    production_vault_ids = [vault_id, additional_vault_id]
+    production_per_user_limit = 200 * EIGHTEEN_DECIMALS
+    production_global_limit = 2_000 * EIGHTEEN_DECIMALS
+    production_min_balance = 10 * EIGHTEEN_DECIMALS
+
+    _prepare_promotional_asset(
+        switchboard_golf,
+        governance,
+        mission_control,
+        bravo_token,
+        vault_id,
+    )
+    _prepare_collection(
+        switchboard_bravo,
+        governance,
+        bravo_token,
+        vault_id,
+    )
+
+    invalid_activation = switchboard_bravo.setAssetDepositParams(
+        bravo_token,
+        production_vault_ids,
+        0,
+        20,
+        production_per_user_limit,
+        production_global_limit,
+        production_min_balance,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    with boa.reverts("cannot change membership and allocs together"):
+        switchboard_bravo.executePendingAction(
+            invalid_activation,
+            sender=governance.address,
+        )
+    assert switchboard_bravo.cancelPendingAction(
+        invalid_activation,
+        sender=governance.address,
+    )
+
+    production_config = switchboard_bravo.setAssetDepositParams(
+        bravo_token,
+        production_vault_ids,
+        0,
+        0,
+        production_per_user_limit,
+        production_global_limit,
+        production_min_balance,
+        sender=governance.address,
+    )
+    _execute(switchboard_bravo, governance, production_config)
+
+    config = mission_control.assetConfig(bravo_token)
+    assert list(config.vaultIds) == production_vault_ids
+    assert config.perUserDepositLimit == production_per_user_limit
+    assert config.globalDepositLimit == production_global_limit
+    assert config.minDepositBalance == production_min_balance
+    assert config.stakersPointsAlloc == 0
+    assert config.voterPointsAlloc == 0
+    assert not config.canDeposit
+    assert mission_control.accrualStartBlock(bravo_token, vault_id) == MAX_UINT256
+
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _open_deposits(switchboard_charlie, governance, bravo_token)
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        bravo_token,
+        bravo_token_whale,
+        simple_erc20_vault,
+    )
+
+    activation = switchboard_bravo.setAssetDepositParams(
+        bravo_token,
+        production_vault_ids,
+        0,
+        20,
+        production_per_user_limit,
+        production_global_limit,
+        production_min_balance,
+        sender=governance.address,
+    )
+    _execute(switchboard_bravo, governance, activation)
+
+    config = mission_control.assetConfig(bravo_token)
+    assert list(config.vaultIds) == production_vault_ids
+    assert config.perUserDepositLimit == production_per_user_limit
+    assert config.globalDepositLimit == production_global_limit
+    assert config.minDepositBalance == production_min_balance
+    assert config.voterPointsAlloc == 20
+    assert mission_control.accrualStartBlock(
+        bravo_token,
+        vault_id,
+    ) == boa.env.evm.patch.block_number
 
 
 def test_full_operator_walk_starts_tickets_at_activation_only(
