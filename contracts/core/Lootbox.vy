@@ -146,6 +146,7 @@ struct DepositPointsConfig:
     voterPointsAlloc: uint256
     isNft: bool
     shouldFundGenPoints: bool
+    accrualStartBlock: uint256
 
 struct ClaimLootConfig:
     canClaimLoot: bool
@@ -734,6 +735,19 @@ def resetAssetPoints(_asset: address, _vaultId: uint256):
 
 @view
 @internal
+def _getDepositElapsedBlocks(_lastUpdate: uint256, _accrualStartBlock: uint256) -> uint256:
+    if _lastUpdate == 0 or _accrualStartBlock == max_value(uint256):
+        return 0
+    effectiveLastUpdate: uint256 = _lastUpdate
+    if _accrualStartBlock != 0:
+        effectiveLastUpdate = max(effectiveLastUpdate, _accrualStartBlock)
+    if block.number <= effectiveLastUpdate:
+        return 0
+    return block.number - effectiveLastUpdate
+
+
+@view
+@internal
 def _getLatestGlobalDepositPoints(
     _globalPoints: GlobalDepositPoints,
     _stakersTotalAlloc: uint256,
@@ -772,13 +786,12 @@ def _getLatestAssetDepositPoints(
     _assetPoints: AssetDepositPoints,
     _stakersAlloc: uint256,
     _voteDepositorAlloc: uint256,
+    _accrualStartBlock: uint256,
 ) -> AssetDepositPoints:
     assetPoints: AssetDepositPoints = _assetPoints
 
     # elapsed blocks
-    elapsedBlocks: uint256 = 0
-    if assetPoints.lastUpdate != 0 and block.number > assetPoints.lastUpdate:
-        elapsedBlocks = block.number - assetPoints.lastUpdate
+    elapsedBlocks: uint256 = self._getDepositElapsedBlocks(assetPoints.lastUpdate, _accrualStartBlock)
 
     # update last update
     assetPoints.lastUpdate = block.number
@@ -807,13 +820,12 @@ def _getLatestAssetDepositPoints(
 @internal
 def _getLatestUserDepositPoints(
     _userPoints: UserDepositPoints,
+    _accrualStartBlock: uint256,
 ) -> UserDepositPoints:
     userPoints: UserDepositPoints = _userPoints
 
     # elapsed blocks
-    elapsedBlocks: uint256 = 0
-    if userPoints.lastUpdate != 0 and block.number > userPoints.lastUpdate:
-        elapsedBlocks = block.number - userPoints.lastUpdate
+    elapsedBlocks: uint256 = self._getDepositElapsedBlocks(userPoints.lastUpdate, _accrualStartBlock)
 
     # update last update
     userPoints.lastUpdate = block.number
@@ -865,7 +877,7 @@ def _getLatestDepositPoints(
 
     # latest asset points
     assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset, _vaultId)
-    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
+    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc, assetConfig.accrualStartBlock)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
@@ -877,7 +889,7 @@ def _getLatestDepositPoints(
     # includes value represented by normalized holder points.
     userPoints: UserDepositPoints = empty(UserDepositPoints)
     if _user != empty(address):
-        userPoints = self._getLatestUserDepositPoints(p.userPoints)
+        userPoints = self._getLatestUserDepositPoints(p.userPoints, assetConfig.accrualStartBlock)
         userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
         if userLootShare != 0 and not isRipeGovVault:
             userLootShare = userLootShare // assetPoints.precision

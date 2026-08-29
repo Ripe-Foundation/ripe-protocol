@@ -20,6 +20,7 @@ initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
+import interfaces.ConfigStructs as cs
 
 interface RipeReserveEngine:
     def setRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
@@ -50,6 +51,25 @@ interface AuctionHouse:
     def startAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: nonpayable
     def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
 
+interface MissionControl:
+    def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256): nonpayable
+    def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
+    def isSupportedAsset(_asset: address) -> bool: view
+    def canPerformLiteAction(_user: address) -> bool: view
+    def rewardVaultId(_asset: address) -> uint256: view
+    def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
+
+interface Ledger:
+    def globalDepositPoints() -> GlobalDepositPoints: view
+    def assetDepositPoints(_vaultId: uint256, _asset: address) -> AssetDepositPoints: view
+
+interface PriceDesk:
+    def getAddr(_regId: uint256) -> address: view
+
+interface CurvePrices:
+    def addGreenRefPoolSnapshot() -> bool: nonpayable
+
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
@@ -60,6 +80,24 @@ flag ActionType:
     START_MANY_AUCTIONS
     PAUSE_AUCTION
     PAUSE_MANY_AUCTIONS
+    SET_ACCRUAL_CLOCK_ARMED
+
+struct GlobalDepositPoints:
+    lastUsdValue: uint256
+    ripeStakerPoints: uint256
+    ripeVotePoints: uint256
+    ripeGenPoints: uint256
+    lastUpdate: uint256
+
+struct AssetDepositPoints:
+    balancePoints: uint256
+    lastBalance: uint256
+    lastUsdValue: uint256
+    ripeStakerPoints: uint256
+    ripeVotePoints: uint256
+    ripeGenPoints: uint256
+    lastUpdate: uint256
+    precision: uint256
 
 struct ReserveEngineConfig:
     paymentCapPerEpoch: uint256
@@ -83,6 +121,12 @@ struct FungAuctionConfig:
     liqUser: address
     vaultId: uint256
     asset: address
+
+struct AccrualClockUpdate:
+    asset: address
+    vaultId: uint256
+    shouldArm: bool
+    missionControl: address
 
 event PendingReserveEngineConfigSet:
     actionId: uint256
@@ -175,6 +219,25 @@ event PauseAuctionExecuted:
 event PauseManyAuctionsExecuted:
     numAuctionsPaused: uint256
 
+event PendingAccrualClockArmedAction:
+    asset: indexed(address)
+    vaultId: uint256
+    shouldArm: bool
+    confirmationBlock: uint256
+    actionId: uint256
+
+event AccrualClockArmedSet:
+    asset: indexed(address)
+    vaultId: uint256
+    shouldArm: bool
+    caller: indexed(address)
+
+event GreenRefPoolSnapshotAttempted:
+    caller: indexed(address)
+    priceSourceId: indexed(uint256)
+    priceSourceAddr: indexed(address)
+    didUpdate: bool
+
 # pending actions
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingEngineConfig: public(HashMap[uint256, ReserveEngineConfig]) # aid -> config
@@ -183,11 +246,16 @@ pendingStartAuctionActions: public(HashMap[uint256, FungAuctionConfig])
 pendingStartManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
 pendingPauseAuctionActions: public(HashMap[uint256, FungAuctionConfig])
 pendingPauseManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
+pendingAccrualClock: public(HashMap[uint256, AccrualClockUpdate])
 
+LEDGER_ID: constant(uint256) = 4
+MISSION_CONTROL_ID: constant(uint256) = 5
+PRICE_DESK_ID: constant(uint256) = 7
 RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
 RIPE_RESERVE_VESTING_ID: constant(uint256) = 27
 AUCTION_HOUSE_ID: constant(uint256) = 9
 MAX_AUCTIONS: constant(uint256) = 20
+HUNDRED_PERCENT: constant(uint256) = 100_00
 
 
 @deploy
@@ -224,6 +292,77 @@ def _getRipeReserveVestingAddr() -> address:
 @internal
 def _getAuctionHouseAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(AUCTION_HOUSE_ID)
+
+
+@view
+@internal
+def _getMissionControlAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
+
+
+@view
+@internal
+def _getLedgerAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+
+
+#########################
+# Promotional Accrual   #
+#########################
+
+
+@view
+@internal
+def _isPristineAssetPoints(_asset: address, _vaultId: uint256) -> bool:
+    points: AssetDepositPoints = staticcall Ledger(self._getLedgerAddr()).assetDepositPoints(_vaultId, _asset)
+    return (
+        points.lastUpdate == 0
+        and points.lastBalance == 0
+        and points.balancePoints == 0
+        and points.ripeStakerPoints == 0
+        and points.ripeVotePoints == 0
+        and points.ripeGenPoints == 0
+        and points.lastUsdValue == 0
+    )
+
+
+@view
+@internal
+def _validateAccrualClockTransition(_asset: address, _vaultId: uint256, _shouldArm: bool, _missionControl: address):
+    assert _missionControl == self._getMissionControlAddr() # dev: not current mission control
+    assert staticcall MissionControl(_missionControl).isSupportedAsset(_asset) # dev: invalid asset
+    assert _vaultId != 0 and staticcall MissionControl(_missionControl).rewardVaultId(_asset) == _vaultId # dev: invalid reward vault
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, _asset) # dev: unsupported reward vault
+
+    config: cs.AssetConfig = staticcall MissionControl(_missionControl).assetConfig(_asset)
+    assert not config.canDeposit # dev: deposits must be disabled
+    assert config.debtTerms.ltv == 0 # dev: ltv must be zero
+    assert config.stakersPointsAlloc == 0 and config.voterPointsAlloc == 0 # dev: allocations must be zero
+    current: uint256 = staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _vaultId)
+    if _shouldArm:
+        assert current == 0 # dev: invalid accrual clock transition
+    else:
+        assert current == max_value(uint256) # dev: invalid accrual clock transition
+    assert self._isPristineAssetPoints(_asset, _vaultId) # dev: asset points not pristine
+
+
+@external
+def setAccrualClockArmed(_asset: address, _vaultId: uint256, _shouldArm: bool) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    mc: address = self._getMissionControlAddr()
+    self._validateAccrualClockTransition(_asset, _vaultId, _shouldArm, mc)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.SET_ACCRUAL_CLOCK_ARMED
+    self.pendingAccrualClock[aid] = AccrualClockUpdate(asset=_asset, vaultId=_vaultId, shouldArm=_shouldArm, missionControl=mc)
+    log PendingAccrualClockArmedAction(
+        asset=_asset,
+        vaultId=_vaultId,
+        shouldArm=_shouldArm,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
 
 
 #########################
@@ -521,6 +660,13 @@ def executePendingAction(_aid: uint256) -> bool:
         numPaused: uint256 = extcall AuctionHouse(self._getAuctionHouseAddr()).pauseManyAuctions(auctions)
         log PauseManyAuctionsExecuted(numAuctionsPaused=numPaused)
 
+    elif actionType == ActionType.SET_ACCRUAL_CLOCK_ARMED:
+        p: AccrualClockUpdate = self.pendingAccrualClock[_aid]
+        self._validateAccrualClockTransition(p.asset, p.vaultId, p.shouldArm, p.missionControl)
+        extcall MissionControl(p.missionControl).setAccrualStartBlock(p.asset, p.vaultId, max_value(uint256) if p.shouldArm else 0)
+        self.pendingAccrualClock[_aid] = empty(AccrualClockUpdate)
+        log AccrualClockArmedSet(asset=p.asset, vaultId=p.vaultId, shouldArm=p.shouldArm, caller=msg.sender)
+
     else:
         raise "invalid action"
 
@@ -557,7 +703,35 @@ def _cancelPendingAction(_aid: uint256):
         or actionType == ActionType.PAUSE_MANY_AUCTIONS
     ):
         pass
+    elif actionType == ActionType.SET_ACCRUAL_CLOCK_ARMED:
+        self.pendingAccrualClock[_aid] = empty(AccrualClockUpdate)
     else:
         raise "invalid action"
 
     self.actionType[_aid] = empty(ActionType)
+
+
+###########################
+# GREEN Ref Pool Snapshot #
+###########################
+
+
+@external
+def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
+    if not gov._canGovern(msg.sender):
+        assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
+
+    priceDesk: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
+    assert priceDesk != empty(address) # dev: missing price desk
+
+    priceSourceAddr: address = staticcall PriceDesk(priceDesk).getAddr(_curvePricesId)
+    assert priceSourceAddr != empty(address) # dev: invalid price source id
+
+    didUpdate: bool = extcall CurvePrices(priceSourceAddr).addGreenRefPoolSnapshot()
+    log GreenRefPoolSnapshotAttempted(
+        caller=msg.sender,
+        priceSourceId=_curvePricesId,
+        priceSourceAddr=priceSourceAddr,
+        didUpdate=didUpdate,
+    )
+    return didUpdate

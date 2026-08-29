@@ -68,6 +68,7 @@ interface MissionControl:
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def rewardVaultId(_asset: address) -> uint256: view
+    def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
 
 interface StabilityPool:
     def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
@@ -504,6 +505,10 @@ def _getLedgerAddr() -> address:
 @view
 @internal
 def _assertValidRewardVaultId(_asset: address, _vaultId: uint256, _oldVaultId: uint256, _missionControl: address):
+    if _oldVaultId != 0 and _vaultId != _oldVaultId:
+        # A live promotional clock and its points history share this row identity.
+        # Retargeting requires an explicit checkpointed points/clock migration.
+        assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _oldVaultId) == 0 # dev: promotional reward row migration required
     checkVaultId: uint256 = _oldVaultId if _vaultId == 0 else _vaultId
     assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(checkVaultId, _asset) # dev: unsupported reward vault
     if _vaultId != 0:
@@ -981,6 +986,9 @@ def deregisterAsset(_asset: address, _missionControl: address = empty(address)) 
 @view
 @internal
 def _validateAssetDeregistration(_asset: address, _missionControl: address):
+    rewardVault: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
+    if rewardVault != 0:
+        assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, rewardVault) == 0 # dev: promotional campaign cannot deregister
     config: AssetRetirementConfig = staticcall MissionControl(_missionControl).getAssetRetirementConfig(_asset)
     assert config.isSupported # dev: invalid asset
     assert (

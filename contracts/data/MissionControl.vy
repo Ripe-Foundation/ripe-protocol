@@ -145,6 +145,7 @@ struct DepositPointsConfig:
     voterPointsAlloc: uint256
     isNft: bool
     shouldFundGenPoints: bool
+    accrualStartBlock: uint256
 
 struct AssetRetirementConfig:
     isSupported: bool
@@ -223,6 +224,7 @@ trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 rewardVaultId: public(HashMap[address, uint256]) # asset -> vaultId, 0 = no earner
+accrualStartBlock: public(HashMap[address, HashMap[uint256, uint256]]) # asset -> vaultId -> start; max = armed
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -449,6 +451,12 @@ def setRewardVaultId(_asset: address, _vaultId: uint256):
         assetConfig.voterPointsAlloc = 0
         self.assetConfig[_asset] = assetConfig
     self.rewardVaultId[_asset] = _vaultId
+
+
+@external
+def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.accrualStartBlock[_asset][_vaultId] = _startBlock
 
 
 # points allocs
@@ -1016,6 +1024,7 @@ def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsC
             voterPointsAlloc=0,
             isNft=assetConfig.isNft,
             shouldFundGenPoints=False,
+            accrualStartBlock=self.accrualStartBlock[_asset][_vaultId],
         )
     earner: uint256 = self.rewardVaultId[_asset]
     isEarner: bool = earner != 0 and _vaultId == earner
@@ -1025,7 +1034,8 @@ def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsC
         stakersPointsAlloc=stakers,
         voterPointsAlloc=voters,
         isNft=assetConfig.isNft,
-        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0,
+        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0 and self.accrualStartBlock[_asset][_vaultId] == 0,
+        accrualStartBlock=self.accrualStartBlock[_asset][_vaultId],
     )
 
 
