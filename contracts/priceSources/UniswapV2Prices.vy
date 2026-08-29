@@ -24,7 +24,6 @@ interface TokenDecimals:
 PRICE_DESK_ID: constant(uint256) = 7
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 MAX_UINT112: constant(uint256) = 2 ** 112 - 1
-MAX_UINT160: constant(uint256) = 2 ** 160 - 1
 MAX_UINT32: constant(uint256) = 2 ** 32 - 1
 
 RIPE_HQ: public(immutable(address))
@@ -81,62 +80,43 @@ def getPoolMonitoringPrice(
     _partner: address,
 ) -> uint256:
     # This generic view is intentionally stateless. Off-chain monitoring config
-    # supplies one asset/pool/partner tuple per observed market. Every invalid or
-    # unavailable dependency fails closed to zero instead of reverting.
+    # supplies one asset/pool/partner tuple per observed market.
     if empty(address) in [_asset, _pool, _partner] or _asset == _partner:
         return 0
 
-    pairIsValid: bool = False
-    token0: address = empty(address)
-    token1: address = empty(address)
-    pairIsValid, token0, token1 = self._safeReadPairTokens(_pool)
-    if not pairIsValid:
-        return 0
-
+    token0: address = staticcall IUniswapV2Pair(_pool).token0()
+    token1: address = staticcall IUniswapV2Pair(_pool).token1()
     assetIsToken0: bool = token0 == _asset and token1 == _partner
     assetIsToken1: bool = token0 == _partner and token1 == _asset
     if not assetIsToken0 and not assetIsToken1:
         return 0
 
-    reservesAreValid: bool = False
-    reserve0: uint256 = 0
-    reserve1: uint256 = 0
-    reservesAreValid, reserve0, reserve1 = self._safeReadReserves(_pool)
-    if not reservesAreValid:
+    valid: bool = False
+    assetReserve: uint256 = 0
+    partnerReserve: uint256 = 0
+    na: uint256 = 0
+    valid, assetReserve, partnerReserve, na = self._readPoolState(_pool, assetIsToken0)
+    if not valid or assetReserve == 0 or partnerReserve == 0:
         return 0
 
-    assetReserve: uint256 = reserve0 if assetIsToken0 else reserve1
-    partnerReserve: uint256 = reserve1 if assetIsToken0 else reserve0
-    if assetReserve == 0 or partnerReserve == 0:
-        return 0
-
-    assetDecimalsAreValid: bool = False
-    partnerDecimalsAreValid: bool = False
-    assetDecimals: uint256 = 0
-    partnerDecimals: uint256 = 0
-    assetDecimalsAreValid, assetDecimals = self._safeReadTokenDecimals(_asset)
-    partnerDecimalsAreValid, partnerDecimals = self._safeReadTokenDecimals(_partner)
-    if not assetDecimalsAreValid or not partnerDecimalsAreValid:
+    assetDecimals: uint256 = staticcall TokenDecimals(_asset).decimals()
+    partnerDecimals: uint256 = staticcall TokenDecimals(_partner).decimals()
+    if assetDecimals > 18 or partnerDecimals > 18:
         return 0
 
     # Partner units per whole asset, normalized to 18 decimals. The uint112
-    # reserve bounds and <=18-decimal constraint keep both branches in uint256.
-    partnerPerAsset: uint256 = 0
-    scaleFactor: uint256 = 0
-    if assetDecimals >= partnerDecimals:
-        scaleFactor = 10 ** (assetDecimals - partnerDecimals)
-        partnerPerAsset = partnerReserve * EIGHTEEN_DECIMALS * scaleFactor // assetReserve
-    else:
-        scaleFactor = 10 ** (partnerDecimals - assetDecimals)
-        partnerPerAsset = partnerReserve * EIGHTEEN_DECIMALS // (assetReserve * scaleFactor)
+    # reserve bounds and <=18-decimal constraint keep the numerator in uint256.
+    partnerPerAsset: uint256 = (
+        partnerReserve * (10 ** assetDecimals) * EIGHTEEN_DECIMALS
+        // assetReserve
+        // (10 ** partnerDecimals)
+    )
 
     if partnerPerAsset == 0:
         return 0
 
-    partnerPriceIsValid: bool = False
-    partnerUsdPrice: uint256 = 0
-    partnerPriceIsValid, partnerUsdPrice = self._safeReadPartnerUsdPrice(_partner)
-    if not partnerPriceIsValid or partnerUsdPrice == 0:
+    partnerUsdPrice: uint256 = self._readPartnerUsdPrice(_partner)
+    if partnerUsdPrice == 0:
         return 0
 
     didMultiply: bool = False
@@ -152,7 +132,7 @@ def getRipePoolState() -> (uint256, uint256, uint256):
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
     lastUpdate: uint256 = 0
-    valid, ripeReserve, wethReserve, lastUpdate = self._readPoolState()
+    valid, ripeReserve, wethReserve, lastUpdate = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)
     if not valid:
         return 0, 0, 0
     return ripeReserve, wethReserve, lastUpdate
@@ -165,7 +145,7 @@ def getRipeWethMonitoringPrice() -> uint256:
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
     na: uint256 = 0
-    valid, ripeReserve, wethReserve, na = self._readPoolState()
+    valid, ripeReserve, wethReserve, na = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)
     if not valid or ripeReserve == 0 or wethReserve == 0:
         return 0
     return wethReserve * EIGHTEEN_DECIMALS // ripeReserve
@@ -178,7 +158,7 @@ def getRipeUsdMonitoringPrice() -> uint256:
     ripeReserve: uint256 = 0
     wethReserve: uint256 = 0
     na: uint256 = 0
-    valid, ripeReserve, wethReserve, na = self._readPoolState()
+    valid, ripeReserve, wethReserve, na = self._readPoolState(RIPE_WETH_POOL, RIPE_IS_TOKEN0)
     if not valid or ripeReserve == 0 or wethReserve == 0:
         return 0
 
@@ -195,15 +175,15 @@ def getRipeUsdMonitoringPrice() -> uint256:
 
 @view
 @internal
-def _readPoolState() -> (bool, uint256, uint256, uint256):
+def _readPoolState(_pool: address, _assetIsToken0: bool) -> (bool, uint256, uint256, uint256):
     reserve0: uint256 = 0
     reserve1: uint256 = 0
     lastUpdate: uint256 = 0
-    reserve0, reserve1, lastUpdate = staticcall IUniswapV2Pair(RIPE_WETH_POOL).getReserves()
+    reserve0, reserve1, lastUpdate = staticcall IUniswapV2Pair(_pool).getReserves()
     if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:
         return False, 0, 0, 0
 
-    if RIPE_IS_TOKEN0:
+    if _assetIsToken0:
         return True, reserve0, reserve1, lastUpdate
     return True, reserve1, reserve0, lastUpdate
 
@@ -223,127 +203,6 @@ def _readPartnerUsdPrice(_partner: address) -> uint256:
     if priceDesk == empty(address):
         return 0
     return staticcall PriceDesk(priceDesk).getPrice(_partner, False)
-
-
-@view
-@internal
-def _safeReadPairTokens(_pool: address) -> (bool, address, address):
-    token0Success: bool = False
-    token0Response: Bytes[33] = b""
-    token0Success, token0Response = raw_call(
-        _pool,
-        method_id("token0()", output_type=Bytes[4]),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not token0Success or len(token0Response) != 32:
-        return False, empty(address), empty(address)
-
-    token0Word: uint256 = abi_decode(token0Response, uint256)
-    if token0Word > MAX_UINT160:
-        return False, empty(address), empty(address)
-
-    token1Success: bool = False
-    token1Response: Bytes[33] = b""
-    token1Success, token1Response = raw_call(
-        _pool,
-        method_id("token1()", output_type=Bytes[4]),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not token1Success or len(token1Response) != 32:
-        return False, empty(address), empty(address)
-
-    token1Word: uint256 = abi_decode(token1Response, uint256)
-    if token1Word > MAX_UINT160:
-        return False, empty(address), empty(address)
-
-    return True, convert(token0Word, address), convert(token1Word, address)
-
-
-@view
-@internal
-def _safeReadReserves(_pool: address) -> (bool, uint256, uint256):
-    success: bool = False
-    response: Bytes[97] = b""
-    success, response = raw_call(
-        _pool,
-        method_id("getReserves()", output_type=Bytes[4]),
-        max_outsize=97,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 96:
-        return False, 0, 0
-
-    reserve0: uint256 = 0
-    reserve1: uint256 = 0
-    lastUpdate: uint256 = 0
-    reserve0, reserve1, lastUpdate = abi_decode(response, (uint256, uint256, uint256))
-    if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:
-        return False, 0, 0
-    return True, reserve0, reserve1
-
-
-@view
-@internal
-def _safeReadTokenDecimals(_token: address) -> (bool, uint256):
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        _token,
-        method_id("decimals()", output_type=Bytes[4]),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return False, 0
-
-    decimals: uint256 = abi_decode(response, uint256)
-    if decimals > 18:
-        return False, 0
-    return True, decimals
-
-
-@view
-@internal
-def _safeReadPartnerUsdPrice(_partner: address) -> (bool, uint256):
-    hqSuccess: bool = False
-    hqResponse: Bytes[33] = b""
-    hqSuccess, hqResponse = raw_call(
-        RIPE_HQ,
-        abi_encode(PRICE_DESK_ID, method_id=method_id("getAddr(uint256)")),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not hqSuccess or len(hqResponse) != 32:
-        return False, 0
-
-    priceDeskWord: uint256 = abi_decode(hqResponse, uint256)
-    if priceDeskWord == 0 or priceDeskWord > MAX_UINT160:
-        return False, 0
-    priceDesk: address = convert(priceDeskWord, address)
-
-    priceSuccess: bool = False
-    priceResponse: Bytes[33] = b""
-    priceSuccess, priceResponse = raw_call(
-        priceDesk,
-        abi_encode(
-            _partner,
-            False,
-            method_id=method_id("getPrice(address,bool)"),
-        ),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not priceSuccess or len(priceResponse) != 32:
-        return False, 0
-    return True, abi_decode(priceResponse, uint256)
 
 
 @view
