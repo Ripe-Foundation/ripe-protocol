@@ -5,7 +5,7 @@
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 49386161
+# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 49396516
 #
 # Snapshot provenance:
 #   repository: ripe-foundation/ripe-protocol
@@ -19,8 +19,8 @@
 #   Ledger compiler-input integrity: 266f985b2ae1049342bac32e9bcd6d0f330ced7e55fcb5cb2456b53da8646e04
 #   Ledger canonical ABI sha256: 2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c
 #   chain id: 4663
-#   snapshot block: 49386161
-#   snapshot block hash: 0x4bb43f54794ad8af235156ee2677de7cd40a90e376a0a557f28c0e5624fc1ef1
+#   snapshot block: 49396516
+#   snapshot block hash: 0x41eb9947675bb181bbcdb8d09256da08fdcfc0be3318f41da44f890e8dcf0731
 #   snapshot finality: unfinalized current-state snapshot explicitly requested
 #   MissionControl: 0x6445Faf17Bf8CE20ea8f038E028078F1E6B87faC
 #   MissionControl code sha256: 03d1d6a795d5d3fb0103c4a94d3e8d2c7b50f8be9b0f51dfa1c010ae4891b892
@@ -141,7 +141,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
 @view
 @external
 def ripeAvailForRewards() -> uint256:
-    return 999473784533333333337932
+    return 999469659533333333337998
 
 
 @view
