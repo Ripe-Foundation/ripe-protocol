@@ -286,7 +286,6 @@ def _validateRehearsalConclusion(
     assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _vaultId) == 0 # dev: accrual clock already armed
     assert staticcall MissionControl(_missionControl).accrualActivationNotBeforeBlock(_asset, _vaultId) == 0 # dev: promotional start already announced
     assert _notBeforeBlock != max_value(uint256) # dev: invalid promotional start block
-    assert _notBeforeBlock == 0 or _notBeforeBlock > block.number # dev: promotional start must be in the future
 
     config: cs.AssetConfig = staticcall MissionControl(_missionControl).assetConfig(_asset)
     assert config.debtTerms.ltv == 0 # dev: ltv must be zero
@@ -304,6 +303,7 @@ def concludeRehearsalAndArm(
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_testers) != 0 # dev: no testers
+    assert _notBeforeBlock == 0 or _notBeforeBlock > block.number # dev: promotional start must be in the future
     for tester: address in _testers:
         assert tester != empty(address) # dev: invalid tester
 
