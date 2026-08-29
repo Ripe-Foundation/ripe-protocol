@@ -1,34 +1,411 @@
-# PR #223 cutover
+# PR #223 promotional collection and reward launch runbook
 
-211 already ran. This flip is only the promo / Golf generation.
-Do not rewrite or re-run `pr-211-cutover-sequence.md`.
+This runbook begins after the PR #223 contracts have been deployed, registered,
+and verified. It covers the transition from the completed rehearsal on the
+existing asset and vault rows to public deposit collection and the final reward
+launch.
 
-## What changes
+It does **not** require a new asset, a new vault, or a virgin Ledger row.
 
-Replace the 211-generation boards that 223 actually changed, and register Golf.
+## Public sequence
 
-| Contract | Registry | Slot | Notes |
-|---|---|---|---|
-| SwitchboardGolf | Switchboard | next id (tests use 7) | **New.** Register before or in the same Safe tx as the Bravo replace. |
-| SwitchboardFoxtrot | Switchboard | 6 | Clock arm / GREEN snapshot |
-| SwitchboardCharlie | Switchboard | 3 | Armed empty-checkpoint guard; `updateMany` rejects `address(0)` |
-| MissionControl | RipeHq | 5 | Clock storage. Snapshot Defaults off the **current** MC (clocks are 0 if no campaign is armed). |
-| Lootbox | RipeHq | 16 | Accrual floor. **After** MC. |
-| SwitchboardBravo | Switchboard | 2 | Thin Bravo. No `addAsset`. After or with Golf. |
+The public launch has three simple stages:
 
-**Do not replace Ledger.** Do not replace Alpha, AuctionHouse, Deleverage, or CreditRedeem unless a later review says they changed.
+1. Deposits are open, but no balance points or RIPE rewards accrue.
+2. A public countdown runs (for example, 24 hours).
+3. Rewards start at the block where governance executes the final Bravo voter
+   allocation action.
 
-## Hard restrictions
+The countdown is operational only. There is no onchain scheduled-start value
+and no permissionless keeper. The actual reward start block, `B`, is always the
+block in which the governor executes the final Bravo action. An execution later
+than the announced target produces a later `B`; there is no retroactive catch-up.
 
-- Do not replace MissionControl while any `accrualStartBlock` is nonzero unless a purpose-built migration copies the clocks. Defaults and `prepare_defaults` do not carry clocks. A silent MC replace zeros armed/live clocks and undoes “activate never ends.”
-- Promo assets must `golf.addAsset` with **one** vault so MC auto-selects `rewardVaultId`. Charlie `setRewardVaultId` checkpoints the new row and makes it non-virgin; Foxtrot then cannot arm.
-- Opening deposits is the commit. `lastUpdate == 0` is required to arm or abort.
-- MC before Lootbox. Golf before or with Bravo.
+## Function-call summary
 
-## Operator facts
+| Phase | Contract call | Result |
+|---|---|---|
+| Pre-announce | `SwitchboardBravo.preparePromotionalCollection(...)` | Immediately closes deposits and queues rehearsal cleanup plus arming. |
+| Pre-announce | `SwitchboardGolf.setWhitelistForAsset(...)` | Queues the production whitelist if a change is needed. |
+| Announce batch — first | `SwitchboardBravo.executePendingAction(prepareActionId)` | Clears rehearsal points, writes `max`, clears gen funding weight, and leaves deposits off. |
+| Announce batch — second | `SwitchboardGolf.executePendingAction(whitelistActionId)` | Installs the production whitelist if a change was queued. |
+| Announce batch — third | `SwitchboardCharlie.setCanDepositAsset(asset, True, address(0))` | Opens deposits only after preparation and whitelist installation. |
+| Announce batch — fourth | `SwitchboardBravo.setAssetDepositParams(...)` | Queues the exact production voter allocation and deposit configuration. It does not start rewards. |
+| Post-announce | No required write | Monitor the frozen collection state and pending voter action during the countdown. |
+| Reward launch | `SwitchboardBravo.executePendingAction(voterActionId)` | Writes actual block `B`, installs voter allocation, and starts rewards. |
+| Abort before preparation | `SwitchboardBravo.cancelPendingAction(...)` and, if applicable, `SwitchboardGolf.cancelPendingAction(...)` | Cancels pending work; deposits remain off until Charlie explicitly reopens them. |
 
-- Live RH rows cannot arm.
-- Foxtrot emits `AccrualClockArmedSet`. Bravo activation is `AssetDepositParamsSet` plus the on-chain clock.
-- After this flip, NVDA-style `addAsset` goes through Golf. See `migrations/robinhood-mainnet/2026082800_RipeNvdaPool.py`.
+## Contract states
 
-Re-read HQ / Switchboard addresses at execution. Do not copy 211 slot addresses from the old cutover.
+| State | `accrualStartBlock` | Voter allocation | Deposits | Effect |
+|---|---:|---:|---|---|
+| Rehearsal / ordinary | `0` | May be nonzero | Tester configuration | Real points and RIPE rewards accrue normally. |
+| Promotional collection | `max_value(uint256)` | `0` | Public configuration | Balances update, but balance, staker, voter, and gen points do not accrue. |
+| Rewards live | Actual activation block `B` | Nonzero | Public configuration | Points and rewards accrue beginning at `B`. |
+
+A successful transition to promotional collection cannot be disarmed back to
+`0`. After activation at `B`, the promotional voter allocation is permanent.
+
+## Required launch inputs
+
+Record and independently review the following for every launch asset before
+creating Safe transactions:
+
+| Input | Requirement |
+|---|---|
+| Asset | Existing supported asset address. |
+| Reward vault ID | Existing nonzero `rewardVaultId` for the asset; the asset must already be supported in this vault. |
+| Tester list | Every address with rehearsal `balancePoints` that must be cleared; maximum 40, unique, and nonzero. An empty list is allowed only if aggregate `balancePoints` is already zero. |
+| Public whitelist | Exact production whitelist address, or `address(0)` if the intended production configuration is unrestricted. |
+| Vault IDs | Exact production `vaultIds` array to preserve in the final Bravo action. |
+| Staker allocation | Must remain `0`. |
+| Voter allocation | Exact nonzero production allocation that will activate rewards. |
+| Deposit limits | Exact production per-user limit, global limit, and minimum balance. The final Bravo action writes all of these fields. |
+| Countdown | Public duration or target time. It must not end before the final Bravo action is confirmable. |
+
+For calls with the optional `_missionControl` argument, omit it or pass
+`address(0)` to target the current MissionControl.
+
+## Phase 0: deployment and state prerequisites
+
+Do not start the launch sequence until all of these are true:
+
+- The intended PR #223 Bravo, Charlie, and Golf contracts are registered.
+- MissionControl, Lootbox, Ledger, and VaultBook resolve to the reviewed
+  deployment addresses.
+- The asset and reward vault are already registered and supported.
+- `rewardVaultId(asset)` equals the intended reward vault ID.
+- `accrualStartBlock(asset, vaultId) == 0`.
+- Asset LTV is `0`.
+- Staker allocation is `0`.
+- The tester census is complete. The chain cannot enumerate every address with
+  residual user points, so the rehearsal allowlist and operator records are the
+  source of this list.
+- All old or unintended pending Bravo asset-deposit actions for the launch asset
+  have been identified and cancelled. Do not reuse a rehearsal allocation action
+  for launch.
+- The current Bravo and Golf `actionTimeLock`, action expiration, and expected
+  confirmation blocks have been read onchain.
+
+Testers may keep their deposits. They do not need to withdraw. They should claim
+any rehearsal RIPE they intend to keep before the preparation action executes.
+RIPE already paid is not clawed back, and any accepted residual RIPE expense is
+outside the point reset.
+
+### Stale action cancellation
+
+For each unintended pending action, call the cancellation function on the board
+that owns it:
+
+```text
+SwitchboardBravo.cancelPendingAction(bravoActionId)
+SwitchboardGolf.cancelPendingAction(golfActionId)
+```
+
+Do not execute a stale Bravo voter-allocation action. If it executes while the
+clock is still `0`, it changes the ordinary voter configuration without writing
+the launch block `B`.
+
+## Phase 1: pre-announce — initiate preparation
+
+Use one atomic Safe batch for all launch assets where practical.
+
+### Call 1 — initiate rehearsal cleanup and promotional collection
+
+Call Bravo once per asset:
+
+```text
+SwitchboardBravo.preparePromotionalCollection(
+    asset,
+    rewardVaultId,
+    testers,
+)
+```
+
+This call immediately disables deposits and initiates the timelocked preparation
+action. It does not yet reset points or change the clock. Record the returned
+Bravo action ID and the `confirmationBlock` from `PendingPromotionalCollection`.
+
+### Call 2 — initiate the production whitelist change
+
+If the current whitelist is not already the intended public whitelist, call Golf
+once per asset:
+
+```text
+SwitchboardGolf.setWhitelistForAsset(
+    asset,
+    publicWhitelist,
+    address(0),
+)
+```
+
+This only initiates the timelocked Golf action; it does not open access yet.
+Record the returned Golf action ID and the `confirmationBlock` from
+`PendingAssetWhitelistChange`.
+
+The preferred Safe ordering is Bravo preparation initiation first, then Golf
+whitelist initiation. Deposits are closed by the first call before any later
+launch work proceeds.
+
+## Phase 2: private timelock window
+
+Do not announce that deposits are open during this phase. Deposits must remain
+disabled.
+
+While waiting:
+
+- Testers may claim rehearsal RIPE.
+- Testers may remain deposited or withdraw.
+- Confirm the Bravo and Golf actions have not expired.
+- Confirm no one has re-enabled deposits through Charlie.
+- Confirm the tester list still covers every address with residual rehearsal
+  `balancePoints`.
+- Prepare and review the complete production values for the final
+  `setAssetDepositParams` call. It writes the vault array and all deposit limits,
+  not only the voter allocation.
+
+Do not proceed until every action needed in the announcement batch is
+confirmable. If the Golf whitelist is already correct, only the Bravo preparation
+action needs to mature.
+
+## Phase 3: announce — prepare, open deposits, and start the countdown
+
+Use one atomic Safe batch. The call order is mandatory.
+
+### Call 1 — execute Bravo preparation
+
+```text
+SwitchboardBravo.executePendingAction(prepareActionId)
+```
+
+This execution atomically:
+
+- checkpoints and sets voter allocation to `0` when necessary;
+- resets the listed testers' balance-point tickets;
+- resets the asset's staker, voter, and gen point buckets;
+- requires aggregate `balancePoints` and all three RIPE point buckets to be `0`;
+- writes `accrualStartBlock = max_value(uint256)`;
+- removes the asset's gen-funding USD weight from global accounting;
+- requires asset `lastUsdValue == 0`; and
+- leaves deposits disabled.
+
+Existing `lastBalance` may remain nonzero. If an unlisted user retains rehearsal
+balance points, the aggregate clean check fails and this entire execution reverts.
+
+### Call 2 — execute the production whitelist
+
+Skip this call if the production whitelist was already installed.
+
+```text
+SwitchboardGolf.executePendingAction(whitelistActionId)
+```
+
+This installs the production whitelist. It must happen after Bravo preparation.
+
+### Call 3 — open deposits
+
+```text
+SwitchboardCharlie.setCanDepositAsset(
+    asset,
+    True,
+    address(0),
+)
+```
+
+This opens deposits only after the clock is frozen at `max` and the public
+whitelist is installed.
+
+### Call 4 — initiate the production voter allocation
+
+Call Bravo with the complete production deposit configuration:
+
+```text
+SwitchboardBravo.setAssetDepositParams(
+    asset,
+    productionVaultIds,
+    0,                         # stakersPointsAlloc
+    productionVoterAllocation,
+    productionPerUserLimit,
+    productionGlobalLimit,
+    productionMinBalance,
+    address(0),
+)
+```
+
+This call only queues the action. It does not change voter allocation and does
+not start rewards. Record its action ID, confirmation block, and expiration from
+`PendingAssetDepositParamsChange` and the board's pending-action getters.
+
+Do not initiate this action before the preparation execution. Do not use an older
+rehearsal action as the launch action.
+
+### Announcement-batch postconditions
+
+Verify every condition onchain before making the public announcement:
+
+- `accrualStartBlock(asset, vaultId) == max_value(uint256)`.
+- Voter allocation is `0`.
+- Staker allocation is `0`.
+- LTV is `0`.
+- `canDeposit == True`.
+- The production whitelist is installed.
+- Asset `balancePoints == 0`.
+- Asset `ripeStakerPoints == 0`.
+- Asset `ripeVotePoints == 0`.
+- Asset `ripeGenPoints == 0`.
+- Asset `lastUsdValue == 0`.
+- `lastBalance` may be nonzero.
+- The new Bravo voter action contains exactly the reviewed production vault IDs,
+  allocation, and deposit limits.
+- The voter action will be confirmable before the announced reward-start target
+  and will not have expired by that target.
+
+Only after these checks pass should the public countdown begin. The public
+message should state:
+
+> Deposits are open. No balance points or RIPE rewards accrue during the
+> collection period. Rewards are expected to begin at or after the announced
+> target. The actual start is the onchain execution block.
+
+## Phase 4: post-announce collection window
+
+During the countdown:
+
+- Public users may deposit according to the production whitelist and limits.
+- Deposits update `lastBalance`, but the `max` clock prevents balance, staker,
+  voter, and gen points from accruing.
+- Do not execute the pending Bravo voter action early.
+- Do not replace MissionControl or Ledger.
+- Monitor the pending action's confirmation block and expiration.
+- Monitor that the clock remains `max`, voter remains `0`, deposits remain open,
+  and `lastUsdValue` and all four point buckets remain `0` after collection
+  activity.
+
+The countdown is not enforced onchain. A governor can execute a confirmable
+action early, so Safe policy and transaction review are the launch guard.
+
+If Bravo's configured delay is longer than the intended countdown, announce a
+longer countdown. Alternatively, execute preparation and queue the voter action
+in an earlier private Safe transaction while deposits remain disabled, then open
+deposits and announce only when the action's remaining delay fits the public
+window. Never queue the voter action before preparation, and never promise a
+start before the action can be confirmed.
+
+## Phase 5: pre-reward-launch checks
+
+Immediately before creating or signing the launch Safe transaction, verify for
+every asset:
+
+- The public countdown has completed.
+- The intended Bravo voter action is confirmable and not expired.
+- The pending action still contains the exact approved production configuration.
+- No stale or competing Bravo asset-deposit action is intended for execution.
+- MissionControl is still the same contract captured by the pending action.
+- Clock is still `max`.
+- Voter and staker allocations are still `0`.
+- LTV is still `0`.
+- Deposits and the intended public whitelist are still enabled.
+- The four asset point buckets and asset `lastUsdValue` remain `0`.
+- Asset `lastBalance != 0`.
+
+The final condition is mandatory. If testers all withdrew and nobody deposited
+during collection, activation reverts until a deposit produces a nonzero
+`lastBalance`.
+
+Anyone deposited at the activation block earns beginning at `B`, including any
+tester who remained deposited.
+
+## Phase 6: reward launch
+
+Execute the intended Bravo voter action:
+
+```text
+SwitchboardBravo.executePendingAction(voterActionId)
+```
+
+The execution checkpoints the frozen row, requires a nonzero `lastBalance`,
+writes `accrualStartBlock = block.number`, and installs the nonzero production
+voter allocation. That transaction's block is `B`.
+
+For a multi-asset launch, place every final Bravo execution in the same atomic
+Safe transaction if the reviewed gas envelope permits it. Successful calls in
+the same transaction share the same `B`. If assets are launched in separate
+transactions or blocks, they have different start blocks.
+
+There is no disarm after this execution. This is the production reward launch.
+
+## Phase 7: post-launch verification and communication
+
+Immediately after the Safe transaction confirms, record and verify:
+
+- Safe transaction hash.
+- Actual launch block `B` for every asset.
+- `accrualStartBlock(asset, vaultId) == B`.
+- Production voter allocation is nonzero and equals the approved value.
+- Staker allocation remains `0`.
+- Deposits and production whitelist remain enabled.
+- The emitted `AssetDepositParamsSet` values match the approved production
+  configuration.
+- A later-block checkpoint or representative deposit position begins accruing
+  from `B`, with no collection-period catch-up.
+
+Publish the actual transaction hash and block `B`. If execution occurred later
+than the announced target, state the actual later start; do not describe rewards
+as having started retroactively.
+
+## Failure and abort handling
+
+### Before Bravo preparation executes
+
+- Cancel the Bravo preparation action with
+  `SwitchboardBravo.cancelPendingAction(prepareActionId)`.
+- Cancel any pending Golf whitelist action with
+  `SwitchboardGolf.cancelPendingAction(whitelistActionId)`.
+- Cancellation or expiry does not reopen deposits. If returning to ordinary
+  rehearsal, governance must explicitly call
+  `SwitchboardCharlie.setCanDepositAsset(asset, True, address(0))` after verifying
+  that doing so is intended and safe.
+
+### Bravo preparation execution reverts
+
+The execution is atomic: voter, point resets, clock changes, and checkpoints
+revert together. Deposits remain disabled from initiation.
+
+- If the tester census was incomplete, cancel and re-initiate with the corrected
+  list, or clear the omitted tickets through an independently reviewed existing
+  reset action before retrying.
+- Do not open the public whitelist or deposits while the clock is still `0`.
+
+### After preparation succeeds but before reward launch
+
+The clock remains `max`; points stay off.
+
+- If the voter action expires, initiate a new action with the exact approved
+  production configuration.
+- If launch must be delayed, do not execute the voter action. Publicly communicate
+  the delay. Charlie may close deposits if required, but that does not disarm the
+  clock.
+- There is no supported transition from `max` back to `0`.
+
+### After reward launch
+
+There is no promotional disarm or rewind after `B`. Use separately reviewed
+emergency controls if another protocol incident requires pausing user actions;
+do not attempt to reset the launch clock or voter allocation through this
+runbook.
+
+## Permanent operational restrictions
+
+- Never execute Golf whitelist or Charlie deposit-opening calls before the Bravo
+  preparation execution.
+- Never execute an old rehearsal voter-allocation action as the launch action.
+- Never execute the final voter action before the announced countdown ends.
+- Do not replace MissionControl after any row reaches `max` or `B`. Defaults and
+  `prepare_defaults` do not carry `accrualStartBlock`; replacement would silently
+  lose the launch state.
+- Do not replace Ledger as part of this sequence.
+- Do not assume a 24-hour countdown matches the Bravo timelock. Read the actual
+  pending action confirmation and expiration blocks.
+- Do not assert global `lastUsdValue == 0`; it may legitimately contain funding
+  weight from other assets. The launch requirement is that this asset's
+  `lastUsdValue == 0`.
