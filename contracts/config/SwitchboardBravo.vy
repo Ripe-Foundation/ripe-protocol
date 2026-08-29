@@ -52,13 +52,13 @@ interface RipeHq:
 
 flag ActionType:
     ASSET_DEPOSIT_PARAMS
-    CONCLUDE_REHEARSAL_AND_ARM
+    PREPARE_PROMOTIONAL_COLLECTION
 
 struct AssetUpdate:
     asset: address
     config: cs.AssetConfig
 
-struct RehearsalConclusion:
+struct PromotionalCollection:
     asset: address
     vaultId: uint256
 
@@ -99,14 +99,14 @@ event AssetDepositParamsSet:
     globalDepositLimit: uint256
     minDepositBalance: uint256
 
-event PendingRehearsalConclusion:
+event PendingPromotionalCollection:
     asset: indexed(address)
     vaultId: uint256
     numTesters: uint256
     confirmationBlock: uint256
     actionId: uint256
 
-event RehearsalConcludedAndArmed:
+event PromotionalCollectionPrepared:
     asset: indexed(address)
     vaultId: uint256
     numTesters: uint256
@@ -115,8 +115,8 @@ event RehearsalConcludedAndArmed:
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingAssetConfig: public(HashMap[uint256, AssetUpdate]) # aid -> asset
-pendingRehearsalConclusion: public(HashMap[uint256, RehearsalConclusion]) # aid -> rehearsal
-pendingRehearsalTesters: public(HashMap[uint256, DynArray[address, MAX_REHEARSAL_TESTERS]]) # aid -> testers
+pendingPromotionalCollection: public(HashMap[uint256, PromotionalCollection]) # aid -> collection
+pendingPromotionalTesters: public(HashMap[uint256, DynArray[address, MAX_REHEARSAL_TESTERS]]) # aid -> testers
 pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
@@ -262,13 +262,13 @@ def _setPendingAssetDepositParams(
 
 
 ############################
-# Rehearsal Cleanup + Arm  #
+# Promotional Collection  #
 ############################
 
 
 @view
 @internal
-def _validateRehearsalConclusion(
+def _validatePromotionalCollection(
     _asset: address,
     _vaultId: uint256,
     _missionControl: address,
@@ -282,36 +282,37 @@ def _validateRehearsalConclusion(
     config: cs.AssetConfig = staticcall MissionControl(_missionControl).assetConfig(_asset)
     assert config.debtTerms.ltv == 0 # dev: ltv must be zero
     assert config.stakersPointsAlloc == 0 # dev: staker allocation must be zero
-    assert config.voterPointsAlloc != 0 # dev: rehearsal voter allocation required
     return config
 
 
 @external
-def concludeRehearsalAndArm(
+def preparePromotionalCollection(
     _asset: address,
     _vaultId: uint256,
     _testers: DynArray[address, MAX_REHEARSAL_TESTERS],
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_testers) != 0 # dev: no testers
-    for tester: address in _testers:
+    for i: uint256 in range(len(_testers), bound=MAX_REHEARSAL_TESTERS):
+        tester: address = _testers[i]
         assert tester != empty(address) # dev: invalid tester
+        for j: uint256 in range(i, bound=MAX_REHEARSAL_TESTERS):
+            assert tester != _testers[j] # dev: duplicate tester
 
     mc: address = self._getMissionControlAddr()
-    config: cs.AssetConfig = self._validateRehearsalConclusion(_asset, _vaultId, mc)
+    config: cs.AssetConfig = self._validatePromotionalCollection(_asset, _vaultId, mc)
     if config.canDeposit:
         config.canDeposit = False
         extcall MissionControl(mc).setAssetConfig(_asset, config)
 
     aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.CONCLUDE_REHEARSAL_AND_ARM
+    self.actionType[aid] = ActionType.PREPARE_PROMOTIONAL_COLLECTION
     self.pendingMissionControl[aid] = mc
-    self.pendingRehearsalConclusion[aid] = RehearsalConclusion(
+    self.pendingPromotionalCollection[aid] = PromotionalCollection(
         asset=_asset,
         vaultId=_vaultId,
     )
-    self.pendingRehearsalTesters[aid] = _testers
-    log PendingRehearsalConclusion(
+    self.pendingPromotionalTesters[aid] = _testers
+    log PendingPromotionalCollection(
         asset=_asset,
         vaultId=_vaultId,
         numTesters=len(_testers),
@@ -403,17 +404,15 @@ def _checkpointSelectedRows(
 
 @view
 @internal
-def _isCleanAssetPoints(_asset: address, _vaultId: uint256) -> bool:
+def _arePromotionalPointsCleared(_asset: address, _vaultId: uint256) -> bool:
     points: AssetDepositPoints = staticcall Ledger(
         staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
     ).assetDepositPoints(_vaultId, _asset)
     return (
-        points.lastBalance == 0
-        and points.balancePoints == 0
+        points.balancePoints == 0
         and points.ripeStakerPoints == 0
         and points.ripeVotePoints == 0
         and points.ripeGenPoints == 0
-        and points.lastUsdValue == 0
     )
 
 
@@ -505,29 +504,28 @@ def executePendingAction(_aid: uint256) -> bool:
         self._writeAssetConfig(p.asset, config, mc, oldStakers, oldVoter)
         log AssetDepositParamsSet(asset=p.asset, numVaultIds=len(p.config.vaultIds), stakersPointsAlloc=p.config.stakersPointsAlloc, voterPointsAlloc=p.config.voterPointsAlloc, perUserDepositLimit=p.config.perUserDepositLimit, globalDepositLimit=p.config.globalDepositLimit, minDepositBalance=p.config.minDepositBalance)
 
-    elif actionType == ActionType.CONCLUDE_REHEARSAL_AND_ARM:
-        conclusion: RehearsalConclusion = self.pendingRehearsalConclusion[_aid]
-        testers: DynArray[address, MAX_REHEARSAL_TESTERS] = self.pendingRehearsalTesters[_aid]
-        config: cs.AssetConfig = self._validateRehearsalConclusion(conclusion.asset, conclusion.vaultId, mc)
+    elif actionType == ActionType.PREPARE_PROMOTIONAL_COLLECTION:
+        collection: PromotionalCollection = self.pendingPromotionalCollection[_aid]
+        testers: DynArray[address, MAX_REHEARSAL_TESTERS] = self.pendingPromotionalTesters[_aid]
+        config: cs.AssetConfig = self._validatePromotionalCollection(collection.asset, collection.vaultId, mc)
         assert not config.canDeposit # dev: deposits must be disabled
 
         oldVoter: uint256 = config.voterPointsAlloc
-        config.voterPointsAlloc = 0
-        self._writeAssetConfig(conclusion.asset, config, mc, 0, oldVoter)
+        if oldVoter != 0:
+            config.voterPointsAlloc = 0
+            self._writeAssetConfig(collection.asset, config, mc, 0, oldVoter)
 
         lootbox: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LOOTBOX_ID)
         for tester: address in testers:
-            extcall Lootbox(lootbox).resetUserBalancePoints(tester, conclusion.asset, conclusion.vaultId)
-        extcall Lootbox(lootbox).resetAssetPoints(conclusion.asset, conclusion.vaultId)
-        assert self._isCleanAssetPoints(conclusion.asset, conclusion.vaultId) # dev: asset points not clean
+            extcall Lootbox(lootbox).resetUserBalancePoints(tester, collection.asset, collection.vaultId)
+        extcall Lootbox(lootbox).resetAssetPoints(collection.asset, collection.vaultId)
+        assert self._arePromotionalPointsCleared(collection.asset, collection.vaultId) # dev: promotional points not clear
 
-        extcall MissionControl(mc).setAccrualStartBlock(conclusion.asset, conclusion.vaultId, max_value(uint256))
-        config.canDeposit = True
-        extcall MissionControl(mc).setAssetConfig(conclusion.asset, config)
-        log RehearsalConcludedAndArmed(asset=conclusion.asset, vaultId=conclusion.vaultId, numTesters=len(testers), caller=msg.sender)
+        extcall MissionControl(mc).setAccrualStartBlock(collection.asset, collection.vaultId, max_value(uint256))
+        log PromotionalCollectionPrepared(asset=collection.asset, vaultId=collection.vaultId, numTesters=len(testers), caller=msg.sender)
 
-        self.pendingRehearsalConclusion[_aid] = empty(RehearsalConclusion)
-        self.pendingRehearsalTesters[_aid] = []
+        self.pendingPromotionalCollection[_aid] = empty(PromotionalCollection)
+        self.pendingPromotionalTesters[_aid] = []
 
     else:
         raise "invalid action"
@@ -551,8 +549,8 @@ def cancelPendingAction(_aid: uint256) -> bool:
 def _cancelPendingAction(_aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     actionType: ActionType = self.actionType[_aid]
-    if actionType == ActionType.CONCLUDE_REHEARSAL_AND_ARM:
-        self.pendingRehearsalConclusion[_aid] = empty(RehearsalConclusion)
-        self.pendingRehearsalTesters[_aid] = []
+    if actionType == ActionType.PREPARE_PROMOTIONAL_COLLECTION:
+        self.pendingPromotionalCollection[_aid] = empty(PromotionalCollection)
+        self.pendingPromotionalTesters[_aid] = []
     self.actionType[_aid] = empty(ActionType)
     self.pendingMissionControl[_aid] = empty(address)
