@@ -520,7 +520,7 @@ def refundAfterCancelPaycheck(
 
     refundAmount: uint256 = _amount
     if _shouldBurnPosition:
-    
+
         # withdraw and burn position
         vaultId: uint256 = self._getContributorRipeGovVaultId(a.missionControl, msg.sender, _vaultId)
         ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)

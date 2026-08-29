@@ -251,7 +251,7 @@ def test_non_burn_cancellation_does_not_checkpoint(
     assert ripe_token.totalSupply() == total_supply_before
 
 
-def test_paused_lootbox_rolls_back_cancel_and_burn(
+def test_paused_lootbox_allows_cancel_and_burn(
     hr_position_factory,
     human_resources,
     ripe_gov_vault,
@@ -272,36 +272,10 @@ def test_paused_lootbox_rolls_back_cancel_and_burn(
     user_points_before = _user_points_state(
         ledger.userDepositPoints(contributor, vault_id, ripe_token)
     )
-    asset_points_before = _asset_points_state(
-        ledger.assetDepositPoints(vault_id, ripe_token)
-    )
     hr_ripe_balance_before = ripe_token.balanceOf(human_resources)
     total_supply_before = ripe_token.totalSupply()
 
     lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
-        human_resources.refundAfterCancelPaycheck(
-            REFUND_AMOUNT,
-            True,
-            sender=contributor,
-        )
-
-    assert ledger.ripeAvailForHr() == ripe_available_before
-    assert ripe_gov_vault.userBalances(contributor, ripe_token) == raw_shares_before
-    assert (
-        ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
-        == position_assets_before
-    )
-    assert _user_points_state(
-        ledger.userDepositPoints(contributor, vault_id, ripe_token)
-    ) == user_points_before
-    assert _asset_points_state(
-        ledger.assetDepositPoints(vault_id, ripe_token)
-    ) == asset_points_before
-    assert ripe_token.balanceOf(human_resources) == hr_ripe_balance_before
-    assert ripe_token.totalSupply() == total_supply_before
-
-    lootbox.pause(False, sender=switchboard_alpha.address)
     human_resources.refundAfterCancelPaycheck(
         REFUND_AMOUNT,
         True,
@@ -322,7 +296,7 @@ def test_paused_lootbox_rolls_back_cancel_and_burn(
     assert total_supply_before - ripe_token.totalSupply() == position_assets_before
 
 
-def test_zero_position_cancel_and_burn_still_requires_unpaused_lootbox(
+def test_zero_position_cancel_and_burn_succeeds_while_lootbox_paused(
     hr_position_factory,
     human_resources,
     ripe_gov_vault,
@@ -336,9 +310,6 @@ def test_zero_position_cancel_and_burn_still_requires_unpaused_lootbox(
     user_points_before = _user_points_state(
         ledger.userDepositPoints(contributor, vault_id, ripe_token)
     )
-    asset_points_before = _asset_points_state(
-        ledger.assetDepositPoints(vault_id, ripe_token)
-    )
     hr_ripe_balance_before = ripe_token.balanceOf(human_resources)
     total_supply_before = ripe_token.totalSupply()
 
@@ -346,24 +317,6 @@ def test_zero_position_cancel_and_burn_still_requires_unpaused_lootbox(
     assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
 
     lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
-        human_resources.refundAfterCancelPaycheck(
-            REFUND_AMOUNT,
-            True,
-            sender=contributor,
-        )
-
-    assert ledger.ripeAvailForHr() == ripe_available_before
-    assert _user_points_state(
-        ledger.userDepositPoints(contributor, vault_id, ripe_token)
-    ) == user_points_before
-    assert _asset_points_state(
-        ledger.assetDepositPoints(vault_id, ripe_token)
-    ) == asset_points_before
-    assert ripe_token.balanceOf(human_resources) == hr_ripe_balance_before
-    assert ripe_token.totalSupply() == total_supply_before
-
-    lootbox.pause(False, sender=switchboard_alpha.address)
     human_resources.refundAfterCancelPaycheck(
         REFUND_AMOUNT,
         True,

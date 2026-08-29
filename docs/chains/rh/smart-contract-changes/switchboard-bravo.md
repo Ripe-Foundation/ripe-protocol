@@ -28,11 +28,9 @@ Robinhood the keeper calls `addGreenRefPoolSnapshot(2)`. That `2` is
 — CurvePrices' PriceDesk registry ID. It is separate from the fact that the
 currently deployed Bravo occupies Switchboard child ID 2.
 
-Measured deployed runtime after the wrapper is 24,177 bytes, leaving 399 bytes
-of EIP-170 headroom. That consumed 56% of Bravo's remaining budget. Bravo is
-no longer the last comfortable config-contract margin; the runtime gate now
-also enforces a Bravo-only 200-byte floor. That floor is not the retired
-global RH-D026 mechanism.
+Measured deployed runtime after the wrapper was 24,177 bytes, leaving 399
+bytes of EIP-170 headroom. This head pins Bravo at 24,448 / 128. Remeasure
+after every Bravo change. Do not authenticate a carried 24,177 figure.
 
 The complete keeper addition changes `SwitchboardBravo`'s ABI and cumulative
 seal. Later comment-only Bravo edits do not.
@@ -114,7 +112,8 @@ Merging this source does not make the wrapper available on the Bravo that
 currently occupies Switchboard child ID 2. Before activation:
 
 - Deploy the exact final Bravo runtime and authenticate source, compiler, ABI,
-  constructor arguments, and the 24,177-byte runtime.
+  constructor arguments, and the 24,448-byte runtime (128 bytes below
+  EIP-170). Remeasure after every further Bravo change.
 - Relinquish temporary local governance and keep the intended timelocks,
   including `actionTimeLock == 0`.
 - Recheck every Bravo-local pending action; replacement creates fresh storage

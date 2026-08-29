@@ -339,20 +339,32 @@ deployment, migration, configuration, or activation authority.
 
 ## Conditional post-deployment asset retirement
 
-This procedure applies only after a separately reviewed MissionControl runtime
-and a hardened SwitchboardCharlie runtime containing the retirement-policy
-checks and MissionControl boolean-return check have both been deployed and made
-authoritative. A source merge, passing suite, or artifact update does not change
-either deployed runtime or authorize either transition.
+This procedure applies only after a separately reviewed, selector-compatible
+generation of MissionControl, SwitchboardCharlie, SwitchboardFoxtrot,
+AuctionHouse, CreditRedeem, and Deleverage has been deployed and made
+authoritative. AuctionHouse and CreditRedeem consume MissionControl selectors
+introduced by this generation; AuctionHouse and Deleverage also share a changed
+internal withdrawal-wrapper selector. Auction start and pause now live on
+Foxtrot, not Charlie. A source merge, passing suite, or artifact update does
+not change any deployed runtime or authorize a transition.
 
-The rollout therefore contains two contract deployments. Bind and review each
-runtime and deployed address separately. For SwitchboardCharlie, also verify
-its Switchboard registration, governance permission, and action-timelock
-wiring before relying on the execution-time revert behavior. Do not infer that
-deploying or activating the guarded MissionControl also activates the hardened
-Charlie behavior. The reviewed Charlie candidate has 703 bytes of EIP-170
-deployed-runtime headroom; recompile and recheck that gate after every further
-Charlie change rather than carrying this measurement forward by assumption.
+The retirement-and-auction rollout therefore contains six required contract
+deployments. Promote them atomically or through a separately qualified order,
+and do not execute retirement, auction purchase, collateral redemption, or
+deleveraging while those runtimes are mixed. Charlie and Foxtrot must be
+promoted together after draining pending Charlie and Foxtrot actions: Charlie
+ActionType bits shifted, and Foxtrot must be in the Switchboard registry or
+AuctionHouse rejects auction calls. Registering Foxtrot also exposes that
+board's reserve-engine setters; that surface stays separately gated. The
+broader Ledger/Lootbox/MissionControl and Alpha/Bravo/Charlie/Delta/Foxtrot
+matched-generation constraints remain controlling. Bind and review each runtime
+and deployed address separately. For SwitchboardCharlie, also verify its
+Switchboard registration, governance permission, and action-timelock wiring
+before relying on the execution-time revert behavior. Do not infer that
+deploying or activating MissionControl also activates the hardened Charlie
+behavior, or that activating Charlie restores auctions. Do not cite a carried
+Charlie EIP-170 headroom figure; recompile and recheck that gate after every
+further Charlie change.
 
 Asset retirement is terminal unless governance later completes a full
 `addAsset` re-registration. Ordinary Bravo and Charlie asset mutations require
@@ -366,25 +378,35 @@ supported asset's normal governance path before continuing; do not retire first
 and plan to repair afterward. Zero-LTV assets do not require either debt-exit
 flag.
 
-Asset retirement is then two governed timelock actions, not one:
+`hasPointsAlloc` is true when `rewardVaultId != 0` or either stored alloc is
+nonzero. Bravo-zeroing both allocs does not clear the earner. After constructor
+seed, a singleton such as RH WETH can sit at 0/0 with an earner still set;
+Charlie then reverts `invalid retirement config`. Charlie
+`setRewardVaultId(asset, 0)` checkpoints, subtracts that asset's live allocs
+from totals, zeros the stored alloc fields, and clears the earner in the same
+write. A later Bravo zero is a harmless 0 → 0 and is not a substitute.
 
-1. Read the complete live `AssetConfig`. Through
-   `SwitchboardBravo.setAssetDepositParams`, preserve the live vault IDs and
-   deposit limits while setting both fixed reward allocations to zero.
-2. Execute the Bravo action and verify both fields are zero and the global
-   staker/voter totals decreased by exactly the former allocations.
-3. Immediately before Charlie execution, read the complete `AssetConfig` again
-   and confirm both allocations are zero and every applicable asset-level exit
-   flag remains enabled. SwitchboardCharlie rejects retirement if any condition
-   fails.
-4. Execute the existing `SwitchboardCharlie.deregisterAsset` action and verify
-   the asset is unsupported and the totals did not decrease a second time.
+Asset retirement is then two Charlie timelock actions, not Bravo then Charlie:
 
-Do not reconstruct the deposit tuple from defaults. If Bravo rejects the live
-sibling fields because a limit is now invalid or a retained VaultBook ID is no
-longer valid, stop and deliberately repair or replace only the offending field
-in the same reviewed deposit-configuration action; record the deviation and
-its evidence rather than guessing a value.
+1. Read the complete live `AssetConfig` and `rewardVaultId`. Execute
+   `SwitchboardCharlie.setRewardVaultId(asset, 0)`.
+2. Verify `rewardVaultId == 0`, both stored allocs are zero, global totals
+   dropped by exactly the former allocations, and every applicable exit flag
+   remains enabled.
+3. Immediately before deregister execute, read retirement config again and
+   confirm `hasPointsAlloc` is false and every applicable asset-level exit
+   flag remains enabled. SwitchboardCharlie rejects retirement if any
+   condition fails. Execute also requires the MissionControl captured at
+   initiate to still be HQ-current.
+4. Execute `SwitchboardCharlie.deregisterAsset` and verify the asset is
+   unsupported and the totals did not decrease a second time.
+
+Do not reconstruct a Bravo deposit tuple from defaults if you still run a
+Bravo write for some other reason. If Bravo rejects the live sibling fields
+because a limit is now invalid or a retained VaultBook ID is no longer valid,
+stop and deliberately repair or replace only the offending field in the same
+reviewed deposit-configuration action; record the deviation and its evidence
+rather than guessing a value.
 
 Once the hardened SwitchboardCharlie runtime is live, Charlie execution
 requires MissionControl to return `True`. If a concurrent or duplicate action
@@ -400,10 +422,10 @@ reverts `invalid vault asset`, emits no `VaultAssetDeregistered`, and leaves the
 action available for retry, cancellation, or expiry. Verify the vault balance
 is zero immediately before execution and verify vault support state afterward.
 
-Zero an asset's staker and voter allocations through Bravo before disabling
-any current vault ID in VaultBook. Bravo fail-closes on a dead current
-VaultBook row; Charlie can still checkpoint that ID with an explicit address,
-but that does not let Bravo write. Restore or repoint the book, then Bravo.
+Charlie-clear the earner before disabling any current vault ID in VaultBook.
+Bravo fail-closes on a dead current VaultBook row; Charlie can still
+checkpoint that ID with an explicit address, but that does not let Bravo
+write. Restore or repoint the book, then Bravo.
 
 On a live allocation change, MultiSend Charlie-pre → Bravo → Charlie-post
 for every initialized historical row. Charlie-post is required on a staker

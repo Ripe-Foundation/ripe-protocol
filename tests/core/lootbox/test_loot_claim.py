@@ -435,7 +435,6 @@ def test_live_active_empty_category_blocks_funded_category_atomically(
         staker_points=1,
         voter_points=1,
     )
-
     assert lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token) == 0
     assert teller.claimLoot(bob, False, sender=bob) == 0
     assert ripe_token.balanceOf(bob) == 0
@@ -490,7 +489,6 @@ def test_exited_empty_active_category_defers_until_reward_flows(
         alpha_token,
         staker_points=1,
     )
-
     # Same-block zero rewards are not terminal: the configured category can receive RIPE next block.
     assert teller.claimLoot(bob, False, sender=bob) == 0
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
@@ -760,6 +758,7 @@ def test_final_reward_wei_that_rounds_out_of_every_bucket_is_terminal(
     alpha_token,
     alpha_token_whale,
     switchboard_alpha,
+    mission_control,
 ):
     setGeneralConfig()
     setAssetConfig(alpha_token, _stakersPointsAlloc=1, _voterPointsAlloc=1)
@@ -790,6 +789,11 @@ def test_final_reward_wei_that_rounds_out_of_every_bucket_is_terminal(
         alpha_token,
         staker_points=1,
         voter_points=1,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token,
+        0,
+        sender=switchboard_alpha.address,
     )
 
     boa.env.time_travel(blocks=1)
@@ -827,6 +831,7 @@ def test_rounding_zero_allocation_defers_only_until_finite_budget_is_exhausted(
     alpha_token,
     alpha_token_whale,
     switchboard_alpha,
+    mission_control,
 ):
     setGeneralConfig()
     setAssetConfig(alpha_token, _stakersPointsAlloc=1)
@@ -856,6 +861,11 @@ def test_rounding_zero_allocation_defers_only_until_finite_budget_is_exhausted(
         vault_id,
         alpha_token,
         staker_points=1,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token,
+        0,
+        sender=switchboard_alpha.address,
     )
 
     boa.env.time_travel(blocks=1)
@@ -1815,7 +1825,7 @@ def test_loot_claim_basic(
     assert claimable == 0
 
 
-def test_accrued_loot_buckets_remain_claimable_while_new_points_are_disabled(
+def test_accrued_loot_buckets_remain_claimable_when_stored_points_flag_is_false(
     bob,
     setGeneralConfig,
     setAssetConfig,
@@ -1946,7 +1956,7 @@ def test_loot_claim_specific_asset(
     assert up.balancePoints == 0
 
 
-def test_loot_claim_points_disabled(
+def test_stored_points_flag_false_does_not_disable_deposit_points(
     bob,
     setGeneralConfig,
     setAssetConfig,
@@ -1960,7 +1970,7 @@ def test_loot_claim_points_disabled(
     alpha_token,
     alpha_token_whale,
 ):
-    # basic setup with points disabled
+    # The legacy field remains stored, but Clock ignores it.
     setGeneralConfig()
     setAssetConfig(alpha_token)
     setRipeRewardsConfig(_arePointsEnabled=False)
@@ -1975,17 +1985,16 @@ def test_loot_claim_points_disabled(
     vault_id = vault_book.getRegId(simple_erc20_vault)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-    # verify no points accumulated
+    # Points continue to accumulate.
     up = ledger.userDepositPoints(bob, vault_id, alpha_token)
-    assert up.balancePoints == 0
+    assert up.balancePoints > 0
 
-    # verify no claimable loot
+    # The accrued points remain claimable.
     claimable = lootbox.getClaimableLoot(bob)
-    assert claimable == 0
+    assert claimable > 0
 
-    # attempt to claim loot
     total_ripe = teller.claimLoot(bob, False, sender=bob)
-    assert total_ripe == 0
+    assert total_ripe == claimable
 
 
 def test_loot_claim_different_allocations(
@@ -2128,7 +2137,7 @@ def test_loot_claim_borrow_multiple_users(
     assert up_alice.points == 0
 
 
-def test_loot_claim_borrow_points_disabled(
+def test_stored_points_flag_false_does_not_disable_borrow_points(
     bob,
     setGeneralConfig,
     setRipeRewardsConfig,
@@ -2139,7 +2148,7 @@ def test_loot_claim_borrow_points_disabled(
     createDebtTerms,
     ripe_token,
 ):
-    # basic setup with points disabled
+    # The legacy field remains stored, but Clock ignores it.
     setGeneralConfig()
     setRipeRewardsConfig(False)
 
@@ -2158,14 +2167,13 @@ def test_loot_claim_borrow_points_disabled(
     # Update again
     lootbox.updateBorrowPoints(bob, sender=teller.address)
 
-    # Verify no claimable loot
+    # Borrow points and rewards continue to accrue.
     claimable = lootbox.getClaimableBorrowLoot(bob)
-    assert claimable == 0
+    assert claimable > 0
 
-    # Attempt to claim
     total_ripe = lootbox.claimBorrowLoot(bob, sender=teller.address)
-    assert total_ripe == 0
-    assert ripe_token.balanceOf(bob) == 0
+    assert total_ripe == claimable
+    assert ripe_token.balanceOf(bob) == total_ripe
 
 
 def test_loot_claim_borrow_debt_changes(

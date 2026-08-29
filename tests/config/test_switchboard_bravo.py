@@ -89,6 +89,26 @@ def _support_asset_with_debt_terms(
     )
 
 
+def _support_reward_asset(
+    mission_control,
+    switchboard_bravo,
+    asset,
+    vault_id,
+):
+    config = list(_asset_config_with_debt_terms())
+    config[0] = [vault_id]
+    mission_control.setAssetConfig(
+        asset,
+        config,
+        sender=switchboard_bravo.address,
+    )
+    mission_control.setRewardVaultId(
+        asset,
+        vault_id,
+        sender=switchboard_bravo.address,
+    )
+
+
 def _propose_asset_with_special_stab_pool(
     switchboard_bravo,
     governance,
@@ -325,6 +345,14 @@ def test_default_target_action_is_bound_across_mission_control_rotation(
         zero_pointer_mission_control,
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    if action_kind == "deposit":
+        with boa.reverts("not current mission control"):
+            switchboard_bravo.executePendingAction(
+                action_id,
+                sender=governance.address,
+            )
+        assert switchboard_bravo.hasPendingAction(action_id)
+        return
     assert switchboard_bravo.executePendingAction(
         action_id,
         sender=governance.address,
@@ -367,6 +395,15 @@ def test_explicit_target_is_stored_and_used_for_every_asset_action(
         == new_mission_control.address
     )
 
+    if action_kind == "deposit":
+        boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+        with boa.reverts("not current mission control"):
+            switchboard_bravo.executePendingAction(
+                action_id,
+                sender=governance.address,
+            )
+        assert switchboard_bravo.hasPendingAction(action_id)
+        return
     _execute_after_timelock(switchboard_bravo, governance, action_id)
     _assert_binding_action_effect(
         action_kind,
@@ -377,7 +414,7 @@ def test_explicit_target_is_stored_and_used_for_every_asset_action(
     assert not mission_control.isSupportedAsset(alpha_token)
 
 
-def test_staged_nonzero_alloc_is_rejected_if_target_becomes_live_before_execution(
+def test_staged_nonzero_alloc_is_rejected_at_initiation_without_earner(
     switchboard_bravo,
     governance,
     ripe_hq,
@@ -385,29 +422,16 @@ def test_staged_nonzero_alloc_is_rejected_if_target_becomes_live_before_executio
     new_mission_control,
     alpha_token,
 ):
-    action_id = _add_asset(
-        switchboard_bravo,
-        governance,
-        alpha_token,
-        [1],
-        50_00,
-        new_mission_control.address,
-    )
-    assert not new_mission_control.isSupportedAsset(alpha_token)
-
-    _replace_registered_mission_control(
-        ripe_hq,
-        governance,
-        new_mission_control,
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    with boa.reverts("new asset must start at zero allocs"):
-        switchboard_bravo.executePendingAction(
-            action_id,
-            sender=governance.address,
+    with boa.reverts("invalid asset"):
+        _add_asset(
+            switchboard_bravo,
+            governance,
+            alpha_token,
+            [1],
+            50_00,
+            new_mission_control.address,
         )
 
-    assert switchboard_bravo.hasPendingAction(action_id)
     assert not new_mission_control.isSupportedAsset(alpha_token)
     assert mission_control.isSupportedAsset(alpha_token) is False
 
@@ -669,20 +693,27 @@ def test_deployment_success(switchboard_bravo):
 def test_staker_allocation_accepts_core_or_stability_vault(
     switchboard_bravo,
     governance,
-    new_mission_control,
+    mission_control,
     alpha_token,
     matching_vault_id,
 ):
-    new_mission_control.setCoreRipeGovVaultId(3, sender=switchboard_bravo.address)
-    new_mission_control.setPreferredStabVaultId(4, sender=switchboard_bravo.address)
-
-    action_id = _add_asset(
+    mission_control.setCoreRipeGovVaultId(3, sender=switchboard_bravo.address)
+    mission_control.setPreferredStabVaultId(4, sender=switchboard_bravo.address)
+    _support_reward_asset(
+        mission_control,
         switchboard_bravo,
-        governance,
+        alpha_token.address,
+        matching_vault_id,
+    )
+    action_id = switchboard_bravo.setAssetDepositParams(
         alpha_token.address,
         [matching_vault_id],
         50_00,
-        new_mission_control.address,
+        0,
+        1_000,
+        10_000,
+        0,
+        sender=governance.address,
     )
     assert action_id > 0
 
@@ -690,23 +721,26 @@ def test_staker_allocation_accepts_core_or_stability_vault(
 def test_staker_allocation_accepts_non_preferred_stability_vault(
     switchboard_bravo,
     governance,
-    new_mission_control,
+    mission_control,
     alpha_token,
 ):
-    new_mission_control.setPriorityStabVaults(
+    mission_control.setPriorityStabVaults(
         [(3, alpha_token.address)],
         sender=switchboard_bravo.address,
     )
 
-    assert new_mission_control.preferredStabVaultId() == 1
-    assert new_mission_control.isStabVaultId(3)
-    action_id = _add_asset(
-        switchboard_bravo,
-        governance,
-        alpha_token.address,
+    assert mission_control.preferredStabVaultId() == 1
+    assert mission_control.isStabVaultId(3)
+    _support_reward_asset(mission_control, switchboard_bravo, alpha_token, 3)
+    action_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
         [3],
         50_00,
-        new_mission_control.address,
+        0,
+        1_000,
+        10_000,
+        0,
+        sender=governance.address,
     )
     assert action_id > 0
 
@@ -714,27 +748,30 @@ def test_staker_allocation_accepts_non_preferred_stability_vault(
 def test_staker_allocation_accepts_retired_stability_vault(
     switchboard_bravo,
     governance,
-    new_mission_control,
+    mission_control,
     alpha_token,
 ):
-    new_mission_control.setPreferredStabVaultId(
+    mission_control.setPreferredStabVaultId(
         3,
         sender=switchboard_bravo.address,
     )
-    new_mission_control.setPreferredStabVaultId(
+    mission_control.setPreferredStabVaultId(
         4,
         sender=switchboard_bravo.address,
     )
 
-    assert new_mission_control.preferredStabVaultId() == 4
-    assert new_mission_control.isStabVaultId(3)
-    action_id = _add_asset(
-        switchboard_bravo,
-        governance,
-        alpha_token.address,
+    assert mission_control.preferredStabVaultId() == 4
+    assert mission_control.isStabVaultId(3)
+    _support_reward_asset(mission_control, switchboard_bravo, alpha_token, 3)
+    action_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
         [3],
         50_00,
-        new_mission_control.address,
+        0,
+        1_000,
+        10_000,
+        0,
+        sender=governance.address,
     )
     assert action_id > 0
 
@@ -742,41 +779,48 @@ def test_staker_allocation_accepts_retired_stability_vault(
 def test_staker_allocation_proposal_gate_rejects_then_accepts_classified_vault(
     switchboard_bravo,
     governance,
-    new_mission_control,
+    mission_control,
     alpha_token,
 ):
     vault_id = 3
-    assert new_mission_control.coreRipeGovVaultId() != vault_id
-    assert not new_mission_control.isStabVaultId(vault_id)
-    with boa.reverts("invalid asset"):
-        _add_asset(
-            switchboard_bravo,
-            governance,
+    _support_reward_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        vault_id,
+    )
+    assert mission_control.coreRipeGovVaultId() != vault_id
+    assert not mission_control.isStabVaultId(vault_id)
+    with boa.reverts("invalid asset deposit params"):
+        switchboard_bravo.setAssetDepositParams(
             alpha_token.address,
             [vault_id],
             50_00,
-            new_mission_control.address,
+            0,
+            1_000,
+            10_000,
+            0,
+            sender=governance.address,
         )
 
-    new_mission_control.setPriorityStabVaults(
+    mission_control.setPriorityStabVaults(
         [(vault_id, alpha_token.address)],
         sender=switchboard_bravo.address,
     )
-    assert new_mission_control.isStabVaultId(vault_id)
-    action_id = _add_asset(
-        switchboard_bravo,
-        governance,
+    assert mission_control.isStabVaultId(vault_id)
+    action_id = switchboard_bravo.setAssetDepositParams(
         alpha_token.address,
         [vault_id],
         50_00,
-        new_mission_control.address,
+        0,
+        1_000,
+        10_000,
+        0,
+        sender=governance.address,
     )
     pending = switchboard_bravo.pendingAssetConfig(action_id)
     assert action_id > 0
-    assert (
-        switchboard_bravo.pendingMissionControl(action_id)
-        == new_mission_control.address
-    )
+    assert switchboard_bravo.pendingMissionControl(action_id) == mission_control.address
     assert list(pending.config.vaultIds) == [vault_id]
     assert pending.config.stakersPointsAlloc == 50_00
 
@@ -807,41 +851,41 @@ def test_zero_staker_allocation_remains_valid_with_initialized_pointers(
 def test_staker_allocation_accepts_each_initialized_pointer(
     switchboard_bravo,
     governance,
-    new_mission_control,
+    mission_control,
     alpha_token,
     initialized_vault_id,
 ):
-    action_id = _add_asset(
+    _support_reward_asset(
+        mission_control,
         switchboard_bravo,
-        governance,
-        alpha_token.address,
+        alpha_token,
+        initialized_vault_id,
+    )
+    action_id = switchboard_bravo.setAssetDepositParams(
+        alpha_token,
         [initialized_vault_id],
         50_00,
-        new_mission_control.address,
+        0,
+        1_000,
+        10_000,
+        0,
+        sender=governance.address,
     )
     assert action_id > 0
 
 
-def test_staker_pointer_validation_is_repeated_at_execution(
+def test_staker_allocation_executes_for_classified_earner(
     switchboard_bravo,
     governance,
-    new_mission_control,
+    mission_control,
     alpha_token,
 ):
-    new_mission_control.setCoreRipeGovVaultId(3, sender=switchboard_bravo.address)
-    new_mission_control.setPreferredStabVaultId(4, sender=switchboard_bravo.address)
-    add_action = _add_asset(
+    mission_control.setCoreRipeGovVaultId(3, sender=switchboard_bravo.address)
+    _support_reward_asset(
+        mission_control,
         switchboard_bravo,
-        governance,
-        alpha_token.address,
-        [3],
-        0,
-        new_mission_control.address,
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    assert switchboard_bravo.executePendingAction(
-        add_action,
-        sender=governance.address,
+        alpha_token,
+        3,
     )
 
     action_id = switchboard_bravo.setAssetDepositParams(
@@ -852,18 +896,18 @@ def test_staker_pointer_validation_is_repeated_at_execution(
         1_000,
         10_000,
         0,
-        new_mission_control.address,
         sender=governance.address,
     )
 
-    new_mission_control.setCoreRipeGovVaultId(4, sender=switchboard_bravo.address)
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    assert switchboard_bravo.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    assert mission_control.assetConfig(alpha_token).stakersPointsAlloc == 50_00
 
-    with boa.reverts("invalid asset config"):
-        switchboard_bravo.executePendingAction(action_id, sender=governance.address)
 
-
-def test_asset_deposit_param_update_uses_target_mission_control_pointers(
+def test_asset_deposit_param_update_requires_current_mission_control(
     switchboard_bravo,
     governance,
     new_mission_control,
@@ -896,25 +940,13 @@ def test_asset_deposit_param_update_uses_target_mission_control_pointers(
         sender=governance.address,
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    assert switchboard_bravo.executePendingAction(move_action, sender=governance.address)
-
-    update_action = switchboard_bravo.setAssetDepositParams(
-        alpha_token.address,
-        [4],
-        25_00,
-        0,
-        2_000,
-        20_000,
-        0,
-        new_mission_control.address,
-        sender=governance.address,
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    assert switchboard_bravo.executePendingAction(update_action, sender=governance.address)
-
-    config = new_mission_control.assetConfig(alpha_token.address)
-    assert list(config.vaultIds) == [4]
-    assert config.stakersPointsAlloc == 25_00
+    with boa.reverts("not current mission control"):
+        switchboard_bravo.executePendingAction(
+            move_action,
+            sender=governance.address,
+        )
+    assert list(new_mission_control.assetConfig(alpha_token).vaultIds) == [3]
+    assert switchboard_bravo.hasPendingAction(move_action)
 
 
 @pytest.mark.parametrize(
@@ -1004,8 +1036,8 @@ def test_add_asset_success(
     action_id = switchboard_bravo.addAsset(
         alpha_token, 
         [1, 2],  # vault IDs
-        50_00,   # stakers points alloc
-        30_00,   # voter points alloc  
+        0,       # new assets start with no staker allocation
+        0,       # new assets start with no voter allocation
         1000,    # per user deposit limit
         10000,   # global deposit limit
         0,       # minDepositBalance
@@ -1035,8 +1067,8 @@ def test_add_asset_success(
     log = logs[0]
     assert log.asset == alpha_token.address
     assert log.numVaults == 2
-    assert log.stakersPointsAlloc == 50_00
-    assert log.voterPointsAlloc == 30_00
+    assert log.stakersPointsAlloc == 0
+    assert log.voterPointsAlloc == 0
     assert log.perUserDepositLimit == 1000
     assert log.globalDepositLimit == 10000
     
@@ -1201,23 +1233,14 @@ def test_asset_deposit_params_success(
     switchboard_bravo,
     governance,
     alpha_token,
-    new_mission_control,
+    mission_control,
 ):
     """Test successful asset deposit params setting"""
-    # First add the asset at zero allocation
-    action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 0, 0, 1000, 10000, 0,
-        (0, 0, 0, 0, 0, 0),  # empty debt terms
-        False, False, False, True, True, True, False, True, True, True, 0,
-        (False, 0, 0, 0, 0), ZERO_ADDRESS, False, new_mission_control.address,
-        sender=governance.address
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    _support_reward_asset(mission_control, switchboard_bravo, alpha_token, 1)
     
     # Set new deposit params on the single existing vault
     action_id = switchboard_bravo.setAssetDepositParams(
-        alpha_token, [1], 40_00, 35_00, 2000, 20000, 0, new_mission_control.address,
+        alpha_token, [1], 40_00, 35_00, 2000, 20000, 0,
         sender=governance.address
     )
     assert action_id > 0
@@ -1236,31 +1259,14 @@ def test_execute_asset_deposit_params(
     switchboard_bravo,
     governance,
     alpha_token,
-    new_mission_control,
+    mission_control,
 ):
     """Test executing asset deposit params change"""
-    # First add the asset at zero allocation
-    action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 0, 0, 1000, 10000, 0,
-        (0, 0, 0, 0, 0, 0),  # empty debt terms
-        False, False, False, True, True, True, False, True, True, True, 0,
-        (False, 0, 0, 0, 0), ZERO_ADDRESS, False, new_mission_control.address,
-        sender=governance.address
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    _support_reward_asset(mission_control, switchboard_bravo, alpha_token, 1)
 
-    # Change membership while allocation remains zero
+    # Change allocation on the selected earner.
     action_id = switchboard_bravo.setAssetDepositParams(
-        alpha_token, [2], 0, 0, 1000, 10000, 0, new_mission_control.address,
-        sender=governance.address
-    )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    assert switchboard_bravo.executePendingAction(action_id, sender=governance.address)
-
-    # Change allocation on the single vault
-    action_id = switchboard_bravo.setAssetDepositParams(
-        alpha_token, [2], 40_00, 35_00, 2000, 20000, 0, new_mission_control.address,
+        alpha_token, [1], 40_00, 35_00, 2000, 20000, 0,
         sender=governance.address
     )
     
@@ -1762,14 +1768,14 @@ def test_asset_deposit_params_boundary_conditions(
     
     # Test with per user = global limit (should be valid)
     action_id = switchboard_bravo.setAssetDepositParams(
-        alpha_token, [1], 50_00, 30_00, 5000, 5000, 0, new_mission_control.address,
+        alpha_token, [1], 0, 30_00, 5000, 5000, 0, new_mission_control.address,
         sender=governance.address
     )
     assert action_id > 0
     
     # Test with total allocation = 100%
     action_id = switchboard_bravo.setAssetDepositParams(
-        alpha_token, [1], 60_00, 40_00, 1000, 10000, 0, new_mission_control.address,
+        alpha_token, [1], 0, 100_00, 1000, 10000, 0, new_mission_control.address,
         sender=governance.address
     )
     assert action_id > 0
@@ -3188,7 +3194,7 @@ def test_set_asset_deposit_params_on_new_mission_control(
     action_id2 = switchboard_bravo.setAssetDepositParams(
         bravo_token.address,
         [1],       # _vaultIds
-        60_00,     # _stakersPointsAlloc (changed)
+        0,         # staker class is irrelevant to the current-MC guard
         20_00,     # _voterPointsAlloc (changed)
         2000,      # _perUserDepositLimit (changed)
         20000,     # _globalDepositLimit (changed)
@@ -3197,12 +3203,17 @@ def test_set_asset_deposit_params_on_new_mission_control(
         sender=governance.address
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id2, sender=governance.address)
+    with boa.reverts("not current mission control"):
+        switchboard_bravo.executePendingAction(
+            action_id2,
+            sender=governance.address,
+        )
 
-    # Verify config changed on new MC
+    # The staged target is unchanged and the action remains pending.
     config = new_mission_control.assetConfig(bravo_token.address)
-    assert config.perUserDepositLimit == 2000
-    assert config.globalDepositLimit == 20000
+    assert config.perUserDepositLimit == 1000
+    assert config.globalDepositLimit == 10000
+    assert switchboard_bravo.hasPendingAction(action_id2)
 
 
 @pytest.mark.parametrize(
@@ -3763,12 +3774,17 @@ def test_structural_rules_for_add_and_deposit_params(
             sender=governance.address,
         )
 
-    # Nonzero allocation change requires exactly one vault.
+    # Multi-vault listings can carry allocs when an earner is selected.
     seeded = list(mission_control.assetConfig(alpha_token))
     seeded[0] = [1, vault_id]
     seeded[1] = 0
     seeded[2] = 0
     mission_control.setAssetConfig(alpha_token, seeded, sender=switchboard_bravo.address)
+    mission_control.setRewardVaultId(
+        alpha_token,
+        1,
+        sender=switchboard_bravo.address,
+    )
     multi_id = switchboard_bravo.setAssetDepositParams(
         alpha_token,
         [1, vault_id],
@@ -3780,11 +3796,11 @@ def test_structural_rules_for_add_and_deposit_params(
         sender=governance.address,
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    with boa.reverts("nonzero allocs require one vault"):
-        switchboard_bravo.executePendingAction(
-            multi_id,
-            sender=governance.address,
-        )
+    assert switchboard_bravo.executePendingAction(
+        multi_id,
+        sender=governance.address,
+    )
+    assert mission_control.assetConfig(alpha_token).voterPointsAlloc == 8
 
     live = list(mission_control.assetConfig(alpha_token))
     live[0] = [1]

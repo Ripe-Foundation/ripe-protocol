@@ -68,7 +68,6 @@ interface PriceSource:
 
 interface Lootbox:
     def updateRipeRewards(): nonpayable
-    def isPaused() -> bool: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -253,10 +252,6 @@ event PendingRipeRewardsAutoStakeParamsChange:
     stabPoolRipePerDollarClaimed: uint256
     confirmationBlock: uint256
     actionId: uint256
-
-event RewardsPointsEnabledModified:
-    arePointsEnabled: bool
-    caller: indexed(address)
 
 event PendingPriorityLiqAssetVaultsChange:
     numPriorityLiqAssetVaults: uint256
@@ -1181,36 +1176,14 @@ def _setPendingRipeRewardsConfig(
     return aid
 
 
-# enable points
+# write ripe rewards config
 
 
 @internal
 def _writeRipeRewardsConfig(_mc: address, _config: cs.RipeRewardsConfig, _settle: bool):
     if _settle:
-        if _mc == self._getMissionControlAddr():
-            lootbox: address = self._hqAddr(LOOTBOX_ID)
-            # Skip only the RH containment case: Lootbox paused and the new
-            # rate is 0. That forfeits the unsettled window. Any other paused
-            # RIPE-field settle must still call and revert.
-            if not (staticcall Lootbox(lootbox).isPaused() and _config.ripePerBlock == 0):
-                extcall Lootbox(lootbox).updateRipeRewards()
+        extcall Lootbox(self._hqAddr(LOOTBOX_ID)).updateRipeRewards()
     extcall MissionControl(_mc).setRipeRewardsConfig(_config)
-
-
-@external
-def setRewardsPointsEnabled(_shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = self._resolveMissionControl(_missionControl)
-    rewardsConfig: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
-    assert rewardsConfig.arePointsEnabled != _shouldEnable # dev: already set
-    rewardsConfig.arePointsEnabled = _shouldEnable
-    # updateRipeRewards ignores arePointsEnabled, so this write does not settle.
-    # Accepted residual: re-enable can still span a disabled interval.
-    self._writeRipeRewardsConfig(mc, rewardsConfig, False)
-
-    log RewardsPointsEnabledModified(arePointsEnabled=_shouldEnable, caller=msg.sender)
-    return True
 
 
 #######################
@@ -1591,6 +1564,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log PythMaxConfidenceRatioSet(ratio=ratio)
 
     elif actionType == ActionType.RIPE_REWARDS_BLOCK or actionType == ActionType.RIPE_REWARDS_ALLOCS or actionType == ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS:
+        assert mc == self._getMissionControlAddr() # dev: not current mission control
         config: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
         p: cs.RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
         settle: bool = False

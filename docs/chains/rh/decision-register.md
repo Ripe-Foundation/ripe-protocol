@@ -47,12 +47,14 @@ enforced in any lane. Those entries stand as historical accepted-risk
 records. Read their waivers and "reopens on change" language as past tense;
 none of it creates an obligation on a current PR.
 
-`tests/test_vault_pointer_runtime_sizes.py` currently enforces three live
-rules: the EIP-170 24,576-byte ceiling for every measured contract; an exact
+`tests/test_vault_pointer_runtime_sizes.py` currently enforces two live rules:
+the EIP-170 24,576-byte ceiling for every measured contract and an exact
 deployed-runtime byte pin per named contract (`EXPECTED_RUNTIME_BYTES` — a
-one-byte drift fails the gate and must be updated if intentional); and a
-Bravo-only 200-byte headroom floor after the GREEN keeper wrapper (RH-D045).
-That Bravo floor is not the retired global RH-D026 mechanism.
+one-byte drift fails the gate and must be updated if intentional). On 26 August
+2026 the owner accepted PR #211's exact 24,529-byte Bravo runtime with 47 bytes
+of headroom, superseding RH-D045's Bravo-only 200-byte floor for this candidate.
+Any Bravo source, compiler, dependency, or compiler-output change must be
+remeasured and separately reviewed.
 
 This register does not replace the linked decision records, authorize a new
 phase, or convert an approved direction into implementation, integration,
@@ -1619,6 +1621,12 @@ externally callable, lite-signer-reachable Switchboard surface and deliberately
 diverges from the constructor-immutable Curve ID used by Teller, CreditEngine,
 and Endaoment. The ordinary bug-fix exception does not apply.
 
+On 26 August 2026 the owner additionally accepted the exact current PR #211
+Bravo runtime at 24,529 deployed bytes, leaving 47 bytes below EIP-170. This
+supersedes the candidate-specific 200-byte Bravo floor recorded above, but not
+the exact-runtime drift pin or the requirement to remeasure and separately
+review any source, compiler, dependency, or compiler-output change.
+
 `SwitchboardBravo.addGreenRefPoolSnapshot(_curvePricesId)` lets current
 governance or a signer authorized by the current MissionControl row's
 `canPerformLiteAction` trigger `CurvePrices.addGreenRefPoolSnapshot()` through
@@ -1628,9 +1636,11 @@ reread from that HQ on each call. The PriceDesk source ID remains a call
 argument. On Robinhood the keeper call is `addGreenRefPoolSnapshot(2)`, where
 `2` is `CURVE_PRICES_ID` in [`config/robinhood_launch.py`](../../../config/robinhood_launch.py).
 That is CurvePrices' PriceDesk ID, not Bravo's Switchboard child ID. Bravo was
-chosen because composed Alpha runtime had 14 bytes of EIP-170 headroom; Bravo
-had 910 and now has 399 after this wrapper (24,177 deployed bytes). No
-constructor argument or immutable Curve ID was added.
+chosen because composed Alpha runtime had 14 bytes of EIP-170 headroom; the
+initial keeper-wrapper candidate had 399 bytes after the wrapper (24,177
+deployed bytes). The coupled PR #211 candidate now has 47 bytes (24,529
+deployed bytes), as accepted above. No constructor argument or immutable Curve
+ID was added.
 
 A production keeper at snapshot cadence effectively requires the lite-signer
 grant: `SwitchboardAlpha.setCanPerformLiteAction(keeper, True)` then
@@ -1738,26 +1748,31 @@ and draft PR #211.
 
 ### RH-D046 — Automatic Lootbox reward-allocation checkpoints
 
-**Status:** Proposed / unapproved. Implemented on the PR #211 checkpoint
-candidate only. No owner acceptance of the economic or operational
-residuals below. Deployment, configuration, activation, and release
-remain separately unauthorized.
+**Status:** Owner accepted on 26 August 2026 the PR #211 checkpoint candidate
+and the economic and operational residuals below. Deployment, configuration,
+activation, and release remain separately unauthorized.
 
-MissionControl now settles Lootbox/Ledger reward and deposit-point clocks
-before a live allocation write. That is a governance-visible behavior
-change: asset `stakersPointsAlloc` / `voterPointsAlloc` writes revert
-while `arePointsEnabled` is false, and the active MissionControl
-hard-depends on Lootbox, Ledger, and VaultBook liveness.
+SwitchboardBravo now settles Lootbox/Ledger reward and deposit-point clocks for
+every initialized row in the asset's current configured vault list before a
+live allocation write. It checkpoints again after a staker allocation
+`0 <-> nonzero` crossing. Removed, disabled, or otherwise historical rows are
+not auto-discovered; SwitchboardCharlie provides a governor-only explicit-row
+checkpoint for Charlie-pre -> Bravo -> Charlie-post batches. That is a
+governance-visible behavior change: asset `stakersPointsAlloc` /
+`voterPointsAlloc` writes revert while `arePointsEnabled` is false, and the
+active MissionControl path hard-depends on Lootbox, Ledger, and current
+VaultBook-row liveness.
 
 `setAssetConfig` has no paused-Lootbox exemption, so asset allocations
 are frozen during containment for two independent reasons (points
 disabled, Lootbox paused).
 
-Activation is safe only as Ledger → Lootbox → MissionControl, or one
-atomic Safe confirmation. Split or manual confirmations expose
-mixed-version incompatibility and are unsupported. New Lootbox requires
-Ledger's `setRipeRewardsAndGlobalDepositPoints`. Qualification should
-prove the batch is atomic.
+The Ledger/Lootbox/MissionControl reward stack and the
+Alpha/Bravo/Charlie/Delta governance paths must be promoted as a matched
+generation or through a separately qualified atomic sequence. Split or manual
+confirmations expose mixed-version incompatibility and are unsupported. New
+Lootbox requires Ledger's `setRipeRewardsAndGlobalDepositPoints`.
+Qualification must prove the exact promotion sequence.
 
 Local `DefaultsLocal.rewardsConfig.arePointsEnabled` is now `True` to
 match production Defaults. That is a test-environment semantic change:
@@ -1770,7 +1785,7 @@ A Ledger redeploy (the planned RH path) is state-destroying: accrued
 points, rewards, and `lastTouch` are dropped. There is no retained-state
 Ledger upgrade and no identity backfill. Fresh Ledger only.
 
-Proposed residuals, pending owner decision, with tests:
+Accepted residuals, with tests:
 
 1. **Paused-Lootbox containment.** `setRipeRewardsConfig` skips the
    pre-write settle only when Lootbox is paused **and** the new
@@ -1779,17 +1794,15 @@ Proposed residuals, pending owner decision, with tests:
    pre-pause active blocks — the conservative direction. Any other
    paused RIPE-field change (nonzero rate or bucket allocs) must settle
    and therefore reverts. A paused Lootbox cannot distribute.
-2. **64-ID discovery bound.** Asset-allocation checkpoints scan vault
-   IDs 1..64 (`MissionControl.maxRewardVaultIds()`). IDs above 64 may
-   register and initialize; those rows are not discovered and do not
-   freeze other assets. VaultBook registration comments and the
-   `maxRewardVaultIds` view are the pre-flight. A 64-row nonzero-to-nonzero
-   change measures ~7.2M gas (Safe-viable on Base). Raising the bound is a
-   MissionControl + test change. Current production: RH = 3, Base ≈ 4.
-3. **VaultBook replacement.** Discovery uses the current VaultBook
-   address. Sanctioned `confirmAddressUpdateToRegistry` at a live ID is
-   allowed; replaced vaults are provably empty. There is no persisted
-   vault-identity guard.
+2. **Current versus historical rows.** Bravo discovers only the asset's current
+   configured vault list and checkpoints every initialized current row. Removed
+   or disabled historical rows require explicit-address Charlie checkpoints.
+   Governance must identify those rows and batch Charlie-pre -> Bravo ->
+   Charlie-post when required; they are not automatically discovered.
+3. **VaultBook replacement.** Bravo resolves the current VaultBook address and
+   current configured rows at execution. Sanctioned
+   `confirmAddressUpdateToRegistry` at a live ID is allowed; replaced vaults are
+   expected to be empty. There is no persisted vault-identity guard.
 4. **Disabled vault.** A zero vault address fails closed only when
    Lootbox would actually call the vault: `stakersPointsAlloc == 0` and
    (`isRipeGovVaultId` or `lastBalance != 0`). Emergency zeroing and
@@ -1807,9 +1820,14 @@ Proposed residuals, pending owner decision, with tests:
    same as `updateDepositPoints`.
 7. **Lootbox selector.** Lootbox uses a dedicated
    `setRipeRewardsAndGlobalDepositPoints` rather than a default-arg
-   overload, spending ~54 bytes of EIP-170 headroom (41 bytes remain).
+   overload. The current exact runtime leaves 74 bytes below EIP-170.
    Default-arg overloads can checkpoint with zero totals via a partial
    selector.
+8. **Inactive MissionControl staging.** Bravo automatically checkpoints only
+   when operating through the current MissionControl. Before repointing HQ
+   `MISSION_CONTROL_ID`, governance must prove allocation parity or checkpoint
+   every initialized row atomically with the pointer change; otherwise the next
+   touch can apply incoming allocations across the pre-swap interval.
 
 This record grants no deployment, configuration, activation, or release
 authority.

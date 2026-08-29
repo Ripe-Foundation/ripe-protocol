@@ -9,6 +9,10 @@ import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs, sync_deployed_token
+from tests.core.auctionHouse.test_ah_poison_price import (
+    UNDERSEND_VAULT_SOURCE,
+    _register_vault,
+)
 
 SIX_DECIMALS = 10**6
 EIGHT_DECIMALS = 10**8
@@ -947,6 +951,94 @@ def test_deleverage_one_unit_short_settles_only_forward_value(
     assert credit_engine.getUserDebtAmount(bob) == debt_before - delivered
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == vault_before - delivered
     assert bravo_token.balanceOf(endaoment_funds) == endao_before + delivered
+
+
+def test_deleverage_malicious_vault_zero_credit_undersend_reverts(
+    governance,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    teller,
+    credit_engine,
+    deleverage,
+    switchboard_alpha,
+    vault_book,
+    endaoment_funds,
+):
+    with boa.env.anchor():
+        vault = boa.loads(UNDERSEND_VAULT_SOURCE, name="deleverage_undersend_vault")
+        vault_id = _register_vault(
+            vault_book,
+            governance,
+            vault,
+            "deleverage undersend vault",
+        )
+        token = boa.load(
+            "contracts/mock/MockErc20.vy",
+            governance,
+            "Deleverage Undersend",
+            "DLVUNDS",
+            18,
+            1_000_000_000,
+            name="deleverage_undersend_token",
+        )
+        borrower = boa.env.generate_address("deleverage-undersend-borrower")
+
+        setGeneralConfig(_perUserMaxVaults=20)
+        setGeneralDebtConfig(_ltvPaybackBuffer=0)
+        setAssetConfig(
+            token,
+            _vaultIds=[vault_id],
+            _debtTerms=createDebtTerms(
+                _ltv=50_00,
+                _redemptionThreshold=70_00,
+                _liqThreshold=80_00,
+                _liqFee=0,
+                _borrowRate=0,
+            ),
+            _shouldBurnAsPayment=False,
+            _shouldTransferToEndaoment=False,
+            _shouldSwapInStabPools=False,
+            _shouldAuctionInstantly=False,
+        )
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+        collateral = 200 * EIGHTEEN_DECIMALS
+        debt = 100 * EIGHTEEN_DECIMALS
+        token.mint(borrower, collateral, sender=governance.address)
+        token.approve(teller, collateral, sender=borrower)
+        teller.deposit(token, collateral, borrower, vault, sender=borrower)
+        teller.borrow(debt, borrower, False, sender=borrower)
+
+        # The dust floor reports one USD wei, but the amount-domain guard must
+        # reject this delivery because it is below the inverse quote.
+        mock_price_source.setPrice(token, 1)
+        vault.setUnderSendAmount(1)
+        assert price_desk.getUsdValue(token, 1, True) == 1
+        max_asset_amount = price_desk.getAssetAmount(token, debt, True)
+        assert 1 <= (max_asset_amount - 1) // debt
+
+        before = {
+            "debt": credit_engine.getUserDebtAmount(borrower),
+            "borrower_collateral": vault.getTotalAmountForUser(borrower, token),
+            "vault_tokens": token.balanceOf(vault),
+            "endaoment_tokens": token.balanceOf(endaoment_funds),
+        }
+        with boa.reverts("zero collateral value (vault under-send)"):
+            deleverage.deleverageWithVolAssets(
+                borrower,
+                [(vault_id, token.address, debt)],
+                sender=switchboard_alpha.address,
+            )
+        assert {
+            "debt": credit_engine.getUserDebtAmount(borrower),
+            "borrower_collateral": vault.getTotalAmountForUser(borrower, token),
+            "vault_tokens": token.balanceOf(vault),
+            "endaoment_tokens": token.balanceOf(endaoment_funds),
+        } == before
 
 
 def test_deleverage_zero_value_position_skips_before_transfer(

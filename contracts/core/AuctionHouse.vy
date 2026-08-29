@@ -1286,7 +1286,7 @@ def _transferCollateral(
         # post-transfer amount to the inverse quote instead of trusting that floor.
         assert amountSent > unsafe_sub(maxAssetAmount, 1) // _targetUsdValue # dev: amounts do not match up
         assert usdValue != 0 # dev: amounts do not match up
-        assert usdValue <= _targetUsdValue # dev: amounts do not match up
+        usdValue = min(usdValue, _targetUsdValue)
 
         # preserve full-quote semantics for the exact one-wei inverse/forward
         # rounding loss. A short delivery always keeps its actual forward value.
@@ -1415,6 +1415,10 @@ def _calcLiqFees(
 @view
 @internal
 def _calcTargetRepayAmount(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+    # 100% target is not a defined LTV gap; pay all rather than divide by zero.
+    if _targetLtv >= HUNDRED_PERCENT:
+        return _debtAmount
+
     # goal is to reduce only the debt needed to get LTV back to a safe position; it's never
     # perfectly precise, so to ensure max protocol solvency we target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT

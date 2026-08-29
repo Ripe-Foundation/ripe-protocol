@@ -88,7 +88,6 @@ def updateDepositPoints(
     _a: addys.Addys = empty(addys.Addys),
 ):
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 """
     assert source.count(needle) == 1
     # Use a # dev: assert, not a string revert: a string payload makes the
@@ -603,6 +602,16 @@ def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms, price_de
             _isNft,
         )
         mission_control.setAssetConfig(_asset, asset_config, sender=switchboard_bravo.address)
+        if (
+            (_stakersPointsAlloc != 0 or _voterPointsAlloc != 0)
+            and mission_control.rewardVaultId(_asset) == 0
+            and len(_vaultIds) >= 1
+        ):
+            mission_control.setRewardVaultId(
+                _asset,
+                _vaultIds[0],
+                sender=switchboard_bravo.address,
+            )
         if not _isNft:
             ensure_token_scale(
                 price_desk,
