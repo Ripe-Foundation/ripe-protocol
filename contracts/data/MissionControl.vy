@@ -1034,7 +1034,7 @@ def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsC
         stakersPointsAlloc=stakers,
         voterPointsAlloc=voters,
         isNft=assetConfig.isNft,
-        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0 and self.accrualStartBlock[_asset][_vaultId] == 0,
+        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 and self.accrualStartBlock[_asset][_vaultId] == 0,
         accrualStartBlock=self.accrualStartBlock[_asset][_vaultId],
     )
 
