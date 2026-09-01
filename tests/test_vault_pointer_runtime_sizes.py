@@ -20,7 +20,7 @@ EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 18948,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 23990,
-    "SwitchboardBravo": 16441,
+    "SwitchboardBravo": 16423,
     "SwitchboardCharlie": 22317,
     "SwitchboardEcho": 23930,
     "SwitchboardFoxtrot": 12061,
