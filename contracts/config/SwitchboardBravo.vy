@@ -388,8 +388,6 @@ def _enforceAccrualConfigChange(_asset: address, _prevConfig: cs.AssetConfig, _n
         extcall MissionControl(_missionControl).setAccrualStartBlock(_asset, vaultId, block.number)
         return
 
-    assert _newConfig.voterPointsAlloc == _prevConfig.voterPointsAlloc # dev: promotional voter alloc is permanent
-
 
 @internal
 def _checkpointSelectedRows(
