@@ -2,6 +2,8 @@
 
 One sequence. Do these in order.
 
+Promo / Golf is a later flip: `pr-223-cutover-sequence.md`. Do not add Golf here.
+
 ## Contracts being redeployed
 
 Nine registry replacements. Nothing else.

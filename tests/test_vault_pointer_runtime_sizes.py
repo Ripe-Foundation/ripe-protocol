@@ -8,8 +8,8 @@ EIP170_LIMIT = 24_576
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
 # Tight EIP-170 headrooms vs 24,576: AuctionHouse 12, Deleverage 17,
-# Teller 24, CreditEngine 33, Bravo 100, Lootbox 266, Alpha 586.
-# Charlie is 21,830 / 2,746 free. MissionControl is 18,644. Ledger is
+# Teller 24, CreditEngine 33, Lootbox 165, Alpha 586, Golf 3,644.
+# Charlie is 22,317 / 2,259 free. MissionControl is 18,948. Ledger is
 # 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
 # Deleverage without remeasuring.
 # Lootbox `# pragma optimize codesize` (no CLI -O override) is load-bearing.
@@ -17,20 +17,21 @@ EIP170_LIMIT = 24_576
 # Alpha always settles ripePerBlock / split writes, including setRipePerBlock(0).
 # Any edit to a pinned contract must recompile and remeasure.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 18644,
+    "MissionControl": 18948,
     "DefaultsLocal": 1200,
     "SwitchboardAlpha": 23990,
-    "SwitchboardBravo": 24476,
-    "SwitchboardCharlie": 21830,
+    "SwitchboardBravo": 16441,
+    "SwitchboardCharlie": 22317,
     "SwitchboardEcho": 23930,
-    "SwitchboardFoxtrot": 11433,
+    "SwitchboardFoxtrot": 12061,
+    "SwitchboardGolf": 20932,
     "VaultMigrator": 15626,
     "VaultBook": 14410,
     "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
-    "Lootbox": 24310,
+    "Lootbox": 24411,
     "GreenToken": 8760,
     "SavingsGreen": 13166,
     "RipeToken": 8760,
@@ -62,6 +63,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     switchboard_charlie,
     switchboard_echo,
     switchboard_foxtrot,
+    switchboard_golf,
     vault_migrator,
     vault_book,
     teller,
@@ -109,6 +111,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         ),
         "SwitchboardFoxtrot": len(
             switchboard_foxtrot.env.get_code(switchboard_foxtrot.address)
+        ),
+        "SwitchboardGolf": len(
+            switchboard_golf.env.get_code(switchboard_golf.address)
         ),
         "VaultMigrator": len(vault_migrator.env.get_code(vault_migrator.address)),
         "VaultBook": len(vault_book.env.get_code(vault_book.address)),

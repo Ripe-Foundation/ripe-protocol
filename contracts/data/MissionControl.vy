@@ -145,6 +145,7 @@ struct DepositPointsConfig:
     voterPointsAlloc: uint256
     isNft: bool
     shouldFundGenPoints: bool
+    accrualStartBlock: uint256
 
 struct AssetRetirementConfig:
     isSupported: bool
@@ -223,6 +224,7 @@ trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 rewardVaultId: public(HashMap[address, uint256]) # asset -> vaultId, 0 = no earner
+accrualStartBlock: public(HashMap[address, HashMap[uint256, uint256]]) # asset -> vaultId -> start; max = armed
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -367,7 +369,10 @@ def deregisterAsset(_asset: address) -> bool:
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
     self.indexOfAsset[_asset] = 0
+    rewardVault: uint256 = self.rewardVaultId[_asset]
     self.rewardVaultId[_asset] = 0
+    if rewardVault != 0:
+        self.accrualStartBlock[_asset][rewardVault] = 0
 
     # get last item, replace the removed item
     if targetIndex != lastIndex:
@@ -449,6 +454,13 @@ def setRewardVaultId(_asset: address, _vaultId: uint256):
         assetConfig.voterPointsAlloc = 0
         self.assetConfig[_asset] = assetConfig
     self.rewardVaultId[_asset] = _vaultId
+
+
+@external
+def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    self.accrualStartBlock[_asset][_vaultId] = _startBlock
 
 
 # points allocs
@@ -1010,12 +1022,14 @@ def getRewardsConfig() -> RewardsConfig:
 @external
 def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    startBlock: uint256 = self.accrualStartBlock[_asset][_vaultId]
     if self.indexOfAsset[_asset] == 0:
         return DepositPointsConfig(
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
             isNft=assetConfig.isNft,
             shouldFundGenPoints=False,
+            accrualStartBlock=startBlock,
         )
     earner: uint256 = self.rewardVaultId[_asset]
     isEarner: bool = earner != 0 and _vaultId == earner
@@ -1025,7 +1039,8 @@ def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsC
         stakersPointsAlloc=stakers,
         voterPointsAlloc=voters,
         isNft=assetConfig.isNft,
-        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0,
+        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 and startBlock == 0,
+        accrualStartBlock=startBlock,
     )
 
 
