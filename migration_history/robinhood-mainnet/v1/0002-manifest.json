@@ -1,0 +1,28 @@
+{
+  "contracts": {
+    "Switchboard": {
+      "address": "0x4A9B60633f65ba9Ae6faedD289A597D78347CFb4",
+      "file": "contracts/registries/Switchboard.vy"
+    },
+    "SwitchboardAlpha": {
+      "address": "0xfa48AF6AE4C4a4E29E8c148518854Ff36023f0E9",
+      "file": "contracts/config/SwitchboardAlpha.vy"
+    },
+    "SwitchboardBravo": {
+      "address": "0x3363B431078eD4E3217AAB1Ee227480CA0f44163",
+      "file": "contracts/config/SwitchboardBravo.vy"
+    },
+    "SwitchboardCharlie": {
+      "address": "0x40c81C760882706d0e88Ca9B74FCcdE6A6c64e5C",
+      "file": "contracts/config/SwitchboardCharlie.vy"
+    },
+    "SwitchboardDelta": {
+      "address": "0x6C75717e34Dcc74DF0a3b03c2C98B9DBCba57756",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    },
+    "SwitchboardEcho": {
+      "address": "0x3e19FB0E87A77Ea4561baC2D94122B14d9FC904c",
+      "file": "contracts/config/SwitchboardEcho.vy"
+    }
+  }
+}

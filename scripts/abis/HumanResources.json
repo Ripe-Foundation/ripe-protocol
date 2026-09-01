@@ -171,6 +171,28 @@
     "type": "event"
   },
   {
+    "name": "LegacyContributorRipeGovVaultSet",
+    "inputs": [
+      {
+        "name": "contributor",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "changedBy",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -1160,11 +1182,61 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "getRipeGovVaultId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "hasRipeBalance",
     "inputs": [
       {
         "name": "_contributor",
         "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasRipeBalance",
+    "inputs": [
+      {
+        "name": "_contributor",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
       }
     ],
     "outputs": [
@@ -1185,6 +1257,31 @@
       },
       {
         "name": "_lockDuration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "transferContributorRipeTokens",
+    "inputs": [
+      {
+        "name": "_owner",
+        "type": "address"
+      },
+      {
+        "name": "_lockDuration",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultId",
         "type": "uint256"
       }
     ],
@@ -1233,6 +1330,26 @@
     "outputs": []
   },
   {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "refundAfterCancelPaycheck",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldBurnPosition",
+        "type": "bool"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
     "stateMutability": "view",
     "type": "function",
     "name": "getTotalClaimed",
@@ -1255,6 +1372,22 @@
         "type": "uint256"
       }
     ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setLegacyContributorRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "_contributor",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
   },
   {
     "stateMutability": "view",
@@ -1304,6 +1437,23 @@
             "type": "uint256"
           }
         ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "legacyContributorRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ]
   },

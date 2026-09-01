@@ -1,8 +1,155 @@
 import pytest
 import boa
 
-from constants import MAX_UINT256, ZERO_ADDRESS
+from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
+
+
+def _asset_config(vault_ids):
+    return (
+        vault_ids,
+        0,
+        0,
+        MAX_UINT256,
+        MAX_UINT256,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        (False, 0, 0, 0, 0),
+        ZERO_ADDRESS,
+        False,
+    )
+
+
+def _support_asset(mission_control, switchboard_bravo, asset, vault_ids):
+    mission_control.setAssetConfig(
+        asset,
+        _asset_config(vault_ids),
+        sender=switchboard_bravo.address,
+    )
+
+
+def _set_existing_borrow_interval(
+    mission_control,
+    switchboard_alpha,
+    max_borrow_per_interval=10_000,
+    num_blocks_per_interval=100,
+):
+    config = mission_control.genDebtConfig()._replace(
+        maxBorrowPerInterval=max_borrow_per_interval,
+        numBlocksPerInterval=num_blocks_per_interval,
+    )
+    mission_control.setGeneralDebtConfig(
+        config,
+        sender=switchboard_alpha.address,
+    )
+
+
+def _register_vault(vault_book, governance, vault, description):
+    assert vault_book.startAddNewAddressToRegistry(
+        vault.address,
+        description,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    return vault_book.confirmNewAddressToRegistry(
+        vault.address,
+        sender=governance.address,
+    )
+
+
+def _legacy_partial_stability_pool(asset, name):
+    return boa.loads(
+        """
+asset: immutable(address)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256:
+    return 0
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        asset,
+        name=name,
+    )
+
+
+def _mutable_full_stability_pool(asset, name):
+    return boa.loads(
+        """
+asset: immutable(address)
+shouldRevert: public(bool)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+def setShouldRevert(_shouldRevert: bool):
+    self.shouldRevert = _shouldRevert
+
+@external
+@view
+def doesVaultHaveAnyFunds() -> bool:
+    return False
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256:
+    return 0
+
+@external
+@view
+def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool:
+    assert not self.shouldRevert
+    return False
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        asset,
+        name=name,
+    )
 
 
 @pytest.fixture(scope="function")
@@ -31,6 +178,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
             100,  # max (less than min)
             50,   # min timelock
             500,  # max timelock
+            0,    # Pyth disabled
         )
     
     # Test equal values
@@ -43,6 +191,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
             100,  # max (equal to min)
             50,   # min timelock
             500,  # max timelock
+            0,    # Pyth disabled
         )
 
 
@@ -104,7 +253,7 @@ def test_set_vault_limits_validation(switchboard_alpha, governance):
         switchboard_alpha.setVaultLimits(10, MAX_UINT256, sender=governance.address)  # max uint256
 
 
-def test_set_vault_limits_success(switchboard_alpha, governance):
+def test_set_vault_limits_success(switchboard_alpha, mission_control, governance):
     # Test valid vault limits
     action_id = switchboard_alpha.setVaultLimits(20, 10, sender=governance.address)
     assert action_id > 0
@@ -121,6 +270,7 @@ def test_set_vault_limits_success(switchboard_alpha, governance):
     pending = switchboard_alpha.pendingGeneralConfig(action_id)
     assert pending.perUserMaxVaults == 20
     assert pending.perUserMaxAssetsPerVault == 10
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_execute_vault_limits(switchboard_alpha, mission_control, governance):
@@ -258,7 +408,8 @@ def test_global_debt_limits_validation(switchboard_alpha, governance):
         switchboard_alpha.setGlobalDebtLimits(MAX_UINT256, 10000, 100, 50, sender=governance.address)  # max uint256
 
 
-def test_global_debt_limits_success(switchboard_alpha, governance):
+def test_global_debt_limits_success(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     assert action_id > 0
     
@@ -270,6 +421,7 @@ def test_global_debt_limits_success(switchboard_alpha, governance):
     assert log.globalDebtLimit == 50000
     assert log.minDebtAmount == 100
     assert log.numAllowedBorrowers == 100
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_borrow_interval_config_validation(switchboard_alpha, governance):
@@ -398,6 +550,7 @@ def test_keeper_config_permissions(switchboard_alpha, governance, bob):
 
 def test_keeper_config_with_existing_debt_config(switchboard_alpha, mission_control, governance):
     """Test that keeper config only modifies the specific fields"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # First set some other debt config fields
     debt_action = switchboard_alpha.setGlobalDebtLimits(6000, 60000, 200, 120, sender=governance.address)
     
@@ -439,7 +592,10 @@ def test_auction_params_validation(switchboard_alpha, governance):
         switchboard_alpha.setGenAuctionParams(100_01, 50_00, 1000, 2000, sender=governance.address)  # start >= 100%
     
     with boa.reverts("invalid auction params"):
-        switchboard_alpha.setGenAuctionParams(50_00, 100_01, 1000, 2000, sender=governance.address)  # max >= 100%
+        switchboard_alpha.setGenAuctionParams(10_00, 100_00, 1000, 2000, sender=governance.address)  # max = 100%
+
+    with boa.reverts("invalid auction params"):
+        switchboard_alpha.setGenAuctionParams(50_00, 100_01, 1000, 2000, sender=governance.address)  # max > 100%
     
     with boa.reverts("invalid auction params"):
         switchboard_alpha.setGenAuctionParams(60_00, 50_00, 1000, 2000, sender=governance.address)  # start >= max
@@ -454,7 +610,51 @@ def test_auction_params_validation(switchboard_alpha, governance):
         switchboard_alpha.setGenAuctionParams(30_00, 50_00, 1000, MAX_UINT256, sender=governance.address)  # max duration
 
 
+def test_auction_params_direct_validator_boundaries(switchboard_alpha):
+    valid_delay = 1000
+    valid_duration = 2000
+
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 99_99, valid_delay, valid_duration)
+    )
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 99_98, 99_99, valid_delay, valid_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 99_99, 99_99, valid_delay, valid_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 100_00, valid_delay, valid_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 100_01, valid_delay, valid_duration)
+    )
+    max_safe_duration = MAX_UINT256 // HUNDRED_PERCENT
+    max_auction_delay = 2**32 - 1
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, 0, max_safe_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, 0, max_safe_duration + 1)
+    )
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, max_auction_delay, 1)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, max_auction_delay + 1, 1)
+    )
+    # Previously accepted: delay = uint256.max - 1, duration = 1.
+    # AuctionHouse then reverts on block.number + delay.
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, MAX_UINT256 - 1, 1)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, MAX_UINT256 - max_safe_duration + 1, max_safe_duration)
+    )
+
+
 def test_execute_debt_configs(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Test executing global debt limits
     action_id = switchboard_alpha.setGlobalDebtLimits(6000, 60000, 200, 150, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -498,7 +698,7 @@ def test_daowry_enable_disable(switchboard_alpha, mission_control, governance):
     assert logs[0].isDaowryEnabled
 
 
-def test_ripe_per_block(switchboard_alpha, governance):
+def test_ripe_per_block(switchboard_alpha, mission_control, governance):
     action_id = switchboard_alpha.setRipePerBlock(1000, sender=governance.address)
     assert action_id > 0
     
@@ -506,6 +706,7 @@ def test_ripe_per_block(switchboard_alpha, governance):
     logs = filter_logs(switchboard_alpha, "PendingRipeRewardsPerBlockChange")
     assert len(logs) == 1
     assert logs[0].ripePerBlock == 1000
+    assert switchboard_alpha.pendingMissionControl(action_id) == mission_control.address
 
 
 def test_rewards_allocs_validation(switchboard_alpha, governance):
@@ -561,21 +762,17 @@ def test_rewards_points_enable_disable(switchboard_alpha, mission_control, gover
     assert logs[0].arePointsEnabled
 
 
-def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
-    # Create sample vault data that will be filtered out due to invalid vault/asset
-    # With the new assertion, these will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+def test_priority_liq_asset_vaults_reject_invalid_entries(switchboard_alpha, governance):
+    # Invalid vault/asset pairs fail the composed validator.
     vaults = [
         (1, ZERO_ADDRESS),  # Will be filtered out due to invalid vault/asset
         (2, ZERO_ADDRESS),
     ]
     
-    # The function should revert because invalid vaults get filtered,
-    # making sanitized length != input length
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
     
-    # Test with duplicate invalid vaults - duplicates get filtered, causing length mismatch
+    # Duplicate invalid entries fail the same validator.
     duplicate_vaults = [
         (1, ZERO_ADDRESS),
         (1, ZERO_ADDRESS),  # Exact duplicate - will be filtered
@@ -585,14 +782,172 @@ def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
         switchboard_alpha.setPriorityLiqAssetVaults(duplicate_vaults, sender=governance.address)
 
 
-def test_priority_stab_vaults_filtered(switchboard_alpha, governance):
-    # Invalid vaults will be filtered during sanitization, causing length mismatch
+@pytest.mark.parametrize("vault_id", [1, 2])
+def test_priority_liq_asset_vaults_reject_special_vaults(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+    vault_id,
+):
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [1, 2, 3],
+    )
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+    if vault_id == 1:
+        assert mission_control.isStabVaultId(vault_id)
+    else:
+        assert mission_control.isRipeGovVaultId(vault_id)
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+
+    with boa.reverts("invalid priority vaults"):
+        switchboard_alpha.setPriorityLiqAssetVaults(
+            [(vault_id, alpha_token.address)],
+            sender=governance.address,
+        )
+
+
+def test_priority_liq_asset_vaults_accept_ordinary_vault(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    assert not mission_control.isStabVaultId(vault_id)
+    assert not mission_control.isRipeGovVaultId(vault_id)
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    stored_vaults = mission_control.getPriorityLiqAssetVaults()
+    assert [(vault.vaultId, vault.asset) for vault in stored_vaults] == [
+        (vault_id, alpha_token.address),
+    ]
+
+
+@pytest.mark.parametrize("classification", ["stab", "ripe_gov"])
+def test_priority_liq_asset_vaults_revalidate_special_classification_at_confirmation(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+    classification,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    previous_vaults = [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ]
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+
+    if classification == "stab":
+        mission_control.setPreferredStabVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
+        )
+    else:
+        mission_control.setCoreRipeGovVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
+        )
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+    if classification == "stab":
+        assert mission_control.isStabVaultId(vault_id)
+    else:
+        assert mission_control.isRipeGovVaultId(vault_id)
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("invalid priority vaults"):
+        switchboard_alpha.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ] == previous_vaults
+
+
+def test_priority_liq_asset_vaults_revalidate_support_at_confirmation(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    previous_vaults = [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ]
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [4],
+    )
+    assert not mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("invalid priority vaults"):
+        switchboard_alpha.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ] == previous_vaults
+
+
+def test_priority_stab_vaults_reject_invalid_entries(switchboard_alpha, governance):
     vaults = [(1, ZERO_ADDRESS)]
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityStabVaults(vaults, sender=governance.address)
     
-    # Test with multiple invalid vaults including duplicates
-    # Both invalid vaults and duplicates will be filtered, causing length mismatch
+    # Multiple invalid entries, including duplicates, also fail.
     multiple_vaults = [
         (1, ZERO_ADDRESS),
         (2, ZERO_ADDRESS),
@@ -603,41 +958,130 @@ def test_priority_stab_vaults_filtered(switchboard_alpha, governance):
         switchboard_alpha.setPriorityStabVaults(multiple_vaults, sender=governance.address)
 
 
+def test_priority_stab_vault_rejects_legacy_partial_interface(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    savings_green,
+):
+    legacy_pool = _legacy_partial_stability_pool(
+        savings_green,
+        "legacy_partial_priority_stability_pool",
+    )
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        legacy_pool,
+        "Legacy Partial Priority Pool",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1, vault_id],
+    )
+
+    with boa.reverts("external call failed"):
+        switchboard_alpha.setPriorityStabVaults(
+            [(vault_id, savings_green.address)],
+            sender=governance.address,
+        )
+
+
+def test_priority_stab_vault_revalidates_interface_at_confirmation(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    stability_pool,
+    savings_green,
+):
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1],
+    )
+    action_id = switchboard_alpha.setPriorityStabVaults(
+        [(1, savings_green.address)],
+        sender=governance.address,
+    )
+    replacement_pool = _mutable_full_stability_pool(
+        savings_green,
+        "mutable_full_priority_stability_pool",
+    )
+    assert vault_book.startAddressUpdateToRegistry(
+        1,
+        replacement_pool.address,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        1,
+        sender=governance.address,
+    )
+    replacement_pool.setShouldRevert(True)
+
+    confirmation_block = switchboard_alpha.getActionConfirmationBlock(action_id)
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+    with boa.reverts("external call failed"):
+        switchboard_alpha.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert vault_book.getAddr(1) == replacement_pool.address
+    assert stability_pool.address != replacement_pool.address
+
+
 def test_invalid_priority_vaults(switchboard_alpha, governance):
-    # With the new assertion requiring exact length match, empty arrays are now valid
-    # since len([]) == len([]) after sanitization
-    # Test that empty arrays now succeed
+    # Empty arrays contain no invalid entry and remain valid.
     action_id = switchboard_alpha.setPriorityLiqAssetVaults([], sender=governance.address)
     assert action_id > 0
     
-    # Test that arrays with invalid vaults still fail due to length mismatch
-    invalid_vaults = [(999, ZERO_ADDRESS)]  # Invalid vault that will be filtered
+    # Arrays with invalid vaults still fail.
+    invalid_vaults = [(999, ZERO_ADDRESS)]
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(invalid_vaults, sender=governance.address)
 
 
-def test_priority_price_source_ids_filtered(switchboard_alpha, governance):
-    # Test with invalid price source IDs (will be filtered)
-    ids = [999, 998, 997]  # Use obviously invalid IDs that should be filtered out
-    # This should revert since all IDs will be filtered out, resulting in empty list
-    with boa.reverts("invalid priority sources"):
-        switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
-    
-    # Test with duplicate invalid IDs
-    duplicate_ids = [999, 999, 998, 998, 997, 997]
-    with boa.reverts("invalid priority sources"):
-        switchboard_alpha.setPriorityPriceSourceIds(duplicate_ids, sender=governance.address)
-    
-    # Test with mix of valid and invalid IDs (1 and 2 are valid in test env)
-    mixed_ids = [1, 2, 999, 998, 1, 2]  # Contains duplicates
-    # This should succeed because it has valid IDs (1 and 2)
-    action_id = switchboard_alpha.setPriorityPriceSourceIds(mixed_ids, sender=governance.address)
-    assert action_id > 0
-    
-    # Check that only valid, deduplicated IDs were stored
-    logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
-    assert len(logs) == 1
-    assert logs[0].numPriorityPriceSourceIds == 2  # Only IDs 1 and 2 should be valid
+def test_priority_price_source_ids_filtered(switchboard_alpha, mission_control, governance):
+    # EIP-170 fallback: nonempty proposals are stored raw; sanitation is at execution.
+    with boa.env.anchor():
+        ids = [999, 998, 997]
+        invalid_action = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
+        assert invalid_action > 0
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 3
+
+        duplicate_ids = [999, 999, 998, 998, 997, 997]
+        action_id = switchboard_alpha.setPriorityPriceSourceIds(duplicate_ids, sender=governance.address)
+        assert action_id > 0
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert logs[0].numPriorityPriceSourceIds == 6
+
+        mixed_ids = [1, 2, 999, 998, 1, 2]
+        mixed_action = switchboard_alpha.setPriorityPriceSourceIds(mixed_ids, sender=governance.address)
+        assert mixed_action > 0
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 6
+
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(mixed_action, sender=governance.address)
+        assert list(mission_control.getPriorityPriceSourceIds()) == [1, 2]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 2
+
+        with boa.reverts("invalid priority price source ids"):
+            switchboard_alpha.executePendingAction(invalid_action, sender=governance.address)
+        assert switchboard_alpha.hasPendingAction(invalid_action)
 
 
 def test_invalid_priority_sources(switchboard_alpha, governance):
@@ -781,6 +1225,7 @@ def test_pending_action_cleanup(switchboard_alpha, governance):
 
 
 def test_borrow_interval_with_existing_debt_config(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # First set global debt limits to establish minDebtAmount
     action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -796,6 +1241,7 @@ def test_borrow_interval_with_existing_debt_config(switchboard_alpha, mission_co
 
 
 def test_full_config_workflow(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     time_lock = switchboard_alpha.actionTimeLock()
     
     # Create multiple configuration changes
@@ -879,8 +1325,8 @@ def test_has_perms_to_enable_complex_scenarios(switchboard_alpha, governance, bo
         switchboard_alpha.setCanDeposit(False, sender=bob)
 
 
-def test_sanitize_priority_vaults_deduplication(switchboard_alpha, governance, alpha_token):
-    """Test the deduplication logic in _sanitizePriorityVaults"""
+def test_validate_priority_vaults_deduplication(switchboard_alpha, governance, alpha_token):
+    """Test the transient deduplication in the priority-vault validator."""
     
     # Test with duplicate vault ID + asset combinations
     vaults = [
@@ -890,41 +1336,52 @@ def test_sanitize_priority_vaults_deduplication(switchboard_alpha, governance, a
         (2, alpha_token),  # different vault, same asset
     ]
     
-    # With the new length assertion, duplicates will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+    # Any duplicate makes the complete proposed list invalid.
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 
 
-def test_sanitize_priority_sources_deduplication(switchboard_alpha, governance):
+def test_sanitize_priority_sources_deduplication(switchboard_alpha, mission_control, governance):
     """Test the deduplication logic in _sanitizePrioritySources"""
     
     # Test with duplicate price source IDs (1 and 2 are valid)
     ids = [1, 1, 2, 2, 1, 99]  # Contains duplicates, 99 is invalid
     
-    # This should succeed with valid IDs 1 and 2 (deduplicated)
-    action_id = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
-    assert action_id > 0
-    
-    # Check deduplication worked
-    logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
-    assert len(logs) == 1
-    assert logs[0].numPriorityPriceSourceIds == 2  # Only unique valid IDs 1 and 2
+    with boa.env.anchor():
+        action_id = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
+        assert action_id > 0
+
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 6
+
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+        assert list(mission_control.getPriorityPriceSourceIds()) == [1, 2]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 2
 
 
-def test_auction_params_boundary_conditions(switchboard_alpha, governance):
+def test_auction_params_boundary_conditions(switchboard_alpha, mission_control, governance):
     """Test auction params validation at boundary conditions"""
     
     # Test with exact boundary values
     HUNDRED_PERCENT = 100_00
     
-    # startDiscount just under maxDiscount (both under 100%)
+    # Highest valid maximum discount, with a clearly lower start discount.
     action_id = switchboard_alpha.setGenAuctionParams(
-        HUNDRED_PERCENT - 2, HUNDRED_PERCENT - 1, 1000, 2000, 
+        10_00, HUNDRED_PERCENT - 1, 1000, 2000,
         sender=governance.address
     )
-    assert action_id > 0
-    
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+
+    params = mission_control.genDebtConfig().genAuctionParams
+    assert params.startDiscount == 10_00
+    assert params.maxDiscount == 99_99
+    assert params.delay == 1000
+    assert params.duration == 2000
+
     # Test delay = duration - 1 (just valid)
     action_id = switchboard_alpha.setGenAuctionParams(
         50_00, 80_00, 1999, 2000, 
@@ -947,8 +1404,13 @@ def test_auction_params_boundary_conditions(switchboard_alpha, governance):
     assert action_id > 0
 
 
-def test_debt_limits_boundary_conditions(switchboard_alpha, governance):
+def test_debt_limits_boundary_conditions(switchboard_alpha, mission_control, governance):
     """Test debt limits validation at boundary conditions"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
+
+    # minDebtAmount may remain zero when the other fields are valid.
+    action_id = switchboard_alpha.setGlobalDebtLimits(1000, 10000, 0, 100, sender=governance.address)
+    assert action_id > 0
     
     # Test where minDebtAmount equals perUserDebtLimit (should be valid)
     action_id = switchboard_alpha.setGlobalDebtLimits(1000, 10000, 1000, 100, sender=governance.address)
@@ -1089,8 +1551,13 @@ def test_cancel_action_edge_cases(switchboard_alpha, governance):
         switchboard_alpha.cancelPendingAction(action_id3, sender=governance.address)
 
 
-def test_complex_workflow_multiple_pending_actions(switchboard_alpha, governance):
+def test_complex_workflow_multiple_pending_actions(
+    switchboard_alpha,
+    mission_control,
+    governance,
+):
     """Test complex workflows with multiple pending actions"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     
     # Create multiple different types of actions
     vault_action = switchboard_alpha.setVaultLimits(15, 8, sender=governance.address)
@@ -1224,8 +1691,7 @@ def test_transient_storage_behavior(switchboard_alpha, governance, alpha_token, 
         (1, alpha_token),  # duplicate of first - will be filtered
     ]
     
-    # With the new length assertion, duplicates will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+    # Any duplicate makes the complete proposed list invalid.
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
     
@@ -1298,26 +1764,30 @@ def test_priority_vault_deduplication_complex(switchboard_alpha, governance, alp
         (3, charlie_token),  # Duplicate - will be filtered
     ]
     
-    # With the new length assertion, duplicates will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+    # Any duplicate makes the complete proposed list invalid.
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 
 
-def test_priority_price_sources_maximum_array(switchboard_alpha, governance):
+def test_priority_price_sources_maximum_array(switchboard_alpha, mission_control, governance):
     """Test priority price sources with maximum allowed array size"""
     # MAX_PRIORITY_PRICE_SOURCES is 10
     # Mix of valid (1, 2) and invalid IDs
     max_sources = [1, 2] + list(range(100, 108))
     
-    # This should succeed with the valid IDs
-    action_id = switchboard_alpha.setPriorityPriceSourceIds(max_sources, sender=governance.address)
-    assert action_id > 0
-    
-    # Should only have the valid IDs
-    logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
-    assert len(logs) == 1
-    assert logs[0].numPriorityPriceSourceIds == 2  # Only IDs 1 and 2 are valid
+    with boa.env.anchor():
+        action_id = switchboard_alpha.setPriorityPriceSourceIds(max_sources, sender=governance.address)
+        assert action_id > 0
+
+        logs = filter_logs(switchboard_alpha, "PendingPriorityPriceSourceIdsChange")
+        assert len(logs) == 1
+        assert logs[0].numPriorityPriceSourceIds == 10
+
+        boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+        assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+        assert list(mission_control.getPriorityPriceSourceIds()) == [1, 2]
+        modified = filter_logs(switchboard_alpha, "PriorityPriceSourceIdsModified")
+        assert modified[0].numIds == 2
 
 
 def test_action_expiration_boundary_conditions(switchboard_alpha, governance):
@@ -1462,8 +1932,9 @@ def test_all_enable_disable_concurrent_state_changes(switchboard_alpha, mission_
     assert config.canClaimLoot  # Never disabled
 
 
-def test_debt_config_interdependencies(switchboard_alpha, governance):
+def test_debt_config_interdependencies(switchboard_alpha, mission_control, governance):
     """Test debt config settings that have interdependencies"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Set initial debt limits
     action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -1482,10 +1953,9 @@ def test_debt_config_interdependencies(switchboard_alpha, governance):
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
     switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     
-    # Now try to set minDebtAmount higher than maxBorrowPerInterval
-    # This should succeed because we're not validating against existing borrow config
-    action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 200, 100, sender=governance.address)
-    assert action_id > 0
+    # The opposite update direction must preserve the same cross-field invariant.
+    with boa.reverts("invalid debt limits"):
+        switchboard_alpha.setGlobalDebtLimits(5000, 50000, 200, 100, sender=governance.address)
 
 
 def test_auction_params_comprehensive_validation(switchboard_alpha, governance):
@@ -1525,8 +1995,9 @@ def test_rewards_config_zero_allocations(switchboard_alpha, mission_control, gov
     assert config.genDepositorsAlloc == 0
 
 
-def test_multiple_pending_actions_cleanup(switchboard_alpha, governance):
+def test_multiple_pending_actions_cleanup(switchboard_alpha, mission_control, governance):
     """Test cleanup of multiple pending actions of different types"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Create one of each type of action
     vault_action = switchboard_alpha.setVaultLimits(10, 5, sender=governance.address)
     stale_action = switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 50, sender=governance.address)
@@ -1575,8 +2046,9 @@ def test_gas_optimization_large_arrays(switchboard_alpha, governance):
     assert action_id > 0
 
 
-def test_action_type_enum_coverage(switchboard_alpha, governance):
+def test_action_type_enum_coverage(switchboard_alpha, mission_control, governance):
     """Ensure all ActionType enum values are tested"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # This test verifies we've covered all action types
     # Based on the contract, these are all the ActionType values:
     action_types_tested = set()
@@ -1672,6 +2144,7 @@ def test_priority_stab_vault_validation_edge_cases(switchboard_alpha, governance
 
 def test_complex_workflow_with_failures(switchboard_alpha, mission_control, governance):
     """Test complex workflow with some actions failing and others succeeding"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Create multiple actions
     action1 = switchboard_alpha.setVaultLimits(10, 5, sender=governance.address)
     action2 = switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 50, sender=governance.address)
@@ -1727,6 +2200,7 @@ def test_enable_disable_rapid_toggle(switchboard_alpha, mission_control, governa
 
 def test_all_debt_config_fields_modified(switchboard_alpha, mission_control, governance):
     """Test modifying all debt config fields through different actions"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     time_lock = switchboard_alpha.actionTimeLock()
     
     # Set all debt config fields
@@ -1973,7 +2447,8 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
             True,    # can exit
             sender=governance.address
         )
-    
+
+
     # Test with unsupported asset (not configured in vault 2)
     with boa.reverts("invalid ripe vault config"):
         switchboard_alpha.setRipeGovVaultConfig(
@@ -2071,6 +2546,221 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
             False,  # canExit = False
             sender=governance.address
         )
+
+
+def test_ripe_gov_vault_config_rejects_zero_max_lock_duration(
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    setAssetConfig,
+    mission_control,
+):
+    """Zero max lock duration is invalid; min zero with a positive max is not."""
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            False,
+            0,
+            0,
+            200_00,
+            0,
+            False,
+            sender=governance.address,
+        )
+
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        0,
+        1_000,
+        200_00,
+        0,
+        False,
+        sender=governance.address,
+    )
+    assert action_id > 0
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    live = mission_control.ripeGovVaultConfig(alpha_token.address)
+    assert live.lockTerms.minLockDuration == 0
+    assert live.lockTerms.maxLockDuration == 1_000
+    assert live.assetWeight == 100_00
+
+    next_action = switchboard_alpha.actionId()
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            150_00,
+            True,
+            0,
+            0,
+            200_00,
+            0,
+            False,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.actionId() == next_action
+    live_after = mission_control.ripeGovVaultConfig(alpha_token.address)
+    assert live_after.lockTerms.minLockDuration == 0
+    assert live_after.lockTerms.maxLockDuration == 1_000
+    assert live_after.assetWeight == 100_00
+    assert not live_after.shouldFreezeWhenBadDebt
+
+
+def test_ripe_gov_vault_config_switchboard_rejects_unsafe_lock_duration(
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    setAssetConfig,
+    mission_control,
+):
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+    max_safe_duration = MAX_UINT256 // 1000_00
+
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        max_safe_duration,
+        max_safe_duration,
+        1000_00,
+        0,
+        False,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(
+        action_id, sender=governance.address
+    )
+    assert (
+        mission_control.ripeGovVaultConfig(alpha_token).lockTerms.maxLockDuration
+        == max_safe_duration
+    )
+
+    latest_action_id = switchboard_alpha.actionId()
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            False,
+            max_safe_duration + 1,
+            max_safe_duration + 1,
+            1000_00,
+            0,
+            False,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.actionId() == latest_action_id
+    assert (
+        mission_control.ripeGovVaultConfig(alpha_token).lockTerms.maxLockDuration
+        == max_safe_duration
+    )
+
+
+def test_ripe_gov_vault_config_rejects_unset_target_core_pointer(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    new_mission_control,
+    alpha_token,
+):
+    # MissionControl now initializes the canonical pointer to 2. Force the
+    # historical/uninitialized state this validation test is meant to cover.
+    new_mission_control.eval("self.coreRipeGovVaultId = 0")
+    new_mission_control.setAssetConfig(
+        alpha_token.address,
+        _asset_config([2]),
+        sender=switchboard_bravo.address,
+    )
+
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            False,
+            100,
+            1_000,
+            200_00,
+            0,
+            False,
+            new_mission_control.address,
+            sender=governance.address,
+        )
+
+
+def test_ripe_gov_vault_config_uses_target_mission_control_pointer(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    new_mission_control,
+    alpha_token,
+):
+    target_core_id = 77
+    new_mission_control.setCoreRipeGovVaultId(target_core_id, sender=switchboard_alpha.address)
+    new_mission_control.setAssetConfig(
+        alpha_token.address,
+        _asset_config([target_core_id]),
+        sender=switchboard_bravo.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        100,
+        1_000,
+        200_00,
+        0,
+        False,
+        new_mission_control.address,
+        sender=governance.address,
+    )
+    assert switchboard_alpha.pendingMissionControl(action_id) == new_mission_control.address
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert new_mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 100_00
+    assert mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 0
+
+
+def test_ripe_gov_vault_config_execution_keeps_existing_no_revalidation_behavior(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    new_mission_control,
+    alpha_token,
+):
+    target_core_id = 77
+    new_mission_control.setCoreRipeGovVaultId(target_core_id, sender=switchboard_alpha.address)
+    new_mission_control.setAssetConfig(
+        alpha_token.address,
+        _asset_config([target_core_id]),
+        sender=switchboard_bravo.address,
+    )
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        100,
+        1_000,
+        200_00,
+        0,
+        False,
+        new_mission_control.address,
+        sender=governance.address,
+    )
+
+    new_mission_control.setCoreRipeGovVaultId(88, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert new_mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 100_00
 
 
 def test_ripe_gov_vault_config_success(switchboard_alpha, governance, alpha_token, setAssetConfig):
@@ -2553,6 +3243,7 @@ def test_execute_multiple_dynamic_rate_configs(switchboard_alpha, mission_contro
 
 def test_dynamic_rate_config_with_existing_debt_config(switchboard_alpha, mission_control, governance):
     """Test that dynamic rate config only modifies the specific fields"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # First set some other debt config fields
     debt_action = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     keeper_action = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=governance.address)
@@ -2971,6 +3662,7 @@ def test_undy_vault_discount_cancel_action(switchboard_alpha, credit_engine, gov
 
 def test_undy_vault_discount_with_other_debt_configs(switchboard_alpha, mission_control, credit_engine, governance):
     """Test that undy vault discount works independently of other debt configs"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Set some other debt config
     debt_action = switchboard_alpha.setGlobalDebtLimits(7000, 70000, 250, 150, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -3202,6 +3894,7 @@ def test_buyback_ratio_cancel_action(switchboard_alpha, credit_engine, governanc
 
 def test_buyback_ratio_with_other_debt_configs(switchboard_alpha, mission_control, credit_engine, governance):
     """Test that buyback ratio works independently of other debt configs"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Set some other debt config
     debt_action = switchboard_alpha.setGlobalDebtLimits(7000, 70000, 250, 150, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())

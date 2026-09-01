@@ -8,7 +8,7 @@
 #                                                   ┻┛┛ ┗┻┗┛┗┛
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -23,13 +23,33 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import interfaces.ConfigStructs as cs
 
+interface StabilityPool:
+    def indexOfClaimableAsset(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def getNumActiveClaimAssets(_stabAsset: address) -> uint256: view
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def indexOfAsset(_asset: address) -> uint256: view
+    def vaultAssets(_index: uint256) -> address: view
+    def getNumVaultAssets() -> uint256: view
+    def isPaused() -> bool: view
+
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
-    def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
+    def coreRipeGovVaultId() -> uint256: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
+    def getRipeHq() -> address: view
+
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
+interface PriceDesk:
+    def tokenScale(_asset: address) -> uint256: view
+    def syncTokenScale(_asset: address): nonpayable
 
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
@@ -37,13 +57,7 @@ interface SwitchboardAlpha:
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
-interface VaultBook:
-    def isValidRegId(_regId: uint256) -> bool: view
-
 interface RipeHq:
-    def getAddr(_regId: uint256) -> address: view
-
-interface Switchboard:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
@@ -173,14 +187,16 @@ actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingAssetConfig: public(HashMap[uint256, AssetUpdate]) # aid -> asset
 pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control
 
+MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 
 GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
 MISSION_CONTROL_ID: constant(uint256) = 5
-VAULT_BOOK_ID: constant(uint256) = 8
 SWITCHBOARD_ID: constant(uint256) = 6
+PRICE_DESK_ID: constant(uint256) = 7
+VAULT_BOOK_ID: constant(uint256) = 8
 SWITCHBOARD_ALPHA_ID: constant(uint256) = 1
 
 
@@ -246,7 +262,8 @@ def addAsset(
     _missionControl: address = empty(address),
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not staticcall MissionControl(self._resolveMissionControl(_missionControl)).isSupportedAsset(_asset) # dev: must be new asset
+    mc: address = self._resolveMissionControl(_missionControl)
+    assert not staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: must be new asset
 
     customAuctionParams: cs.AuctionParams = empty(cs.AuctionParams)
     if _customAuctionParams.hasParams:
@@ -275,11 +292,11 @@ def addAsset(
         whitelist=_whitelist,
         isNft=_isNft,
     )
-    assert self._isValidAssetConfig(_asset, config) # dev: invalid asset
+    assert self._isValidAssetConfig(_asset, config, mc) # dev: invalid asset
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.ASSET_ADD_NEW
-    self.pendingMissionControl[aid] = _missionControl
+    self.pendingMissionControl[aid] = mc
     self.pendingAssetConfig[aid] = AssetUpdate(
         asset=_asset,
         config=config,
@@ -322,14 +339,14 @@ def addAsset(
 
 @view
 @internal
-def _isValidAssetConfig(_asset: address, _config: cs.AssetConfig) -> bool:
+def _isValidAssetConfig(_asset: address, _config: cs.AssetConfig, _missionControl: address) -> bool:
     if _asset == empty(address):
         return False
     if not self._isValidDebtTerms(_config.debtTerms):
         return False
-    if not self._isValidAssetDepositParams(_asset, _config.vaultIds, _config.stakersPointsAlloc, _config.voterPointsAlloc, _config.perUserDepositLimit, _config.globalDepositLimit, _config.minDepositBalance):
+    if not self._isValidAssetDepositParams(_asset, _config.vaultIds, _config.stakersPointsAlloc, _config.voterPointsAlloc, _config.perUserDepositLimit, _config.globalDepositLimit, _config.minDepositBalance, _missionControl):
         return False
-    if not self._isValidAssetLiqConfig(_asset, _config.shouldBurnAsPayment, _config.shouldTransferToEndaoment, _config.shouldSwapInStabPools, _config.shouldAuctionInstantly, _config.specialStabPoolId, _config.isNft, _config.whitelist, _config.debtTerms.ltv):
+    if not self._isValidAssetLiqConfig(_asset, _config.shouldBurnAsPayment, _config.shouldTransferToEndaoment, _config.shouldSwapInStabPools, _config.shouldAuctionInstantly, _config.specialStabPoolId, _config.isNft, _config.whitelist, _config.debtTerms.ltv, _missionControl):
         return False
     if not self._isValidRedeemCollateralConfig(_asset, _config.canRedeemCollateral, _config.isNft, _config.debtTerms.ltv, _config.shouldTransferToEndaoment):
         return False
@@ -358,9 +375,10 @@ def setAssetDepositParams(
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    assert staticcall MissionControl(self._resolveMissionControl(_missionControl)).isSupportedAsset(_asset) # dev: invalid asset
-    assert self._isValidAssetDepositParams(_asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit, _minDepositBalance) # dev: invalid asset deposit params
-    return self._setPendingAssetConfig(ActionType.ASSET_DEPOSIT_PARAMS, _asset, _missionControl, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit, _minDepositBalance)
+    mc: address = self._resolveMissionControl(_missionControl)
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
+    assert self._isValidAssetDepositParams(_asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit, _minDepositBalance, mc) # dev: invalid asset deposit params
+    return self._setPendingAssetConfig(ActionType.ASSET_DEPOSIT_PARAMS, _asset, mc, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit, _minDepositBalance)
 
 
 @view
@@ -373,6 +391,7 @@ def _isValidAssetDepositParams(
     _perUserDepositLimit: uint256,
     _globalDepositLimit: uint256,
     _minDepositBalance: uint256,
+    _missionControl: address,
 ) -> bool:
     vaultBook: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
     if 0 in [_perUserDepositLimit, _globalDepositLimit]:
@@ -391,9 +410,14 @@ def _isValidAssetDepositParams(
     
     # staker allocs must be with staker vaults
     if _stakersPointsAlloc != 0:
+        coreRipeGovVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+
         hasStakerVault: bool = False
-        for sid: uint256 in [1, 2]:
-            if sid in _vaultIds:
+        for vaultId: uint256 in _vaultIds:
+            if coreRipeGovVaultId != 0 and vaultId == coreRipeGovVaultId:
+                hasStakerVault = True
+                break
+            if staticcall MissionControl(_missionControl).isStabVaultId(vaultId):
                 hasStakerVault = True
                 break
         if not hasStakerVault:
@@ -428,8 +452,8 @@ def setAssetLiqConfig(
     mc: address = self._resolveMissionControl(_missionControl)
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
-    assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, assetConfig.isNft, assetConfig.whitelist, assetConfig.debtTerms.ltv) # dev: invalid asset liq config
-    return self._setPendingAssetConfig(ActionType.ASSET_LIQ_CONFIG, _asset, _missionControl, [], 0, 0, 0, 0, 0, empty(cs.DebtTerms), _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, customAuctionParams)
+    assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, assetConfig.isNft, assetConfig.whitelist, assetConfig.debtTerms.ltv, mc) # dev: invalid asset liq config
+    return self._setPendingAssetConfig(ActionType.ASSET_LIQ_CONFIG, _asset, mc, [], 0, 0, 0, 0, 0, empty(cs.DebtTerms), _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, customAuctionParams)
 
 
 @view
@@ -444,11 +468,15 @@ def _isValidAssetLiqConfig(
     _isNft: bool,
     _whitelist: address,
     _debtTermsLtv: uint256,
+    _missionControl: address,
 ) -> bool:
     ripeHq: address = gov._getRipeHqFromGov()
     greenToken: address = staticcall RipeHq(ripeHq).getAddr(GREEN_TOKEN_ID)
     savingsGreen: address = staticcall RipeHq(ripeHq).getAddr(SAVINGS_GREEN_ID)
     vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
+
+    if _shouldSwapInStabPools and not _shouldAuctionInstantly:
+        return False
 
     if _shouldBurnAsPayment:
 
@@ -470,16 +498,44 @@ def _isValidAssetLiqConfig(
 
         # cannot have whitelist if no special stab pool
         if _whitelist != empty(address) and _specialStabPoolId == 0:
-            if _whitelist != staticcall MissionControl(self._getMissionControlAddr()).trainingWheels():
+            if _whitelist != staticcall MissionControl(_missionControl).trainingWheels():
                 return False
 
         # must have ltv
         if _debtTermsLtv == 0:
             return False
 
-    # make sure special stab pool is valid
-    if _specialStabPoolId != 0 and not staticcall VaultBook(vaultBook).isValidRegId(_specialStabPoolId):
-        return False
+    # verify has correct interface
+    if _specialStabPoolId != 0:
+        if not staticcall VaultBook(vaultBook).isValidRegId(_specialStabPoolId):
+            return False
+        stabPool: address = staticcall VaultBook(vaultBook).getAddr(_specialStabPoolId)
+        if stabPool == empty(address) or not stabPool.is_contract:
+            return False
+        numStabAssets: uint256 = staticcall StabilityPool(stabPool).getNumVaultAssets()
+        hasStabAsset: bool = numStabAssets != 0
+        stabAsset: address = savingsGreen
+        if hasStabAsset:
+            stabAsset = staticcall StabilityPool(stabPool).vaultAssets(1)
+            if stabAsset == empty(address):
+                return False
+
+        # configuration validity is structural
+        claimAssetIndex: uint256 = staticcall StabilityPool(stabPool).indexOfAsset(_asset)
+        claimIndex: uint256 = staticcall StabilityPool(stabPool).indexOfClaimableAsset(stabAsset, _asset)
+        activeClaimCount: uint256 = staticcall StabilityPool(stabPool).getNumActiveClaimAssets(stabAsset)
+        if hasStabAsset and (
+            claimAssetIndex != 0
+            or (claimIndex == 0 and activeClaimCount >= MAX_ACTIVE_CLAIM_ASSETS)
+        ):
+            return False
+
+        # verify has correct interface
+        naPair: uint256 = staticcall StabilityPool(stabPool).claimableBalances(stabAsset, _asset)
+        na: uint256 = staticcall StabilityPool(stabPool).totalClaimableBalances(savingsGreen)
+        naPaused: bool = staticcall StabilityPool(stabPool).isPaused()
+        if naPaused:
+            return False
 
     return True
 
@@ -488,7 +544,7 @@ def _isValidAssetLiqConfig(
 @internal
 def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
     switchboard: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ID)
-    switchboardAlpha: address = staticcall Switchboard(switchboard).getAddr(SWITCHBOARD_ALPHA_ID)
+    switchboardAlpha: address = staticcall RipeHq(switchboard).getAddr(SWITCHBOARD_ALPHA_ID)
     return staticcall SwitchboardAlpha(switchboardAlpha).areValidAuctionParams(_params)
 
 
@@ -513,7 +569,7 @@ def setAssetDebtTerms(
     mc: address = self._resolveMissionControl(_missionControl)
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
-    assert self._isLtvWithinMaxDeviation(_ltv, assetConfig.debtTerms.ltv, staticcall MissionControl(mc).maxLtvDeviation()) # dev: ltv is outside max deviation
+    maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
 
     debtTerms: cs.DebtTerms = cs.DebtTerms(
         ltv=_ltv,
@@ -523,8 +579,9 @@ def setAssetDebtTerms(
         borrowRate=_borrowRate,
         daowry=_daowry,
     )
+    self._assertDebtTermsWithinMaxStep(debtTerms, assetConfig.debtTerms, maxDeviation)
     assert self._isValidDebtTerms(debtTerms) # dev: invalid debt terms
-    return self._setPendingAssetConfig(ActionType.ASSET_DEBT_TERMS, _asset, _missionControl, [], 0, 0, 0, 0, 0, debtTerms)
+    return self._setPendingAssetConfig(ActionType.ASSET_DEBT_TERMS, _asset, mc, [], 0, 0, 0, 0, 0, debtTerms)
 
 
 @view
@@ -561,8 +618,23 @@ def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation:
     if _prevLtv == 0 or _maxDeviation == 0:
         return True
 
-    lowerBound: uint256 = _prevLtv - min(_maxDeviation, _prevLtv)
-    return HUNDRED_PERCENT > _newLtv and _newLtv >= lowerBound
+    return HUNDRED_PERCENT > _newLtv and self._isWithinMaxStepDown(_newLtv, _prevLtv, _maxDeviation)
+
+
+@internal
+def _assertDebtTermsWithinMaxStep(_new: cs.DebtTerms, _prev: cs.DebtTerms, _maxDeviation: uint256):
+    assert self._isLtvWithinMaxDeviation(_new.ltv, _prev.ltv, _maxDeviation) # dev: ltv is outside max deviation
+    assert self._isWithinMaxStepDown(_new.redemptionThreshold, _prev.redemptionThreshold, _maxDeviation) # dev: redemption threshold is outside max deviation
+    assert self._isWithinMaxStepDown(_new.liqThreshold, _prev.liqThreshold, _maxDeviation) # dev: liq threshold is outside max deviation
+    assert _prev.borrowRate == 0 or _maxDeviation == 0 or _new.borrowRate <= _prev.borrowRate or _new.borrowRate - _prev.borrowRate <= _maxDeviation # dev: borrow rate is outside max deviation
+
+
+@view
+@internal
+def _isWithinMaxStepDown(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
+    if _prev == 0 or _maxDeviation == 0:
+        return True
+    return _new >= _prev or _prev - _new <= _maxDeviation
 
 
 #####################
@@ -574,9 +646,10 @@ def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation:
 def setWhitelistForAsset(_asset: address, _whitelist: address, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    assert staticcall MissionControl(self._resolveMissionControl(_missionControl)).isSupportedAsset(_asset) # dev: invalid asset
+    mc: address = self._resolveMissionControl(_missionControl)
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assert self._isValidWhitelist(_whitelist) # dev: invalid whitelist
-    return self._setPendingAssetConfig(ActionType.ASSET_WHITELIST, _asset, _missionControl, [], 0, 0, 0, 0, 0, empty(cs.DebtTerms), False, False, False, False, 0, empty(cs.AuctionParams), _whitelist)
+    return self._setPendingAssetConfig(ActionType.ASSET_WHITELIST, _asset, mc, [], 0, 0, 0, 0, 0, empty(cs.DebtTerms), False, False, False, False, 0, empty(cs.AuctionParams), _whitelist)
 
 
 @view
@@ -747,8 +820,14 @@ def executePendingAction(_aid: uint256) -> bool:
 
     if actionType == ActionType.ASSET_ADD_NEW:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
-        assert self._isValidAssetConfig(p.asset, p.config) # dev: invalid asset config
+        assert not staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: must be new asset
+        assert self._isValidAssetConfig(p.asset, p.config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, p.config)
+        if not p.config.isNft:
+            priceDesk: address = staticcall RipeHq(staticcall MissionControl(mc).getRipeHq()).getAddr(PRICE_DESK_ID)
+            assert priceDesk != empty(address) # dev: missing price desk
+            if staticcall PriceDesk(priceDesk).tokenScale(p.asset) == 0:
+                extcall PriceDesk(priceDesk).syncTokenScale(p.asset)
         log AssetAdded(asset=p.asset)
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:
@@ -760,7 +839,7 @@ def executePendingAction(_aid: uint256) -> bool:
         config.perUserDepositLimit = p.config.perUserDepositLimit
         config.globalDepositLimit = p.config.globalDepositLimit
         config.minDepositBalance = p.config.minDepositBalance
-        assert self._isValidAssetConfig(p.asset, config) # dev: invalid asset config
+        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
         log AssetDepositParamsSet(asset=p.asset, numVaultIds=len(p.config.vaultIds), stakersPointsAlloc=p.config.stakersPointsAlloc, voterPointsAlloc=p.config.voterPointsAlloc, perUserDepositLimit=p.config.perUserDepositLimit, globalDepositLimit=p.config.globalDepositLimit, minDepositBalance=p.config.minDepositBalance)
 
@@ -773,23 +852,27 @@ def executePendingAction(_aid: uint256) -> bool:
         config.shouldAuctionInstantly = p.config.shouldAuctionInstantly
         config.specialStabPoolId = p.config.specialStabPoolId
         config.customAuctionParams = p.config.customAuctionParams
-        assert self._isValidAssetConfig(p.asset, config) # dev: invalid asset config
+        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
         log AssetLiqConfigSet(asset=p.asset, shouldBurnAsPayment=p.config.shouldBurnAsPayment, shouldTransferToEndaoment=p.config.shouldTransferToEndaoment, shouldSwapInStabPools=p.config.shouldSwapInStabPools, shouldAuctionInstantly=p.config.shouldAuctionInstantly, specialStabPoolId=p.config.specialStabPoolId, auctionStartDiscount=p.config.customAuctionParams.startDiscount, auctionMaxDiscount=p.config.customAuctionParams.maxDiscount, auctionDelay=p.config.customAuctionParams.delay, auctionDuration=p.config.customAuctionParams.duration)
 
     elif actionType == ActionType.ASSET_DEBT_TERMS:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
-        config.debtTerms = p.config.debtTerms
-        assert self._isValidAssetConfig(p.asset, config) # dev: invalid asset config
+        previousTerms: cs.DebtTerms = config.debtTerms
+        pendingTerms: cs.DebtTerms = p.config.debtTerms
+        maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
+        self._assertDebtTermsWithinMaxStep(pendingTerms, previousTerms, maxDeviation)
+        config.debtTerms = pendingTerms
+        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
-        log AssetDebtTermsSet(asset=p.asset, ltv=p.config.debtTerms.ltv, redemptionThreshold=p.config.debtTerms.redemptionThreshold, liqThreshold=p.config.debtTerms.liqThreshold, liqFee=p.config.debtTerms.liqFee, borrowRate=p.config.debtTerms.borrowRate, daowry=p.config.debtTerms.daowry)
+        log AssetDebtTermsSet(asset=p.asset, ltv=pendingTerms.ltv, redemptionThreshold=pendingTerms.redemptionThreshold, liqThreshold=pendingTerms.liqThreshold, liqFee=pendingTerms.liqFee, borrowRate=pendingTerms.borrowRate, daowry=pendingTerms.daowry)
 
     elif actionType == ActionType.ASSET_WHITELIST:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.whitelist = p.config.whitelist
-        assert self._isValidAssetConfig(p.asset, config) # dev: invalid asset config
+        assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
         log WhitelistAssetSet(asset=p.asset, whitelist=p.config.whitelist)
 

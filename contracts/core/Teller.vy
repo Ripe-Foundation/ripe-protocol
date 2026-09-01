@@ -16,7 +16,7 @@
 #     ╚═══════════════════════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -46,23 +46,33 @@ interface TellerUtils:
     def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
     def isUnderscoreWalletOrVault(_addr: address, _mc: address = empty(address)) -> bool: view
 
-interface AuctionHouse:
-    def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def buyFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def liquidateUser(_liqUser: address, _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-
-interface StabVault:
-    def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def redeemFromStabilityPool(_claimAsset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
     def shouldCheckLastTouch() -> bool: view
+
+interface RipeGovVault:
+    def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def exportPositionForMigration(_user: address, _asset: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
+    def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _migration: RipeGovMigrationData) -> uint256: nonpayable
+    def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
+interface Ledger:
+    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
+    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+    def isLockedAccount(_user: address) -> bool: view
+    def isPaused() -> bool: view
+
+interface AuctionHouse:
+    def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def liquidateUser(_liqUser: address, _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -74,20 +84,17 @@ interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface RipeGovVault:
-    def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
-    def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
-
-interface Ledger:
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
-    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
-    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+interface StabVault:
+    def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface Deleverage:
     def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface AddressRegistry:
+    def isValidAddr(_addr: address) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
 
 interface CreditRedeem:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -101,8 +108,11 @@ interface PriceDesk:
 interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
 
-interface AddressRegistry:
-    def getAddr(_regId: uint256) -> address: view
+struct RipeGovMigrationData:
+    amount: uint256
+    govPoints: uint256
+    unlock: uint256
+    lastTerms: cs.LockTerms
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -200,6 +210,8 @@ event UserDelegationSet:
     canClaimLoot: bool
     caller: indexed(address)
 
+receiptMeasurementActive: transient(bool)
+
 MAX_BALANCE_ACTION: constant(uint256) = 20
 MAX_CLAIM_USERS: constant(uint256) = 25
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
@@ -210,15 +222,14 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
-STABILITY_POOL_ID: constant(uint256) = 1
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
-CURVE_PRICES_ID: constant(uint256) = 2
+CURVE_PRICES_ID: immutable(uint256)
 
 
 @deploy
-def __init__(_ripeHq: address, _shouldPause: bool):
+def __init__(_ripeHq: address, _shouldPause: bool, _curvePricesId: uint256):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
+    CURVE_PRICES_ID = _curvePricesId
 
 
 ############
@@ -244,10 +255,11 @@ def deposit(
 @external
 def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_ACTION]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
+    assert len(_deposits) != 0 # dev: empty batch
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
         self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, False, False, a)
-    self._performHousekeeping(False, _user, True, a)
+    self._performHousekeeping(False, _user, True, _user == msg.sender, a)
     return len(_deposits)
 
 
@@ -287,9 +299,19 @@ def _deposit(
     utils: address = addys._getTellerUtilsAddr()
     vaultAddr, vaultId = staticcall TellerUtils(utils).getVaultAddrAndId(_asset, _vaultAddr, _vaultId, _a.vaultBook, _a.missionControl)
 
+    # one more validation -- TellerUtils repeats this check, but putting here as backup
+    assert staticcall AddressRegistry(_a.vaultBook).isValidAddr(vaultAddr) # dev: invalid vault
+
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
     amount: uint256 = staticcall TellerUtils(utils).validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _didAlreadyValidateSender, _areFundsHereAlready, d, _a)
+
+    # block overlapping receipt measurements
+    assert not self.receiptMeasurementActive # dev: receipt measurement active
+    self.receiptMeasurementActive = True
+
+    # measure custody before transfer
+    custodyBefore: uint256 = staticcall IERC20(_asset).balanceOf(vaultAddr)
 
     # transfer tokens
     if _areFundsHereAlready:
@@ -297,11 +319,17 @@ def _deposit(
     else:
         assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
 
+    # verify custody after transfer
+    assert staticcall IERC20(_asset).balanceOf(vaultAddr) - custodyBefore == amount # dev: custody mismatch
+
     # deposit tokens
-    if _lockDuration != 0:
-        amount = extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a)
+    if _lockDuration == 0:
+        assert extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a) == amount # dev: deposit failed
     else:
-        amount = extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a)
+        assert extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a) == amount # dev: deposit failed
+
+    # disable receipt measurement
+    self.receiptMeasurementActive = False
 
     # register vault participation
     if not d.isParticipatingInVault:
@@ -312,7 +340,7 @@ def _deposit(
 
     # perform house keeping
     if _shouldPerformHouseKeeping:
-        self._performHousekeeping(False, _user, True, _a)
+        self._performHousekeeping(False, _user, True, _user == _depositor, _a)
 
     # update price desk (important for share-based assets)
     extcall PriceDesk(_a.priceDesk).addPriceSnapshot(_asset)
@@ -338,7 +366,7 @@ def withdraw(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     amount: uint256 = self._withdraw(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, a)
-    self._performHousekeeping(True, _user, True, a)
+    self._performHousekeeping(True, _user, True, True, a)
     return amount
 
 
@@ -346,10 +374,11 @@ def withdraw(
 @external
 def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BALANCE_ACTION]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
+    assert len(_withdrawals) != 0 # dev: empty batch
     a: addys.Addys = addys._getAddys()
     for w: WithdrawalAction in _withdrawals:
         self._withdraw(w.asset, w.amount, _user, w.vaultAddr, w.vaultId, msg.sender, a)
-    self._performHousekeeping(True, _user, True, a)
+    self._performHousekeeping(True, _user, True, True, a)
     return len(_withdrawals)
 
 
@@ -441,7 +470,7 @@ def rebalance(
 
     # perform house keeping !!!
     # this ensures user's debt position is still healthy after the rebalance
-    self._performHousekeeping(True, _user, True, a)
+    self._performHousekeeping(True, _user, True, True, a)
 
     log TellerRebalance(
         user=_user,
@@ -454,6 +483,69 @@ def rebalance(
         withdrawVaultId=_withdrawVaultId
     )
     return withdrawnAmount, depositedAmount
+
+
+####################
+# Vault Migrations #
+####################
+
+
+# basic vault migration
+
+
+@nonreentrant
+@external
+def withdrawOnVaultMigration(_user: address, _asset: address, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool):
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert deptBasics.isPaused # dev: teller not paused
+    return extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), self, addys._getAddys(_a))
+
+
+@nonreentrant
+@external
+def depositOnVaultMigration(_user: address,_asset: address,_amount: uint256,_targetVaultId: uint256,_targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert deptBasics.isPaused # dev: teller not paused
+    return self._deposit(_asset, _amount, _user, _targetVault, _targetVaultId, msg.sender, 0, True, True, False, addys._getAddys(_a))
+
+
+# normal ripe gov vault migration
+
+
+@nonreentrant
+@external
+def exportPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    return extcall RipeGovVault(_sourceVault).exportPositionForMigration(_user, _asset, _targetVault, addys._getAddys(_a))
+
+
+@nonreentrant
+@external
+def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _migration: RipeGovMigrationData, _ledger: address) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    targetShares: uint256 = extcall RipeGovVault(_targetVault).importPositionForMigration(_user, _asset, _sourceVault, _migration)
+    extcall Ledger(_ledger).addVaultToUser(_user, _targetVaultId)
+    return targetShares
+
+
+# legacy ripe gov vault migration
+
+
+@nonreentrant
+@external
+def exportPositionForLegacyRipeGovMigration(
+    _user: address,
+    _asset: address,
+    _sourceVault: address,
+    _targetVault: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert deptBasics.isPaused # dev: teller not paused
+    amount: uint256 = 0
+    isDepleted: bool = False
+    amount, isDepleted = extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), _targetVault, addys._getAddys(_a))
+    return amount
 
 
 ########
@@ -474,7 +566,7 @@ def borrow(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    self._performHousekeeping(True, _user, False, a)
+    self._performHousekeeping(True, _user, False, True, a)
     return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _wantsSavingsGreen, _shouldEnterStabPool, msg.sender, a)
 
 
@@ -491,34 +583,9 @@ def repay(
 ) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    self._performHousekeeping(False, _user, False, a)
+    self._performHousekeeping(False, _user, False, _user == msg.sender, a)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
     return extcall CreditEngine(a.creditEngine).repayForUser(_user, greenAmount, _shouldRefundSavingsGreen, msg.sender, a)
-
-
-# redeem collateral
-
-
-@nonreentrant
-@external
-def redeemCollateral(
-    _user: address,
-    _vaultId: uint256,
-    _asset: address,
-    _paymentAmount: uint256 = max_value(uint256),
-    _isPaymentSavingsGreen: bool = False,
-    _shouldTransferBalance: bool = False,
-    _shouldRefundSavingsGreen: bool = True,
-    _recipient: address = msg.sender,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    creditRedeem: address = addys._getCreditRedeemAddr()
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, creditRedeem, a.greenToken, a.savingsGreen)
-    redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS] = [CollateralRedemption(user=_user, vaultId=_vaultId, asset=_asset, maxGreenAmount=greenAmount)]
-    greenSpent: uint256 = extcall CreditRedeem(creditRedeem).redeemCollateralFromMany(redemptions, max_value(uint256), _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
-    return greenSpent
 
 
 @nonreentrant
@@ -536,7 +603,7 @@ def redeemCollateralFromMany(
     creditRedeem: address = addys._getCreditRedeemAddr()
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, creditRedeem, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall CreditRedeem(creditRedeem).redeemCollateralFromMany(_redemptions, greenAmount, _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
+    self._performHousekeeping(False, _recipient, True, _recipient == msg.sender, a)
     return greenSpent
 
 
@@ -557,7 +624,7 @@ def liquidateUser(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     keeperRewards: uint256 = extcall AuctionHouse(a.auctionHouse).liquidateUser(_liqUser, msg.sender, _wantsSavingsGreen, a)
-    self._performHousekeeping(False, msg.sender, True, a)
+    self._performHousekeeping(False, msg.sender, True, True, a)
     return keeperRewards
 
 
@@ -570,31 +637,8 @@ def liquidateManyUsers(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     keeperRewards: uint256 = extcall AuctionHouse(a.auctionHouse).liquidateManyUsers(_liqUsers, msg.sender, _wantsSavingsGreen, a)
-    self._performHousekeeping(False, msg.sender, True, a)
+    self._performHousekeeping(False, msg.sender, True, True, a)
     return keeperRewards
-
-
-# buy fungible auctions
-
-
-@nonreentrant
-@external
-def buyFungibleAuction(
-    _liqUser: address,
-    _vaultId: uint256,
-    _asset: address,
-    _paymentAmount: uint256 = max_value(uint256),
-    _isPaymentSavingsGreen: bool = False,
-    _shouldTransferBalance: bool = False,
-    _shouldRefundSavingsGreen: bool = True,
-    _recipient: address = msg.sender,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.auctionHouse, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall AuctionHouse(a.auctionHouse).buyFungibleAuction(_liqUser, _vaultId, _asset, greenAmount, _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
-    return greenSpent
 
 
 @nonreentrant
@@ -611,7 +655,7 @@ def buyManyFungibleAuctions(
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.auctionHouse, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall AuctionHouse(a.auctionHouse).buyManyFungibleAuctions(_purchases, greenAmount, _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
+    self._performHousekeeping(False, _recipient, True, _recipient == msg.sender, a)
     return greenSpent
 
 
@@ -639,28 +683,9 @@ def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _gr
     sGreenAmount: uint256 = extcall IERC4626(a.savingsGreen).deposit(greenAmount, self)
     assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
 
-    return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, False, True, True, a)
-
-
-# claims
-
-
-@nonreentrant
-@external
-def claimFromStabilityPool(
-    _vaultId: uint256,
-    _stabAsset: address,
-    _claimAsset: address,
-    _maxUsdValue: uint256 = max_value(uint256),
-    _user: address = msg.sender,
-    _shouldAutoDeposit: bool = False,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(_user, _stabAsset, _claimAsset, _maxUsdValue, msg.sender, _shouldAutoDeposit, a)
-    self._performHousekeeping(True, _user, True, a)
-    return claimUsdValue
+    vaultId: uint256 = staticcall MissionControl(a.missionControl).preferredStabVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), vaultId, msg.sender, 0, False, True, True, a)
 
 
 @nonreentrant
@@ -675,31 +700,8 @@ def claimManyFromStabilityPool(
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(_user, _claims, msg.sender, _shouldAutoDeposit, a)
-    self._performHousekeeping(True, _user, True, a)
+    self._performHousekeeping(True, _user, True, True, a)
     return claimUsdValue
-
-
-# redemptions
-
-
-@nonreentrant
-@external
-def redeemFromStabilityPool(
-    _vaultId: uint256,
-    _claimAsset: address,
-    _paymentAmount: uint256 = max_value(uint256),
-    _recipient: address = msg.sender,
-    _shouldAutoDeposit: bool = False,
-    _isPaymentSavingsGreen: bool = False,
-    _shouldRefundSavingsGreen: bool = True,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, _recipient, msg.sender, _shouldAutoDeposit, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
-    return greenSpent
 
 
 @nonreentrant
@@ -718,7 +720,7 @@ def redeemManyFromStabilityPool(
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, _recipient, msg.sender, _shouldAutoDeposit, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
+    self._performHousekeeping(False, _recipient, True, _recipient == msg.sender, a)
     return greenSpent
 
 
@@ -736,7 +738,7 @@ def claimLoot(_user: address = msg.sender, _shouldStake: bool = True) -> uint256
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     totalRipe: uint256 = extcall Lootbox(a.lootbox).claimLootForUser(_user, msg.sender, _shouldStake, a)
-    self._performHousekeeping(False, _user, True, a)
+    self._performHousekeeping(False, _user, True, _user == msg.sender, a)
     return totalRipe
 
 
@@ -749,7 +751,7 @@ def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldSta
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     totalRipe: uint256 = extcall Lootbox(a.lootbox).claimLootForManyUsers(_users, msg.sender, _shouldStake, a)
-    self._performHousekeeping(False, msg.sender, True, a)
+    self._performHousekeeping(False, msg.sender, True, True, a)
     return totalRipe
 
 
@@ -769,39 +771,37 @@ def depositIntoGovVault(
     a: addys.Addys = addys._getAddys()
     if _user != msg.sender:
         assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-    return self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, True, False, True, a)
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    return self._deposit(_asset, _amount, _user, empty(address), vaultId, msg.sender, _lockDuration, True, False, True, a)
 
 
 @nonreentrant
 @external
-def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.sender):
+def adjustLock(
+    _asset: address,
+    _newLockDuration: uint256,
+    _user: address = msg.sender,
+    _vaultId: uint256 = 0,
+):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
-
-    # validate underscore wallet
-    if _user != msg.sender and not isSwitchboard:
-        assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
-    self._performHousekeeping(False, _user, True, a)
+    self._performHousekeeping(False, _user, True, True, a)
 
 
 @nonreentrant
 @external
-def releaseLock(_asset: address, _user: address = msg.sender):
+def releaseLock(
+    _asset: address,
+    _user: address = msg.sender,
+    _vaultId: uint256 = 0,
+):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
-
-    # validate underscore wallet
-    if _user != msg.sender and not isSwitchboard:
-        assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    vaultAddr: address = self._getRipeGovVaultAddr(_vaultId, _user, a)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
-    self._performHousekeeping(False, _user, True, a)
+    self._performHousekeeping(True, _user, True, True, a)
 
 
 ##################
@@ -813,16 +813,18 @@ def releaseLock(_asset: address, _user: address = msg.sender):
 @external
 def purchaseRipeBond(
     _paymentAsset: address,
-    _paymentAmount: uint256 = max_value(uint256),
+    _paymentAmount: uint256,
     _lockDuration: uint256 = 0,
     _recipient: address = msg.sender,
+    _minRipePayout: uint256 = 0,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     paymentAmount: uint256 = min(_paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(msg.sender))
     assert extcall IERC20(_paymentAsset).transferFrom(msg.sender, a.bondRoom, paymentAmount, default_return_value=True) # dev: token transfer failed
     ripePayout: uint256 = extcall BondRoom(a.bondRoom).purchaseRipeBond(_recipient, _paymentAsset, paymentAmount, _lockDuration, msg.sender, a)
-    self._performHousekeeping(False, _recipient, True, a)
+    assert ripePayout >= _minRipePayout # dev: minimum payout not met
+    self._performHousekeeping(False, _recipient, True, _recipient == msg.sender, a)
     return ripePayout
 
 
@@ -831,25 +833,18 @@ def purchaseRipeBond(
 ##############
 
 
-@external
-def deleverageUser(_user: address = msg.sender, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    return extcall Deleverage(addys._getDeleverageAddr()).deleverageUser(_user, msg.sender, _targetRepayAmount, a)
-
-
+@nonreentrant
 @external
 def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    return extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(_users, msg.sender, a)
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(_users, msg.sender)
 
 
+@nonreentrant
 @external
 def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    return extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets(_user, _assets, msg.sender, a)
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets(_user, _assets, msg.sender)
 
 
 ###############
@@ -860,9 +855,9 @@ def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERA
 @external
 def setUserConfig(
     _user: address = msg.sender,
-    _canAnyoneDeposit: bool = True,
-    _canAnyoneRepayDebt: bool = True,
-    _canAnyoneBondForUser: bool = True,
+    _canAnyoneDeposit: bool = False,
+    _canAnyoneRepayDebt: bool = False,
+    _canAnyoneBondForUser: bool = False,
 ) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     mc: address = addys._getMissionControlAddr()
@@ -967,6 +962,31 @@ def setUndyLegoAccess(_legoAddr: address) -> bool:
 #############
 
 
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
+
+
+@view
+@internal
+def _getRipeGovVaultAddr(_vaultId: uint256, _user: address, _a: addys.Addys) -> address:
+    assert (
+        _user == msg.sender
+        or addys._isSwitchboardAddr(msg.sender)
+        or staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, _a.missionControl)
+    ) # dev: no perms
+    vaultId: uint256 = self._getCoreRipeGovVaultId(_a.missionControl)
+    if _vaultId != 0:
+        vaultId = _vaultId
+        assert staticcall MissionControl(_a.missionControl).isRipeGovVaultId(vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
+    assert vaultAddr != empty(address) # dev: invalid vault id
+    return vaultAddr
+
+
 # housekeeping
 
 
@@ -979,7 +999,7 @@ def performHousekeeping(
 ):
     assert addys._isValidRipeAddr(msg.sender) # dev: only ripe addr allowed
     a: addys.Addys = addys._getAddys(_a)
-    self._performHousekeeping(_isHigherRisk, _user, _shouldUpdateDebt, a)
+    self._performHousekeeping(_isHigherRisk, _user, _shouldUpdateDebt, True, a)
 
 
 @internal
@@ -987,14 +1007,21 @@ def _performHousekeeping(
     _isHigherRisk: bool,
     _user: address,
     _shouldUpdateDebt: bool,
+    _shouldWriteLastTouch: bool,
     _a: addys.Addys,
 ):
+    assert not self.receiptMeasurementActive # dev: receipt window active
+
     # one action per block
-    shouldCheckLastTouch: bool = False
-    if staticcall MissionControl(_a.missionControl).shouldCheckLastTouch():
-        isUndyCaller: bool = staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreWalletOrVault(_user, _a.missionControl)
-        shouldCheckLastTouch = _isHigherRisk and not isUndyCaller
-    extcall Ledger(_a.ledger).checkAndUpdateLastTouch(_user, shouldCheckLastTouch)
+    if _shouldWriteLastTouch:
+        shouldCheckLastTouch: bool = False
+        if staticcall MissionControl(_a.missionControl).shouldCheckLastTouch():
+            isUndyCaller: bool = staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreWalletOrVault(_user, _a.missionControl)
+            shouldCheckLastTouch = _isHigherRisk and not isUndyCaller
+        extcall Ledger(_a.ledger).checkAndUpdateLastTouch(_user, shouldCheckLastTouch)
+    else:
+        assert not staticcall Ledger(_a.ledger).isPaused() # dev: not activated
+        assert not staticcall Ledger(_a.ledger).isLockedAccount(_user) # dev: account locked
 
     # update green ref pool snapshot
     curvePrices: address = staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID)
@@ -1055,4 +1082,4 @@ def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = emp
 ##     ## ######   ########  ##     ##  ######   ##     ##    
 ##     ## ##       ##        ##     ##       ##  ##     ##    
 ##     ## ##       ##        ##     ## ##    ##  ##     ##    
-########  ######## ##         #######   ######  ####    ##  
+########  ######## ##         #######   ######  ####    ##

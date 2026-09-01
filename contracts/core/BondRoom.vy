@@ -14,7 +14,7 @@
 #     ╚════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -49,11 +49,12 @@ interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
-interface PriceDesk:
-    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
-
 interface MissionControl:
     def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig: view
+    def coreRipeGovVaultId() -> uint256: view
+
+interface PriceDesk:
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
@@ -99,7 +100,6 @@ event BondBoosterSet:
     bondBooster: address
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 bondBooster: public(address)
 
@@ -162,6 +162,7 @@ def purchaseRipeBond(
     # main ripe payout
     oneUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256)
     units: uint256 = paymentAmount // oneUnit
+    paymentAmount = units * oneUnit
     baseRipePayout: uint256 = ripePerUnit * units
     assert baseRipePayout != 0 # dev: must have base ripe payout
     totalRipePayout: uint256 = baseRipePayout
@@ -218,9 +219,11 @@ def purchaseRipeBond(
 
     # mint ripe tokens, deposit into gov vault or transfer tokens to user
     if lockDuration != 0:
+        coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+        assert coreRipeGovVaultId != 0 # dev: invalid vault id
         extcall RipeToken(a.ripeToken).mint(self, totalRipePayout)
         assert extcall IERC20(a.ripeToken).approve(a.teller, totalRipePayout, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(a.teller).depositFromTrusted(_recipient, RIPE_GOV_VAULT_ID, a.ripeToken, totalRipePayout, lockDuration, a)
+        extcall Teller(a.teller).depositFromTrusted(_recipient, coreRipeGovVaultId, a.ripeToken, totalRipePayout, lockDuration, a)
         assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     else:
         extcall RipeToken(a.ripeToken).mint(_recipient, totalRipePayout)
@@ -305,8 +308,20 @@ def previewRipeBondPayout(_recipient: address, _lockDuration: uint256 = 0, _paym
 
     totalRipePayout: uint256 = baseRipePayout
 
-    # bonus for lock duration
+    # lock duration
     lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
+
+    # bonus from bond booster (if applicable)
+    bondBooster: address = self.bondBooster
+    if bondBooster != empty(address):
+        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check
+        ripeBoostBonus: uint256 = baseRipePayout * boostRatio // HUNDRED_PERCENT
+        totalRipePayout += ripeBoostBonus
+        if ripeBoostBonus != 0:
+            lockDuration = max(lockDuration, staticcall BondBooster(bondBooster).minLockDuration())
+            lockDuration = min(lockDuration, config.maxLockDuration)
+
+    # bonus for lock duration
     if lockDuration >= config.minLockDuration:
         maxLockBonusRatio: uint256 = min(config.maxRipePerUnitLockBonus, 10 * HUNDRED_PERCENT) # extra sanity check 
         lockBonusRatio: uint256 = 0
@@ -315,12 +330,6 @@ def previewRipeBondPayout(_recipient: address, _lockDuration: uint256 = 0, _paym
         else:
             lockBonusRatio = maxLockBonusRatio # when min and max are equal, give full bonus
         totalRipePayout += baseRipePayout * lockBonusRatio // HUNDRED_PERCENT
-
-    # bonus from bond booster (if applicable)
-    bondBooster: address = self.bondBooster
-    if bondBooster != empty(address):
-        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check 
-        totalRipePayout += baseRipePayout * boostRatio // HUNDRED_PERCENT
 
     return totalRipePayout
 
@@ -364,6 +373,8 @@ def startBondEpochAtBlock(_block: uint256):
     a: addys.Addys = addys._getAddys()
 
     config: PurchaseRipeBondConfig = staticcall MissionControl(a.missionControl).getPurchaseRipeBondConfig(empty(address))
+    assert config.epochLength != 0 # dev: invalid epoch length
+    assert config.amountPerEpoch != 0 # dev: invalid amount per epoch
     startBlock: uint256 = max(_block, block.number)
     extcall Ledger(a.ledger).setEpochData(startBlock, startBlock + config.epochLength, config.amountPerEpoch)
 
@@ -393,6 +404,7 @@ def _refreshBondEpoch(
 
     didChange: bool = False
     startBlock, endBlock, didChange = self._getLatestEpochBlockTimes(startBlock, endBlock, _epochLength)
+    assert _amountPerEpoch != 0 # dev: invalid amount per epoch
     if didChange:
         extcall Ledger(_ledger).setEpochData(startBlock, endBlock, _amountPerEpoch)
 
@@ -415,6 +427,8 @@ def _getLatestEpochBlockTimes(
     _prevEndBlock: uint256,
     _epochLength: uint256,
 ) -> (uint256, uint256, bool):
+    assert _epochLength != 0 # dev: invalid epoch length
+
     startBlock: uint256 = _prevStartBlock
     endBlock: uint256 = _prevEndBlock
 
@@ -445,4 +459,4 @@ def _getLatestEpochBlockTimes(
 ########  ##     ## ## ## ## ##     ## 
 ##     ## ##     ## ##  #### ##     ## 
 ##     ## ##     ## ##   ### ##     ## 
-########   #######  ##    ## ######## 
+########   #######  ##    ## ########

@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -9,6 +9,10 @@ from ethereum.ercs import IERC4626
 uses: token
 from contracts.tokens.modules import Erc20Token as token
 from ethereum.ercs import IERC20
+
+interface AssetToken:
+    def blacklisted(_addr: address) -> bool: view
+    def isPaused() -> bool: view
 
 event Deposit:
     sender: indexed(address)
@@ -54,6 +58,8 @@ def totalAssets() -> uint256:
 @view
 @external
 def maxDeposit(_receiver: address) -> uint256:
+    if token.isPaused or token.blacklisted[_receiver] or _receiver in [empty(address), self] or self._assetBlocked() or self._zeroBacking():
+        return 0
     return max_value(uint256)
 
 
@@ -83,6 +89,8 @@ def deposit(_assets: uint256, _receiver: address = msg.sender) -> uint256:
 @view
 @external
 def maxMint(_receiver: address) -> uint256:
+    if token.isPaused or token.blacklisted[_receiver] or _receiver in [empty(address), self] or self._assetBlocked() or self._zeroBacking():
+        return 0
     return max_value(uint256)
 
 
@@ -127,7 +135,9 @@ def _deposit(_asset: address, _amount: uint256, _shares: uint256, _recipient: ad
 @view
 @external
 def maxWithdraw(_owner: address) -> uint256:
-    return staticcall IERC20(ASSET).balanceOf(self)
+    if token.isPaused or token.blacklisted[_owner] or self._assetBlocked() or self._zeroBacking():
+        return 0
+    return self._sharesToAmount(token.balanceOf[_owner], token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)
 
 
 @view
@@ -150,6 +160,8 @@ def withdraw(_assets: uint256, _receiver: address = msg.sender, _owner: address 
 @view
 @external
 def maxRedeem(_owner: address) -> uint256:
+    if token.isPaused or token.blacklisted[_owner] or self._assetBlocked() or self._zeroBacking():
+        return 0
     return token.balanceOf[_owner]
 
 
@@ -187,9 +199,12 @@ def _redeem(
     assert _shares != 0 # dev: cannot redeem 0 shares
     assert _recipient != empty(address) # dev: invalid recipient
 
+    assert not token.isPaused # dev: token paused
+    assert not token.blacklisted[_owner] # dev: owner blacklisted
     assert token.balanceOf[_owner] >= _shares # dev: insufficient shares
 
     if _sender != _owner:
+        assert not token.blacklisted[_sender] # dev: spender blacklisted
         token._spendAllowance(_owner, _sender, _shares)
 
     token._burn(_owner, _shares)
@@ -300,3 +315,18 @@ def getLastUnderlying(_shares: uint256) -> uint256:
 @external
 def pricePerShare() -> uint256:
     return self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)
+
+
+# utils
+
+
+@view
+@internal
+def _assetBlocked() -> bool:
+    return staticcall AssetToken(ASSET).isPaused() or staticcall AssetToken(ASSET).blacklisted(self)
+
+
+@view
+@internal
+def _zeroBacking() -> bool:
+    return token.totalSupply != 0 and staticcall IERC20(ASSET).balanceOf(self) == 0

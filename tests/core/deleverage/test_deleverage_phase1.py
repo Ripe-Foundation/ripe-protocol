@@ -3,6 +3,18 @@ from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 
 
+def _deleverage_one(teller, user, target_repay_amount, *, sender):
+    return teller.deleverageManyUsers(
+        [(user, target_repay_amount)],
+        sender=sender,
+    )
+
+
+def _wrap_green_as_sgreen(user, green_amount, green_token, savings_green):
+    green_token.approve(savings_green, green_amount, sender=user)
+    return savings_green.deposit(green_amount, user, sender=user)
+
+
 @pytest.fixture(autouse=True)
 def setup(
     setGeneralConfig,
@@ -33,17 +45,12 @@ def setup(
         _shouldTransferToEndaoment=False,
     )
 
-    # Configure sGREEN and GREEN for burning (stability pool assets)
+    # GREEN itself is prohibited as a StabilityPool asset. Its ERC-4626 share
+    # token, sGREEN, is the supported GREEN-backed stability asset.
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
     setAssetConfig(
         savings_green,
         _vaultIds=[1], # Stability Pool
-        _debtTerms=stab_debt_terms,
-        _shouldBurnAsPayment=True,
-    )
-    setAssetConfig(
-        green_token,
-        _vaultIds=[1],
         _debtTerms=stab_debt_terms,
         _shouldBurnAsPayment=True,
     )
@@ -52,7 +59,6 @@ def setup(
     setup_priority_configs(
         priority_stab_assets=[
             (stability_pool, savings_green),
-            (stability_pool, green_token),
         ]
     )
 
@@ -96,7 +102,7 @@ def test_phase1_burns_users_sgreen_from_stability_pool(
     assert pre_sgreen_in_pool > 0, "User should have sGREEN in stability pool"
 
     # deleverage!
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -128,7 +134,7 @@ def test_phase1_burns_users_sgreen_from_stability_pool(
     assert log.hasGoodDebtHealth == True
 
 
-def test_phase1_burns_users_green_from_stability_pool(
+def test_phase1_wraps_borrowed_green_before_stability_pool_burn(
     teller,
     credit_engine,
     stability_pool,
@@ -136,14 +142,15 @@ def test_phase1_burns_users_green_from_stability_pool(
     alpha_token,
     alpha_token_whale,
     green_token,
+    savings_green,
     setupDeleverage,
     performDeposit,
     _test,
     switchboard_alpha,
 ):
     """
-    Test that user's GREEN in stability pool is burned during Phase 1 deleveraging.
-    Similar to sGREEN test but uses GREEN directly.
+    Test the supported path for borrowed GREEN: wrap it as sGREEN before
+    depositing into the StabilityPool, then burn its underlying in Phase 1.
     """
     # borrowed and received GREEN (not sGREEN)
     setupDeleverage(
@@ -155,32 +162,36 @@ def test_phase1_burns_users_green_from_stability_pool(
         get_sgreen=False,  # User receives GREEN
     )
 
-    # get user's GREEN balance and deposit ALL into stability pool
+    # Wrap all borrowed GREEN, then deposit the sGREEN shares into the pool.
     green_balance = green_token.balanceOf(bob)
     assert green_balance > 0, "User should have GREEN"
-
-    # deposit into stability pool
-    performDeposit(bob, green_balance, green_token, bob, stability_pool)
+    sgreen_balance = _wrap_green_as_sgreen(
+        bob,
+        green_balance,
+        green_token,
+        savings_green,
+    )
+    performDeposit(bob, sgreen_balance, savings_green, bob, stability_pool)
 
     # verify deposit succeeded
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     assert pre_debt > 0, "User should have debt"
 
     # pre-deleverage balances
-    pre_green_in_pool = stability_pool.getTotalAmountForUser(bob, green_token)
-    assert pre_green_in_pool > 0, "User should have GREEN in stability pool"
+    pre_sgreen_in_pool = stability_pool.getTotalAmountForUser(bob, savings_green)
+    assert pre_sgreen_in_pool > 0, "User should have sGREEN in stability pool"
 
     # deleverage!
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
     log = filter_logs(teller, "DeleverageUser")[0]
 
-    # verify GREEN was burned
-    post_green_in_pool = stability_pool.getTotalAmountForUser(bob, green_token)
-    green_burned_from_pool = pre_green_in_pool - post_green_in_pool
-    _test(green_balance, green_burned_from_pool)
+    # Verify the sGREEN shares were removed and their GREEN was burned.
+    post_sgreen_in_pool = stability_pool.getTotalAmountForUser(bob, savings_green)
+    sgreen_burned_from_pool = pre_sgreen_in_pool - post_sgreen_in_pool
+    _test(sgreen_balance, sgreen_burned_from_pool)
 
     # verify debt was reduced
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -190,8 +201,8 @@ def test_phase1_burns_users_green_from_stability_pool(
     # verify detailed event
     assert logDetail.user == bob
     assert logDetail.vaultId == 1
-    assert logDetail.stabAsset == green_token.address
-    assert logDetail.amountBurned == green_burned_from_pool
+    assert logDetail.stabAsset == savings_green.address
+    assert logDetail.amountBurned == sgreen_burned_from_pool
     assert logDetail.usdValue == debt_reduction
     assert logDetail.isDepleted == True
 
@@ -257,7 +268,7 @@ def test_phase1_partial_burn_when_sgreen_exceeds_debt(
     assert green_underlying > pre_debt, "User should have more GREEN (from sGREEN) than debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -324,7 +335,7 @@ def test_phase1_depletes_stab_asset_when_insufficient(
     assert green_underlying < pre_debt, "User should have less sGREEN than debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -353,6 +364,7 @@ def test_phase1_burns_both_sgreen_and_green_in_order(
     teller,
     credit_engine,
     stability_pool,
+    simple_erc20_vault,
     bob,
     alpha_token,
     alpha_token_whale,
@@ -360,12 +372,15 @@ def test_phase1_burns_both_sgreen_and_green_in_order(
     green_token,
     setupDeleverage,
     performDeposit,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
     _test,
     switchboard_alpha,
 ):
     """
-    Test that when user has both sGREEN and GREEN, Phase 1 processes
-    them in priority order (sGREEN first, then GREEN).
+    Test that Phase 1 processes sGREEN in the StabilityPool and GREEN in
+    another eligible vault in the configured priority order.
 
     Setup ensures both assets WILL be burned by having debt that requires both.
     """
@@ -383,18 +398,30 @@ def test_phase1_burns_both_sgreen_and_green_in_order(
     sgreen_balance = savings_green.balanceOf(bob)
     performDeposit(bob, sgreen_balance, savings_green, bob, stability_pool)
 
-    # Borrow MORE and get GREEN (more than needed so it won't be depleted)
+    # Borrow more GREEN and place it in a vault that permits GREEN directly.
     teller.borrow(400 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
     green_balance = green_token.balanceOf(bob)
-    performDeposit(bob, green_balance, green_token, bob, stability_pool)
+    setAssetConfig(
+        green_token,
+        _vaultIds=[3],
+        _debtTerms=createDebtTerms(),
+        _shouldBurnAsPayment=True,
+    )
+    performDeposit(bob, green_balance, green_token, bob, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[
+            (stability_pool, savings_green),
+            (simple_erc20_vault, green_token),
+        ]
+    )
 
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_sgreen = stability_pool.getTotalAmountForUser(bob, savings_green)
-    pre_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 400 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 400 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -412,7 +439,7 @@ def test_phase1_burns_both_sgreen_and_green_in_order(
 
     # Verify both were actually burned from pool
     post_sgreen = stability_pool.getTotalAmountForUser(bob, savings_green)
-    post_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     assert post_sgreen == 0, "sGREEN should be fully depleted"
     assert post_green < pre_green, "GREEN should be partially burned"
@@ -476,7 +503,7 @@ def test_phase1_with_target_repay_amount(
     target_repay = 100 * EIGHTEEN_DECIMALS
 
     # Deleverage with target
-    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     # Get events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -502,6 +529,7 @@ def test_phase1_processes_green_after_sgreen_depleted(
     teller,
     credit_engine,
     stability_pool,
+    simple_erc20_vault,
     bob,
     alpha_token,
     alpha_token_whale,
@@ -509,12 +537,15 @@ def test_phase1_processes_green_after_sgreen_depleted(
     green_token,
     setupDeleverage,
     performDeposit,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
     _test,
     switchboard_alpha,
 ):
     """
-    Test that when sGREEN in pool is depleted but insufficient,
-    Phase 1 continues to GREEN in priority order.
+    Test that when sGREEN in the pool is depleted but insufficient, Phase 1
+    continues to GREEN in another eligible vault in priority order.
     """
     # Setup user with sGREEN
     setupDeleverage(
@@ -531,18 +562,30 @@ def test_phase1_processes_green_after_sgreen_depleted(
     small_sgreen = sgreen_balance // 4  # 25% only
     performDeposit(bob, small_sgreen, savings_green, bob, stability_pool)
 
-    # Also borrow and deposit GREEN
+    # Also borrow GREEN and deposit it into a vault that permits GREEN.
     teller.borrow(400 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
     green_balance = green_token.balanceOf(bob)
-    performDeposit(bob, green_balance, green_token, bob, stability_pool)
+    setAssetConfig(
+        green_token,
+        _vaultIds=[3],
+        _debtTerms=createDebtTerms(),
+        _shouldBurnAsPayment=True,
+    )
+    performDeposit(bob, green_balance, green_token, bob, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[
+            (stability_pool, savings_green),
+            (simple_erc20_vault, green_token),
+        ]
+    )
 
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_sgreen = stability_pool.getTotalAmountForUser(bob, savings_green)
-    pre_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -563,7 +606,7 @@ def test_phase1_processes_green_after_sgreen_depleted(
 
     # Verify both were burned
     post_sgreen = stability_pool.getTotalAmountForUser(bob, savings_green)
-    post_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     assert post_sgreen == 0, "sGREEN should be fully depleted"
     assert post_green < pre_green, "GREEN should be partially burned"
@@ -573,6 +616,7 @@ def test_phase1_zero_balance_handled_gracefully(
     teller,
     credit_engine,
     stability_pool,
+    simple_erc20_vault,
     bob,
     alpha_token,
     alpha_token_whale,
@@ -580,6 +624,9 @@ def test_phase1_zero_balance_handled_gracefully(
     green_token,
     setupDeleverage,
     performDeposit,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
     switchboard_alpha,
 ):
     """
@@ -596,9 +643,21 @@ def test_phase1_zero_balance_handled_gracefully(
         get_sgreen=False,  # Get GREEN only
     )
 
-    # Deposit GREEN to pool
+    # Deposit GREEN into a vault that permits GREEN directly.
     green_balance = green_token.balanceOf(bob)
-    performDeposit(bob, green_balance, green_token, bob, stability_pool)
+    setAssetConfig(
+        green_token,
+        _vaultIds=[3],
+        _debtTerms=createDebtTerms(),
+        _shouldBurnAsPayment=True,
+    )
+    performDeposit(bob, green_balance, green_token, bob, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[
+            (stability_pool, savings_green),
+            (simple_erc20_vault, green_token),
+        ]
+    )
 
     # Verify user has NO sGREEN in pool
     sgreen_in_pool = stability_pool.getTotalAmountForUser(bob, savings_green)
@@ -606,10 +665,10 @@ def test_phase1_zero_balance_handled_gracefully(
 
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    pre_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     # Deleverage (should skip sGREEN, process GREEN)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -619,7 +678,7 @@ def test_phase1_zero_balance_handled_gracefully(
     assert burn_logs[0].stabAsset == green_token.address
 
     # Verify GREEN was burned
-    post_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
     assert post_green < pre_green, "GREEN should be burned"
 
     # Verify debt reduced
@@ -679,7 +738,7 @@ def test_phase1_skipped_when_priority_vaults_empty(
     )
 
     # Deleverage (Phase 1 should be skipped, Phase 3 should handle)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -764,7 +823,7 @@ def test_phase1_user_not_participating_in_any_priority_vault(
     assert bob_sgreen_in_pool == 0, "Bob should have no sGREEN in stability pool"
 
     # Execute deleveraging
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -857,7 +916,7 @@ def test_phase1_skips_non_green_stablecoin_assets(
     assert pre_alpha > 0, "User should have alpha_token in pool"
 
     # Execute deleveraging
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -914,9 +973,9 @@ def test_phase1_processes_multiple_stability_pools(
 
     VALIDATES: Lines 244-255 (multiple pool iteration and participation check)
     """
-    # Configure GREEN token to be supported by simple_erc20_vault (vault ID 3)
-    # This allows Alice to deposit GREEN there for the second pool
-    setAssetConfig(green_token, _vaultIds=[1, 3], _debtTerms=createDebtTerms(), _shouldBurnAsPayment=True)
+    # GREEN is supported only by the ordinary vault; sGREEN is used in the
+    # StabilityPool. Alice's GREEN supplies the second priority vault.
+    setAssetConfig(green_token, _vaultIds=[3], _debtTerms=createDebtTerms(), _shouldBurnAsPayment=True)
     # Setup bob with debt using alpha_token as collateral
     # Using standard borrow_amount=500 which creates 500 debt and yields 500 GREEN
     setupDeleverage(
@@ -928,10 +987,16 @@ def test_phase1_processes_multiple_stability_pools(
         get_sgreen=False,
     )
 
-    # Bob borrowed GREEN, deposit some to stability pool (vault 1)
+    # Bob borrowed GREEN; wrap it before depositing into the StabilityPool.
     green_balance = green_token.balanceOf(bob)
     assert green_balance == 500 * EIGHTEEN_DECIMALS, "Should have 500 GREEN"
-    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, green_token, bob, stability_pool)
+    first_sgreen = _wrap_green_as_sgreen(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        green_token,
+        savings_green,
+    )
+    performDeposit(bob, first_sgreen, savings_green, bob, stability_pool)
 
     # Setup Alice with GREEN in simple_erc20_vault (vault 3) - Alice needs to borrow her own GREEN
     setupDeleverage(
@@ -947,39 +1012,44 @@ def test_phase1_processes_multiple_stability_pools(
     # Alice deposits her GREEN to simple_erc20_vault using performDeposit fixture
     performDeposit(alice, 500 * EIGHTEEN_DECIMALS, green_token, alice, simple_erc20_vault)
 
-    # Add more GREEN to stability pool (simulating different priority)
-    # Bob has 300 GREEN remaining, deposit it
-    performDeposit(bob, 300 * EIGHTEEN_DECIMALS, green_token, bob, stability_pool)
+    # Wrap and deposit Bob's remaining 300 GREEN.
+    second_sgreen = _wrap_green_as_sgreen(
+        bob,
+        300 * EIGHTEEN_DECIMALS,
+        green_token,
+        savings_green,
+    )
+    performDeposit(bob, second_sgreen, savings_green, bob, stability_pool)
 
     # Configure multiple pools with priority order
-    # Bob has 500 GREEN total in stability pool, Alice has 500 in simple_erc20_vault
+    # Bob has 500 GREEN-equivalent sGREEN in the pool; Alice has 500 GREEN.
     setup_priority_configs(
         priority_stab_assets=[
-            (stability_pool, green_token),     # Priority 1: Bob has 500 GREEN total
+            (stability_pool, savings_green),   # Priority 1: Bob has 500 GREEN-equivalent
             (simple_erc20_vault, green_token), # Priority 2: Alice has 500, Bob has 0
         ]
     )
 
     # Track balances before
-    pre_bob_green_stab = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_bob_sgreen_stab = stability_pool.getTotalAmountForUser(bob, savings_green)
     pre_alice_green_vault = simple_erc20_vault.getTotalAmountForUser(alice, green_token)
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Verify initial state
-    assert pre_bob_green_stab == 500 * EIGHTEEN_DECIMALS  # 200 + 300 deposited
+    assert pre_bob_sgreen_stab == first_sgreen + second_sgreen
     assert pre_alice_green_vault == 500 * EIGHTEEN_DECIMALS
     # Note: Bob borrowed 600 but only received 500 GREEN due to fees, however debt is still 500 not 600
     # The borrow amount includes fees, but the actual debt recorded is the net amount
     assert pre_debt == 500 * EIGHTEEN_DECIMALS
 
     # Deleverage bob
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get burn events
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
 
     # Track balances after
-    post_bob_green_stab = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_bob_sgreen_stab = stability_pool.getTotalAmountForUser(bob, savings_green)
     post_alice_green_vault = simple_erc20_vault.getTotalAmountForUser(alice, green_token)
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
@@ -988,8 +1058,8 @@ def test_phase1_processes_multiple_stability_pools(
     # 1. Should have exactly 1 burn event (pool 2 skipped, only pool 1 processed)
     assert len(burn_logs) == 1, f"Expected 1 burn (pool 2 skipped), got {len(burn_logs)}"
 
-    # 2. Only burn: GREEN from pool 1 (500 burned, partial debt coverage)
-    assert burn_logs[0].stabAsset == green_token.address
+    # 2. Only burn: sGREEN from pool 1 (500 GREEN-equivalent burned).
+    assert burn_logs[0].stabAsset == savings_green.address
     assert burn_logs[0].vaultId == 1  # stability_pool
     assert burn_logs[0].amountBurned == 500 * EIGHTEEN_DECIMALS
     assert burn_logs[0].isDepleted == True  # All depleted
@@ -998,7 +1068,7 @@ def test_phase1_processes_multiple_stability_pools(
     assert post_alice_green_vault == pre_alice_green_vault, "Alice's assets should be untouched"
 
     # 5. Bob's balances updated correctly
-    assert post_bob_green_stab == 0, "Bob's GREEN should be fully depleted"
+    assert post_bob_sgreen_stab == 0, "Bob's sGREEN should be fully depleted"
 
     # 6. Debt fully repaid (500 GREEN covers 500 debt completely)
     assert post_debt == 0, "Debt should be fully repaid"
@@ -1010,6 +1080,7 @@ def test_phase1_exact_balance_equals_target(
     stability_pool,
     bob,
     green_token,
+    savings_green,
     alpha_token,
     alpha_token_whale,
     setupDeleverage,
@@ -1045,18 +1116,24 @@ def test_phase1_exact_balance_equals_target(
         get_sgreen=False,
     )
 
-    # Bob already has borrowed GREEN, deposit EXACTLY 500 GREEN to stability pool
+    # Bob already has borrowed GREEN; wrap exactly 500 for the StabilityPool.
     green_balance = green_token.balanceOf(bob)
     assert green_balance >= 500 * EIGHTEEN_DECIMALS, "Should have at least 500 GREEN"
-    performDeposit(bob, 500 * EIGHTEEN_DECIMALS, green_token, bob, stability_pool)
+    sgreen_balance = _wrap_green_as_sgreen(
+        bob,
+        500 * EIGHTEEN_DECIMALS,
+        green_token,
+        savings_green,
+    )
+    performDeposit(bob, sgreen_balance, savings_green, bob, stability_pool)
 
     # Configure Phase 1
     setup_priority_configs(
-        priority_stab_assets=[(stability_pool, green_token)]
+        priority_stab_assets=[(stability_pool, savings_green)]
     )
 
     # Track balances
-    pre_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_green = stability_pool.getTotalAmountForUser(bob, savings_green)
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Verify exact match
@@ -1064,13 +1141,13 @@ def test_phase1_exact_balance_equals_target(
     assert pre_debt == 500 * EIGHTEEN_DECIMALS, "Should have exactly 500 debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get burn event
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
 
     # Post balances
-    post_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_green = stability_pool.getTotalAmountForUser(bob, savings_green)
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # CRITICAL ASSERTIONS for exact match:
@@ -1098,6 +1175,7 @@ def test_phase1_handles_dust_amounts(
     stability_pool,
     bob,
     green_token,
+    savings_green,
     alpha_token,
     alpha_token_whale,
     setupDeleverage,
@@ -1133,31 +1211,37 @@ def test_phase1_handles_dust_amounts(
         get_sgreen=False,
     )
 
-    # Bob already has borrowed GREEN, deposit it to stability pool
+    # Bob already has borrowed GREEN; wrap the dust before depositing it.
     green_balance = green_token.balanceOf(bob)
     assert green_balance > 0, "Should have some GREEN from borrowing"
-    performDeposit(bob, green_balance, green_token, bob, stability_pool)
+    sgreen_balance = _wrap_green_as_sgreen(
+        bob,
+        green_balance,
+        green_token,
+        savings_green,
+    )
+    performDeposit(bob, sgreen_balance, savings_green, bob, stability_pool)
 
     # Configure Phase 1
     setup_priority_configs(
-        priority_stab_assets=[(stability_pool, green_token)]
+        priority_stab_assets=[(stability_pool, savings_green)]
     )
 
     # Track balances
-    pre_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_green = stability_pool.getTotalAmountForUser(bob, savings_green)
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     assert pre_green == 1, "Should have 1 wei GREEN from 1 wei borrow"
     assert pre_debt == 1, "Should have 1 wei debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get burn event
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
 
     # Post balances
-    post_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_green = stability_pool.getTotalAmountForUser(bob, savings_green)
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Assertions for dust amount:
@@ -1178,4 +1262,3 @@ def test_phase1_handles_dust_amounts(
 
     # 5. Repaid exactly 1 wei
     _test(repaid_amount, 1)
-

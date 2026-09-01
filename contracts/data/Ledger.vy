@@ -17,7 +17,7 @@
 #     ╚══════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025  
+#     Ripe Foundation (C) 2026  
 
 # @version 0.4.3
 
@@ -127,8 +127,11 @@ struct RipeBondData:
     ripeAvailForBonds: uint256
     badDebt: uint256
 
+ARB_SYS: constant(address) = 0x0000000000000000000000000000000000000064
+ACTION_BLOCK_SOURCE: public(immutable(address))
+
 # high level
-lastTouch: public(HashMap[address, uint256])  # user -> block number
+lastTouch: public(HashMap[address, uint256])  # user -> action-block identity
 isLockedAccount: public(HashMap[address, bool]) # wallet -> is locked
 
 # user vault participation
@@ -184,7 +187,10 @@ greenPoolDebt: public(HashMap[address, uint256]) # pool -> debt
 
 
 @deploy
-def __init__(_ripeHq: address, _defaults: address):
+def __init__(_ripeHq: address, _defaults: address, _actionBlockSource: address):
+    assert _actionBlockSource in [empty(address), ARB_SYS] # dev: invalid action block source
+    ACTION_BLOCK_SOURCE = _actionBlockSource
+
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
@@ -197,17 +203,47 @@ def __init__(_ripeHq: address, _defaults: address):
 # one action per block
 
 
+@view
+@external
+def getArbActionBlock() -> uint256:
+    return self._getArbActionBlock()
+
+
+@view
+@internal
+def _getArbActionBlock() -> uint256:
+    response: Bytes[65] = raw_call(
+        ARB_SYS,
+        method_id("arbBlockNumber()", output_type=Bytes[4]),
+        max_outsize=65,
+        is_static_call=True,
+        revert_on_failure=True,
+    )
+    assert len(response) == 32 # dev: invalid action block response
+    return abi_decode(response, uint256)
+
+
+@view
+@internal
+def _getActionBlock() -> uint256:
+    if ACTION_BLOCK_SOURCE == empty(address):
+        return block.number
+    return self._getArbActionBlock()
+
+
 @external
 def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool, _mc: address = empty(address)):
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not deptBasics.isPaused # dev: not activated
 
-    # check if user already interacted in this block
+    actionBlock: uint256 = self._getActionBlock()
+
+    # check if user already interacted in this action block
     if _shouldCheck:
-        assert self.lastTouch[_user] != block.number # dev: one action per block
+        assert self.lastTouch[_user] != actionBlock # dev: one action per block
     
     # update last touch
-    self.lastTouch[_user] = block.number
+    self.lastTouch[_user] = actionBlock
 
     # check locked account
     assert not self.isLockedAccount[_user] # dev: account locked
@@ -277,6 +313,11 @@ def addVaultToUser(_user: address, _vaultId: uint256):
 def removeVaultFromUser(_user: address, _vaultId: uint256):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
     assert not deptBasics.isPaused # dev: not activated
+    self._removeVaultFromUser(_user, _vaultId)
+
+
+@internal
+def _removeVaultFromUser(_user: address, _vaultId: uint256):
 
     numUserVaults: uint256 = self.numUserVaults[_user]
     if numUserVaults == 0:

@@ -12,7 +12,7 @@
 #     ╚═════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -38,5 +38,7 @@ def __init__(
     _initialSupply: uint256,
     _initialSupplyRecipient: address,
 ):
+    # _initialSupplyRecipient is retained for deployment-interface compatibility.
+    assert _initialSupply == 0  # dev: invalid initial supply
     token.__init__("Savings Green USD", "sGREEN", staticcall IERC20Detailed(_asset).decimals(), _ripeHq, _initialGov, _minHqTimeLock, _maxHqTimeLock, _initialSupply, _initialSupplyRecipient)
     erc4626.__init__(_asset)

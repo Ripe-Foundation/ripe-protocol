@@ -1,7 +1,62 @@
 import boa
+import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, redeem_collateral
+
+
+def _setup_backing_aware_redemption_position(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    simple_erc20_vault,
+    vault_book,
+    bob,
+):
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    for token in (alpha_token, bravo_token):
+        setAssetConfig(token, _debtTerms=debt_terms)
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+    setGeneralDebtConfig()
+
+    alpha_amount = 100 * EIGHTEEN_DECIMALS
+    bravo_amount = 140 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, alpha_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, bravo_amount, bravo_token, bravo_token_whale)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    alpha_token.burn(1, sender=simple_erc20_vault.address)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    return vault_id, alpha_amount, bravo_amount, debt_amount
+
+
+@pytest.fixture(scope="module")
+def credit_redeem_pointer_harness(credit_redeem):
+    credit_redeem.inject_function(
+        """
+@external
+def testHandleGreenForUser(_recipient: address, _amount: uint256):
+    a: addys.Addys = addys._getAddys()
+    self._handleGreenForUser(_recipient, _amount, True, True, a)
+        """
+    )
+    return credit_redeem
 
 
 def test_credit_redemption_basic(
@@ -71,7 +126,7 @@ def test_credit_redemption_basic(
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # Alice redeems collateral
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+    green_spent = redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
     
     # Verify redemption occurred
     assert green_spent > 0
@@ -146,24 +201,24 @@ def test_credit_redemption_validation(
     # Test paused state
     teller.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
     teller.pause(False, sender=switchboard_alpha.address)
 
     # Test zero address user
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(ZERO_ADDRESS, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, ZERO_ADDRESS, vault_id, alpha_token, green_amount, sender=alice)
 
     # Test invalid vault ID
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, 999999, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, 999999, alpha_token, green_amount, sender=alice)
 
     # Test zero address asset
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, ZERO_ADDRESS, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, ZERO_ADDRESS, green_amount, sender=alice)
 
     # Test zero green amount
     with boa.reverts("cannot transfer 0 amount"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, 0, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, 0, sender=alice)
 
 
 def test_credit_redemption_user_no_debt(
@@ -204,7 +259,7 @@ def test_credit_redemption_user_no_debt(
 
     # Should not be able to redeem from user with no debt
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
 
 def test_credit_redemption_user_in_liquidation(
@@ -263,7 +318,7 @@ def test_credit_redemption_user_in_liquidation(
 
     # Should not be able to redeem from user in liquidation
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
 
 def test_credit_redemption_below_threshold(
@@ -318,7 +373,7 @@ def test_credit_redemption_below_threshold(
     green_token.approve(teller, green_amount, sender=alice)
 
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
 
 def test_credit_redemption_config_disabled(
@@ -370,7 +425,7 @@ def test_credit_redemption_config_disabled(
     # Test 1: Disable general redemption config
     setGeneralConfig(_canRedeemCollateral=False)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
     # Re-enable general config
     setGeneralConfig()
@@ -378,11 +433,11 @@ def test_credit_redemption_config_disabled(
     # Test 2: Disable asset-specific redemption config
     setAssetConfig(alpha_token, _debtTerms=debt_terms, _canRedeemCollateral=False)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
     # Re-enable and verify it works
     setAssetConfig(alpha_token, _debtTerms=debt_terms)
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+    green_spent = redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
     assert green_spent > 0
 
 
@@ -434,7 +489,7 @@ def test_credit_redemption_ltv_payback_buffer(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Redeem
-    teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+    redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
     # Check that redemption targets LTV with buffer
     # Target LTV = 60% * (100% - 10%) = 54%
@@ -501,7 +556,7 @@ def test_credit_redemption_partial(
     initial_debt, bt_initial, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
 
     # Redeem
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+    green_spent = redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
     
     # Should use all the green
     _test(green_amount, green_spent)
@@ -581,7 +636,7 @@ def test_credit_redemption_multiple_assets(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Redeem from alpha token
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+    green_spent = redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
     assert green_spent > 0
     assert alpha_token.balanceOf(alice) > 0
 
@@ -597,7 +652,7 @@ def test_credit_redemption_multiple_assets(
     green_token.transfer(alice, green_amount, sender=whale)
     green_token.approve(teller, green_amount, sender=alice)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, bravo_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, bravo_token, green_amount, sender=alice)
 
 
 def test_credit_redeem_many_basic(
@@ -616,11 +671,16 @@ def test_credit_redeem_many_basic(
     teller,
     green_token,
     whale,
+    credit_engine,
+    credit_redeem,
+    price_desk,
+    savings_green,
     simple_erc20_vault,
     vault_book,
     createDebtTerms,
+    _test,
 ):
-    """Test redeemCollateralFromMany with multiple redemptions"""
+    """Healthy entries preserve typed borrower-term and redemption behavior."""
     setGeneralConfig()
     
     debt_terms = createDebtTerms(
@@ -658,14 +718,42 @@ def test_credit_redeem_many_basic(
     green_amount = 100 * EIGHTEEN_DECIMALS
     green_token.transfer(alice, green_amount, sender=whale)
     green_token.approve(teller, green_amount, sender=alice)
+    alpha_to_deliver = price_desk.getAssetAmount(
+        alpha_token, 30 * EIGHTEEN_DECIMALS, True
+    )
+    bravo_to_deliver = price_desk.getAssetAmount(
+        bravo_token, 40 * EIGHTEEN_DECIMALS, True
+    )
+    bob_collateral_before = simple_erc20_vault.getTotalAmountForUser(
+        bob, alpha_token
+    )
+    sally_collateral_before = simple_erc20_vault.getTotalAmountForUser(
+        sally, bravo_token
+    )
+    savings_before = savings_green.balanceOf(alice)
 
     # Redeem from many
     total_green_spent = teller.redeemCollateralFromMany(redemptions, green_amount, sender=alice)
 
     # Check results
     assert total_green_spent == 70 * EIGHTEEN_DECIMALS  # 30 + 40
-    assert alpha_token.balanceOf(alice) > 0
-    assert bravo_token.balanceOf(alice) > 0
+    assert credit_engine.getUserDebtAmount(bob) == 70 * EIGHTEEN_DECIMALS
+    assert credit_engine.getUserDebtAmount(sally) == 60 * EIGHTEEN_DECIMALS
+    assert alpha_token.balanceOf(alice) == alpha_to_deliver
+    assert bravo_token.balanceOf(alice) == bravo_to_deliver
+    assert simple_erc20_vault.getTotalAmountForUser(
+        bob, alpha_token
+    ) == bob_collateral_before - alpha_to_deliver
+    assert simple_erc20_vault.getTotalAmountForUser(
+        sally, bravo_token
+    ) == sally_collateral_before - bravo_to_deliver
+    assert green_token.balanceOf(credit_redeem) == 0
+
+    savings_received = savings_green.balanceOf(alice) - savings_before
+    _test(
+        green_amount - total_green_spent,
+        savings_green.getLastUnderlying(savings_received),
+    )
 
     # Check events
     logs = filter_logs(teller, "CollateralRedeemed")
@@ -673,13 +761,468 @@ def test_credit_redeem_many_basic(
     
     # First redemption (Bob's alpha)
     assert logs[0].user == bob
+    assert logs[0].vaultId == vault_id
     assert logs[0].asset == alpha_token.address
+    assert logs[0].amount == alpha_to_deliver
+    assert logs[0].recipient == alice
+    assert logs[0].caller == alice
     assert logs[0].repayValue == 30 * EIGHTEEN_DECIMALS
     
     # Second redemption (Sally's bravo)
     assert logs[1].user == sally
+    assert logs[1].vaultId == vault_id
     assert logs[1].asset == bravo_token.address
+    assert logs[1].amount == bravo_to_deliver
+    assert logs[1].recipient == alice
+    assert logs[1].caller == alice
     assert logs[1].repayValue == 40 * EIGHTEEN_DECIMALS
+
+    repay_logs = filter_logs(teller, "RepayDebt")
+    assert len(repay_logs) == 2
+    assert [log.user for log in repay_logs] == [bob, sally]
+    assert [log.repayValue for log in repay_logs] == [
+        30 * EIGHTEEN_DECIMALS,
+        40 * EIGHTEEN_DECIMALS,
+    ]
+    assert all(log.repayType == 8 for log in repay_logs)
+
+
+@pytest.mark.parametrize(
+    "price_failure",
+    (
+        pytest.param("zero", id="existing-feed-zero-price"),
+        pytest.param("revert", id="reverting-source-no-fallback"),
+        pytest.param("no-feed", id="no-price-config"),
+    ),
+)
+def test_credit_redeem_many_skips_borrower_with_any_unpriceable_collateral(
+    price_failure,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    sally,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    credit_engine,
+    credit_redeem,
+    ledger,
+    price_desk,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+):
+    """One missing portfolio price skips only that borrower."""
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _borrowRate=0,
+    )
+    for token in (alpha_token, bravo_token, charlie_token):
+        setAssetConfig(token, _debtTerms=debt_terms)
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+
+    collateral = 200 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral, alpha_token, alpha_token_whale)
+    performDeposit(bob, collateral, bravo_token, bravo_token_whale)
+    bob_debt = 200 * EIGHTEEN_DECIMALS
+    teller.borrow(bob_debt, bob, False, sender=bob)
+    performDeposit(
+        sally,
+        200 * 10 ** charlie_token.decimals(),
+        charlie_token,
+        charlie_token_whale,
+    )
+    sally_debt = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(sally_debt, sally, False, sender=sally)
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 70 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(charlie_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    if price_failure == "zero":
+        mock_price_source.setPrice(bravo_token, 0)
+    elif price_failure == "revert":
+        mock_price_source.setShouldRevert(bravo_token, True)
+    else:
+        mock_price_source.disablePriceFeed(bravo_token)
+
+    borrower_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+        bob,
+        ledger.numUserVaults(bob),
+        False,
+    )
+    assert borrower_terms.collateralVal == 140 * EIGHTEEN_DECIMALS
+    assert borrower_terms.hasQuarantinedAsset
+    if price_failure == "no-feed":
+        strict_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+            bob,
+            ledger.numUserVaults(bob),
+            True,
+        )
+        assert strict_terms.hasQuarantinedAsset
+    else:
+        with boa.reverts("has price config, no price"):
+            credit_engine.getUserBorrowTermsWithNumVaults(
+                bob,
+                ledger.numUserVaults(bob),
+                True,
+            )
+    assert not credit_engine.canRedeemUserCollateral(bob)
+    assert credit_engine.canRedeemUserCollateral(sally)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    bad_max = 30 * EIGHTEEN_DECIMALS
+    healthy_max = 40 * EIGHTEEN_DECIMALS
+    redemptions = [
+        (bob, vault_id, alpha_token.address, bad_max),
+        (sally, vault_id, charlie_token.address, healthy_max),
+    ]
+    payment = 80 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+
+    expected_charlie = price_desk.getAssetAmount(
+        charlie_token, healthy_max, True
+    )
+    bob_debt_before = credit_engine.getUserDebtAmount(bob)
+    bob_alpha_before = simple_erc20_vault.getTotalAmountForUser(
+        bob, alpha_token
+    )
+    bob_bravo_before = simple_erc20_vault.getTotalAmountForUser(
+        bob, bravo_token
+    )
+    sally_charlie_before = simple_erc20_vault.getTotalAmountForUser(
+        sally, charlie_token
+    )
+    alice_green_before = green_token.balanceOf(alice)
+    alice_alpha_before = alpha_token.balanceOf(alice)
+    alice_charlie_before = charlie_token.balanceOf(alice)
+
+    spent = teller.redeemCollateralFromMany(
+        redemptions,
+        payment,
+        False,
+        False,
+        False,
+        sender=alice,
+    )
+
+    assert spent == healthy_max
+    assert credit_engine.getUserDebtAmount(bob) == bob_debt_before
+    assert simple_erc20_vault.getTotalAmountForUser(
+        bob, alpha_token
+    ) == bob_alpha_before
+    assert simple_erc20_vault.getTotalAmountForUser(
+        bob, bravo_token
+    ) == bob_bravo_before
+    assert alpha_token.balanceOf(alice) == alice_alpha_before
+    assert credit_engine.getUserDebtAmount(sally) == sally_debt - healthy_max
+    assert simple_erc20_vault.getTotalAmountForUser(
+        sally, charlie_token
+    ) == sally_charlie_before - expected_charlie
+    assert (
+        charlie_token.balanceOf(alice)
+        == alice_charlie_before + expected_charlie
+    )
+    assert green_token.balanceOf(alice) == alice_green_before - healthy_max
+    assert green_token.balanceOf(credit_redeem) == 0
+
+    logs = filter_logs(teller, "CollateralRedeemed")
+    assert len(logs) == 1
+    assert logs[0].user == sally
+    assert logs[0].asset == charlie_token.address
+    assert logs[0].repayValue == healthy_max
+
+
+@pytest.mark.parametrize(
+    "price_failure",
+    (
+        # This configured-zero case pins CreditRedeem's non-strict price read.
+        pytest.param("zero", id="existing-feed-zero-price"),
+        # Supplemental no-config coverage is intentionally non-differential.
+        pytest.param("no-feed", id="no-price-config"),
+    ),
+)
+def test_credit_redeem_many_skips_unpriceable_zero_ltv_asset_after_borrower_preflight(
+    price_failure,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    sally,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    credit_engine,
+    credit_redeem,
+    ledger,
+    price_desk,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+):
+    """A zero-LTV target reaches the separate non-strict asset-price read."""
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _borrowRate=0,
+    )
+    zero_ltv_terms = createDebtTerms(
+        _ltv=0,
+        _redemptionThreshold=0,
+        _liqThreshold=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=debt_terms)
+    setAssetConfig(charlie_token, _debtTerms=zero_ltv_terms)
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    if price_failure == "zero":
+        mock_price_source.setPrice(charlie_token, 0)
+    else:
+        mock_price_source.disablePriceFeed(charlie_token)
+
+    collateral = 200 * EIGHTEEN_DECIMALS
+    zero_ltv_collateral = 50 * 10 ** charlie_token.decimals()
+    debt = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral, alpha_token, alpha_token_whale)
+    performDeposit(
+        bob,
+        zero_ltv_collateral,
+        charlie_token,
+        charlie_token_whale,
+    )
+    teller.borrow(debt, bob, False, sender=bob)
+    performDeposit(sally, collateral, bravo_token, bravo_token_whale)
+    teller.borrow(debt, sally, False, sender=sally)
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    borrower_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+        bob,
+        ledger.numUserVaults(bob),
+        False,
+    )
+    assert borrower_terms.collateralVal == 140 * EIGHTEEN_DECIMALS
+    assert not borrower_terms.hasQuarantinedAsset
+    assert credit_engine.canRedeemUserCollateral(bob)
+    assert price_desk.getAssetAmount(
+        charlie_token, 30 * EIGHTEEN_DECIMALS, False
+    ) == 0
+    if price_failure == "zero":
+        with boa.reverts("has price config, no price"):
+            price_desk.getAssetAmount(
+                charlie_token, 30 * EIGHTEEN_DECIMALS, True
+            )
+    else:
+        assert price_desk.getAssetAmount(
+            charlie_token, 30 * EIGHTEEN_DECIMALS, True
+        ) == 0
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    skipped_max = 30 * EIGHTEEN_DECIMALS
+    healthy_max = 40 * EIGHTEEN_DECIMALS
+    redemptions = [
+        (bob, vault_id, charlie_token.address, skipped_max),
+        (sally, vault_id, bravo_token.address, healthy_max),
+    ]
+    payment = 70 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+
+    bob_debt_before = credit_engine.getUserDebtAmount(bob)
+    bob_alpha_before = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    bob_charlie_before = simple_erc20_vault.getTotalAmountForUser(
+        bob, charlie_token
+    )
+    alice_charlie_before = charlie_token.balanceOf(alice)
+    alice_bravo_before = bravo_token.balanceOf(alice)
+    alice_green_before = green_token.balanceOf(alice)
+    expected_bravo = price_desk.getAssetAmount(bravo_token, healthy_max, True)
+
+    spent = teller.redeemCollateralFromMany(
+        redemptions,
+        payment,
+        False,
+        False,
+        False,
+        sender=alice,
+    )
+
+    assert spent == healthy_max
+    assert credit_engine.getUserDebtAmount(bob) == bob_debt_before
+    assert simple_erc20_vault.getTotalAmountForUser(
+        bob, alpha_token
+    ) == bob_alpha_before
+    assert simple_erc20_vault.getTotalAmountForUser(
+        bob, charlie_token
+    ) == bob_charlie_before
+    assert charlie_token.balanceOf(alice) == alice_charlie_before
+    assert credit_engine.getUserDebtAmount(sally) == debt - healthy_max
+    assert bravo_token.balanceOf(alice) == alice_bravo_before + expected_bravo
+    assert green_token.balanceOf(alice) == alice_green_before - healthy_max
+    assert green_token.balanceOf(credit_redeem) == 0
+
+    logs = filter_logs(teller, "CollateralRedeemed")
+    assert len(logs) == 1
+    assert logs[0].user == sally
+    assert logs[0].asset == bravo_token.address
+    assert logs[0].repayValue == healthy_max
+
+
+def test_credit_redeem_many_all_unpriceable_entries_revert_with_complete_rollback(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    sally,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    credit_engine,
+    credit_redeem,
+    ledger,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+):
+    """Teller payment and every skipped entry roll back at the terminal guard."""
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _borrowRate=0,
+    )
+    zero_ltv_terms = createDebtTerms(
+        _ltv=0,
+        _redemptionThreshold=0,
+        _liqThreshold=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=debt_terms)
+    setAssetConfig(charlie_token, _debtTerms=zero_ltv_terms)
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, 0)
+
+    collateral = 200 * EIGHTEEN_DECIMALS
+    debt = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral, alpha_token, alpha_token_whale)
+    teller.borrow(debt, bob, False, sender=bob)
+    performDeposit(sally, collateral, bravo_token, bravo_token_whale)
+    performDeposit(
+        sally,
+        50 * 10 ** charlie_token.decimals(),
+        charlie_token,
+        charlie_token_whale,
+    )
+    teller.borrow(debt, sally, False, sender=sally)
+    mock_price_source.setPrice(bravo_token, 70 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(alpha_token, 0)
+
+    with boa.reverts("has price config, no price"):
+        credit_engine.getUserBorrowTermsWithNumVaults(
+            bob,
+            ledger.numUserVaults(bob),
+            True,
+        )
+    bob_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+        bob,
+        ledger.numUserVaults(bob),
+        False,
+    )
+    assert bob_terms.hasQuarantinedAsset
+    sally_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+        sally,
+        ledger.numUserVaults(sally),
+        True,
+    )
+    assert sally_terms.collateralVal == 140 * EIGHTEEN_DECIMALS
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    payment = 60 * EIGHTEEN_DECIMALS
+    redemptions = [
+        (bob, vault_id, alpha_token.address, 30 * EIGHTEEN_DECIMALS),
+        (sally, vault_id, charlie_token.address, 30 * EIGHTEEN_DECIMALS),
+    ]
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+
+    before = (
+        green_token.balanceOf(alice),
+        green_token.allowance(alice, teller),
+        green_token.balanceOf(credit_redeem),
+        credit_engine.getUserDebtAmount(bob),
+        credit_engine.getUserDebtAmount(sally),
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(sally, bravo_token),
+        simple_erc20_vault.getTotalAmountForUser(sally, charlie_token),
+        alpha_token.balanceOf(alice),
+        charlie_token.balanceOf(alice),
+    )
+    assert filter_logs(teller, "CollateralRedeemed") == []
+
+    with boa.reverts("no redemptions occurred"):
+        teller.redeemCollateralFromMany(
+            redemptions,
+            payment,
+            False,
+            False,
+            False,
+            sender=alice,
+        )
+
+    assert (
+        green_token.balanceOf(alice),
+        green_token.allowance(alice, teller),
+        green_token.balanceOf(credit_redeem),
+        credit_engine.getUserDebtAmount(bob),
+        credit_engine.getUserDebtAmount(sally),
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(sally, bravo_token),
+        simple_erc20_vault.getTotalAmountForUser(sally, charlie_token),
+        alpha_token.balanceOf(alice),
+        charlie_token.balanceOf(alice),
+    ) == before
+    assert filter_logs(teller, "CollateralRedeemed") == []
 
 
 def test_credit_redeem_many_insufficient_green(
@@ -840,7 +1383,7 @@ def test_credit_redemption_refund_regular(
     green_token.balanceOf(alice)
 
     # Redeem with shouldStakeRefund=False
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, False, False, False, sender=alice)
+    green_spent = redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, False, False, False, sender=alice)
 
     # Alice should get refund as regular GREEN
     final_green_balance = green_token.balanceOf(alice)
@@ -896,7 +1439,7 @@ def test_credit_redemption_refund_savings(
     initial_savings_balance = savings_green.balanceOf(alice)
 
     # Redeem with shouldStakeRefund=True (default)
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+    green_spent = redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
     # Alice should get refund as savings GREEN
     final_savings_balance = savings_green.balanceOf(alice)
@@ -952,9 +1495,9 @@ def test_credit_redemption_price_oracle_issues(
     # Set price to 0 (oracle failure)
     mock_price_source.setPrice(alpha_token, 0)
 
-    # Should fail due to price calculation issues
+    # The unsafe entry is skipped, then the otherwise-empty batch terminates.
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
 
 def test_credit_redemption_user_no_balance(
@@ -1003,7 +1546,7 @@ def test_credit_redemption_user_no_balance(
 
     # Try to redeem alpha (which Bob doesn't have)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+        redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
 
 def test_credit_redemption_math_calculation(
@@ -1064,7 +1607,7 @@ def test_credit_redemption_math_calculation(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Redeem
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
+    green_spent = redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
     # Should spend approximately 200 GREEN
     assert abs(green_spent - 200 * EIGHTEEN_DECIMALS) < EIGHTEEN_DECIMALS  # Within 1 token
@@ -1347,13 +1890,14 @@ def test_utility_functions_edge_cases(
     user_debt = ledger.userDebt(bob)
     debt_amount = user_debt[0]  # Get the debt amount
 
-    # When price is 0, collateral value becomes 0
-    # With debt > 0 and collateral = 0, the user is technically underwater
-    # canRedeemUserCollateral returns True because collateral (0) <= redemptionThreshold
-    assert credit_engine.canRedeemUserCollateral(bob)
+    # A positive debt-bearing balance with no usable price is quarantined, so
+    # redemption eligibility cannot be inferred from a zero collateral value.
+    terms = credit_engine.getUserBorrowTerms(bob, False)
+    assert terms.collateralVal == 0
+    assert terms.hasQuarantinedAsset
+    assert not credit_engine.canRedeemUserCollateral(bob)
     
-    # getMaxRedeemValue returns 0 because even though user is redeemable,
-    # there's no collateral value to actually redeem
+    # getMaxRedeemValue also rejects the quarantined borrower terms.
     assert credit_redeem.getMaxRedeemValue(bob) == 0
     
     # getRedemptionThreshold calculation:
@@ -1475,7 +2019,7 @@ def test_credit_redemption_transfer_balance_basic(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Redeem with _shouldTransferBalance=True
-    green_spent = teller.redeemCollateral(
+    green_spent = redeem_collateral(teller,
         bob, vault_id, alpha_token, green_amount, 
         False, True, False,  # _shouldTransferBalance=True
         sender=alice
@@ -1670,7 +2214,7 @@ def test_credit_redemption_transfer_balance_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Redeem with transfer
-    teller.redeemCollateral(
+    redeem_collateral(teller,
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice
@@ -1733,7 +2277,7 @@ def test_credit_redemption_transfer_refund_handling(
     initial_savings_balance = savings_green.balanceOf(alice)
 
     # Redeem with transfer and savings green refund
-    green_spent = teller.redeemCollateral(
+    green_spent = redeem_collateral(teller,
         bob, vault_id, alpha_token, green_amount,
         False, True, True,  # _shouldTransferBalance=True, _shouldRefundSavingsGreen=True
         sender=alice
@@ -1797,7 +2341,7 @@ def test_credit_redemption_recipient_equals_user(
     # This should fail because CreditRedeem._redeemCollateral checks if recipient == user
     vault_id = vault_book.getRegId(simple_erc20_vault)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(
+        redeem_collateral(teller,
             bob,  # user to redeem from
             vault_id,  # vault ID
             alpha_token,
@@ -1861,7 +2405,7 @@ def test_credit_redemption_unauthorized_deposit_for_recipient(
     # This should fail with "not allowed to deposit for user"
     vault_id = vault_book.getRegId(simple_erc20_vault)
     with boa.reverts("not allowed to deposit for user"):
-        teller.redeemCollateral(
+        redeem_collateral(teller,
             bob,  # user to redeem from
             vault_id,  # vault ID
             alpha_token,
@@ -1928,7 +2472,7 @@ def test_credit_redemption_zero_redemption_threshold(
     # Alice tries to redeem but it should fail since threshold is 0
     vault_id = vault_book.getRegId(simple_erc20_vault)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemCollateral(
+        redeem_collateral(teller,
             bob,  # user to redeem from
             vault_id,  # vault ID
             alpha_token,
@@ -2002,7 +2546,7 @@ def test_credit_redemption_stability_pool_entry(
     # Note: This functionality would need to be exposed through Teller
     # For now, we test the indirect path where refunds go to savings green
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    green_spent = teller.redeemCollateral(
+    green_spent = redeem_collateral(teller,
         bob,
         vault_id,
         alpha_token,
@@ -2042,6 +2586,45 @@ def test_credit_redemption_stability_pool_entry(
 
     # Alice's sGREEN balance should now be 0 (deposited into pool)
     assert savings_green.balanceOf(alice) == 0
+
+
+def test_credit_redeem_green_handler_uses_preferred_stability_pool_pointer(
+    credit_redeem_pointer_harness,
+    credit_engine,
+    alternate_stability_pool,
+    stability_pool,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    green_token,
+    savings_green,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    preferred_id = registerVault(alternate_stability_pool, "Preferred Stability Pool")
+    setGeneralConfig()
+    setAssetConfig(savings_green, [preferred_id])
+    mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard_alpha.address)
+
+    amount = 10 * EIGHTEEN_DECIMALS
+    green_token.mint(
+        credit_redeem_pointer_harness.address,
+        amount,
+        sender=credit_engine.address,
+    )
+    credit_redeem_pointer_harness.inject.testHandleGreenForUser(alice, amount, sender=alice)
+    assert alternate_stability_pool.getTotalAmountForUser(alice, savings_green) > 0
+    assert stability_pool.getTotalAmountForUser(alice, savings_green) == 0
+
+    mission_control.eval("self.preferredStabVaultId = 0")
+    green_token.mint(
+        credit_redeem_pointer_harness.address,
+        amount,
+        sender=credit_engine.address,
+    )
+    with boa.reverts("invalid vault id"):
+        credit_redeem_pointer_harness.inject.testHandleGreenForUser(alice, amount, sender=alice)
 
 
 def test_credit_redemption_with_interest_accrual(
@@ -2101,7 +2684,7 @@ def test_credit_redemption_with_interest_accrual(
     # Alice redeems from Bob
     initial_alice_green = green_token.balanceOf(alice)
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    green_spent = teller.redeemCollateral(
+    green_spent = redeem_collateral(teller,
         bob,
         vault_id,
         alpha_token,
@@ -2136,3 +2719,198 @@ def test_credit_redemption_with_interest_accrual(
     # Verify Alice spent green tokens for the redemption
     assert green_token.balanceOf(alice) < initial_alice_green
 
+
+@pytest.mark.parametrize(
+    "should_transfer_balance",
+    (
+        pytest.param(False, id="external-delivery"),
+        pytest.param(True, id="internal-balance-transfer"),
+    ),
+)
+def test_credit_redeem_single_deficient_asset_fails_without_side_effects(
+    should_transfer_balance,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    credit_engine,
+    simple_erc20_vault,
+    vault_book,
+    bob,
+    alice,
+):
+    vault_id, alpha_amount, bravo_amount, debt_amount = (
+        _setup_backing_aware_redemption_position(
+            setGeneralConfig,
+            setAssetConfig,
+            setGeneralDebtConfig,
+            createDebtTerms,
+            performDeposit,
+            mock_price_source,
+            teller,
+            alpha_token,
+            alpha_token_whale,
+            bravo_token,
+            bravo_token_whale,
+            simple_erc20_vault,
+            vault_book,
+            bob,
+        )
+    )
+    assert not credit_engine.canRedeemUserCollateral(bob)
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
+    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == bravo_amount
+
+    payment = 30 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    before = (
+        green_token.balanceOf(alice),
+        alpha_token.balanceOf(simple_erc20_vault),
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        simple_erc20_vault.totalBalances(alpha_token),
+        credit_engine.getUserDebtAmount(bob),
+    )
+
+    with boa.reverts("no redemptions occurred"):
+        redeem_collateral(teller,
+            bob,
+            vault_id,
+            alpha_token,
+            payment,
+            False,
+            should_transfer_balance,
+            False,
+            sender=alice,
+        )
+
+    assert (
+        green_token.balanceOf(alice),
+        alpha_token.balanceOf(simple_erc20_vault),
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        simple_erc20_vault.totalBalances(alpha_token),
+        credit_engine.getUserDebtAmount(bob),
+    ) == before
+    assert alpha_token.balanceOf(simple_erc20_vault) == alpha_amount - 1
+    assert credit_engine.getUserDebtAmount(bob) == debt_amount
+    assert filter_logs(teller, "CollateralRedeemed") == []
+
+
+@pytest.mark.parametrize(
+    "should_transfer_balance",
+    (
+        pytest.param(False, id="external-delivery"),
+        pytest.param(True, id="internal-balance-transfer"),
+    ),
+)
+@pytest.mark.parametrize(
+    "deficient_first",
+    (
+        pytest.param(True, id="deficient-first"),
+        pytest.param(False, id="deficient-last"),
+    ),
+)
+def test_credit_redeem_many_suppresses_all_entries_for_quarantined_user(
+    should_transfer_balance,
+    deficient_first,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    credit_engine,
+    simple_erc20_vault,
+    vault_book,
+    bob,
+    alice,
+):
+    vault_id, alpha_amount, bravo_amount, debt_amount = (
+        _setup_backing_aware_redemption_position(
+            setGeneralConfig,
+            setAssetConfig,
+            setGeneralDebtConfig,
+            createDebtTerms,
+            performDeposit,
+            mock_price_source,
+            teller,
+            alpha_token,
+            alpha_token_whale,
+            bravo_token,
+            bravo_token_whale,
+            simple_erc20_vault,
+            vault_book,
+            bob,
+        )
+    )
+    max_per_entry = 30 * EIGHTEEN_DECIMALS
+    deficient = (bob, vault_id, alpha_token.address, max_per_entry)
+    healthy = (bob, vault_id, bravo_token.address, max_per_entry)
+    redemptions = [deficient, healthy] if deficient_first else [healthy, deficient]
+
+    payment = 60 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    before = (
+        green_token.balanceOf(alice),
+        credit_engine.getUserDebtAmount(bob),
+        alpha_token.balanceOf(simple_erc20_vault),
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        simple_erc20_vault.totalBalances(alpha_token),
+        bravo_token.balanceOf(simple_erc20_vault),
+        bravo_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, bravo_token),
+        simple_erc20_vault.userBalances(alice, bravo_token),
+        simple_erc20_vault.totalBalances(bravo_token),
+    )
+
+    with boa.reverts("no redemptions occurred"):
+        teller.redeemCollateralFromMany(
+            redemptions,
+            payment,
+            False,
+            should_transfer_balance,
+            False,
+            sender=alice,
+        )
+
+    assert (
+        green_token.balanceOf(alice),
+        credit_engine.getUserDebtAmount(bob),
+        alpha_token.balanceOf(simple_erc20_vault),
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        simple_erc20_vault.totalBalances(alpha_token),
+        bravo_token.balanceOf(simple_erc20_vault),
+        bravo_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, bravo_token),
+        simple_erc20_vault.userBalances(alice, bravo_token),
+        simple_erc20_vault.totalBalances(bravo_token),
+    ) == before
+    assert before[1] == debt_amount
+    assert before[2] == alpha_amount - 1
+    assert before[9] == bravo_amount
+    assert filter_logs(teller, "CollateralRedeemed") == []

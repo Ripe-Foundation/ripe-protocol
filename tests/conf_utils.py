@@ -1,9 +1,407 @@
 import pytest
+import boa
 from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS, EIGHTEEN_DECIMALS
+
+
+def advance_timelock_blocks(blocks):
+    """Advance governance block number without aging historical fork oracles."""
+    boa.env.evm.patch.block_number += blocks
+
+
+def ensure_token_scale(price_desk, asset, sender, gov=None):
+    """Cache PriceDesk scale when a priced asset has none yet."""
+    if asset is None:
+        return
+    asset_addr = getattr(asset, "address", asset)
+    if asset_addr in (ZERO_ADDRESS, price_desk.ETH()):
+        return
+    if price_desk.tokenScale(asset_addr) != 0:
+        return
+    setter = gov if gov is not None else _SCALE_BIND.get("gov", sender)
+    try:
+        price_desk.syncTokenScale(asset_addr, sender=setter)
+    except boa.BoaError:
+        return
+
+
+_SCALE_BIND = {}
+
+
+def bind_token_scale(price_desk, sender, gov=None):
+    _SCALE_BIND["desk"] = price_desk
+    _SCALE_BIND["sender"] = sender
+    if gov is not None:
+        _SCALE_BIND["gov"] = gov
+
+
+def unbind_token_scale():
+    _SCALE_BIND.clear()
+
+
+def sync_deployed_token(token):
+    desk = _SCALE_BIND.get("desk")
+    sender = _SCALE_BIND.get("sender")
+    assert desk is not None, "PriceDesk token-scale bind is not active"
+    assert sender is not None, "token-scale sender bind is not active"
+    ensure_token_scale(desk, token, sender)
+
+
+def clear_transient_storage():
+    """Emulate a real EVM transaction boundary under titanoboa 0.2.7."""
+    boa.env.evm.vm.state.clear_transient_storage()
+
+
+def has_dev_reason(error, expected_reason):
+    return any(
+        not isinstance(frame, str)
+        and getattr(frame, "dev_reason", None) is not None
+        and frame.dev_reason.reason_str == expected_reason
+        for frame in error.stack_trace
+    )
+
+
+def assert_reverted_call(error, expected_reason, contract):
+    """Bind a nested dev reason to the exact failed outer computation.
+
+    Outer Vyper extcalls can mask nested dev labels from ``boa.reverts``, so
+    inspect the structured frames instead. ``_computation`` is intentionally
+    coupled to the repository's pinned titanoboa 0.2.7 test API; py-evm drops
+    all logs from an error computation by construction, so ``is_error`` also
+    establishes that no transaction event can survive the revert.
+    """
+    assert has_dev_reason(error, expected_reason), str(error)
+    computation = contract._computation
+    assert computation is not None
+    assert computation.is_error
+
+
+def install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, blocked_user):
+    from pathlib import Path
+
+    source = Path("contracts/core/Lootbox.vy").read_text()
+    needle = """@external
+def updateDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+"""
+    assert source.count(needle) == 1
+    # Use a # dev: assert, not a string revert: a string payload makes the
+    # Lootbox mutant exceed EIP-170. Teller-wrapped calls do not surface
+    # the # dev: reason, so callers match with bare boa.reverts() plus
+    # pre/post state.
+    source = source.replace(
+        needle,
+        needle + f"    assert _user != {blocked_user} # dev: user checkpoint blocked\n",
+        1,
+    )
+    mutant = boa.loads(
+        source,
+        ripe_hq.address,
+        43_200,
+        43_200,
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        name="lootbox_user_checkpoint_trap",
+    )
+    boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
+
+
+@pytest.fixture
+def registerVault(vault_book, governance):
+    def registerVault(vault, description):
+        assert vault_book.startAddNewAddressToRegistry(
+            vault.address,
+            description,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+        return vault_book.confirmNewAddressToRegistry(vault.address, sender=governance.address)
+
+    yield registerVault
+
+
+@pytest.fixture
+def cleanCoreRipeGovFixture(
+    ripe_hq,
+    ripe_token,
+    vault_book,
+    mission_control,
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+):
+    """Build and select one clean RipeGov vault through all delayed paths.
+
+    RIPE must have finite nonzero deposit caps before this builder runs because
+    SwitchboardBravo deliberately rejects max_value(uint256) caps.
+    """
+
+    def _advance_to(block_number):
+        current = boa.env.evm.patch.block_number
+        if current < block_number:
+            boa.env.time_travel(blocks=block_number - current)
+        assert boa.env.evm.patch.block_number >= block_number
+
+    def build():
+        clean_vault = boa.load(
+            "contracts/vaults/RipeGov.vy",
+            ripe_hq,
+            name="aud_024_clean_core_ripe_gov_vault",
+        )
+        assert boa.env.get_code(clean_vault.address) != b""
+        assert clean_vault.totalGovPoints() == 0
+        assert not clean_vault.isPaused()
+        assert clean_vault.totalBalances(ripe_token) == 0
+
+        previous_core_id = mission_control.coreRipeGovVaultId()
+        assert vault_book.startAddNewAddressToRegistry(
+            clean_vault,
+            "AUD-024 clean RipeGov",
+            sender=governance.address,
+        )
+        registration = vault_book.pendingNewAddr(clean_vault)
+        assert registration.initiatedBlock != 0
+        assert registration.confirmBlock > registration.initiatedBlock
+        _advance_to(registration.confirmBlock)
+        new_id = vault_book.confirmNewAddressToRegistry(
+            clean_vault,
+            sender=governance.address,
+        )
+        assert vault_book.isValidRegId(new_id)
+        assert vault_book.getAddr(new_id) == clean_vault.address
+        assert new_id != previous_core_id
+
+        asset_config_before = mission_control.assetConfig(ripe_token)
+        lock_config_before = mission_control.ripeGovVaultConfig(ripe_token)
+        existing_vault_ids = list(asset_config_before.vaultIds)
+        assert new_id not in existing_vault_ids
+        assert len(existing_vault_ids) < 10
+        assert 0 < asset_config_before.perUserDepositLimit < MAX_UINT256
+        assert 0 < asset_config_before.globalDepositLimit < MAX_UINT256
+        new_vault_ids = existing_vault_ids + [new_id]
+
+        # Omit the optional MissionControl argument intentionally. Both
+        # switchboards resolve empty(address) to the current MissionControl and
+        # reject its explicit address with "use empty for current mission control".
+        support_action = switchboard_bravo.setAssetDepositParams(
+            ripe_token,
+            new_vault_ids,
+            asset_config_before.stakersPointsAlloc,
+            asset_config_before.voterPointsAlloc,
+            asset_config_before.perUserDepositLimit,
+            asset_config_before.globalDepositLimit,
+            asset_config_before.minDepositBalance,
+            sender=governance.address,
+        )
+        support_confirmation = switchboard_bravo.getActionConfirmationBlock(
+            support_action
+        )
+        assert support_confirmation > boa.env.evm.patch.block_number
+        _advance_to(support_confirmation)
+        assert switchboard_bravo.executePendingAction(
+            support_action,
+            sender=governance.address,
+        )
+
+        asset_config_after = mission_control.assetConfig(ripe_token)
+        assert mission_control.isSupportedAssetInVault(new_id, ripe_token)
+        assert list(asset_config_after.vaultIds) == new_vault_ids
+        for field in (
+            "stakersPointsAlloc",
+            "voterPointsAlloc",
+            "perUserDepositLimit",
+            "globalDepositLimit",
+            "minDepositBalance",
+        ):
+            assert getattr(asset_config_after, field) == getattr(
+                asset_config_before, field
+            )
+        for field in asset_config_before._fields:
+            if field not in (
+                "vaultIds",
+                "stakersPointsAlloc",
+                "voterPointsAlloc",
+                "perUserDepositLimit",
+                "globalDepositLimit",
+                "minDepositBalance",
+            ):
+                assert getattr(asset_config_after, field) == getattr(
+                    asset_config_before, field
+                )
+        assert mission_control.ripeGovVaultConfig(ripe_token) == lock_config_before
+
+        assert vault_book.isValidRegId(new_id)
+        assert vault_book.getAddr(new_id) == clean_vault.address
+        assert new_id != previous_core_id
+        assert mission_control.isSupportedAssetInVault(new_id, ripe_token)
+        assert clean_vault.totalGovPoints() == 0
+        assert not clean_vault.isPaused()
+        assert clean_vault.totalBalances(ripe_token) == 0
+
+        pointer_action = switchboard_charlie.setCoreRipeGovVaultId(
+            new_id,
+            sender=governance.address,
+        )
+        pointer_confirmation = switchboard_charlie.getActionConfirmationBlock(
+            pointer_action
+        )
+        assert pointer_confirmation > boa.env.evm.patch.block_number
+        _advance_to(pointer_confirmation)
+        assert switchboard_charlie.executePendingAction(
+            pointer_action,
+            sender=governance.address,
+        )
+
+        assert mission_control.coreRipeGovVaultId() == new_id
+        assert mission_control.isRipeGovVaultId(new_id)
+        assert mission_control.isRipeGovVaultId(previous_core_id)
+        assert vault_book.getAddr(new_id) == clean_vault.address
+        assert not clean_vault.isPaused()
+        assert clean_vault.totalBalances(ripe_token) == 0
+
+        return {
+            "vault": clean_vault,
+            "vault_id": new_id,
+            "previous_vault_id": previous_core_id,
+            "existing_vault_ids": existing_vault_ids,
+            "new_vault_ids": new_vault_ids,
+            "registration_confirmation": registration.confirmBlock,
+            "support_action": support_action,
+            "support_confirmation": support_confirmation,
+            "pointer_action": pointer_action,
+            "pointer_confirmation": pointer_confirmation,
+            "asset_config_before": asset_config_before,
+            "asset_config_after": asset_config_after,
+            "lock_config_before": lock_config_before,
+        }
+
+    return build
 
 
 def filter_logs(contract, event_name, _strict=False):
     return [e for e in contract.get_logs(strict=_strict) if type(e).__name__ == event_name]
+
+
+def get_boa_dev_reasons(error):
+    return {
+        frame.dev_reason.reason_str
+        for frame in error.stack_trace
+        if getattr(frame, "dev_reason", None) is not None
+    }
+
+
+def redeem_collateral(
+    teller,
+    user,
+    vault_id,
+    asset,
+    payment_amount=MAX_UINT256,
+    is_payment_savings_green=False,
+    should_transfer_balance=False,
+    should_refund_savings_green=True,
+    recipient=None,
+    *,
+    sender,
+):
+    """Execute the removed single-redemption API through its one-item batch equivalent."""
+    if recipient is None:
+        recipient = sender
+    redemption = (user, vault_id, asset, MAX_UINT256)
+    return teller.redeemCollateralFromMany(
+        [redemption],
+        payment_amount,
+        is_payment_savings_green,
+        should_transfer_balance,
+        should_refund_savings_green,
+        recipient,
+        sender=sender,
+    )
+
+
+def buy_fungible_auction(
+    teller,
+    liq_user,
+    vault_id,
+    asset,
+    payment_amount=MAX_UINT256,
+    is_payment_savings_green=False,
+    should_transfer_balance=False,
+    should_refund_savings_green=True,
+    recipient=None,
+    *,
+    sender,
+):
+    """Execute the removed single-auction API through its one-item batch equivalent."""
+    if recipient is None:
+        recipient = sender
+    purchase = (liq_user, vault_id, asset, MAX_UINT256)
+    return teller.buyManyFungibleAuctions(
+        [purchase],
+        payment_amount,
+        is_payment_savings_green,
+        should_transfer_balance,
+        should_refund_savings_green,
+        recipient,
+        sender=sender,
+    )
+
+
+def claim_from_stability_pool(
+    teller,
+    vault_id,
+    stab_asset,
+    claim_asset,
+    max_usd_value=MAX_UINT256,
+    user=None,
+    should_auto_deposit=False,
+    *,
+    sender,
+):
+    """Execute the removed single-claim API through its one-item batch equivalent."""
+    if user is None:
+        user = sender
+    claim = (stab_asset, claim_asset, max_usd_value)
+    return teller.claimManyFromStabilityPool(
+        vault_id,
+        [claim],
+        user,
+        should_auto_deposit,
+        sender=sender,
+    )
+
+
+def redeem_from_stability_pool(
+    teller,
+    vault_id,
+    claim_asset,
+    payment_amount=MAX_UINT256,
+    recipient=None,
+    should_auto_deposit=False,
+    is_payment_savings_green=False,
+    should_refund_savings_green=True,
+    *,
+    sender,
+):
+    """Execute the removed single-pool redemption through its one-item batch equivalent."""
+    if recipient is None:
+        recipient = sender
+    redemption = (claim_asset, MAX_UINT256)
+    return teller.redeemManyFromStabilityPool(
+        vault_id,
+        [redemption],
+        payment_amount,
+        recipient,
+        should_auto_deposit,
+        is_payment_savings_green,
+        should_refund_savings_green,
+        sender=sender,
+    )
 
 
 def set_full_payoff_params(
@@ -156,7 +554,7 @@ def createAuctionParams():
 
 
 @pytest.fixture(scope="session")
-def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms):
+def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms, price_desk, governance):
     def setAssetConfig(
         _asset,
         _vaultIds = [3], # default simple erc20 vault
@@ -205,6 +603,13 @@ def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms):
             _isNft,
         )
         mission_control.setAssetConfig(_asset, asset_config, sender=switchboard_bravo.address)
+        if not _isNft:
+            ensure_token_scale(
+                price_desk,
+                _asset,
+                switchboard_bravo.address,
+                gov=governance.address,
+            )
     yield setAssetConfig
 
 

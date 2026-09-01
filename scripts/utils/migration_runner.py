@@ -1,10 +1,10 @@
 import importlib.util
 import os
 import re
-from operator import itemgetter
 
 from scripts.utils import log
-from scripts.utils.migration import Migration
+from scripts.utils.migration import (Migration, MigrationHistoryError,
+                                     history_has_deployment)
 from scripts.utils.deploy_args import DeployArgs
 
 
@@ -37,6 +37,88 @@ class MigrationRunner:
         self.files = files
         self.gas = 0
 
+    def _known_migration_timestamps(self):
+        return {
+            timestamp
+            for _filename, timestamp, _prev in self._filtered_migration_filenames(
+                None, "0"
+            )
+        }
+
+    def _recorded_frontier(self):
+        """Latest migration this history has a completion marker for."""
+        try:
+            return self._latest_manifest_timestamp()
+        except RuntimeError:
+            # MIGRATION_RESUME_CHECKPOINT_REQUIRED: a current manifest with no
+            # numeric checkpoint. Nothing is proven complete, so no start point
+            # can be shown to be safe.
+            return None
+
+    def _require_start_point(self, deploy_args, start_timestamp):
+        # A history holding current-manifest.json has been deployed. Running
+        # against it again requires naming where to continue from, and the name
+        # has to be checked rather than merely non-empty: `int(value) > 0` was
+        # satisfied by `1`, which selects essentially the whole history -- 16
+        # migrations on robinhood-mainnet, the exact redeployment this guard
+        # exists to prevent.
+        #
+        # The value must name the earliest known migration after the latest
+        # completion marker. Merely requiring a later timestamp would let an
+        # operator skip unfinished stages whose postconditions later stages
+        # depend on. There is deliberately no override; --force-replay is the
+        # more dangerous mode, not a bypass.
+        if not history_has_deployment(self.history_dir):
+            return
+
+        text = "" if start_timestamp is None else str(start_timestamp).strip()
+        # "0" is the sentinel for "from the beginning", not a start point.
+        if not text.isdigit() or int(text) == 0:
+            raise MigrationHistoryError(
+                "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
+                f"{self.history_dir} already holds a deployed "
+                "current-manifest.json. Pass --start-timestamp naming the first "
+                "migration to run; the default would select deployed history "
+                "from the beginning."
+            )
+
+        known = self._known_migration_timestamps()
+        if text not in known:
+            raise MigrationHistoryError(
+                f"H06_START_TIMESTAMP_UNKNOWN: {text} names no migration in "
+                f"{self.migrations_dir}."
+            )
+
+        frontier = self._recorded_frontier()
+        if frontier is None:
+            raise MigrationHistoryError(
+                "H06_NO_RECORDED_FRONTIER: "
+                f"{self.history_dir} has a current manifest but no numeric "
+                "completion marker, so no start point can be shown to be safe."
+            )
+        if int(text) <= int(frontier):
+            raise MigrationHistoryError(
+                f"H06_START_TIMESTAMP_NOT_AFTER_FRONTIER: {text} is at or "
+                f"before {frontier}, the latest migration this history records "
+                "as complete. Re-running it would repeat work already done."
+            )
+
+        unfinished = sorted(
+            (timestamp for timestamp in known if int(timestamp) > int(frontier)),
+            key=int,
+        )
+        if not unfinished:
+            raise MigrationHistoryError(
+                "H06_NO_UNFINISHED_MIGRATION: no known migration follows "
+                f"the recorded frontier {frontier}."
+            )
+        expected = unfinished[0]
+        if text != expected:
+            raise MigrationHistoryError(
+                f"H06_START_TIMESTAMP_NOT_NEXT: {text} would skip {expected}, "
+                "the earliest migration not recorded complete."
+            )
+
     def run(self, deploy_args: DeployArgs, start_timestamp=None, end_timestamp=None, continue_running=True):
         """
         Run migrations starting at `start_timestamp`. If no start timestamp is provided,
@@ -52,11 +134,23 @@ class MigrationRunner:
         named `current-manifest.json` will be also be saved in the history directory,
         duplicating the manifest of the latest migration.
         """
+        if not __debug__:
+            raise MigrationHistoryError(
+                "MIGRATION_OPTIMIZED_MODE_FORBIDDEN: migrations require Python "
+                "assertions because deployment validation must not be stripped"
+            )
+
+        self._require_start_point(deploy_args, start_timestamp)
+
         for migrate, timestamp, prev_timestamp in self._migrations(start_timestamp, end_timestamp):
             log.h1(f"Running migration with timestamp {timestamp}...")
             try:
                 migration = Migration(
-                    deploy_args, self.files, timestamp, prev_timestamp, self.history_dir
+                    deploy_args,
+                    self.files,
+                    timestamp,
+                    prev_timestamp,
+                    self.history_dir,
                 )
                 migrate(migration)
                 self.gas += migration.end()
@@ -127,7 +221,23 @@ class MigrationRunner:
 
             if end_timestamp_int is not None and timestamp_int > end_timestamp_int:
                 break
-            if start_timestamp_int is None or timestamp_int >= start_timestamp_int:
+            # `inclusive` was declared, documented and passed by the auto-resume
+            # call above, but never read here -- both modes compared with `>=`.
+            # That made resuming re-run the migration that produced the latest
+            # manifest. On both mainnets the resume point is 2026080700, whose
+            # migration deploys the CCIP token pools, so a resume would have
+            # deployed a second set against a live chain.
+            #
+            # This is origin/rh's implementation verbatim. rh fixed the same bug
+            # after c70f14e slimmed this file from the pre-rh baseline, so the
+            # slim carried the inert version forward. Keeping rh's exact form
+            # means the merge is a no-op here rather than a competing rewrite.
+            starts_here = (
+                start_timestamp_int is None
+                or timestamp_int > start_timestamp_int
+                or (inclusive and timestamp_int == start_timestamp_int)
+            )
+            if starts_here:
                 migrations.append((filename, timestamp, prev_timestamp))
             prev_timestamp = timestamp
 
@@ -139,16 +249,22 @@ class MigrationRunner:
 
         latest_timestamp = None
 
-        # create the history directory if it doesn't already exist
-        os.makedirs(self.history_dir, exist_ok=True)
+        if not os.path.isdir(self.history_dir):
+            raise RuntimeError("MIGRATION_HISTORY_UNAVAILABLE")
 
-        # scan each file to get the latest timestamp
+        # Only a numeric manifest is a completed checkpoint. `current` is a
+        # state index, and `*-pending-manifest.json` is an incomplete journal;
+        # neither may silently advance resume.
         for file in os.listdir(self.history_dir):
-            match = re.fullmatch(r"(.*)\-manifest\.json$", file)
+            match = re.fullmatch(r"(\d+)\-manifest\.json$", file)
             if match:
                 timestamp = match.group(1)
-                # Convert timestamps to integers for proper numerical comparison
                 if latest_timestamp == None or int(timestamp) > int(latest_timestamp):
                     latest_timestamp = timestamp
+
+        if latest_timestamp is None and os.path.exists(
+            os.path.join(self.history_dir, "current-manifest.json")
+        ):
+            raise RuntimeError("MIGRATION_RESUME_CHECKPOINT_REQUIRED")
 
         return latest_timestamp

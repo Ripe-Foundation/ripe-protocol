@@ -1,7 +1,31 @@
+from hashlib import sha256
+from pathlib import Path
+
 import boa
 import pytest
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs
+
+
+@pytest.mark.artifact
+def test_deleverage_source_abi_and_vault_interface_hashes_are_current():
+    """Pin the approved quarantine implementation and its exported ABI."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    expected = {
+        "contracts/core/Deleverage.vy": (
+            "b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1"
+        ),
+        "scripts/abis/Deleverage.json": (
+            "e1d03ccd37548984f2c0a0b016cdb3c2730549793676f6172f3a70670cb43b3e"
+        ),
+        "interfaces/Vault.vyi": (
+            "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"
+        ),
+    }
+
+    for path, expected_digest in expected.items():
+        assert sha256((repo_root / path).read_bytes()).hexdigest() == expected_digest
 
 
 @pytest.fixture
@@ -114,6 +138,7 @@ def test_swap_collateral_basic_same_vault(
     setupSwapScenario,
     price_desk,
     _test,
+    ledger,
 ):
     """Test basic swap from alpha to bravo in same vault with equal USD value"""
     # Setup: bob has 1000 alpha, governance has 1000 bravo
@@ -137,6 +162,8 @@ def test_swap_collateral_basic_same_vault(
     initial_bob_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     initial_gov_alpha = alpha_token.balanceOf(governance)
     initial_gov_bravo = bravo_token.balanceOf(governance)
+    previous_touch = ledger.lastTouch(bob)
+    boa.env.time_travel(blocks=1)
 
     # Execute swap: withdraw all alpha, deposit equivalent bravo
     withdrawn, deposited = deleverage.swapCollateral(
@@ -177,6 +204,65 @@ def test_swap_collateral_basic_same_vault(
     # Verify USD value matches the withdrawn amount's value
     expected_usd = price_desk.getUsdValue(alpha_token, withdrawn, True)
     _test(log.usdValue, expected_usd, _buffer=50)
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
+    assert ledger.lastTouch(bob) != previous_touch
+
+
+def test_swap_collateral_external_housekeeping_failure_rolls_back_all_effects(
+    deleverage,
+    bob,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    governance,
+    simple_erc20_vault,
+    vault_book,
+    setupSwapScenario,
+    ledger,
+    switchboard_alpha,
+):
+    setupSwapScenario(
+        user=bob,
+        withdraw_token=alpha_token,
+        deposit_token=bravo_token,
+        withdraw_whale=alpha_token_whale,
+        deposit_whale=bravo_token_whale,
+        governance=governance,
+        deleverage=deleverage,
+        withdraw_vault=simple_erc20_vault,
+    )
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    before = (
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        alpha_token.balanceOf(governance),
+        bravo_token.balanceOf(governance),
+        ledger.lastTouch(bob),
+    )
+
+    # swapCollateral calls performHousekeeping(False, bob, True, a) only
+    # after both collateral legs; a Ledger failure must unwind all of them.
+    ledger.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("not activated"):
+        deleverage.swapCollateral(
+            bob,
+            vault_id,
+            alpha_token,
+            vault_id,
+            bravo_token,
+            MAX_UINT256,
+            sender=governance.address,
+        )
+
+    after = (
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        alpha_token.balanceOf(governance),
+        bravo_token.balanceOf(governance),
+        ledger.lastTouch(bob),
+    )
+    assert after == before
 
 
 def test_swap_collateral_different_vaults(
@@ -1239,7 +1325,7 @@ def test_swap_no_collateral_fails(
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # Bob has no alpha collateral, so withdrawal should fail
-    with boa.reverts():
+    with boa.reverts("no collateral withdrawn"):
         deleverage.swapCollateral(
             bob,
             vault_id,

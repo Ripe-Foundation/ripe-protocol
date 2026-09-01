@@ -1144,6 +1144,33 @@
     "type": "event"
   },
   {
+    "name": "PriceSnapshotAdded",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "priceSourceId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "priceSourceAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "didUpdate",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -3080,6 +3107,27 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "addPriceSnapshot",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_priceSourceId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "setCanPerformLiteAction",
     "inputs": [
       {
@@ -3748,6 +3796,10 @@
       },
       {
         "name": "_maxConfigTimeLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_pythPricesId",
         "type": "uint256"
       }
     ],

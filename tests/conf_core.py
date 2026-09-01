@@ -2,7 +2,16 @@ import pytest
 import boa
 
 from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS, CORE_TOKENS
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
+from constants import (
+    ZERO_ADDRESS,
+    EIGHTEEN_DECIMALS,
+    HUNDRED_PERCENT,
+    GREEN_CCIP_POOL_HQ_ID,
+    RIPE_CCIP_POOL_HQ_ID,
+    VAULT_MIGRATOR_HQ_ID,
+    RIPE_RESERVE_ENGINE_HQ_ID,
+    RIPE_RESERVE_VESTING_HQ_ID,
+)
 
 
 ###########
@@ -40,6 +49,7 @@ def ripe_hq(
     human_resources,
     mission_control,
     switchboard,
+    switchboard_charlie,
     credit_engine,
     deleverage,
     endaoment,
@@ -53,6 +63,13 @@ def ripe_hq(
     teller_utils,
     endaoment_funds,
     endaoment_psm,
+    green_ccip_pool_placeholder,
+    ripe_ccip_pool_placeholder,
+    vault_migrator,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -78,6 +95,20 @@ def ripe_hq(
     # 7
     assert ripe_hq_deploy.startAddNewAddressToRegistry(price_desk, "Price Desk", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(price_desk, sender=deploy3r) == 7
+
+    # Common priced test tokens bypass Bravo onboarding. Cache their scales
+    # before governance handoff so valuation never calls token decimals.
+    for token in (
+        green_token,
+        savings_green,
+        ripe_token,
+        alpha_token,
+        bravo_token,
+        charlie_token,
+        delta_token,
+    ):
+        if price_desk.tokenScale(token) == 0:
+            price_desk.syncTokenScale(token, sender=deploy3r)
 
     # 8
     assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_book, "Vault Book", sender=deploy3r)
@@ -141,6 +172,30 @@ def ripe_hq(
     assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_psm, "Endaoment PSM", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_psm, sender=deploy3r) == 22
 
+    # 23 and 24 are occupied by the two CCIP pools on both deployment chains.
+    # Local tests use inert departments so VaultMigrator retains its production id.
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(
+        ripe_ccip_pool_placeholder, "RIPE CCIP Pool Placeholder", sender=deploy3r,
+    )
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(
+        ripe_ccip_pool_placeholder, sender=deploy3r,
+    ) == RIPE_CCIP_POOL_HQ_ID
+
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(
+        green_ccip_pool_placeholder, "GREEN CCIP Pool Placeholder", sender=deploy3r,
+    )
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(
+        green_ccip_pool_placeholder, sender=deploy3r,
+    ) == GREEN_CCIP_POOL_HQ_ID
+
+    # 25
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_migrator, "Vault Migrator", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(
+        vault_migrator, sender=deploy3r,
+    ) == VAULT_MIGRATOR_HQ_ID
+    assert ripe_hq_deploy.getAddr(RIPE_RESERVE_ENGINE_HQ_ID) == ZERO_ADDRESS
+    assert ripe_hq_deploy.getAddr(RIPE_RESERVE_VESTING_HQ_ID) == ZERO_ADDRESS
+
     # special permission setup
 
     # switchboard can set token blacklists
@@ -182,6 +237,10 @@ def ripe_hq(
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
     assert ripe_hq_deploy.finishRipeHqSetup(governance, sender=deploy3r)
+
+    # Canonical vault pointers used by the default local test deployment.
+    mission_control.setCoreRipeGovVaultId(2, sender=switchboard_charlie.address)
+    mission_control.setPreferredStabVaultId(1, sender=switchboard_charlie.address)
 
     return ripe_hq_deploy
 
@@ -253,6 +312,7 @@ def ledger(ripe_hq_deploy, defaults):
         "contracts/data/Ledger.vy",
         ripe_hq_deploy,
         defaults,
+        ZERO_ADDRESS,
         name="ledger",
     )
 
@@ -349,10 +409,11 @@ def bond_room(ripe_hq_deploy, bond_booster):
 
 
 @pytest.fixture(scope="session")
-def credit_engine(ripe_hq_deploy):
+def credit_engine(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/CreditEngine.vy",
         ripe_hq_deploy,
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="credit_engine",
     )
 
@@ -367,6 +428,7 @@ def endaoment(ripe_hq_deploy, fork):
         ripe_hq_deploy,
         ADDYS[fork]["WETH"],
         ADDYS[fork]["ETH"],
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="endaoment",
     )
 
@@ -428,6 +490,7 @@ def lootbox(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Lootbox.vy",
         ripe_hq_deploy,
+        43_200, # minimum interval floor: 1 day in Base blocks
         43_200, # 1 day in blocks
         100 * EIGHTEEN_DECIMALS, # deposit rewards amount
         100 * EIGHTEEN_DECIMALS, # yield bonus amount
@@ -439,11 +502,12 @@ def lootbox(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def teller(ripe_hq_deploy):
+def teller(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/Teller.vy",
         ripe_hq_deploy,
         False,
+        PARAMS[fork]["CURVE_PRICES_ID"],
         name="teller",
     )
 
@@ -469,6 +533,42 @@ def teller_utils(ripe_hq_deploy):
         "contracts/core/TellerUtils.vy",
         ripe_hq_deploy,
         name="teller_utils",
+    )
+
+
+# vault migrator
+
+
+@pytest.fixture(scope="session")
+def green_ccip_pool_placeholder(ripe_hq_deploy):
+    return boa.load(
+        "contracts/mock/MockDepartment.vy",
+        ripe_hq_deploy,
+        False,
+        False,
+        name="green_ccip_pool_placeholder",
+    )
+
+
+@pytest.fixture(scope="session")
+def ripe_ccip_pool_placeholder(ripe_hq_deploy):
+    return boa.load(
+        "contracts/mock/MockDepartment.vy",
+        ripe_hq_deploy,
+        False,
+        False,
+        name="ripe_ccip_pool_placeholder",
+    )
+
+
+@pytest.fixture(scope="session")
+def vault_migrator(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/VaultMigrator.vy",
+        ripe_hq_deploy,
+        False,
+        ZERO_ADDRESS,
+        name="vault_migrator",
     )
 
 
@@ -538,6 +638,7 @@ def switchboard_alpha(ripe_hq_deploy, fork):
         PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["PYTH_PRICES_ID"],
         name="switchboard_alpha",
     )
 
@@ -606,12 +707,12 @@ def switchboard_echo(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def defaults(fork, contributor_template, training_wheels, mock_undy_v2):
+def defaults(fork):
     d = ZERO_ADDRESS
     if fork == "local":
         d = boa.load("contracts/config/DefaultsLocal.vy")
     elif fork == "base":
-        d = boa.load("contracts/config/DefaultsBase.vy", contributor_template, training_wheels, mock_undy_v2)
+        d = boa.load("contracts/config/DefaultsBase.vy")
     return d
 
 
@@ -724,6 +825,15 @@ def stability_pool(ripe_hq_deploy):
     )
 
 
+@pytest.fixture(scope="function")
+def alternate_stability_pool(ripe_hq):
+    return boa.load(
+        "contracts/vaults/StabilityPool.vy",
+        ripe_hq,
+        name="alternate_stability_pool",
+    )
+
+
 # ripe gov vault
 
 
@@ -733,6 +843,15 @@ def ripe_gov_vault(ripe_hq_deploy):
         "contracts/vaults/RipeGov.vy",
         ripe_hq_deploy,
         name="ripe_gov_vault",
+    )
+
+
+@pytest.fixture(scope="function")
+def alternate_ripe_gov_vault(ripe_hq):
+    return boa.load(
+        "contracts/vaults/RipeGov.vy",
+        ripe_hq,
+        name="alternate_ripe_gov_vault",
     )
 
 
@@ -797,8 +916,13 @@ def price_desk(
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 6
 
-    # register aero ripe prices
-    assert price_desk_deploy.startAddNewAddressToRegistry(aero_ripe_prices, "Aero Ripe Prices", sender=deploy3r)
+    # Test-only inert registration preserves the established source IDs used by
+    # the shared bootstrap. Production must not register the Aero monitor.
+    assert price_desk_deploy.startAddNewAddressToRegistry(
+        aero_ripe_prices,
+        "Aero Monitor (test only)",
+        sender=deploy3r,
+    )
     assert price_desk_deploy.confirmNewAddressToRegistry(aero_ripe_prices, sender=deploy3r) == 7
 
     # register wsuper oethb prices
@@ -827,8 +951,10 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     CHAINLINK_ETH_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_ETH_USD"]
     CHAINLINK_BTC_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_BTC_USD"]
 
-    # For forked tests, use staleTime=0 since historical Chainlink data may be stale
-    default_stale_time = 0 if fork != "local" else 60 * 60 * 24  # 1 day for local
+    # This session fixture configures Chainlink before the autouse RipeHq fixture
+    # registers MissionControl. Use an explicit bounded policy during bootstrap;
+    # staleTime=0 now inherits MissionControl and must fail closed while it is absent.
+    default_stale_time = 7 * 24 * 60 * 60 if fork != "local" else 24 * 60 * 60
 
     c = boa.load(
         "contracts/priceSources/ChainlinkPrices.vy",
@@ -846,10 +972,14 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     )
 
     # testing setup with mock feeds (using sally/bob as fake assets here)
-    assert c.addNewPriceFeed(sally, mock_chainlink_feed_one, sender=deploy3r)
+    assert c.addNewPriceFeed(
+        sally, mock_chainlink_feed_one, default_stale_time, sender=deploy3r
+    )
     assert c.confirmNewPriceFeed(sally, sender=deploy3r)
 
-    assert c.addNewPriceFeed(bob, mock_chainlink_feed_two, sender=deploy3r)
+    assert c.addNewPriceFeed(
+        bob, mock_chainlink_feed_two, default_stale_time, sender=deploy3r
+    )
     assert c.confirmNewPriceFeed(bob, sender=deploy3r)
 
     # finish setup
@@ -887,6 +1017,7 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r, green_token, savings_green):
 def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
     MORPHO_A = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY"]
     MORPHO_B = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY_LEGACY"]
+    MORPHO_V2 = mock_yield_registry if fork == "local" else ZERO_ADDRESS
     EULER_A = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EVAULT_FACTORY"]
     EULER_B = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EARN_FACTORY"]
     FLUID = mock_yield_registry if fork == "local" else ADDYS[fork]["FLUID_RESOLVER"]
@@ -906,6 +1037,7 @@ def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
         COMPOUND_V3,
         MOONWELL,
         AAVE_V3,
+        MORPHO_V2,
         name="blue_chip_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
@@ -956,21 +1088,36 @@ def stork_prices(ripe_hq_deploy, fork, deploy3r, mock_stork):
 
 
 @pytest.fixture(scope="session")
-def aero_ripe_prices(ripe_hq_deploy, fork, deploy3r):
-    ripe_weth_pool = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["RIPE_WETH_POOL"]
-    ripe_token = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["RIPE_TOKEN"]
+def aero_ripe_prices(ripe_hq_deploy, ripe_token):
+    weth = boa.load(
+        "contracts/mock/MockUniswapV2Token.vy",
+        18,
+        name="aero_monitor_weth",
+    )
+    ripe_weth_pool = boa.load(
+        "contracts/mock/MockAeroRipePool.vy",
+        ripe_token,
+        weth,
+        name="aero_monitor_pool",
+    )
+    # Plausible nonzero reserves keep the test-only monitor self-consistent;
+    # bootstrap consumers still see it only through the inert PriceSource API.
+    ripe_weth_pool.configureState(
+        100 * EIGHTEEN_DECIMALS,
+        10 * EIGHTEEN_DECIMALS,
+        1_700_000_000,
+    )
 
     c = boa.load(
         "contracts/priceSources/AeroRipePrices.vy",
         ripe_hq_deploy,
-        ZERO_ADDRESS,
         ripe_weth_pool,
         ripe_token,
-        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
-        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        weth,
         name="aero_ripe_prices",
     )
-    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert c.isMonitoringOnly()
+    assert c.getPriceAndHasFeed(ripe_token) == (0, False)
     return c
 
 

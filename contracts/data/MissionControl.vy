@@ -9,7 +9,7 @@
 #     ╚═══════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025    
+#     Ripe Foundation (C) 2026    
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -193,6 +193,9 @@ rewardsConfig: public(cs.RipeRewardsConfig)
 totalPointsAllocs: public(TotalPointsAllocs)
 
 # vault cs
+coreRipeGovVaultId: public(uint256)
+preferredStabVaultId: public(uint256)
+isStabVaultId: public(HashMap[uint256, bool])
 ripeGovVaultConfig: public(HashMap[address, cs.RipeGovVaultConfig]) # asset -> cs
 priorityLiqAssetVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
 priorityStabVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
@@ -207,6 +210,7 @@ priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
 underscoreRegistry: public(address)
 trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
+isRipeGovVaultId: public(HashMap[uint256, bool])
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -221,6 +225,10 @@ def __init__(_ripeHq: address, _defaults: address):
 
     self.numAssets = 1 # not using 0 index
     self.numLiteSigners = 1 # not using 0 index, 0 means "not in list"
+    self.preferredStabVaultId = 1
+    self.isStabVaultId[1] = True
+    self.coreRipeGovVaultId = 2
+    self.isRipeGovVaultId[2] = True
 
     # defaults
     if _defaults != empty(address):
@@ -245,6 +253,9 @@ def __init__(_ripeHq: address, _defaults: address):
         # priority lists
         self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
         self.priorityStabVaults = staticcall Defaults(_defaults).priorityStabVaults()
+        for vault: cs.VaultLite in self.priorityStabVaults:
+            if vault.vaultId != 0:
+                self.isStabVaultId[vault.vaultId] = True
         self.priorityPriceSourceIds = staticcall Defaults(_defaults).priorityPriceSourceIds()
 
         # lite signers
@@ -298,6 +309,10 @@ def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
+    # monotonic because retired stability pools can still hold user balances.
+    if _config.specialStabPoolId != 0:
+        self.isStabVaultId[_config.specialStabPoolId] = True
+
     # register asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
         self._registerAsset(_asset)
@@ -325,6 +340,8 @@ def deregisterAsset(_asset: address) -> bool:
     targetIndex: uint256 = self.indexOfAsset[_asset]
     if targetIndex == 0:
         return False
+
+    assert self.assetConfig[_asset].stakersPointsAlloc == 0 and self.assetConfig[_asset].voterPointsAlloc == 0 # dev: active points alloc
 
     # update data
     lastIndex: uint256 = numAssets - 1
@@ -391,6 +408,29 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
 ################
 
 
+# core ripe gov vault id
+
+
+@external
+def setCoreRipeGovVaultId(_vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _vaultId != 0 # dev: invalid vault id
+    self.isRipeGovVaultId[self.coreRipeGovVaultId] = True
+    self.isRipeGovVaultId[_vaultId] = True
+    self.coreRipeGovVaultId = _vaultId
+
+
+# preferred stability pool vault id
+
+
+@external
+def setPreferredStabVaultId(_vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _vaultId != 0 # dev: invalid vault id
+    self.preferredStabVaultId = _vaultId
+    self.isStabVaultId[_vaultId] = True
+
+
 # ripe gov vault
 
 
@@ -425,6 +465,9 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
 def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityStabVaults = _priorityStabVaults
+    for vault: cs.VaultLite in _priorityStabVaults:
+        if vault.vaultId != 0:
+            self.isStabVaultId[vault.vaultId] = True
 
 
 ################
@@ -735,13 +778,15 @@ def getGenLiqConfig() -> GenLiqConfig:
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []
     for pData: cs.VaultLite in self.priorityLiqAssetVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
-        priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
+        if vaultAddr != empty(address):
+            priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     # stability pool vault data
     priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []
     for pData: cs.VaultLite in self.priorityStabVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
-        priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
+        if vaultAddr != empty(address):
+            priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     return GenLiqConfig(
         canLiquidate=self.genConfig.canLiquidate,

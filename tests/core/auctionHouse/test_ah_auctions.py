@@ -1,9 +1,40 @@
-import boa
+from hashlib import sha256
+from pathlib import Path
 
-from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+import boa
+import pytest
+from boa.contracts.base_evm_contract import BoaError
+
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ONE_YEAR, ZERO_ADDRESS
+from conf_utils import (
+    assert_reverted_call,
+    buy_fungible_auction,
+    clear_transient_storage,
+    filter_logs,
+)
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
+
+
+@pytest.mark.artifact
+def test_auction_house_source_abi_and_vault_interface_are_frozen():
+    """The current backing-aware consumer source keeps its public boundaries exact."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    expected = {
+        "contracts/core/AuctionHouse.vy": (
+            "e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e"
+        ),
+        "scripts/abis/AuctionHouse.json": (
+            "5fd8e740cee561933a74fc64136ad2a3e42867b9754c38ae596a85b83460d9e7"
+        ),
+        "interfaces/Vault.vyi": (
+            "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"
+        ),
+    }
+
+    for path, expected_digest in expected.items():
+        assert sha256((repo_root / path).read_bytes()).hexdigest() == expected_digest
 
 
 def test_ah_liquidation_auction_creation(
@@ -18,6 +49,7 @@ def test_ah_liquidation_auction_creation(
     mock_price_source,
     createDebtTerms,
     credit_engine,
+    ledger,
     sally,
 ):
     """Test auction creation when liquidation doesn't restore debt health
@@ -82,6 +114,8 @@ def test_ah_liquidation_auction_creation(
     # Verify user is still in liquidation
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
     assert user_debt.inLiquidation
+    assert ledger.hasFungibleAuctions(bob)
+    assert not credit_engine.canLiquidateUser(bob)
 
 
 def test_ah_liquidation_auction_discount_calculation(
@@ -153,7 +187,7 @@ def test_ah_liquidation_auction_discount_calculation(
     # Test auction purchase at start (minimum discount)
     # Auction starts immediately (delay=0), so we're already at start
     green_to_spend = 10 * EIGHTEEN_DECIMALS
-    green_spent_start = teller.buyFungibleAuction(
+    green_spent_start = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -164,7 +198,7 @@ def test_ah_liquidation_auction_discount_calculation(
     middle_blocks = duration // 2
     boa.env.time_travel(blocks=middle_blocks)
     
-    green_spent_middle = teller.buyFungibleAuction(
+    green_spent_middle = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
 
@@ -174,7 +208,7 @@ def test_ah_liquidation_auction_discount_calculation(
     near_end_blocks = middle_blocks - 1  # 2 blocks before end
     boa.env.time_travel(blocks=near_end_blocks)
     
-    green_spent_end = teller.buyFungibleAuction(
+    green_spent_end = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     _test(green_spent_end, green_to_spend)
@@ -182,7 +216,7 @@ def test_ah_liquidation_auction_discount_calculation(
     # Verify auction expires and reverts
     boa.env.time_travel(blocks=5)  # Move to end block
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
         )
 
@@ -296,6 +330,8 @@ def test_ah_liquidation_auction_position_depletion(
     performDeposit,
     alpha_token,
     alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
     bob,
     alice,
     teller,
@@ -305,6 +341,7 @@ def test_ah_liquidation_auction_position_depletion(
     green_token,
     whale,
     ledger,
+    credit_engine,
 ):
     """Test auction behavior when user's position is depleted
     
@@ -327,20 +364,31 @@ def test_ah_liquidation_auction_position_depletion(
         _shouldSwapInStabPools=False,
         _shouldAuctionInstantly=True,
     )
+    setAssetConfig(
+        bravo_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
 
     # Setup
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
     
     # Small position for easy depletion
     deposit_amount = 50 * EIGHTEEN_DECIMALS
     performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
-    debt_amount = 30 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+    debt_amount = 40 * EIGHTEEN_DECIMALS
     teller.borrow(debt_amount, bob, False, sender=bob)
 
     # Set liquidatable price
     new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
     mock_price_source.setPrice(alpha_token, new_price)
+    mock_price_source.setPrice(bravo_token, new_price)
 
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
@@ -356,12 +404,40 @@ def test_ah_liquidation_auction_position_depletion(
     assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)
 
     # Buy enough to deplete position
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_amount, False, sender=alice
     )
 
     # auction no longer exists
     assert not ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)
+    assert not ledger.hasFungibleAuctions(bob)
+
+    # Buying all auctionable collateral does not necessarily restore health.
+    # With no auction left, the account stays frozen but a later permissionless
+    # liquidation pass is allowed once the remaining position is again beyond
+    # its liquidation threshold.
+    residual_debt, residual_terms, _ = credit_engine.getLatestUserDebtAndTerms(
+        bob,
+        False,
+    )
+    assert residual_debt.inLiquidation
+    assert residual_debt.amount > residual_terms.totalMaxDebt
+    assert not credit_engine.canLiquidateUser(bob)
+
+    mock_price_source.setPrice(bravo_token, 10 * EIGHTEEN_DECIMALS // 100)
+    assert credit_engine.canLiquidateUser(bob)
+    clear_transient_storage()
+    debt_after_purchase = ledger.userDebt(bob).amount
+    keeper_before = green_token.balanceOf(sally)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
+    assert ledger.userDebt(bob).amount == debt_after_purchase
+    assert ledger.userDebt(bob).inLiquidation
+    assert green_token.balanceOf(sally) == keeper_before
+    retry_log = filter_logs(teller, "LiquidateUser")[0]
+    assert retry_log.totalLiqFees == 0
+    assert retry_log.keeperFee == 0
+    assert retry_log.repayAmount == 0
+    assert retry_log.numAuctionsStarted == 0
     
     # Verify alice received the collateral
     alice_alpha_balance = alpha_token.balanceOf(alice)
@@ -504,7 +580,7 @@ def test_ah_auction_buy_config_restrictions(
     setGeneralConfig(_canBuyInAuction=False)
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -520,7 +596,7 @@ def test_ah_auction_buy_config_restrictions(
     )
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -543,7 +619,7 @@ def test_ah_auction_buy_config_restrictions(
     
     # Alice is not on whitelist, should fail
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -551,7 +627,7 @@ def test_ah_auction_buy_config_restrictions(
     mock_whitelist.setAllowed(alice, alpha_token, True, sender=alice)
     
     # Test 4: Now buying should work
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent > 0  # Should succeed
@@ -635,7 +711,7 @@ def test_ah_auction_time_boundary_edge_cases(
     # Test 1: Before auction starts (should fail gracefully)
     # We're currently at liquidation_block, auction starts at liquidation_block + 5
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -643,7 +719,7 @@ def test_ah_auction_time_boundary_edge_cases(
     boa.env.time_travel(blocks=5)  # Move to start block
     assert boa.env.evm.patch.block_number == start_block
     
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     # At start of auction (0% discount), should spend exactly what we requested
@@ -655,20 +731,23 @@ def test_ah_auction_time_boundary_edge_cases(
     boa.env.time_travel(blocks=blocks_to_move)
     assert boa.env.evm.patch.block_number == end_block - 1
     
-    green_spent = teller.buyFungibleAuction(
+    alice_before = alpha_token.balanceOf(alice)
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    # At end of auction, should get some discount (spend less than at start)
-    # The exact amount depends on collateral availability and pricing
-    assert green_spent > 0  # Should successfully purchase
-    assert green_spent < 10 * EIGHTEEN_DECIMALS  # Should spend less due to discount
+    # Last purchasable block is exactly maxDiscount (50%).
+    collateral_received = alpha_token.balanceOf(alice) - alice_before
+    collateral_usd = collateral_received * new_price // EIGHTEEN_DECIMALS
+    assert green_spent > 0
+    assert collateral_usd > 0
+    assert green_spent * HUNDRED_PERCENT == collateral_usd * (HUNDRED_PERCENT - 50_00)
     
     # Test 4: Exactly at end block (should fail)
     boa.env.time_travel(blocks=1)  # Move to end block
     assert boa.env.evm.patch.block_number == end_block
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -676,7 +755,7 @@ def test_ah_auction_time_boundary_edge_cases(
     boa.env.time_travel(blocks=5)  # Move past end block
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
 
@@ -737,7 +816,7 @@ def test_ah_auction_insufficient_green_scenarios(
     
     # user has no green
     with boa.reverts("cannot transfer 0 amount"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, False, sender=alice
         )
    
@@ -848,19 +927,19 @@ def test_ah_auction_discount_calculation_edge_cases(
 
     # Test discount at start (should be 25%)
     green_to_spend = 10 * EIGHTEEN_DECIMALS
-    green_spent_start = teller.buyFungibleAuction(
+    green_spent_start = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
     # Test discount at middle (should still be 25%)
     boa.env.time_travel(blocks=50)  # Middle of auction
-    green_spent_middle = teller.buyFungibleAuction(
+    green_spent_middle = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
     # Test discount near end (should still be 25%)
     boa.env.time_travel(blocks=49)  # Near end of auction
-    green_spent_end = teller.buyFungibleAuction(
+    green_spent_end = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -935,7 +1014,7 @@ def test_ah_auction_payment_validation_edge_cases(
 
     # Test 1: Very small payment (1 wei)
     tiny_amount = 1  # 1 wei
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, tiny_amount, False, sender=alice
     )
     # Should spend exactly the tiny amount (no discount at start)
@@ -943,7 +1022,7 @@ def test_ah_auction_payment_validation_edge_cases(
     
     # Test 2: Odd number that might cause rounding issues
     odd_amount = 123456789  # Odd number in wei
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, odd_amount, False, sender=alice
     )
     # Should spend exactly the odd amount (no discount at start)
@@ -951,7 +1030,7 @@ def test_ah_auction_payment_validation_edge_cases(
     
     # Test 3: Large payment amount
     large_amount = 100 * EIGHTEEN_DECIMALS
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, large_amount, False, sender=alice
     )
     # Should spend exactly the large amount (no discount at start)
@@ -1069,19 +1148,19 @@ def test_ah_auction_multiple_asset_coordination(
 
     # Test coordinated auction purchases
     # Buy from alpha auction (available immediately)
-    green_spent_alpha = teller.buyFungibleAuction(
+    green_spent_alpha = buy_fungible_auction(teller,
         bob, alpha_auction.vaultId, alpha_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent_alpha > 0  # Should successfully purchase from alpha auction
     
     # Try to buy from bravo auction (should fail - not started yet due to delay)
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, bravo_auction.vaultId, bravo_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
     # Buy from charlie auction (available immediately)
-    green_spent_charlie = teller.buyFungibleAuction(
+    green_spent_charlie = buy_fungible_auction(teller,
         bob, charlie_auction.vaultId, charlie_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent_charlie > 0  # Should successfully purchase from charlie auction
@@ -1090,7 +1169,7 @@ def test_ah_auction_multiple_asset_coordination(
     boa.env.time_travel(blocks=5)
     
     # Now bravo auction should work
-    green_spent_bravo = teller.buyFungibleAuction(
+    green_spent_bravo = buy_fungible_auction(teller,
         bob, bravo_auction.vaultId, bravo_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent_bravo > 0  # Should successfully purchase from bravo auction
@@ -1163,7 +1242,7 @@ def test_ah_auction_savings_green_preferences(
     alice_savings_before = savings_green.balanceOf(alice)
     
     # Spend less than available to create leftover
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_amount, False, True, sender=alice  # True = wants savings GREEN
     )
     assert green_spent != 0
@@ -1366,7 +1445,7 @@ def test_ah_auction_user_exits_liquidation_via_auction_purchases(
     green_token.approve(teller, amount_to_repay, sender=alice)
 
     # Purchase auction with amount to restore health
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, amount_to_repay, False, sender=alice
     )
     
@@ -1383,6 +1462,554 @@ def test_ah_auction_user_exits_liquidation_via_auction_purchases(
     final_ltv = user_debt_final.amount * 100 // bt_final.collateralVal if bt_final.collateralVal > 0 else 0
     assert final_ltv < 80  # LTV is definitely safe (should be around 76% based on our calculation)
     
+
+def test_ah_auction_repayment_caps_and_returns_payer_leftover(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    credit_engine,
+    ledger,
+    green_token,
+    savings_green,
+    whale,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    debt = 100 * EIGHTEEN_DECIMALS
+    assert teller.borrow(debt, bob, False, sender=bob) == debt
+
+    # $110 of collateral against $100 debt is liquidatable but still creates
+    # an auction purchase whose GREEN spend can exceed the remaining debt.
+    mock_price_source.setPrice(
+        alpha_token,
+        55 * EIGHTEEN_DECIMALS // 100,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
+    assert auction_log.liqUser == bob
+    assert auction_log.liqUser != ZERO_ADDRESS
+    assert ledger.hasFungibleAuction(
+        bob,
+        auction_log.vaultId,
+        alpha_token,
+    )
+
+    debt_before = ledger.userDebt(bob).amount
+    supply_before = green_token.totalSupply()
+    debtor_green_before = green_token.balanceOf(bob)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+    payer_sgreen_before = savings_green.balanceOf(alice)
+    savings_assets_before = green_token.balanceOf(savings_green)
+
+    payment = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    payer_green_before = green_token.balanceOf(alice)
+    green_spent = buy_fungible_auction(
+        teller,
+        bob,
+        auction_log.vaultId,
+        alpha_token,
+        payment,
+        False,
+        False,
+        False,
+        sender=alice,
+    )
+
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.user == bob
+    assert green_spent == debt_before
+    assert repay_log.repayValue == debt_before
+    assert repay_log.refundAmount == 0
+    assert repay_log.refundWasSavingsGreen
+    assert ledger.userDebt(bob).amount == 0
+
+    # AuctionHouse returns the unspent payment to the payer before CreditEngine,
+    # so no discounted collateral or debtor refund is created by overpayment.
+    assert green_token.totalSupply() == supply_before - debt_before
+    assert payer_green_before - green_token.balanceOf(alice) == debt_before
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert savings_green.balanceOf(bob) == debtor_sgreen_before
+    assert savings_green.balanceOf(alice) == payer_sgreen_before
+    assert green_token.balanceOf(savings_green) == savings_assets_before
+    purchase_log = filter_logs(teller, "FungAuctionPurchased")[0]
+    assert purchase_log.liqUser == bob
+    assert purchase_log.greenSpent == green_spent
+
+
+def test_auction_purchase_caps_spend_and_discounted_collateral_at_live_debt(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    credit_engine,
+    ledger,
+    green_token,
+    savings_green,
+    whale,
+    createDebtTerms,
+    createAuctionParams,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    auction_params = createAuctionParams(
+        _startDiscount=17_00,
+        _maxDiscount=17_00,
+        _duration=100,
+    )
+    debt_terms = createDebtTerms(
+        _ltv=10_00,
+        _redemptionThreshold=20_00,
+        _liqThreshold=25_00,
+        _liqFee=0,
+        _borrowRate=10_00,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+        _customAuctionParams=auction_params,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        1_000 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 20 * EIGHTEEN_DECIMALS // 100)
+    teller.liquidateUser(bob, False, sender=sally)
+    auction = filter_logs(teller, "FungibleAuctionUpdated")[0]
+
+    boa.env.evm.patch.timestamp += ONE_YEAR
+    live_debt = credit_engine.getUserDebtAmount(bob)
+    assert live_debt > 100 * EIGHTEEN_DECIMALS
+
+    payment = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    payer_green_before = green_token.balanceOf(alice)
+    buyer_collateral_before = alpha_token.balanceOf(alice)
+    borrower_sgreen_before = savings_green.balanceOf(bob)
+    supply_before = green_token.totalSupply()
+
+    green_spent = buy_fungible_auction(
+        teller,
+        bob,
+        auction.vaultId,
+        alpha_token,
+        payment,
+        False,
+        False,
+        False,
+        sender=alice,
+    )
+
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    purchase_log = filter_logs(teller, "FungAuctionPurchased")[0]
+    collateral_received = alpha_token.balanceOf(alice) - buyer_collateral_before
+    collateral_value = (
+        collateral_received * 20 * EIGHTEEN_DECIMALS
+        // (100 * EIGHTEEN_DECIMALS)
+    )
+    net_rate = HUNDRED_PERCENT - 17_00
+    expected_collateral_value = live_debt * HUNDRED_PERCENT // net_rate
+    expected_spend = expected_collateral_value * net_rate // HUNDRED_PERCENT
+    assert expected_spend < live_debt
+    assert live_debt - expected_spend == 1
+    assert green_spent == expected_spend
+    assert payer_green_before - green_token.balanceOf(alice) == expected_spend
+    assert repay_log.repayValue == expected_spend
+    assert repay_log.refundAmount == 0
+    assert purchase_log.greenSpent == expected_spend
+    assert collateral_value == expected_collateral_value
+    assert savings_green.balanceOf(bob) == borrower_sgreen_before
+    assert green_token.totalSupply() == supply_before - expected_spend
+    assert ledger.userDebt(bob).amount == live_debt - expected_spend
+    assert not ledger.hasFungibleAuctions(bob)
+
+
+@pytest.mark.parametrize(
+    "first_purchase",
+    [60, 100],
+    ids=["first-partially-repays", "first-clears-debt"],
+)
+def test_batch_recomputes_same_borrower_debt_before_each_purchase(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    ledger,
+    green_token,
+    whale,
+    createDebtTerms,
+    createAuctionParams,
+    first_purchase,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    auction_params = createAuctionParams(
+        _startDiscount=20_00,
+        _maxDiscount=20_00,
+        _duration=100,
+    )
+    debt_terms = createDebtTerms(
+        _ltv=10_00,
+        _redemptionThreshold=20_00,
+        _liqThreshold=25_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    for token in (alpha_token, bravo_token):
+        setAssetConfig(
+            token,
+            _debtTerms=debt_terms,
+            _shouldSwapInStabPools=False,
+            _shouldAuctionInstantly=True,
+            _customAuctionParams=auction_params,
+        )
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+    performDeposit(
+        bob,
+        1_000 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    performDeposit(
+        bob,
+        1_000 * EIGHTEEN_DECIMALS,
+        bravo_token,
+        bravo_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    for token in (alpha_token, bravo_token):
+        mock_price_source.setPrice(token, 20 * EIGHTEEN_DECIMALS // 100)
+    teller.liquidateUser(bob, False, sender=sally)
+    auctions = filter_logs(teller, "FungibleAuctionUpdated")
+    assert len(auctions) == 2
+
+    payment = 160 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    payer_before = green_token.balanceOf(alice)
+    purchases = [
+        (
+            auctions[0].liqUser,
+            auctions[0].vaultId,
+            auctions[0].asset,
+            first_purchase * EIGHTEEN_DECIMALS,
+        ),
+        (
+            auctions[1].liqUser,
+            auctions[1].vaultId,
+            auctions[1].asset,
+            60 * EIGHTEEN_DECIMALS,
+        ),
+    ]
+    total_spent = teller.buyManyFungibleAuctions(
+        purchases,
+        payment,
+        False,
+        False,
+        False,
+        alice,
+        sender=alice,
+    )
+
+    purchase_logs = filter_logs(teller, "FungAuctionPurchased")
+    repay_logs = filter_logs(teller, "RepayDebt")
+    expected_spends = (
+        [60 * EIGHTEEN_DECIMALS, 40 * EIGHTEEN_DECIMALS]
+        if first_purchase == 60
+        else [100 * EIGHTEEN_DECIMALS]
+    )
+    assert [log.greenSpent for log in purchase_logs] == expected_spends
+    assert [log.repayValue for log in repay_logs] == expected_spends
+    assert all(log.refundAmount == 0 for log in repay_logs)
+    assert total_spent == 100 * EIGHTEEN_DECIMALS
+    assert payer_before - green_token.balanceOf(alice) == total_spent
+    assert ledger.userDebt(bob).amount == 0
+    assert not ledger.hasFungibleAuctions(bob)
+
+
+def test_batch_with_valid_then_zero_payment_dust_reverts_atomically(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    ledger,
+    green_token,
+    whale,
+    createDebtTerms,
+    createAuctionParams,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    auction_params = createAuctionParams(
+        _startDiscount=20_00,
+        _maxDiscount=20_00,
+        _duration=100,
+    )
+    debt_terms = createDebtTerms(
+        _ltv=10_00,
+        _redemptionThreshold=20_00,
+        _liqThreshold=25_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    for token in (alpha_token, bravo_token):
+        setAssetConfig(
+            token,
+            _debtTerms=debt_terms,
+            _shouldSwapInStabPools=False,
+            _shouldAuctionInstantly=True,
+            _customAuctionParams=auction_params,
+        )
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+    for token, whale_addr in (
+        (alpha_token, alpha_token_whale),
+        (bravo_token, bravo_token_whale),
+    ):
+        performDeposit(
+            bob,
+            1_000 * EIGHTEEN_DECIMALS,
+            token,
+            whale_addr,
+        )
+
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    for token in (alpha_token, bravo_token):
+        mock_price_source.setPrice(token, 20 * EIGHTEEN_DECIMALS // 100)
+    teller.liquidateUser(bob, False, sender=sally)
+    auctions = filter_logs(teller, "FungibleAuctionUpdated")
+    assert len(auctions) == 2
+
+    payment = 10 * EIGHTEEN_DECIMALS + 1
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    payer_before = green_token.balanceOf(alice)
+    debt_before = ledger.userDebt(bob).amount
+    alpha_before = alpha_token.balanceOf(alice)
+    bravo_before = bravo_token.balanceOf(alice)
+    purchases = [
+        (
+            auctions[0].liqUser,
+            auctions[0].vaultId,
+            auctions[0].asset,
+            10 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            auctions[1].liqUser,
+            auctions[1].vaultId,
+            auctions[1].asset,
+            1,
+        ),
+    ]
+
+    # Prove the first entry is a valid, state-changing purchase on its own.
+    with boa.env.anchor():
+        valid_payer_before = green_token.balanceOf(alice)
+        valid_debt_before = ledger.userDebt(bob).amount
+        valid_collateral_before = alpha_token.balanceOf(alice)
+        assert teller.buyManyFungibleAuctions(
+            [purchases[0]],
+            10 * EIGHTEEN_DECIMALS,
+            False,
+            False,
+            False,
+            alice,
+            sender=alice,
+        ) == 10 * EIGHTEEN_DECIMALS
+        assert valid_payer_before - green_token.balanceOf(alice) == (
+            10 * EIGHTEEN_DECIMALS
+        )
+        assert ledger.userDebt(bob).amount < valid_debt_before
+        assert alpha_token.balanceOf(alice) > valid_collateral_before
+
+    with pytest.raises(BoaError) as exc_info:
+        teller.buyManyFungibleAuctions(
+            purchases,
+            payment,
+            False,
+            False,
+            False,
+            alice,
+            sender=alice,
+        )
+    # GREEN rejects the zero transfer before CreditEngine can receive the call.
+    assert_reverted_call(exc_info.value, "cannot transfer 0 amount", teller)
+
+    assert green_token.balanceOf(alice) == payer_before
+    assert ledger.userDebt(bob).amount == debt_before
+    assert alpha_token.balanceOf(alice) == alpha_before
+    assert bravo_token.balanceOf(alice) == bravo_before
+    assert ledger.hasFungibleAuctions(bob)
+
+
+@pytest.mark.parametrize(
+    ("purchase_amounts", "regression_ceiling"),
+    [
+        ([1], 355_000),
+        ([100, 1], 355_000),
+        ([1] * 20, 4_030_000),
+    ],
+    ids=["single-success", "clear-then-skip", "twenty-successes"],
+)
+def test_live_debt_cap_batch_gas_bounds(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    ledger,
+    green_token,
+    whale,
+    createDebtTerms,
+    createAuctionParams,
+    purchase_amounts,
+    regression_ceiling,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    auction_params = createAuctionParams(
+        _startDiscount=20_00,
+        _maxDiscount=20_00,
+        _duration=100,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=createDebtTerms(
+            _ltv=10_00,
+            _redemptionThreshold=20_00,
+            _liqThreshold=25_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+        _customAuctionParams=auction_params,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        1_000 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 20 * EIGHTEEN_DECIMALS // 100)
+    teller.liquidateUser(bob, False, sender=sally)
+    auction = filter_logs(teller, "FungibleAuctionUpdated")[0]
+
+    payment = sum(purchase_amounts) * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    purchases = [
+        (
+            auction.liqUser,
+            auction.vaultId,
+            auction.asset,
+            amount * EIGHTEEN_DECIMALS,
+        )
+        for amount in purchase_amounts
+    ]
+    gas_before = boa.env.get_gas_used()
+    total_spent = teller.buyManyFungibleAuctions(
+        purchases,
+        payment,
+        False,
+        False,
+        False,
+        alice,
+        sender=alice,
+    )
+    gas_used = boa.env.get_gas_used() - gas_before
+    print(
+        "AUCTION_LIVE_DEBT_CAP_GAS",
+        f"items={len(purchases)}",
+        f"successful={len(filter_logs(teller, 'FungAuctionPurchased'))}",
+        f"gas={gas_used}",
+    )
+
+    expected_spent = min(sum(purchase_amounts), 100) * EIGHTEEN_DECIMALS
+    expected_successes = 1 if purchase_amounts[0] == 100 else len(purchase_amounts)
+    assert total_spent == expected_spent
+    assert len(filter_logs(teller, "FungAuctionPurchased")) == expected_successes
+    assert ledger.userDebt(bob).amount == 100 * EIGHTEEN_DECIMALS - expected_spent
+    # About 20% above the pinned 294,904 / 293,583 / 3,354,607 measurements.
+    assert gas_used <= regression_ceiling
+    assert gas_used < 15_000_000
+
 
 def test_ah_auction_collateral_amounts_and_discount_verification(
     setGeneralConfig,
@@ -1459,7 +2086,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     green_to_spend = 10 * EIGHTEEN_DECIMALS
     alice_alpha_before = alpha_token.balanceOf(alice)
     
-    green_spent_start = teller.buyFungibleAuction(
+    green_spent_start = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1475,7 +2102,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     # Move to 25% through auction (25 blocks)
     boa.env.time_travel(blocks=25)
     
-    green_spent_quarter = teller.buyFungibleAuction(
+    green_spent_quarter = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1493,7 +2120,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     # Move to 50% through auction (25 more blocks = 50 total)
     boa.env.time_travel(blocks=25)
     
-    green_spent_half = teller.buyFungibleAuction(
+    green_spent_half = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1511,7 +2138,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     # Move to end of auction (50 more blocks = 100 total)
     boa.env.time_travel(blocks=49)  # 99 blocks total (1 before end)
     
-    green_spent_end = teller.buyFungibleAuction(
+    green_spent_end = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1616,7 +2243,7 @@ def test_ah_auction_buy_with_balance_transfer_basic(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Buy auction with _shouldTransferBalance=True
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, vault_id, alpha_token, green_amount, 
         False,  # _isPaymentSavingsGreen
         True,   # _shouldTransferBalance
@@ -1865,7 +2492,7 @@ def test_ah_auction_balance_transfer_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Buy with balance transfer
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice
@@ -1892,7 +2519,7 @@ def test_ah_auction_balance_transfer_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
     
     # Buy with intent to deplete Bob's position
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice
@@ -1908,4 +2535,3 @@ def test_ah_auction_balance_transfer_edge_cases(
     # Alice should have received all the transferred balance
     alice_final_balance = vault.userBalances(alice, alpha_token)
     assert alice_final_balance > final_alice_vault_balance
-    

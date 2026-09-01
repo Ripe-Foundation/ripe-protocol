@@ -1,7 +1,60 @@
 import boa
+from eth_utils import to_checksum_address
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs
+
+
+ARB_SYS = to_checksum_address("0x0000000000000000000000000000000000000064")
+LEDGER_ID = 4
+
+
+def _replace_ledger_with_arb_source(
+    ripe_hq_deploy,
+    defaults,
+    governance,
+    child_identity,
+):
+    implementation = boa.loads(
+        """# @version 0.4.3
+actionBlock: uint256
+
+@view
+@external
+def arbBlockNumber() -> uint256:
+    return self.actionBlock
+""",
+        name="withdraw_many_arb_source",
+    )
+    boa.env.set_code(ARB_SYS, boa.env.get_code(implementation.address))
+    boa.env.set_storage(ARB_SYS, 0, child_identity)
+
+    arb_ledger = boa.load(
+        "contracts/data/Ledger.vy",
+        ripe_hq_deploy,
+        defaults,
+        ARB_SYS,
+        name="withdraw_many_arb_ledger",
+    )
+    assert ripe_hq_deploy.startAddressUpdateToRegistry(
+        LEDGER_ID,
+        arb_ledger,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq_deploy.registryChangeTimeLock())
+    assert ripe_hq_deploy.confirmAddressUpdateToRegistry(
+        LEDGER_ID,
+        sender=governance.address,
+    )
+    return arb_ledger
+
+
+def _set_withdraw_many_child_identity(child_identity):
+    boa.env.set_storage(ARB_SYS, 0, child_identity)
+
+
+def _repr_without_storage(contract):
+    return f"<{contract.compiler_data.contract_path} at {contract.address}>"
 
 
 def test_teller_basic_withdraw(
@@ -36,6 +89,95 @@ def test_teller_basic_withdraw(
     # check balance
     assert alpha_token.balanceOf(simple_erc20_vault) == 0
     assert alpha_token.balanceOf(bob) == amount
+
+
+def test_low_risk_deposit_arms_same_action_block_withdraw_rejection(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
+
+    with boa.reverts("one action per block"):
+        teller.withdraw(
+            alpha_token,
+            deposit_amount,
+            bob,
+            simple_erc20_vault,
+            sender=bob,
+        )
+
+    assert (
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+        == deposit_amount
+    )
+    assert alpha_token.balanceOf(bob) == 0
+
+
+def test_checked_withdraw_rejects_second_same_action_block_and_rolls_back(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+
+    teller.withdraw(
+        alpha_token,
+        deposit_amount // 2,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    )
+    remaining = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    user_balance = alpha_token.balanceOf(bob)
+    touch = ledger.lastTouch(bob)
+
+    with boa.reverts("one action per block"):
+        teller.withdraw(
+            alpha_token,
+            1,
+            bob,
+            simple_erc20_vault,
+            sender=bob,
+        )
+
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == remaining
+    assert alpha_token.balanceOf(bob) == user_balance
+    assert ledger.lastTouch(bob) == touch
 
 
 def test_teller_withdraw_protocol_disabled(
@@ -126,6 +268,7 @@ def test_teller_withdraw_others_not_allowed(
     setUserDelegation,
     teller,
     performDeposit,
+    ledger,
 ):
     # Setup with others not allowed to withdraw
     setGeneralConfig()
@@ -149,6 +292,8 @@ def test_teller_withdraw_others_not_allowed(
     assert alpha_token.balanceOf(bob) == deposit_amount
     assert alpha_token.balanceOf(simple_erc20_vault) == 0
     assert alpha_token.balanceOf(sally) == 0
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
+    assert ledger.lastTouch(sally) == 0
 
 
 def test_teller_withdraw_many(
@@ -163,6 +308,9 @@ def test_teller_withdraw_many(
     teller,
     vault_book,
     performDeposit,
+    ledger,
+    mission_control,
+    switchboard_alpha,
 ):
     # basic setup
     setGeneralConfig()
@@ -181,6 +329,12 @@ def test_teller_withdraw_many(
         (alpha_token.address, deposit_amount, simple_erc20_vault.address, vault_id),
         (bravo_token.address, deposit_amount, simple_erc20_vault.address, vault_id)
     ]
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
 
     # Execute multiple withdrawals
     num_withdrawals = teller.withdrawMany(bob, withdrawals, sender=bob)
@@ -209,6 +363,7 @@ def test_teller_withdraw_many(
     assert bravo_log.caller == bob
     assert bravo_log.amount == deposit_amount
     assert bravo_log.vaultAddr == simple_erc20_vault.address
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
     assert bravo_log.vaultId == vault_id
     assert bravo_log.isDepleted
 
@@ -217,6 +372,149 @@ def test_teller_withdraw_many(
     assert bravo_token.balanceOf(simple_erc20_vault) == 0
     assert alpha_token.balanceOf(bob) == deposit_amount
     assert bravo_token.balanceOf(bob) == deposit_amount
+
+
+def test_protected_vault_max_withdraw_batch_stays_below_gas_ceiling(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    vault_book,
+    performDeposit,
+):
+    """Exercise all 20 slots with BasicVault's four custody/delivery reads."""
+
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    unit = EIGHTEEN_DECIMALS
+    batch_size = 20
+    performDeposit(
+        bob,
+        batch_size * unit,
+        alpha_token,
+        alpha_token_whale,
+    )
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    withdrawals = [
+        (
+            alpha_token.address,
+            unit,
+            simple_erc20_vault.address,
+            vault_id,
+        )
+        for _ in range(batch_size)
+    ]
+
+    gas_before = boa.env.get_gas_used()
+    assert teller.withdrawMany(bob, withdrawals, sender=bob) == batch_size
+    gas_used = boa.env.get_gas_used() - gas_before
+
+    # A local-EVM regression ceiling for the maximum public batch, not a claim
+    # about a Robinhood block gas limit or production gas estimate.
+    assert gas_used < 6_000_000, f"20-row withdrawal used {gas_used} gas"
+    assert alpha_token.balanceOf(simple_erc20_vault) == 0
+    assert alpha_token.balanceOf(bob) == batch_size * unit
+
+
+def test_withdraw_many_arb_sys_rejects_second_same_action_block(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    vault_book,
+    performDeposit,
+    mission_control,
+    switchboard_alpha,
+    ripe_hq_deploy,
+    defaults,
+    governance,
+    monkeypatch,
+):
+    arb_ledger = _replace_ledger_with_arb_source(
+        ripe_hq_deploy,
+        defaults,
+        governance,
+        4_100,
+    )
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(bravo_token)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    child_identity = 4_101
+    _set_withdraw_many_child_identity(child_identity)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    first_withdrawals = [
+        (
+            alpha_token.address,
+            deposit_amount // 2,
+            simple_erc20_vault.address,
+            vault_id,
+        ),
+        (
+            bravo_token.address,
+            deposit_amount // 2,
+            simple_erc20_vault.address,
+            vault_id,
+        ),
+    ]
+    assert teller.withdrawMany(bob, first_withdrawals, sender=bob) == 2
+    assert arb_ledger.lastTouch(bob) == child_identity
+
+    before = (
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        alpha_token.balanceOf(bob),
+        bravo_token.balanceOf(bob),
+        arb_ledger.lastTouch(bob),
+    )
+    boa.env.time_travel(blocks=60)
+    second_withdrawals = [
+        (
+            alpha_token.address,
+            1,
+            simple_erc20_vault.address,
+            vault_id,
+        ),
+        (
+            bravo_token.address,
+            1,
+            simple_erc20_vault.address,
+            vault_id,
+        ),
+    ]
+    # Titanoboa 0.2.7 can retain an incompatible storage model for a reused
+    # address in the aggregate suite, then crash while formatting the expected
+    # child revert. Suppress storage rendering only around this diagnostic
+    # path; execution and exact revert matching remain unchanged.
+    with monkeypatch.context() as patch:
+        patch.setattr(type(teller), "__repr__", _repr_without_storage)
+        with boa.reverts("one action per block"):
+            teller.withdrawMany(bob, second_withdrawals, sender=bob)
+    after = (
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        alpha_token.balanceOf(bob),
+        bravo_token.balanceOf(bob),
+        arb_ledger.lastTouch(bob),
+    )
+    assert after == before
+    assert arb_ledger.lastTouch(bob) == child_identity
 
 
 def test_teller_withdraw_teller_paused(
@@ -1265,8 +1563,8 @@ def test_teller_withdraw_high_ltv_asset(
     # Without bravo: $100 alpha, $30 capacity
     # Need: $100 * 1.01 = $101
     # Bravo must cover: $101 - $30 = $71
-    # Min bravo: $71 / 90% = $78.888...
-    # Can withdraw: $100 - $78.889 = $21.111
+    # Min bravo: ceil(71e18 * 10000 / 9000) = $78.888... + 1 wei
+    # Can withdraw: $100 - $78.888... - 1 wei
     max_withdrawable_bravo = credit_engine.getMaxWithdrawableForAsset(
         bob,
         vault_id,
@@ -1276,11 +1574,10 @@ def test_teller_withdraw_high_ltv_asset(
 
     # Calculation in wei:
     # gap = 101e18 - 30e18 = 71e18
-    # minBravo = 71e18 * 10000 // 9000 = 78.888...e18 (rounds down in division)
     # 71e18 * 10000 = 710000e18
-    # 710000e18 // 9000 = 78888888888888888888 (78.888... tokens)
-    # withdraw = 100e18 - 78888888888888888888 = 21111111111111111112
-    expected = 21111111111111111112  # ~21.111 tokens
+    # 710000e18 // 9000 = 78888888888888888888 with leftover, so ceil + 1
+    # withdraw = 100e18 - 78888888888888888889 = 21111111111111111111
+    expected = 21111111111111111111
     assert max_withdrawable_bravo == expected
 
     # Verify can actually withdraw this amount

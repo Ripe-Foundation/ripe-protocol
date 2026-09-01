@@ -3,7 +3,7 @@ import boa
 
 from constants import BLUE_CHIP_PROTOCOL_MORPHO, EIGHTEEN_DECIMALS
 from config.BluePrint import YIELD_TOKENS, CORE_TOKENS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, advance_timelock_blocks
 
 
 @pytest.fixture(scope="module")
@@ -12,7 +12,7 @@ def usdc_token(fork, chainlink, governance):
     if not chainlink.hasPriceFeed(usdc):
         # Use staleTime=0 for forked tests since historical Chainlink data may be stale
         assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", 0, False, False, sender=governance.address)
-        boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+        advance_timelock_blocks(chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
 
@@ -30,7 +30,7 @@ def cbbtc_token(fork, chainlink, governance):
     if not chainlink.hasPriceFeed(cbbtc):
         # Use staleTime=0 for forked tests since historical Chainlink data may be stale
         assert chainlink.addNewPriceFeed(cbbtc, "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D", 0, False, False, sender=governance.address)
-        boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+        advance_timelock_blocks(chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(cbbtc, sender=governance.address)
     return cbbtc
 
@@ -54,7 +54,7 @@ def test_add_morpho_vault_token_usdc(
 
     # add new price feed
     assert blue_chip_prices.addNewPriceFeed(morpho_usdc, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0, sender=governance.address)
-    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(blue_chip_prices.actionTimeLock() + 1)
     assert blue_chip_prices.confirmNewPriceFeed(morpho_usdc, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]
@@ -102,7 +102,7 @@ def test_add_morpho_vault_token_weth(
 
     # add new price feed
     assert blue_chip_prices.addNewPriceFeed(morpho_weth, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0, sender=governance.address)
-    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(blue_chip_prices.actionTimeLock() + 1)
     assert blue_chip_prices.confirmNewPriceFeed(morpho_weth, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]
@@ -151,7 +151,7 @@ def test_add_morpho_vault_token_cbbtc(
 
     # add new price feed
     assert blue_chip_prices.addNewPriceFeed(morpho_cbbtc, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0, sender=governance.address)
-    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    advance_timelock_blocks(blue_chip_prices.actionTimeLock() + 1)
     assert blue_chip_prices.confirmNewPriceFeed(morpho_cbbtc, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]

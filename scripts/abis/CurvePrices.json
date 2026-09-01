@@ -1935,6 +1935,10 @@
           {
             "name": "stabilizerMaxPoolDebt",
             "type": "uint256"
+          },
+          {
+            "name": "altBalance",
+            "type": "uint256"
           }
         ]
       }

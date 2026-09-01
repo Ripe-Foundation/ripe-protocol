@@ -1,0 +1,1655 @@
+[
+  {
+    "name": "EpochInitialized",
+    "inputs": [
+      {
+        "name": "epoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "basePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "rateSource",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "paymentCap",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minPaymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxVestingBonus",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "timingEligible",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EpochRolled",
+    "inputs": [
+      {
+        "name": "fromEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "toEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "oldBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "rateSource",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newPaymentCap",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMinPaymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMaxVestingBonus",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMinVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMaxVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "previousAcceptedPayment",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "previousPaymentCap",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "previousWeightedLateness",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "previousTimingEligible",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "utilizationBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "effectiveAdjustmentBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "decaySteps",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeAllocated",
+    "inputs": [
+      {
+        "name": "acquirer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "positionId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "paymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "baseRipe",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "bonusRipe",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "bonusRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "vestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "creationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "claimStartBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maturityBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "totalRipe",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "basePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "rateSource",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "epoch",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "VestedRipeClaimed",
+    "inputs": [
+      {
+        "name": "beneficiary",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "positionId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "amountClaimed",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "totalClaimedForPosition",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "ripeAllocation",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "autoDeposited",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "requestedLockDuration",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ReserveEngineConfigSet",
+    "inputs": [
+      {
+        "name": "paymentCapPerEpoch",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minPaymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxAllInPayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "seedBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "uHighBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "uLowBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minUpBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxUpBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minDownBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDownBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "decayBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDecayEpochs",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxVestingBonus",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxVestingLength",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "epochLength",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanAcquireRipeSet",
+    "inputs": [
+      {
+        "name": "canAcquireRipe",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ReserveEngineStarted",
+    "inputs": [
+      {
+        "name": "genesisBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "epochLength",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ReserveEngineStopped",
+    "inputs": [
+      {
+        "name": "epochLength",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PaymentTokenSet",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "decimals",
+        "type": "uint8",
+        "indexed": false
+      },
+      {
+        "name": "scale",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideInstalled",
+    "inputs": [
+      {
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideApplied",
+    "inputs": [
+      {
+        "name": "fromEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "toEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideMissed",
+    "inputs": [
+      {
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "committedEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "controllerBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideCancelled",
+    "inputs": [
+      {
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideInvalidated",
+    "inputs": [
+      {
+        "name": "targetEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetBasePayoutRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentPauseModified",
+    "inputs": [
+      {
+        "name": "isPaused",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentFundsRecovered",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAddys",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeHq",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintGreen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintRipe",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "_shouldPause",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFunds",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFundsMany",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isPaused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "acquireRipe",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedVestingLength",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedVestingLength",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedEpoch",
+        "type": "uint256"
+      },
+      {
+        "name": "_minRipeOut",
+        "type": "uint256"
+      },
+      {
+        "name": "_deadlineBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "previewAcquireRipe",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedVestingLength",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "available",
+            "type": "bool"
+          },
+          {
+            "name": "epoch",
+            "type": "uint256"
+          },
+          {
+            "name": "controllerBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "basePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "rateSource",
+            "type": "uint256"
+          },
+          {
+            "name": "remainingPayment",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "budgetRemaining",
+            "type": "uint256"
+          },
+          {
+            "name": "baseRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "bonusRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "bonusRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "vestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "creationBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "claimStartBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "maturityBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "totalRipe",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimVestedRipe",
+    "inputs": [
+      {
+        "name": "_positionId",
+        "type": "uint256"
+      },
+      {
+        "name": "_autoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_lockDuration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimVestedRipeMany",
+    "inputs": [
+      {
+        "name": "_positionIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_autoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_lockDuration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getEpochSnapshot",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "epoch",
+            "type": "uint256"
+          },
+          {
+            "name": "controllerBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "basePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "rateSource",
+            "type": "uint256"
+          },
+          {
+            "name": "paymentCap",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "acceptedPayment",
+            "type": "uint256"
+          },
+          {
+            "name": "weightedLateness",
+            "type": "uint256"
+          },
+          {
+            "name": "timingEligible",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochLength",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidEpochLength",
+    "inputs": [
+      {
+        "name": "_epochLength",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "start",
+    "inputs": [
+      {
+        "name": "_genesisBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_epochLength",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "stop",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setConfig",
+    "inputs": [
+      {
+        "name": "_newConfig",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxAllInPayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanAcquireRipe",
+    "inputs": [
+      {
+        "name": "_canAcquireRipe",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRateOverride",
+    "inputs": [
+      {
+        "name": "_targetBasePayoutRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetEpoch",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelRateOverride",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidRateOverride",
+    "inputs": [
+      {
+        "name": "_targetBasePayoutRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetEpoch",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPaymentToken",
+    "inputs": [
+      {
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidPaymentToken",
+    "inputs": [
+      {
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidConfig",
+    "inputs": [
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxAllInPayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "engineConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxAllInPayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "overrideTargetBasePayoutRate",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "overrideTargetEpoch",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canAcquireRipe",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isRunning",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochState",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "epoch",
+            "type": "uint256"
+          },
+          {
+            "name": "controllerBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "basePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "rateSource",
+            "type": "uint256"
+          },
+          {
+            "name": "paymentCap",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "acceptedPayment",
+            "type": "uint256"
+          },
+          {
+            "name": "weightedLateness",
+            "type": "uint256"
+          },
+          {
+            "name": "timingEligible",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "paymentToken",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "paymentScale",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "genesisBlock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "MAX_VESTING_LENGTH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "MAX_BATCH_CLAIMS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "RATE_SOURCE_SEED",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "RATE_SOURCE_CONTROLLER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "RATE_SOURCE_OVERRIDE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_ripeHq",
+        "type": "address"
+      },
+      {
+        "name": "_paymentToken",
+        "type": "address"
+      },
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxAllInPayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedBasePayoutRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  }
+]

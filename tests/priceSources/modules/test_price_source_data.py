@@ -324,7 +324,7 @@ def test_price_source_data_recover_funds_many(
     
     # Test recovery with too many assets
     too_many_assets = [alpha_token] * 21  # MAX_RECOVER_ASSETS is 20
-    with boa.reverts():
+    with boa.reverts("DynArray[address, 20] bounds check"):
         price_source_mock.recoverFundsMany(bob, too_many_assets, sender=switchboard_alpha.address)
     
     # Test successful recovery of multiple assets
@@ -371,6 +371,86 @@ def test_price_source_data_max_assets(
         assert price_source_mock.assets(i + 1) == assets[i]
         assert price_source_mock.indexOfAsset(assets[i]) == i + 1
         assert assets[i] in tokens  # Verify each asset is one of our tokens
+
+
+def _fill_priced_assets(price_source_mock, count=50):
+    tokens = []
+    for i in range(count):
+        token = boa.env.generate_address(f"priced-asset-{i}")
+        tokens.append(token)
+        price_source_mock.setPrice(token, 100 + i)
+    return tokens
+
+
+def test_price_source_data_rejects_51st_asset_atomically(price_source_mock):
+    tokens = _fill_priced_assets(price_source_mock, 50)
+    assert price_source_mock.numAssets() == 51
+    assert len(price_source_mock.getPricedAssets()) == 50
+
+    rejected = boa.env.generate_address("priced-asset-51")
+    with boa.reverts("too many assets"):
+        price_source_mock.setPrice(rejected, 999)
+
+    assert price_source_mock.numAssets() == 51
+    assert price_source_mock.indexOfAsset(rejected) == 0
+    assert price_source_mock.price(rejected) == 0
+    assert not price_source_mock.hasPriceFeed(rejected)
+    assets = price_source_mock.getPricedAssets()
+    assert len(assets) == 50
+    assert rejected not in assets
+    assert assets == tokens
+
+
+def test_price_source_data_zero_address_and_duplicate_behavior_unchanged(
+    price_source_mock,
+    alpha_token,
+):
+    price_source_mock.setPrice(ZERO_ADDRESS, 111)
+    assert price_source_mock.numAssets() == 2
+    assert price_source_mock.indexOfAsset(ZERO_ADDRESS) == 1
+    assert price_source_mock.assets(1) == ZERO_ADDRESS
+    assert price_source_mock.hasPriceFeed(ZERO_ADDRESS)
+    assert price_source_mock.price(ZERO_ADDRESS) == 111
+
+    price_source_mock.setPrice(ZERO_ADDRESS, 222)
+    assert price_source_mock.numAssets() == 2
+    assert price_source_mock.indexOfAsset(ZERO_ADDRESS) == 1
+    assert price_source_mock.price(ZERO_ADDRESS) == 222
+
+    price_source_mock.setPrice(alpha_token, 100)
+    price_source_mock.setPrice(alpha_token, 200)
+    assert price_source_mock.numAssets() == 3
+    assert price_source_mock.indexOfAsset(alpha_token) == 2
+    assert len(price_source_mock.getPricedAssets()) == 2
+
+    filled = _fill_priced_assets(price_source_mock, 48)
+    assert len(price_source_mock.getPricedAssets()) == 50
+    rejected = boa.env.generate_address("invalid-overflow")
+    with boa.reverts("too many assets"):
+        price_source_mock.setPrice(rejected, 1)
+    assert price_source_mock.indexOfAsset(rejected) == 0
+    assert not price_source_mock.hasPriceFeed(rejected)
+    assert filled[-1] in price_source_mock.getPricedAssets()
+
+
+def test_price_source_data_can_add_after_removing_one_at_capacity(price_source_mock):
+    tokens = _fill_priced_assets(price_source_mock, 50)
+    removed = tokens[7]
+    price_source_mock.disablePriceFeed(removed)
+    assert price_source_mock.numAssets() == 50
+    assert price_source_mock.indexOfAsset(removed) == 0
+
+    replacement = boa.env.generate_address("priced-asset-replacement")
+    price_source_mock.setPrice(replacement, 321)
+    assets = price_source_mock.getPricedAssets()
+    assert len(assets) == 50
+    assert replacement in assets
+    assert removed not in assets
+    assert price_source_mock.indexOfAsset(replacement) != 0
+    assert price_source_mock.hasPriceFeed(replacement)
+
+    with boa.reverts("too many assets"):
+        price_source_mock.setPrice(boa.env.generate_address("priced-asset-overflow"), 1)
 
 
 def test_price_source_data_array_ordering(

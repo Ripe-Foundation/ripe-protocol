@@ -80,6 +80,79 @@ def test_teller_basic_rebalance(
     assert bravo_token.balanceOf(simple_erc20_vault) == initial_vault_bravo + deposit_amount
 
 
+def test_rebalance_after_effects_guard_rejection_rolls_back_every_leg(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+    vault_book,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(bravo_token)
+
+    total = 100 * EIGHTEEN_DECIMALS
+    amount = 25 * EIGHTEEN_DECIMALS
+    performDeposit(bob, total, alpha_token, alpha_token_whale)
+    bravo_token.transfer(bob, total, sender=bravo_token_whale)
+    bravo_token.approve(teller.address, total, sender=bob)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    teller.rebalance(
+        bravo_token,
+        vault_id,
+        alpha_token,
+        vault_id,
+        amount,
+        amount,
+        bob,
+        sender=bob,
+    )
+    before = (
+        alpha_token.balanceOf(bob),
+        bravo_token.balanceOf(bob),
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        ledger.lastTouch(bob),
+    )
+
+    with boa.reverts("one action per block"):
+        teller.rebalance(
+            bravo_token,
+            vault_id,
+            alpha_token,
+            vault_id,
+            amount,
+            amount,
+            bob,
+            sender=bob,
+        )
+
+    after = (
+        alpha_token.balanceOf(bob),
+        bravo_token.balanceOf(bob),
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        ledger.lastTouch(bob),
+    )
+    assert after == before
+
+
 def test_teller_rebalance_partial_amounts(
     simple_erc20_vault,
     alpha_token,
@@ -977,7 +1050,7 @@ def test_teller_rebalance_no_withdrawal_balance(
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # attempt rebalance should fail when trying to withdraw alpha (none available)
-    with boa.reverts():  # Will fail in withdrawal validation
+    with boa.reverts("user does not have this asset"):  # Will fail in withdrawal validation
         teller.rebalance(
             bravo_token.address,  # deposit asset
             vault_id,  # deposit vault id
@@ -1231,3 +1304,65 @@ def test_teller_rebalance_respects_deposit_limits(
     # deposit should be capped at user limit
     assert deposited_amount == user_limit
     assert withdrawn_amount == alpha_amount
+
+
+def test_m1_rebalance_short_deposit_reverts_before_withdrawal_atomically(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    deploy3r,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+    vault_book,
+    credit_engine,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    hostile = boa.load(
+        "contracts/mock/MockStockTokenControls.vy",
+        deploy3r,
+        18,
+        name="m1_rebalance_short_token",
+        override_address=boa.env.generate_address(),
+    )
+    setAssetConfig(hostile)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    hostile.mint(bob, amount, sender=deploy3r)
+    hostile.approve(teller, amount, sender=bob)
+    hostile.setUpgradeBehavior(3, sender=deploy3r)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    bob_alpha_before = alpha_token.balanceOf(bob)
+    bob_hostile_before = hostile.balanceOf(bob)
+    vault_alpha_before = alpha_token.balanceOf(simple_erc20_vault)
+    vault_hostile_before = hostile.balanceOf(simple_erc20_vault)
+    alpha_claim_before = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    hostile_claim_before = simple_erc20_vault.getTotalAmountForUser(bob, hostile)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+
+    with boa.reverts("custody mismatch"):
+        teller.rebalance(
+            hostile,
+            vault_id,
+            alpha_token,
+            vault_id,
+            amount,
+            amount,
+            bob,
+            sender=bob,
+        )
+
+    assert alpha_token.balanceOf(bob) == bob_alpha_before
+    assert hostile.balanceOf(bob) == bob_hostile_before
+    assert alpha_token.balanceOf(simple_erc20_vault) == vault_alpha_before
+    assert hostile.balanceOf(simple_erc20_vault) == vault_hostile_before
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == alpha_claim_before
+    assert simple_erc20_vault.getTotalAmountForUser(bob, hostile) == hostile_claim_before
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+    assert filter_logs(teller, "TellerRebalance") == []
+    assert filter_logs(teller, "TellerWithdrawal") == []

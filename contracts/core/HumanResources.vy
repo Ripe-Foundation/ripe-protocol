@@ -16,7 +16,7 @@
 #     ╚═══════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -51,29 +51,35 @@ interface Ledger:
     def numContributors() -> uint256: view
     def ripeAvailForHr() -> uint256: view
 
-interface RipeGovVault:
-    def transferContributorRipeTokens(_contributor: address, _toUser: address, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def withdrawContributorTokensToBurn(_user: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-
-interface RipeToken:
-    def mint(_to: address, _amount: uint256): nonpayable
-    def burn(_amount: uint256) -> bool: nonpayable
+interface MissionControl:
+    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def coreRipeGovVaultId() -> uint256: view
+    def hrConfig() -> cs.HrConfig: view
 
 interface HrContributor:
     def totalClaimed() -> uint256: view
     def compensation() -> uint256: view
+    def manager() -> address: view
+    def owner() -> address: view
+
+interface RipeGovVault:
+    def transferContributorRipeTokens(_contributor: address, _toUser: address, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def withdrawContributorTokensToBurn(_user: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
+interface RipeToken:
+    def mint(_to: address, _amount: uint256): nonpayable
+    def burn(_amount: uint256) -> bool: nonpayable
 
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
-
-interface MissionControl:
-    def hrConfig() -> cs.HrConfig: view
 
 struct ContributorTerms:
     owner: address
@@ -121,10 +127,14 @@ event NewContributorCancelled:
     confirmationBlock: uint256
     actionId: uint256
 
+event LegacyContributorRipeGovVaultSet:
+    contributor: indexed(address)
+    vaultId: uint256
+    changedBy: indexed(address)
+
 # pending
 pendingContributor: public(HashMap[uint256, ContributorTerms]) # aid -> terms
-
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
+legacyContributorRipeGovVaultId: public(HashMap[address, uint256])
 
 
 @deploy
@@ -173,7 +183,7 @@ def initiateNewContributor(
         depositLockDuration=_depositLockDuration,
     )
     hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
-    assert self._areValidContributorTerms(terms, hrConfig, a.ledger) # dev: invalid terms
+    assert self._areValidContributorTerms(terms, hrConfig, a.ledger, a.missionControl, a.ripeToken) # dev: invalid terms
 
     aid: uint256 = timeLock._initiateAction()
     self.pendingContributor[aid] = terms
@@ -206,7 +216,7 @@ def confirmNewContributor(_aid: uint256) -> bool:
     assert terms.owner != empty(address) # dev: no pending contributor
 
     hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
-    if not self._areValidContributorTerms(terms, hrConfig, a.ledger):
+    if not self._areValidContributorTerms(terms, hrConfig, a.ledger, a.missionControl, a.ripeToken):
         self._cancelNewPendingContributor(_aid)
         return False
 
@@ -259,9 +269,10 @@ def cancelNewContributor(_aid: uint256) -> bool:
 
     terms: ContributorTerms = self.pendingContributor[_aid]
     assert terms.owner != empty(address) # dev: no pending contributor
-    self._cancelNewPendingContributor(_aid)
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(_aid)
+    self._cancelNewPendingContributor(_aid)
+
     log NewContributorCancelled(
         owner=terms.owner,
         manager=terms.manager,
@@ -312,12 +323,18 @@ def areValidContributorTerms(
         depositLockDuration=_depositLockDuration,
     )
     hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
-    return self._areValidContributorTerms(terms, hrConfig, a.ledger)
+    return self._areValidContributorTerms(terms, hrConfig, a.ledger, a.missionControl, a.ripeToken)
 
 
 @view
 @internal
-def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, _ledger: address) -> bool:
+def _areValidContributorTerms(
+    _terms: ContributorTerms,
+    _hrConfig: cs.HrConfig,
+    _ledger: address,
+    _missionControl: address,
+    _ripeToken: address,
+) -> bool:
 
     # must have a template
     if _hrConfig.contribTemplate == empty(address):
@@ -365,6 +382,51 @@ def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, 
     if empty(address) in [_terms.owner, _terms.manager]:
         return False
 
+    # Distinct Contributor agreement: 0 < duration <= live RipeGov max. Being below the live general minimum is allowed.
+    # Later min/max changes do not amend a confirmed term; this check is creation/confirmation only.
+    if _terms.depositLockDuration == 0:
+        return False
+
+    # live ripe gov max lock must be configured
+    ripeGovConfig: cs.RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_ripeToken)
+    if ripeGovConfig.lockTerms.maxLockDuration == 0:
+        return False
+
+    # deposit lock cannot exceed live ripe gov max
+    if _terms.depositLockDuration > ripeGovConfig.lockTerms.maxLockDuration:
+        return False
+
+    # compensation cannot overflow vesting math
+    if _terms.compensation > max_value(uint256) // 2:
+        return False
+
+    # vesting length cannot overflow vested-amount math
+    if _terms.vestingLength > 2 ** 128:
+        return False
+
+    # defense in depth: the live RipeGov config ceiling is currently tighter,
+    # but keep the local arithmetic invariant if that upstream policy changes.
+    if _terms.depositLockDuration > max_value(uint256) - 2 ** 64:
+        return False
+
+    # start delay cannot overflow start time
+    if _terms.startDelay > max_value(uint256) - block.timestamp:
+        return False
+
+    startTime: uint256 = block.timestamp + _terms.startDelay
+
+    # vesting cannot overflow end time
+    if _terms.vestingLength > max_value(uint256) - startTime:
+        return False
+
+    # cliff cannot overflow cliff time
+    if _terms.cliffLength > max_value(uint256) - startTime:
+        return False
+
+    # unlock cannot overflow unlock time
+    if _terms.unlockLength > max_value(uint256) - startTime:
+        return False
+
     return True
 
 
@@ -384,9 +446,16 @@ def canModifyHrContributor(_addr: address) -> bool:
 
 @view
 @external
-def hasRipeBalance(_contributor: address) -> bool:
+def getRipeGovVaultId(_vaultId: uint256 = 0) -> uint256:
+    return self._getRipeGovVaultId(addys._getMissionControlAddr(), _vaultId)
+
+
+@view
+@external
+def hasRipeBalance(_contributor: address, _vaultId: uint256 = 0) -> bool:
     a: addys.Addys = addys._getAddys()
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID) 
+    vaultId: uint256 = self._getContributorRipeGovVaultId(a.missionControl, _contributor, _vaultId)
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
     return staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(_contributor, a.ripeToken)
 
 
@@ -394,18 +463,25 @@ def hasRipeBalance(_contributor: address) -> bool:
 
 
 @external
-def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256:
+def transferContributorRipeTokens(
+    _owner: address,
+    _lockDuration: uint256,
+    _vaultId: uint256 = 0,
+) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
     # transfer tokens in ripe gov vault
-    vaultId: uint256 = RIPE_GOV_VAULT_ID
+    vaultId: uint256 = self._getContributorRipeGovVaultId(a.missionControl, msg.sender, _vaultId)
     ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId) 
     amount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).transferContributorRipeTokens(msg.sender, _owner, _lockDuration, a)
 
     extcall Ledger(a.ledger).addVaultToUser(_owner, vaultId)
+    extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
     extcall Lootbox(a.lootbox).updateDepositPoints(_owner, vaultId, ripeGovVaultAddr, a.ripeToken, a)
+    if _vaultId == 0:
+        self.legacyContributorRipeGovVaultId[msg.sender] = 0
     return amount
 
 
@@ -423,7 +499,8 @@ def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
 
     # deposit into gov vault
     assert extcall IERC20(a.ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
-    extcall Teller(a.teller).depositFromTrusted(msg.sender, RIPE_GOV_VAULT_ID, a.ripeToken, _amount, _lockDuration, a)
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    extcall Teller(a.teller).depositFromTrusted(msg.sender, vaultId, a.ripeToken, _amount, _lockDuration, a)
     assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     return True
 
@@ -432,23 +509,33 @@ def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
 
 
 @external
-def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
+def refundAfterCancelPaycheck(
+    _amount: uint256,
+    _shouldBurnPosition: bool,
+    _vaultId: uint256 = 0,
+):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
-    # refund ledger 
-    extcall Ledger(a.ledger).refundRipeAfterCancelPaycheck(_amount)
+    budget: uint256 = staticcall Ledger(a.ledger).ripeAvailForHr()
+    creditedAmount: uint256 = min(_amount, max_value(uint256) - budget)
+    extcall Ledger(a.ledger).refundRipeAfterCancelPaycheck(creditedAmount)
 
     if not _shouldBurnPosition:
         return
 
     # withdraw and burn position
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    vaultId: uint256 = self._getContributorRipeGovVaultId(a.missionControl, msg.sender, _vaultId)
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
     withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
+    extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
     burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
     if burnAmount != 0:
-        extcall RipeToken(a.ripeToken).burn(burnAmount)
+        assert extcall RipeToken(a.ripeToken).burn(burnAmount)  # dev: ripe burn failed
+    extcall Teller(a.teller).performHousekeeping(True, msg.sender, True, a)
+    if _vaultId == 0:
+        self.legacyContributorRipeGovVaultId[msg.sender] = 0
 
 
 #########
@@ -470,7 +557,10 @@ def getTotalClaimed() -> uint256:
         contributorAddr: address = staticcall Ledger(ledger).contributors(i)
         if contributorAddr == empty(address):
             continue
-        totalClaimed += staticcall HrContributor(contributorAddr).totalClaimed()
+        claimed: uint256 = staticcall HrContributor(contributorAddr).totalClaimed()
+        if totalClaimed > max_value(uint256) - claimed:
+            return max_value(uint256)
+        totalClaimed += claimed
 
     return totalClaimed
 
@@ -489,6 +579,59 @@ def getTotalCompensation() -> uint256:
         contributorAddr: address = staticcall Ledger(ledger).contributors(i)
         if contributorAddr == empty(address):
             continue
-        totalCompensation += staticcall HrContributor(contributorAddr).compensation()
+        compensation: uint256 = staticcall HrContributor(contributorAddr).compensation()
+        if totalCompensation > max_value(uint256) - compensation:
+            return max_value(uint256)
+        totalCompensation += compensation
 
     return totalCompensation
+
+
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
+
+
+@view
+@internal
+def _getRipeGovVaultId(_missionControl: address, _vaultId: uint256) -> uint256:
+    if _vaultId == 0:
+        return self._getCoreRipeGovVaultId(_missionControl)
+    assert staticcall MissionControl(_missionControl).isRipeGovVaultId(_vaultId) # dev: invalid vault id
+    return _vaultId
+
+
+@view
+@internal
+def _getContributorRipeGovVaultId(
+    _missionControl: address,
+    _contributor: address,
+    _vaultId: uint256,
+) -> uint256:
+    vaultId: uint256 = _vaultId
+    if vaultId == 0:
+        vaultId = self.legacyContributorRipeGovVaultId[_contributor]
+    return self._getRipeGovVaultId(_missionControl, vaultId)
+
+
+@external
+def setLegacyContributorRipeGovVaultId(_contributor: address, _vaultId: uint256):
+    a: addys.Addys = addys._getAddys()
+    assert staticcall Ledger(a.ledger).isHrContributor(_contributor) # dev: not a contributor
+    assert (
+        addys._isSwitchboardAddr(msg.sender)
+        or msg.sender == staticcall HrContributor(_contributor).owner()
+        or msg.sender == staticcall HrContributor(_contributor).manager()
+    ) # dev: no perms
+
+    if _vaultId != 0:
+        vaultId: uint256 = self._getRipeGovVaultId(a.missionControl, _vaultId)
+        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
+        assert vaultAddr != empty(address) # dev: invalid vault id
+        assert staticcall Vault(vaultAddr).doesUserHaveBalance(_contributor, a.ripeToken) # dev: no balance
+
+    self.legacyContributorRipeGovVaultId[_contributor] = _vaultId
+    log LegacyContributorRipeGovVaultSet(contributor=_contributor, vaultId=_vaultId, changedBy=msg.sender)

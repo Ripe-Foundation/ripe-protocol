@@ -762,6 +762,65 @@
     "type": "event"
   },
   {
+    "name": "PendingRipeGovPointAccrualGlobalDisable",
+    "inputs": [
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "vaultAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingRipeGovPointAccrualUserDisable",
+    "inputs": [
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "vaultAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "EndaoTransferExecuted",
     "inputs": [
       {
@@ -1076,6 +1135,45 @@
         "name": "shouldAutoDeposit",
         "type": "bool",
         "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeGovPointAccrualGlobalDisableExecuted",
+    "inputs": [
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "vaultAddr",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeGovPointAccrualUserDisableExecuted",
+    "inputs": [
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "vaultAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
       }
     ],
     "anonymous": false,
@@ -1708,6 +1806,182 @@
     "type": "function",
     "name": "expiration",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateRipeGovPositions",
+    "inputs": [
+      {
+        "name": "_users",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateRipeGovPositionsForUserByAssets",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateVaultPositions",
+    "inputs": [
+      {
+        "name": "_users",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateVaultPositionsForUserByAssets",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateLegacyRipeGovPositions",
+    "inputs": [
+      {
+        "name": "_users",
+        "type": "address[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidRipeGovPointAccrualDisable",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "disableRipeGovPointAccrualGlobally",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "disableRipeGovPointAccrualForUser",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -2987,6 +3261,10 @@
       {
         "name": "_minLpAmount",
         "type": "uint256"
+      },
+      {
+        "name": "_expectedLpToken",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -3564,6 +3842,10 @@
           {
             "name": "minLpAmount",
             "type": "uint256"
+          },
+          {
+            "name": "expectedLpToken",
+            "type": "address"
           }
         ]
       }
@@ -3929,6 +4211,37 @@
           {
             "name": "shouldAutoDeposit",
             "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingRipeGovPointAccrualDisableActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "vaultAddr",
+            "type": "address"
+          },
+          {
+            "name": "user",
+            "type": "address"
           }
         ]
       }

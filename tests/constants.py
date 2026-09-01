@@ -6,6 +6,13 @@ HUNDRED_PERCENT = 100_00
 ONE_YEAR = 60 * 60 * 24 * 365 # seconds
 ONE_DAY_IN_SECS = 60 * 60 * 24 # seconds
 
+# RipeHQ ids reserved across Base and Robinhood deployments.
+RIPE_CCIP_POOL_HQ_ID = 23
+GREEN_CCIP_POOL_HQ_ID = 24
+VAULT_MIGRATOR_HQ_ID = 25
+RIPE_RESERVE_ENGINE_HQ_ID = 26
+RIPE_RESERVE_VESTING_HQ_ID = 27
+
 # curve pool types
 
 CURVE_POOL_TYPE_STABLESWAP_NG = 2**0  # 2 ** 0 = 1
@@ -25,3 +32,4 @@ BLUE_CHIP_PROTOCOL_SKY = 2**3  # 2 ** 3 = 8
 BLUE_CHIP_PROTOCOL_FLUID = 2**4  # 2 ** 4 = 16
 BLUE_CHIP_PROTOCOL_AAVE_V3 = 2**5  # 2 ** 5 = 32
 BLUE_CHIP_PROTOCOL_COMPOUND_V3 = 2**6  # 2 ** 6 = 64
+BLUE_CHIP_PROTOCOL_MORPHO_V2 = 2**7  # 2 ** 7 = 128; append only

@@ -11,7 +11,7 @@
 #     ╚══════════════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -42,6 +42,7 @@ interface CreditEngine:
 
 interface MissionControl:
     def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
+    def preferredStabVaultId() -> uint256: view
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
 
@@ -70,6 +71,7 @@ struct UserBorrowTerms:
     debtTerms: cs.DebtTerms
     lowestLtv: uint256
     highestLtv: uint256
+    hasQuarantinedAsset: bool
 
 struct UserDebt:
     amount: uint256
@@ -107,7 +109,6 @@ event CollateralRedeemed:
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
-STABILITY_POOL_ID: constant(uint256) = 1
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 
 
@@ -186,8 +187,9 @@ def _redeemCollateral(
     if vaultAddr == empty(address):
         return 0
 
-    # user must have balance
-    if not staticcall Vault(vaultAddr).doesUserHaveBalance(_user, _asset):
+    # user must have a usable balance
+    userAmount: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
+    if userAmount == 0:
         return 0
 
     # cannot redeem from underscore vaults
@@ -213,9 +215,10 @@ def _redeemCollateral(
     if userDebt.amount == 0 or userDebt.inLiquidation:
         return 0
 
-    # get latest debt terms
-    bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, True, 0, empty(address), _a)
-    if bt.collateralVal == 0:
+    # get latest debt terms without propagating price-source failures
+    # CreditEngine quarantines the terms if any debt-bearing collateral has a positive balance but no usable price.
+    bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, False, 0, empty(address), _a)
+    if bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
 
     # user has not reached redemption threshold
@@ -236,15 +239,26 @@ def _redeemCollateral(
         return 0
 
     # max asset amount to take from user
-    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, True)
-    if maxAssetAmount == 0:
+    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, False)
+
+    # Skip expected zero-credit positions before vault mutation. A later
+    # post-transfer zero repayment is an unexpected under-send and reverts.
+    previewAmount: uint256 = min(userAmount, maxAssetAmount)
+
+    # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
+    if maxAssetAmount == 0 or previewAmount <= (maxAssetAmount - 1) // maxRedeemValue:
         return 0
 
     # withdraw or transfer balance to redeemer
     amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(_shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)
+    assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
+    if amountSent == 0:
+        return 0
 
-    # repay debt
+    # Expected zero-credit positions are skipped before transfer.
+    # A post-transfer zero repayment means the vault sent less than previewed and must revert atomically.
     repayValue: uint256 = min(amountSent * maxRedeemValue // maxAssetAmount, userDebt.amount)
+    assert repayValue != 0 # dev: zero repayment value (vault under-send)
     assert extcall GreenToken(_a.greenToken).burn(repayValue) # dev: could not burn green
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, repayValue, newInterest, d.numUserVaults, _a)
 
@@ -289,8 +303,10 @@ def _handleGreenForUser(
 
         # put sGREEN into stability pool
         if _shouldEnterStabPool:
+            preferredStabVaultId: uint256 = staticcall MissionControl(_a.missionControl).preferredStabVaultId()
+            assert preferredStabVaultId != 0 # dev: invalid vault id
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, sGreenAmount, default_return_value=True) # dev: sgreen approval failed
-            extcall Teller(_a.teller).depositFromTrusted(_recipient, STABILITY_POOL_ID, _a.savingsGreen, sGreenAmount, 0, _a)
+            extcall Teller(_a.teller).depositFromTrusted(_recipient, preferredStabVaultId, _a.savingsGreen, sGreenAmount, 0, _a)
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, 0, default_return_value=True) # dev: sgreen approval failed
 
     else:
@@ -310,7 +326,7 @@ def getMaxRedeemValue(_user: address) -> uint256:
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
     userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, False, a)
-    if userDebt.amount == 0 or userDebt.inLiquidation or bt.collateralVal == 0:
+    if userDebt.amount == 0 or userDebt.inLiquidation or bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
 
     if not self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
@@ -329,9 +345,8 @@ def getMaxRedeemValue(_user: address) -> uint256:
 @view
 @internal
 def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
-    # goal here is to only reduce the debt necessary to get LTV back to safe position
-    # it will never be perfectly precise because depending on what assets are taken
-    # to ensure maximum protocol solvency, we will target the user's lowest LTV
+    # only reduce the debt necessary to get LTV back to a safe position — never perfectly precise depending on which assets are taken
+    # to ensure maximum protocol solvency, we target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
     # collateral value too low

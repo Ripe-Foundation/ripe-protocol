@@ -8,7 +8,7 @@
 #                                                  ┛┗┗┣┛┛┗┗┻
 #                                                     ┛     
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
 # pragma optimize codesize
@@ -34,28 +34,37 @@ interface MissionControl:
     def setGeneralDebtConfig(_genDebtConfig: cs.GenDebtConfig): nonpayable
     def setGeneralConfig(_genConfig: cs.GenConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def rewardsConfig() -> cs.RipeRewardsConfig: view
     def genDebtConfig() -> cs.GenDebtConfig: view
+    def coreRipeGovVaultId() -> uint256: view
     def genConfig() -> cs.GenConfig: view
+    def getRipeHq() -> address: view
 
-interface VaultBook:
-    def isValidRegId(_regId: uint256) -> bool: view
-    def getAddr(_regId: uint256) -> address: view
+interface StabilityPool:
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def isPaused() -> bool: view
 
 interface CreditEngine:
     def setUnderscoreVaultDiscount(_discount: uint256): nonpayable
     def setBuybackRatio(_ratio: uint256): nonpayable
 
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
 interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 
-interface PriceSource:
-    def addPriceSnapshot(_asset: address) -> bool: nonpayable
-
 interface PythPrices:
     def setMaxConfidenceRatio(_newRatio: uint256) -> bool: nonpayable
+
+interface PriceSource:
+    def addPriceSnapshot(_asset: address) -> bool: nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -393,19 +402,24 @@ pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
 
-MIN_STALE_TIME: public(immutable(uint256))
-MAX_STALE_TIME: public(immutable(uint256))
-
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
+PRIORITY_LIQ_EXECUTION: constant(uint256) = 0
+PRIORITY_LIQ_PROPOSAL: constant(uint256) = 1
+PRIORITY_STAB_EXECUTION: constant(uint256) = 2
+PRIORITY_STAB_PROPOSAL: constant(uint256) = 3
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
+MAX_AUCTION_DELAY: constant(uint256) = 2**32 - 1 # protect overflow
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
-PYTH_PRICES_ID: constant(uint256) = 4
 CREDIT_ENGINE_ID: constant(uint256) = 13
+
+MIN_STALE_TIME: public(immutable(uint256))
+MAX_STALE_TIME: public(immutable(uint256))
+PYTH_PRICES_ID: immutable(uint256)
 
 
 @deploy
@@ -416,6 +430,7 @@ def __init__(
     _maxStaleTime: uint256,
     _minConfigTimeLock: uint256,
     _maxConfigTimeLock: uint256,
+    _pythPricesId: uint256,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
@@ -423,6 +438,7 @@ def __init__(
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
     MIN_STALE_TIME = _minStaleTime
     MAX_STALE_TIME = _maxStaleTime
+    PYTH_PRICES_ID = _pythPricesId
 
 
 # access control
@@ -443,8 +459,14 @@ def _hasPermsToEnable(_caller: address, _shouldEnable: bool) -> bool:
 
 @view
 @internal
+def _hqAddr(_id: uint256) -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(_id)
+
+
+@view
+@internal
 def _getMissionControlAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
+    return self._hqAddr(MISSION_CONTROL_ID)
 
 
 @view
@@ -455,30 +477,6 @@ def _resolveMissionControl(_missionControl: address) -> address:
         return mc
     assert _missionControl != mc # dev: use empty for current mission control
     return _missionControl
-
-
-@view
-@internal
-def _getPriceDeskAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
-
-
-@view
-@internal
-def _getVaultBookAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
-
-
-@view
-@internal
-def _getCreditEngineAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(CREDIT_ENGINE_ID)
-
-
-@view
-@internal
-def _getPythPricesAddr() -> address:
-    return staticcall PriceDesk(self._getPriceDeskAddr()).getAddr(PYTH_PRICES_ID)
 
 
 ##################
@@ -513,15 +511,9 @@ def _areValidVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: 
 @external
 def setStaleTime(_staleTime: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
+    assert _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME # dev: invalid stale time
     mc: address = self._resolveMissionControl(_missionControl)
     return self._setPendingGenConfig(ActionType.GEN_CONFIG_STALE_TIME, mc, 0, 0, _staleTime)
-
-
-@view
-@internal
-def _isValidStaleTime(_staleTime: uint256) -> bool:
-    return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
 
 
 # set pending general config
@@ -688,14 +680,14 @@ def _setGenConfigFlag(_flag: GenConfigFlag, _shouldEnable: bool, _missionControl
 @external
 def setGlobalDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits
     mc: address = self._resolveMissionControl(_missionControl)
+    assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers, mc) # dev: invalid debt limits
     return self._setPendingDebtConfig(ActionType.DEBT_GLOBAL_LIMITS, mc, _perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers)
 
 
 @view
 @internal
-def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256) -> bool:
+def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256, _missionControl: address) -> bool:
     if 0 in [_perUserDebtLimit, _globalDebtLimit, _numAllowedBorrowers]:
         return False
     if max_value(uint256) in [_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers]:
@@ -703,6 +695,9 @@ def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _
     if _perUserDebtLimit > _globalDebtLimit:
         return False
     if _minDebtAmount > _perUserDebtLimit:
+        return False
+    config: cs.GenDebtConfig = staticcall MissionControl(_missionControl).genDebtConfig()
+    if _minDebtAmount > config.maxBorrowPerInterval:
         return False
     return True
 
@@ -713,19 +708,19 @@ def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _
 @external
 def setBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval) # dev: invalid borrow interval config
     mc: address = self._resolveMissionControl(_missionControl)
+    assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval, mc) # dev: invalid borrow interval config
     return self._setPendingDebtConfig(ActionType.DEBT_BORROW_INTERVAL, mc, 0, 0, 0, 0, _maxBorrowPerInterval, _numBlocksPerInterval)
 
 
 @view
 @internal
-def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256) -> bool:
+def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256, _missionControl: address) -> bool:
     if 0 in [_maxBorrowPerInterval, _numBlocksPerInterval]:
         return False
     if max_value(uint256) in [_maxBorrowPerInterval, _numBlocksPerInterval]:
         return False
-    config: cs.GenDebtConfig = staticcall MissionControl(self._getMissionControlAddr()).genDebtConfig()
+    config: cs.GenDebtConfig = staticcall MissionControl(_missionControl).genDebtConfig()
     if _maxBorrowPerInterval < config.minDebtAmount:
         return False
     return True
@@ -867,13 +862,13 @@ def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
         return False
     if _params.startDiscount > HUNDRED_PERCENT:
         return False
-    if _params.maxDiscount > HUNDRED_PERCENT:
+    if _params.maxDiscount >= HUNDRED_PERCENT:
         return False
     if _params.startDiscount >= _params.maxDiscount:
         return False
-    if _params.delay == max_value(uint256):
+    if _params.duration == 0 or _params.duration > max_value(uint256) // HUNDRED_PERCENT: # overflow protection
         return False
-    if _params.duration == 0 or _params.duration == max_value(uint256):
+    if _params.delay > MAX_AUCTION_DELAY: # overflow protection
         return False
     return True
 
@@ -922,6 +917,7 @@ def setBuybackRatio(_ratio: uint256) -> uint256:
 def setPythMaxConfidenceRatio(_ratio: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _ratio < HUNDRED_PERCENT # dev: ratio must be < 100%
+    assert PYTH_PRICES_ID != 0 # dev: pyth disabled
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.PYTH_MAX_CONFIDENCE_RATIO
@@ -1209,16 +1205,16 @@ def setRewardsPointsEnabled(_shouldEnable: bool, _missionControl: address = empt
 def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA], _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityLiqAssetVaults)
-    assert len(priorityVaults) == len(_priorityLiqAssetVaults) # dev: invalid priority vaults
+    mc: address = self._resolveMissionControl(_missionControl)
+    assert self._validatePriorityVaults(_priorityLiqAssetVaults, mc, PRIORITY_LIQ_PROPOSAL) == 0 # dev: invalid priority vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS
-    self.pendingPriorityLiqAssetVaults[aid] = priorityVaults
-    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    self.pendingPriorityLiqAssetVaults[aid] = _priorityLiqAssetVaults
+    self.pendingMissionControl[aid] = mc
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingPriorityLiqAssetVaultsChange(
-        numPriorityLiqAssetVaults=len(priorityVaults),
+        numPriorityLiqAssetVaults=len(_priorityLiqAssetVaults),
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -1232,40 +1228,60 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
 def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA], _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityStabVaults)
-    assert len(priorityVaults) == len(_priorityStabVaults) # dev: invalid priority vaults
+    mc: address = self._resolveMissionControl(_missionControl)
+    validation: uint256 = self._validatePriorityVaults(_priorityStabVaults, mc, PRIORITY_STAB_PROPOSAL)
+    assert validation != 1 # dev: invalid priority vaults
+    assert validation == 0 # dev: invalid priority stab vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_STAB_VAULTS
-    self.pendingPriorityStabVaults[aid] = priorityVaults
-    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    self.pendingPriorityStabVaults[aid] = _priorityStabVaults
+    self.pendingMissionControl[aid] = mc
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingPriorityStabVaultsChange(
-        numPriorityStabVaults=len(priorityVaults),
+        numPriorityStabVaults=len(_priorityStabVaults),
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
     return aid
 
 
-# sanitize
+# validate
 
 
 @internal
-def _sanitizePriorityVaults(_priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]) -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
-    sanitizedVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = []
-    vaultBook: address = self._getVaultBookAddr()
-    mc: address = self._getMissionControlAddr()
+def _validatePriorityVaults(
+    _priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA],
+    _missionControl: address,
+    _validationMode: uint256,
+) -> uint256:
+    vaultBook: address = self._hqAddr(VAULT_BOOK_ID)
+    isProposal: bool = (_validationMode & 1) != 0
     for vault: cs.VaultLite in _priorityVaults:
-        if self.vaultDedupe[vault.vaultId][vault.asset]:
-            continue
+        if isProposal and self.vaultDedupe[vault.vaultId][vault.asset]:
+            return 1
         if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):
-            continue
-        if not staticcall MissionControl(mc).isSupportedAssetInVault(vault.vaultId, vault.asset):
-            continue
-        sanitizedVaults.append(vault)
-        self.vaultDedupe[vault.vaultId][vault.asset] = True
-    return sanitizedVaults
+            return 1
+        if not staticcall MissionControl(_missionControl).isSupportedAssetInVault(vault.vaultId, vault.asset):
+            return 1
+        if _validationMode < PRIORITY_STAB_EXECUTION:
+            if staticcall MissionControl(_missionControl).isStabVaultId(vault.vaultId):
+                return 1
+            if staticcall MissionControl(_missionControl).isRipeGovVaultId(vault.vaultId):
+                return 1
+        else:
+            vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vault.vaultId)
+            if not vaultAddr.is_contract:
+                return 2
+
+            # capability probes only
+            naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(vault.asset, empty(address))
+            naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(vault.asset, empty(address))
+            if staticcall StabilityPool(vaultAddr).isPaused():
+                return 2
+        if isProposal:
+            self.vaultDedupe[vault.vaultId][vault.asset] = True
+    return 0
 
 
 #############################
@@ -1276,17 +1292,15 @@ def _sanitizePriorityVaults(_priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAU
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES], _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-
-    priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self._sanitizePrioritySources(_priorityIds)
-    assert len(priorityIds) != 0 # dev: invalid priority sources
+    assert len(_priorityIds) != 0 # dev: invalid priority sources
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS
-    self.pendingPriorityPriceSourceIds[aid] = priorityIds
+    self.pendingPriorityPriceSourceIds[aid] = _priorityIds
     self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingPriorityPriceSourceIdsChange(
-        numPriorityPriceSourceIds=len(priorityIds),
+        numPriorityPriceSourceIds=len(_priorityIds),
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -1295,11 +1309,16 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE
 
 @view
 @internal
-def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
+def _sanitizePrioritySources(
+    _priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES],
+    _missionControl: address,
+) -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
     sanitizedIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
-    priceDesk: address = self._getPriceDeskAddr()
+    priceDesk: address = staticcall RipeHq(staticcall MissionControl(_missionControl).getRipeHq()).getAddr(PRICE_DESK_ID)
     for pid: uint256 in _priorityIds:
         if not staticcall PriceDesk(priceDesk).isValidRegId(pid):
+            continue
+        if staticcall PriceDesk(priceDesk).getAddr(pid) == empty(address):
             continue
         if pid in sanitizedIds:
             continue
@@ -1316,7 +1335,7 @@ def addPriceSnapshot(_asset: address, _priceSourceId: uint256) -> bool:
     if not gov._canGovern(msg.sender):
         assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
     
-    priceSourceAddr: address = staticcall PriceDesk(self._getPriceDeskAddr()).getAddr(_priceSourceId)
+    priceSourceAddr: address = staticcall PriceDesk(self._hqAddr(PRICE_DESK_ID)).getAddr(_priceSourceId)
     assert priceSourceAddr != empty(address) # dev: invalid price source id
 
     didUpdate: bool = extcall PriceSource(priceSourceAddr).addPriceSnapshot(_asset) 
@@ -1368,6 +1387,7 @@ def setRipeGovVaultConfig(
     _missionControl: address = empty(address),
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
+    mc: address = self._resolveMissionControl(_missionControl)
 
     lockTerms: cs.LockTerms = cs.LockTerms(
         minLockDuration=_minLockDuration,
@@ -1376,7 +1396,7 @@ def setRipeGovVaultConfig(
         canExit=_canExit,
         exitFee=_exitFee,
     )
-    assert self._isValidRipeVaultConfig(_asset, _assetWeight, lockTerms) # dev: invalid ripe vault config
+    assert self._isValidRipeVaultConfig(_asset, _assetWeight, lockTerms, mc) # dev: invalid ripe vault config
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_VAULT_CONFIG
@@ -1386,7 +1406,7 @@ def setRipeGovVaultConfig(
         shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
         lockTerms=lockTerms,
     )
-    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    self.pendingMissionControl[aid] = mc
 
     log PendingRipeGovVaultConfigChange(
         asset=_asset,
@@ -1405,22 +1425,28 @@ def setRipeGovVaultConfig(
 
 @view
 @internal
-def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: cs.LockTerms) -> bool:
+def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: cs.LockTerms, _missionControl: address) -> bool:
     if _asset == empty(address):
         return False
 
-    mc: address = self._getMissionControlAddr()
-    if not staticcall MissionControl(mc).isSupportedAsset(_asset):
+    if not staticcall MissionControl(_missionControl).isSupportedAsset(_asset):
         return False
 
-    # NOTE: this assumes that vault id 2 is ripe gov vault !!
-    if not staticcall MissionControl(mc).isSupportedAssetInVault(2, _asset):
+    coreRipeGovVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    if coreRipeGovVaultId == 0:
+        return False
+    if not staticcall MissionControl(_missionControl).isSupportedAssetInVault(coreRipeGovVaultId, _asset):
         return False
 
     if _assetWeight > 500_00: # max 500%
         return False
 
-    if _lockTerms.minLockDuration > _lockTerms.maxLockDuration:
+    # maxLockBoost (1000%) is the largest downstream duration multiplier.
+    if (
+        _lockTerms.maxLockDuration == 0
+        or unsafe_mul(_lockTerms.maxLockDuration, 1000_00) // 1000_00 != _lockTerms.maxLockDuration
+        or _lockTerms.minLockDuration > _lockTerms.maxLockDuration
+    ):
         return False
 
     if _lockTerms.maxLockBoost > 1000_00: # max 1000%
@@ -1429,10 +1455,7 @@ def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: 
     if _lockTerms.exitFee > HUNDRED_PERCENT:
         return False
 
-    if _lockTerms.canExit and _lockTerms.exitFee == 0:
-        return False
-
-    if not _lockTerms.canExit and _lockTerms.exitFee != 0:
+    if _lockTerms.canExit == (_lockTerms.exitFee == 0):
         return False
 
     return True
@@ -1477,6 +1500,7 @@ def executePendingAction(_aid: uint256) -> bool:
     elif actionType == ActionType.DEBT_GLOBAL_LIMITS:
         config: cs.GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
         p: cs.GenDebtConfig = self.pendingDebtConfig[_aid]
+        assert p.minDebtAmount <= config.maxBorrowPerInterval # dev: invalid debt limits
         config.perUserDebtLimit = p.perUserDebtLimit
         config.globalDebtLimit = p.globalDebtLimit
         config.minDebtAmount = p.minDebtAmount
@@ -1487,6 +1511,7 @@ def executePendingAction(_aid: uint256) -> bool:
     elif actionType == ActionType.DEBT_BORROW_INTERVAL:
         config: cs.GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
         p: cs.GenDebtConfig = self.pendingDebtConfig[_aid]
+        assert p.maxBorrowPerInterval >= config.minDebtAmount # dev: invalid borrow interval config
         config.maxBorrowPerInterval = p.maxBorrowPerInterval
         config.numBlocksPerInterval = p.numBlocksPerInterval
         extcall MissionControl(mc).setGeneralDebtConfig(config)
@@ -1532,17 +1557,17 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.DEBT_UNDY_VAULT_DISCOUNT:
         discount: uint256 = self.pendingUndyVaultDiscount[_aid]
-        extcall CreditEngine(self._getCreditEngineAddr()).setUnderscoreVaultDiscount(discount)
+        extcall CreditEngine(self._hqAddr(CREDIT_ENGINE_ID)).setUnderscoreVaultDiscount(discount)
         log UndyVaultDiscountSet(discount=discount)
 
     elif actionType == ActionType.DEBT_BUYBACK_RATIO:
         ratio: uint256 = self.pendingBuybackRatio[_aid]
-        extcall CreditEngine(self._getCreditEngineAddr()).setBuybackRatio(ratio)
+        extcall CreditEngine(self._hqAddr(CREDIT_ENGINE_ID)).setBuybackRatio(ratio)
         log BuybackRatioSet(ratio=ratio)
 
     elif actionType == ActionType.PYTH_MAX_CONFIDENCE_RATIO:
         ratio: uint256 = self.pendingPythMaxConfidenceRatio[_aid]
-        extcall PythPrices(self._getPythPricesAddr()).setMaxConfidenceRatio(ratio)
+        extcall PythPrices(staticcall PriceDesk(self._hqAddr(PRICE_DESK_ID)).getAddr(PYTH_PRICES_ID)).setMaxConfidenceRatio(ratio)
         log PythMaxConfidenceRatioSet(ratio=ratio)
 
     elif actionType == ActionType.RIPE_REWARDS_BLOCK:
@@ -1572,16 +1597,19 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]
+        assert self._validatePriorityVaults(priorityVaults, mc, PRIORITY_LIQ_EXECUTION) == 0 # dev: invalid priority vaults
         extcall MissionControl(mc).setPriorityLiqAssetVaults(priorityVaults)
         log PriorityLiqAssetVaultsSet(numVaults=len(priorityVaults))
 
     elif actionType == ActionType.OTHER_PRIORITY_STAB_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityStabVaults[_aid]
+        assert self._validatePriorityVaults(priorityVaults, mc, PRIORITY_STAB_EXECUTION) == 0 # dev: invalid priority stab vaults
         extcall MissionControl(mc).setPriorityStabVaults(priorityVaults)
         log PriorityStabVaultsSet(numVaults=len(priorityVaults))
 
     elif actionType == ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS:
-        priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self.pendingPriorityPriceSourceIds[_aid]
+        priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self._sanitizePrioritySources(self.pendingPriorityPriceSourceIds[_aid], mc)
+        assert len(priorityIds) != 0 # dev: invalid priority price source ids
         extcall MissionControl(mc).setPriorityPriceSourceIds(priorityIds)
         log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
 

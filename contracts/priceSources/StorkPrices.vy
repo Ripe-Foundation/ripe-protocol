@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -23,16 +23,13 @@ import contracts.modules.TimeLock as timeLock
 import interfaces.PriceSource as PriceSource
 
 interface StorkNetwork:
+    def updateTemporalNumericValuesV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]): payable
+    def getUpdateFeeV1(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> uint256: view
     def getTemporalNumericValueUnsafeV1(_feedId: bytes32) -> TemporalNumericValue: view
-    def updateTemporalNumericValuesV1(_payload: Bytes[2048]): payable
-    def getUpdateFeeV1(_payload: Bytes[2048]) -> uint256: view
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
-
-struct TemporalNumericValue:
-    timestampNs: uint64
-    quantizedValue: uint256
+    def getPriceStaleTime() -> uint256: view
 
 struct StorkFeedConfig:
     feedId: bytes32
@@ -41,6 +38,19 @@ struct StorkFeedConfig:
 struct PendingStorkFeed:
     actionId: uint256
     config: StorkFeedConfig
+
+struct TemporalNumericValue:
+    timestampNs: uint64
+    quantizedValue: int192
+
+struct TemporalNumericValueInput:
+    temporalNumericValue: TemporalNumericValue
+    id: bytes32
+    publisherMerkleRoot: bytes32
+    valueComputeAlgHash: bytes32
+    r: bytes32
+    s: bytes32
+    v: uint8
 
 event NewStorkFeedPending:
     asset: indexed(address)
@@ -92,7 +102,7 @@ event DisableStorkFeedCancelled:
     feedId: bytes32
 
 event StorkPriceUpdated:
-    payload: Bytes[2048]
+    payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]
     feeAmount: uint256
     caller: indexed(address)
 
@@ -105,8 +115,9 @@ feedConfig: public(HashMap[address, StorkFeedConfig]) # asset -> feed
 pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
 STORK: public(immutable(address))
-
 MAX_PRICE_UPDATES: constant(uint256) = 20
+MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
+MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
 
 
 @deploy
@@ -140,7 +151,13 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
+    if not isValid:
+        return 0
     return self._getPrice(config.feedId, staleTime)
 
 
@@ -150,7 +167,13 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0, True
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
+    if not isValid:
+        return 0, True
     return self._getPrice(config.feedId, staleTime), True
 
 
@@ -158,20 +181,39 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 @internal
 def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
+    return self._validatePriceData(data, _staleTime)
 
-    # no price
-    if data.quantizedValue == 0:
+
+@view
+@internal
+def _validatePriceData(_data: TemporalNumericValue, _staleTime: uint256) -> uint256:
+
+    # official 1e18 as-is; reject non-positive int192
+    if _data.quantizedValue <= 0:
         return 0
 
-    # price is too stale
-    publishTime: uint256 = convert(data.timestampNs, uint256) // 1_000_000_000
+    # validate publish time and staleness
+    # sub-second future values within the current second truncate to current time
+    publishTime: uint256 = convert(_data.timestampNs, uint256) // 1_000_000_000
+    if publishTime == 0 or publishTime > block.timestamp:
+        return 0
     if _staleTime != 0 and block.timestamp - publishTime > _staleTime:
         return 0
 
-    return data.quantizedValue
+    return convert(_data.quantizedValue, uint256)
 
 
 # utilities
+
+
+@view
+@internal
+def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
+    # only canonical PriceDesk may supply a nonzero forwarded global policy
+    if _staleTime == 0:
+        return True
+    priceDesk: address = addys._getPriceDeskAddr()
+    return msg.sender == priceDesk and _priceDesk == priceDesk
 
 
 @view
@@ -191,6 +233,38 @@ def addPriceSnapshot(_asset: address) -> bool:
     return False
 
 
+@view
+@internal
+def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (uint256, bool):
+    if _feedStaleTime != 0:
+        if _feedStaleTime < MIN_LOCAL_STALE_TIME or _feedStaleTime > MAX_EFFECTIVE_STALE_TIME:
+            return 0, False
+        return _feedStaleTime, True
+
+    globalStaleTime: uint256 = _globalStaleTime
+    if globalStaleTime == 0:
+        isValid: bool = False
+        globalStaleTime, isValid = self._getGlobalStaleTime()
+        if not isValid:
+            return 0, False
+    elif globalStaleTime > MAX_EFFECTIVE_STALE_TIME:
+        return 0, False
+    return globalStaleTime, True
+
+
+@view
+@internal
+def _getGlobalStaleTime() -> (uint256, bool):
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl == empty(address):
+        return 0, False
+
+    staleTime: uint256 = staticcall MissionControl(missionControl).getPriceStaleTime()
+    if staleTime == 0 or staleTime > MAX_EFFECTIVE_STALE_TIME:
+        return 0, False
+    return staleTime, True
+
+
 ################
 # Add New Feed #
 ################
@@ -200,9 +274,10 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 
 @external
-def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
+def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     assert self._isValidNewFeed(_asset, _feedId, _staleTime) # dev: invalid feed
@@ -229,6 +304,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.config.feedId != empty(bytes32) # dev: no pending new feed
+    assert self.feedConfig[_asset].feedId == empty(bytes32) # dev: no pending new feed
     if not self._isValidNewFeed(_asset, d.config.feedId, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
@@ -254,6 +330,9 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingStorkFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending new feed
+    assert d.config.feedId != empty(bytes32) # dev: no pending new feed
+    assert self.feedConfig[_asset].feedId == empty(bytes32) # dev: no pending new feed
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
     log NewStorkFeedCancelled(asset=_asset, feedId=d.config.feedId)
     return True
@@ -291,13 +370,42 @@ def _isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> b
 
 
 @external
-def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
+def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+    assert _feedId != self.feedConfig[_asset].feedId # dev: invalid feed
+
+    # feed rotation defaults to the active stale policy. `updateStaleTime(..., 0)`
+    # remains the explicit path for resetting a feed to MissionControl inheritance.
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
+
+    return self._initiatePriceFeedUpdate(_asset, _feedId, staleTime)
+
+
+@external
+def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
+    config: StorkFeedConfig = self.feedConfig[_asset]
+    return self._initiatePriceFeedUpdate(_asset, config.feedId, _staleTime)
+
+
+@view
+@internal
+def _normalizeFeedUpdateStaleTime(_asset: address, _staleTime: uint256) -> uint256:
+    if _staleTime == 0:
+        return self.feedConfig[_asset].staleTime
+    return _staleTime
+
+
+@internal
+def _initiatePriceFeedUpdate(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
+
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
-    assert self._isValidUpdateFeed(_asset, _feedId, oldFeedId, _staleTime) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, _feedId, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -322,7 +430,12 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.config.feedId != empty(bytes32) # dev: no pending update feed
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
-    if not self._isValidUpdateFeed(_asset, d.config.feedId, oldFeedId, d.config.staleTime):
+    assert oldFeedId != empty(bytes32) # dev: no pending update feed
+    if not self._isValidUpdateFeed(_asset, d.config.feedId, d.config.staleTime):
+        # a stale-only update can fail transiently when its unchanged oracle is
+        # unavailable. Preserve the timelocked action so governance can retry.
+        if d.config.feedId == oldFeedId:
+            return False
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -346,6 +459,9 @@ def cancelPriceFeedUpdate(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingStorkFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending update feed
+    assert d.config.feedId != empty(bytes32) # dev: no pending update feed
+    assert self.feedConfig[_asset].feedId != empty(bytes32) # dev: no pending update feed
     self._cancelPriceFeedUpdate(_asset, d.actionId)
     log StorkFeedUpdateCancelled(asset=_asset, feedId=d.config.feedId, oldFeedId=self.feedConfig[_asset].feedId)
     return True
@@ -363,16 +479,31 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
-    return self._isValidUpdateFeed(_asset, _feedId, self.feedConfig[_asset].feedId, _staleTime)
+    # feed-changing preflight intentionally rejects the active feed. Use
+    # `isValidStaleTimeUpdate` for a same-feed policy change.
+    if _feedId == self.feedConfig[_asset].feedId:
+        return False
+    staleTime: uint256 = self._normalizeFeedUpdateStaleTime(_asset, _staleTime)
+    return self._isValidUpdateFeed(_asset, _feedId, staleTime)
+
+
+@view
+@external
+def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    # stale-only preflight validates against the active feed configuration
+    config: StorkFeedConfig = self.feedConfig[_asset]
+    return self._isValidUpdateFeed(_asset, config.feedId, _staleTime)
 
 
 @view
 @internal
-def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _oldFeedId: bytes32, _staleTime: uint256) -> bool:
-    if _feedId == _oldFeedId:
+def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    oldConfig: StorkFeedConfig = self.feedConfig[_asset]
+    if priceData.indexOfAsset[_asset] == 0 or oldConfig.feedId == empty(bytes32): # use the `addNewPriceFeed` function instead
         return False
-    if priceData.indexOfAsset[_asset] == 0 or _oldFeedId == empty(bytes32): # use the `addNewPriceFeed` function instead
+    if _feedId == oldConfig.feedId and _staleTime == oldConfig.staleTime:
         return False
+
     return self._isValidFeedConfig(_asset, _feedId, _staleTime)
 
 
@@ -382,8 +513,15 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
     if _asset == empty(address):
         return False
 
+    # fetch first to preserve the Stork network's NotFound behavior for unknown
+    # feed IDs, then reuse the exact runtime data validation below
     data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
-    return data.timestampNs != 0
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(0, _staleTime)
+    if not isValid:
+        return False
+    return self._validatePriceData(data, staleTime) != 0
 
 
 ################
@@ -398,6 +536,7 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
 def disablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
@@ -426,6 +565,8 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feedId == empty(bytes32) # dev: no pending disable feed
+    assert oldFeedId != empty(bytes32) # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeedId):
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False
@@ -450,7 +591,11 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    self._cancelDisablePriceFeed(_asset, self.pendingUpdates[_asset].actionId)
+    d: PendingStorkFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feedId == empty(bytes32) # dev: no pending disable feed
+    assert self.feedConfig[_asset].feedId != empty(bytes32) # dev: no pending disable feed
+    self._cancelDisablePriceFeed(_asset, d.actionId)
     log DisableStorkFeedCancelled(asset=_asset, feedId=self.feedConfig[_asset].feedId)
     return True
 
@@ -485,20 +630,20 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 
 @payable
 @external
-def updateStorkPrice(_payload: Bytes[2048]) -> bool:
+def updateStorkPrice(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     assert msg.value != 0 # dev: payment required
     return self._updateStorkPrice(_payload, STORK, msg.value, True)
 
 
 @external
-def updateStorkPriceNoPay(_payload: Bytes[2048]) -> bool:
+def updateStorkPriceNoPay(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     return self._updateStorkPrice(_payload, STORK, self.balance, False)
 
 
 @internal
-def _updateStorkPrice(_payload: Bytes[2048], _stork: address, _payment: uint256, _shouldRefund: bool) -> bool:
+def _updateStorkPrice(_payload: DynArray[TemporalNumericValueInput, MAX_PRICE_UPDATES], _stork: address, _payment: uint256, _shouldRefund: bool) -> bool:
     feeAmount: uint256 = staticcall StorkNetwork(_stork).getUpdateFeeV1(_payload)
     assert _payment >= feeAmount # dev: insufficient payment
 

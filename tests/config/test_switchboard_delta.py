@@ -139,7 +139,8 @@ def deployedContributor(
     ledger,
     governance,
     alice,
-    bob
+    bob,
+    setupRipeGovVaultConfig,
 ):
     """Deploy a contributor contract for testing"""
     def _deployedContributor(_owner=alice, _manager=bob, _compensation=1000 * EIGHTEEN_DECIMALS):
@@ -160,7 +161,8 @@ def deployedContributor(
         
         # Set available RIPE for HR
         ledger.setRipeAvailForHr(10000 * EIGHTEEN_DECIMALS, sender=switchboard_delta.address)
-        
+        setupRipeGovVaultConfig()
+
         # Initiate new contributor
         aid = human_resources.initiateNewContributor(
             owner,             # _owner
@@ -694,13 +696,14 @@ def test_switchboard_delta_execute_pending_manager_change(
 
 
 def test_switchboard_delta_execute_pending_cancel_paycheck(
-    switchboard_delta, governance, human_resources, setupHrConfig, setupLedgerBalance, alice, bob
+    switchboard_delta, governance, human_resources, setupHrConfig, setupLedgerBalance, setupRipeGovVaultConfig, alice, bob
 ):
     """Test executing pending paycheck cancellation succeeds when switchboard is properly registered"""
     # Set up HR config and ledger balance
     setupHrConfig()
     setupLedgerBalance(1000 * EIGHTEEN_DECIMALS)
-    
+    setupRipeGovVaultConfig()
+
     # Create contributor with long but valid vesting period to allow cancellation
     aid = human_resources.initiateNewContributor(
         alice,                      # _owner
@@ -806,13 +809,14 @@ def test_switchboard_delta_complete_hr_config_workflow(
 
 def test_switchboard_delta_complete_contributor_management_workflow(
     switchboard_delta, mission_control, governance, human_resources, setupHrConfig, setupLedgerBalance,
-    alice, bob
+    setupRipeGovVaultConfig, alice, bob
 ):
     """Test complete workflow for contributor management - SwitchboardDelta has proper permissions"""
     # Set up HR config and ledger balance
     setupHrConfig()
     setupLedgerBalance(1000 * EIGHTEEN_DECIMALS)
-    
+    setupRipeGovVaultConfig()
+
     # Create contributor with long but valid vesting period to allow paycheck cancellation
     aid = human_resources.initiateNewContributor(
         alice,                      # _owner
@@ -1075,7 +1079,7 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
 def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, governance, alice):
     """Test setRipeBondBooster validation for invalid bond booster addresses"""
     # Non-contract address should fail validation (will revert when trying to call getBoostRatio)
-    with boa.reverts():  # This will catch any revert, not a specific message
+    with boa.reverts("returndatasize too small"):  # This will catch any revert, not a specific message
         switchboard_delta.setRipeBondBooster(alice, sender=governance.address)
     
     # Empty address is actually allowed by the validation logic
@@ -1084,11 +1088,36 @@ def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, g
     assert aid > 0
 
 
-def test_switchboard_delta_set_start_epoch_at_block(switchboard_delta, bond_room, governance, alice):
+def test_switchboard_delta_set_start_epoch_at_block(
+    switchboard_delta,
+    bond_room,
+    mission_control,
+    governance,
+    alice,
+    ripe_token,
+):
     """Test setStartEpochAtBlock is instant and requires governance permissions"""
     # Non-governance cannot set start epoch
     with boa.reverts("no perms"):
         switchboard_delta.setStartEpochAtBlock(sender=alice)
+
+    # A zero epoch length is deliberately rejected by BondRoom. Install a valid
+    # config through the authorized Switchboard before exercising the instant
+    # start-block control.
+    mission_control.setRipeBondConfig(
+        (
+            ripe_token.address,
+            1_000 * EIGHTEEN_DECIMALS,
+            False,
+            1 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            100_00,
+            100,
+            True,
+            0,
+        ),
+        sender=switchboard_delta.address,
+    )
     
     # Governance can set start epoch at block immediately (no timelock)
     current_block = boa.env.evm.patch.block_number
@@ -1169,19 +1198,19 @@ def test_switchboard_delta_set_booster_min_lock_duration(switchboard_delta, bond
 def test_set_underscore_registry_success(switchboard_delta, governance, mock_rando_contract):
     """Test that setUnderscoreRegistry can be called by governance"""
     # This will fail validation as mock_rando_contract doesn't implement the required interface
-    with boa.reverts():  # Just check it reverts, don't match exact message
+    with boa.reverts("external call failed"):  # Just check it reverts, don't match exact message
         switchboard_delta.setUnderscoreRegistry(mock_rando_contract, sender=governance.address)
 
 
 def test_underscore_registry_validation_comprehensive(switchboard_delta, governance):
     """Test underscore registry validation with various scenarios"""
     # Test with contract that doesn't implement expected interface
-    with boa.reverts():
+    with boa.reverts("external call failed"):
         switchboard_delta.setUnderscoreRegistry(governance.address, sender=governance.address)
 
     # Test with EOA (not a contract)
     eoa_address = boa.env.generate_address()
-    with boa.reverts():
+    with boa.reverts("invalid underscore registry"):
         switchboard_delta.setUnderscoreRegistry(eoa_address, sender=governance.address)
 
 
@@ -1636,6 +1665,60 @@ def test_set_single_bond_booster_execute_success(
     assert switchboard_delta.actionType(aid) == 0
 
 
+def test_bond_booster_replacement_uses_expiry_state_at_timelock_execution(
+    switchboard_delta, governance, alice, bond_booster, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    timelock = switchboard_delta.actionTimeLock()
+    old_expiry = current_block + timelock
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    assert bond_booster.config(alice)[0] == alice
+    assert bond_booster.unitsUsed(alice) == 30
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 1000)
+    aid = switchboard_delta.setBondBooster(new_config, sender=governance.address)
+    assert bond_booster.unitsUsed(alice) == 30
+
+    boa.env.time_travel(blocks=timelock)
+    assert boa.env.evm.patch.block_number == old_expiry
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+    assert switchboard_delta.executePendingAction(aid, sender=governance.address)
+    stored_config = bond_booster.config(alice)
+    assert (stored_config[0], stored_config[1], stored_config[2], stored_config[3]) == new_config
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 75) == 2 * HUNDRED_PERCENT
+
+
+def test_bond_booster_replacement_preserves_usage_when_active_at_timelock_execution(
+    switchboard_delta, governance, alice, bond_booster, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    timelock = switchboard_delta.actionTimeLock()
+    old_expiry = current_block + timelock + 1000
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    assert bond_booster.config(alice)[0] == alice
+    assert bond_booster.unitsUsed(alice) == 30
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 1000)
+    aid = switchboard_delta.setBondBooster(new_config, sender=governance.address)
+    boa.env.time_travel(blocks=timelock)
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    assert switchboard_delta.executePendingAction(aid, sender=governance.address)
+    stored_config = bond_booster.config(alice)
+    assert (stored_config[0], stored_config[1], stored_config[2], stored_config[3]) == new_config
+    assert bond_booster.unitsUsed(alice) == 30
+    assert bond_booster.getBoostRatio(alice, 45) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 46) == 0
+
+
 def test_remove_single_bond_booster_permissions(switchboard_delta, governance, alice, bob, mission_control):
     """Test removeBondBooster permissions: requires governance or lite action with enable"""
     # Non-governance without lite access cannot remove
@@ -1714,15 +1797,8 @@ def test_remove_single_bond_booster_immediate_execution(
 # ========================================
 
 
-def test_deleverage_user_permissions(switchboard_delta, governance, alice, bob, mission_control):
-    """Test deleverageUser requires governance or lite action permission to enable"""
-    # Non-governance without lite access cannot call
-    with boa.reverts("no perms"):
-        switchboard_delta.deleverageUser(alice, sender=bob)
-
-    # Grant bob lite access - verify the permission is granted
-    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
-    assert mission_control.canPerformLiteAction(bob)
+def test_singular_deleverage_api_is_removed(switchboard_delta):
+    assert not hasattr(switchboard_delta, "deleverageUser")
 
 
 def test_deleverage_many_users_permissions(switchboard_delta, governance, alice, bob, mission_control):

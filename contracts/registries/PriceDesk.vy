@@ -17,7 +17,7 @@
 #     ╚════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -38,24 +38,38 @@ import contracts.registries.modules.AddressRegistry as registry
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 
-from interfaces import PriceSource
 from interfaces import Department
-from ethereum.ercs import IERC20Detailed
 
 interface MissionControl:
     def getPriceConfig() -> PriceConfig: view
     def underscoreRegistry() -> address: view
+    def getPriceStaleTime() -> uint256: view
 
 interface UnderscoreRegistry:
     def getAddr(_regId: uint256) -> address: view
+
+interface IERC20Detailed:
+    def decimals() -> uint8: view
 
 struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
+event TokenScaleSet:
+    asset: indexed(address)
+    decimals: indexed(uint256)
+    scale: indexed(uint256)
+
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 UNDERSCORE_APPRAISER_ID: constant(uint256) = 7
+PRICE_SOURCE_PRICE_GAS: constant(uint256) = 250_000
+PRICE_SOURCE_HAS_FEED_GAS: constant(uint256) = 75_000
+PRICE_SOURCE_SNAPSHOT_GAS: constant(uint256) = 150_000
+MAX_SUPPORTED_TOKEN_DECIMALS: constant(uint256) = 77
+
+# 0 = unset. 1 = valid zero-decimal token (10 ** 0).
+tokenScale: public(HashMap[address, uint256])
 
 
 @deploy
@@ -86,14 +100,17 @@ def __init__(
 def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256:
     if _amount == 0 or _asset == empty(address):
         return 0
+
+    tokenScale: uint256 = self._readTokenScale(_asset, _shouldRaise)
+    if tokenScale == 0:
+        return 0
+
     price: uint256 = self._getPrice(_asset, _shouldRaise)
     if price == 0:
         return 0
 
     numerator: uint256 = price * _amount
-    denominator: uint256 = 10 ** 18
-    if _asset != ETH:
-        denominator = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+    denominator: uint256 = tokenScale
 
     # important to return non-zero value -- Stability Pool dust issues 
     if numerator < denominator:
@@ -113,15 +130,15 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
     if _usdValue == 0 or _asset == empty(address):
         return 0
 
+    tokenScale: uint256 = self._readTokenScale(_asset, _shouldRaise)
+    if tokenScale == 0:
+        return 0
+
     price: uint256 = self._getPrice(_asset, _shouldRaise)
     if price == 0:
         return 0
 
-    decimals: uint256 = 18
-    if _asset != ETH:
-        decimals = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
-
-    return _usdValue * (10 ** decimals) // price
+    return _usdValue * tokenScale // price
 
 
 #############
@@ -131,9 +148,16 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 
 @view
 @external
-def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
+def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 0) -> uint256:
     if _asset == empty(address):
         return 0
+
+    # preserve the selector while rejecting the retired caller cap for real assets
+    if _staleTime != 0:
+        if _shouldRaise:
+            raise "caller stale time unsupported"
+        return 0
+
     return self._getPrice(_asset, _shouldRaise)
 
 
@@ -141,7 +165,7 @@ def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 @internal
 def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     price: uint256 = 0
-    hasFeedConfig: bool = False
+    mustRaiseOnZero: bool = False
     alreadyLooked: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
 
     # config
@@ -149,12 +173,12 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 
     # go thru priority partners first
     for pid: uint256 in config.priorityPriceSourceIds:
-        hasFeed: bool = False
-        price, hasFeed = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
+        sourceStatus: uint256 = 0
+        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
         if price != 0:
             break
-        if hasFeed:
-            hasFeedConfig = True
+        if sourceStatus != 0:
+            mustRaiseOnZero = True
         alreadyLooked.append(pid)
 
     # go thru rest of price sources
@@ -164,27 +188,77 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
             for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
                 if pid in alreadyLooked:
                     continue
-                hasFeed: bool = False
-                price, hasFeed = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
+                sourceStatus: uint256 = 0
+                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
                 if price != 0:
                     break
-                if hasFeed:
-                    hasFeedConfig = True
+                if sourceStatus != 0:
+                    mustRaiseOnZero = True
 
-    # raise exception if feed exists but no price
-    if price == 0 and hasFeedConfig and _shouldRaise:
+    # a failed source leaves feed coverage uncertain, so strict callers still
+    # fail closed if no later healthy source establishes a usable price.
+    if price == 0 and mustRaiseOnZero and _shouldRaise:
         raise "has price config, no price"
 
     return price
 
 
+# price from source
+
+
 @view
 @internal
-def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256) -> (uint256, bool):
+def _getPriceFromPriceSource(_pid: uint256, _asset: address, _globalStaleTime: uint256) -> (uint256, uint256):
+    # status: 0 = valid/no feed, 1 = valid/feed, 2 = failed or malformed
     priceSource: address = registry._getAddr(_pid)
     if priceSource == empty(address):
-        return 0, False
-    return staticcall PriceSource(priceSource).getPriceAndHasFeed(_asset, _staleTime, self)
+        return 0, 0
+
+    return self._getPriceFromSource(priceSource, _asset, _globalStaleTime)
+
+
+@view
+@external
+def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256):
+    if _staleTime != 0:
+        return 0, 2
+    # admission checks call from the candidate source itself, so no aggregate
+    # fallback can mask a source that is not executable under the live stipend.
+    globalStaleTime: uint256 = staticcall MissionControl(addys._getMissionControlAddr()).getPriceStaleTime()
+    return self._getPriceFromSource(msg.sender, _asset, globalStaleTime)
+
+
+@view
+@internal
+def _getPriceFromSource(_priceSource: address, _asset: address, _globalStaleTime: uint256) -> (uint256, uint256):
+    # status: 0 = valid/no feed, 1 = valid/feed, 2 = failed or malformed
+
+    success: bool = False
+    response: Bytes[65] = b""
+    success, response = raw_call(
+        _priceSource,
+        abi_encode(
+            _asset,
+            _globalStaleTime,
+            self,
+            method_id=method_id("getPriceAndHasFeed(address,uint256,address)"),
+        ),
+        max_outsize=65,
+        gas=PRICE_SOURCE_PRICE_GAS,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 64:
+        return 0, 2
+
+    price: uint256 = 0
+    hasFeedWord: uint256 = 0
+    price, hasFeedWord = abi_decode(response, (uint256, uint256))
+    if hasFeedWord > 1:
+        return 0, 2
+    if price != 0 and hasFeedWord == 0:
+        return 0, 2
+    return price, hasFeedWord
 
 
 ###############
@@ -220,6 +294,12 @@ def getEthAmount(_usdValue: uint256, _shouldRaise: bool = False) -> uint256:
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
+    return self._hasPriceFeed(_asset)
+
+
+@view
+@internal
+def _hasPriceFeed(_asset: address) -> bool:
     numSources: uint256 = registry.numAddrs
     if numSources == 0:
         return False
@@ -227,9 +307,69 @@ def hasPriceFeed(_asset: address) -> bool:
         priceSource: address = registry._getAddr(pid)
         if priceSource == empty(address):
             continue
-        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
+        valid: bool = False
+        hasFeed: bool = False
+        valid, hasFeed = self._safeHasPriceFeed(priceSource, _asset)
+        if valid and hasFeed:
             return True
     return False
+
+
+@view
+@internal
+def _safeHasPriceFeed(_priceSource: address, _asset: address) -> (bool, bool):
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _priceSource,
+        abi_encode(_asset, method_id=method_id("hasPriceFeed(address)")),
+        max_outsize=33,
+        gas=PRICE_SOURCE_HAS_FEED_GAS,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, False
+
+    hasFeedWord: uint256 = abi_decode(response, uint256)
+    if hasFeedWord > 1:
+        return False, False
+    return True, hasFeedWord == 1
+
+
+################
+# Token Scales #
+################
+
+
+@external
+def syncTokenScale(_asset: address):
+    assert _asset != empty(address) and _asset != ETH # dev: invalid asset
+
+    # permissionless if not gov or switchboard
+    if not gov._canGovern(msg.sender) and not addys._isSwitchboardAddr(msg.sender):
+        assert self._hasPriceFeed(_asset) # dev: no price feed
+        assert self.tokenScale[_asset] == 0 # dev: already set
+    
+    decimals: uint256 = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+    assert decimals <= MAX_SUPPORTED_TOKEN_DECIMALS # dev: invalid token decimals
+    scale: uint256 = 10 ** decimals
+    self.tokenScale[_asset] = scale
+    log TokenScaleSet(asset=_asset, decimals=decimals, scale=scale)
+
+
+@view
+@internal
+def _readTokenScale(_asset: address, _shouldRaise: bool) -> uint256:
+    if _asset == ETH:
+        return 10 ** 18
+
+    scale: uint256 = self.tokenScale[_asset]
+    if scale == 0:
+        if _shouldRaise:
+            raise "missing token scale"
+        return 0
+    return scale
 
 
 ############
@@ -320,11 +460,33 @@ def addPriceSnapshot(_asset: address) -> bool:
         if priceSource == empty(address):
             continue
 
-        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
-            extcall PriceSource(priceSource).addPriceSnapshot(_asset)
+        valid: bool = False
+        hasFeed: bool = False
+        valid, hasFeed = self._safeHasPriceFeed(priceSource, _asset)
+        if not valid or not hasFeed:
+            continue
+        if self._safeAddPriceSnapshot(priceSource, _asset):
             didUpdate = True
 
     return didUpdate
+
+
+@internal
+def _safeAddPriceSnapshot(_priceSource: address, _asset: address) -> bool:
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _priceSource,
+        abi_encode(_asset, method_id=method_id("addPriceSnapshot(address)")),
+        max_outsize=33,
+        gas=PRICE_SOURCE_SNAPSHOT_GAS,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False
+
+    resultWord: uint256 = abi_decode(response, uint256)
+    return resultWord == 1
 
 
 @view

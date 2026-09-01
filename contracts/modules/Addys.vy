@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -59,6 +59,11 @@ CREDIT_REDEEM_ID: constant(uint256) = 19
 TELLER_UTILS_ID: constant(uint256) = 20
 ENDAOMENT_FUNDS_ID: constant(uint256) = 21
 ENDAOMENT_PSM_ID: constant(uint256) = 22
+RIPE_CCIP_POOL_ID: constant(uint256) = 23
+GREEN_CCIP_POOL_ID: constant(uint256) = 24
+VAULT_MIGRATOR_ID: constant(uint256) = 25
+RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
+RIPE_RESERVE_VESTING_ID: constant(uint256) = 27
 
 
 @deploy
@@ -477,3 +482,48 @@ def _getEndaomentPsmId() -> uint256:
 @internal
 def _getEndaomentPsmAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_PSM_ID)
+
+
+# vault migrator
+
+
+@view
+@internal
+def _getVaultMigratorId() -> uint256:
+    return VAULT_MIGRATOR_ID
+
+
+@view
+@internal
+def _getVaultMigratorAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_MIGRATOR_ID)
+
+
+# ripe reserve engine
+
+
+@view
+@internal
+def _getRipeReserveEngineId() -> uint256:
+    return RIPE_RESERVE_ENGINE_ID
+
+
+@view
+@internal
+def _getRipeReserveEngineAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_RESERVE_ENGINE_ID)
+
+
+# ripe reserve vesting
+
+
+@view
+@internal
+def _getRipeReserveVestingId() -> uint256:
+    return RIPE_RESERVE_VESTING_ID
+
+
+@view
+@internal
+def _getRipeReserveVestingAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_RESERVE_VESTING_ID)

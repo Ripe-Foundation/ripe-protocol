@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -120,6 +120,10 @@ def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]):
 def _setBondBooster(_config: BoosterConfig) -> bool:
     if not self._isValidBooster(_config):
         return False
+
+    # absent or expired configs begin a fresh grant and reset
+    if self.config[_config.user].expireBlock <= block.number:
+        self.unitsUsed[_config.user] = 0
 
     self.config[_config.user] = _config
     log BondBoostModified(

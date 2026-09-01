@@ -71,16 +71,24 @@ def test_time_lock_deploy(createMockTimeLock):
             _expiration = 50,  # Expiration less than time lock
         )
 
+    with boa.reverts("invalid expiration"):
+        mock = createMockTimeLock(
+            _minTimeLock = 100,
+            _maxTimeLock = 200,
+            _initialTimeLock = 150,
+            _expiration = 201,  # Expiration above configured maximum
+        )
+
     # Success case with valid parameters
     mock = createMockTimeLock(
         _minTimeLock = 100,
-        _maxTimeLock = 200,
+        _maxTimeLock = 300,
         _initialTimeLock = 150,
         _expiration = 300,
     )
 
     assert mock.minActionTimeLock() == 100
-    assert mock.maxActionTimeLock() == 200
+    assert mock.maxActionTimeLock() == 300
     assert mock.actionTimeLock() == 150
     assert mock.expiration() == 300
     assert mock.actionId() == 1  # starts at 1
@@ -197,6 +205,51 @@ def test_time_lock_time_lock_management(
         mock.setActionTimeLock(mock.minActionTimeLock() - 1, sender=governance.address)
     with boa.reverts("invalid time lock"):
         mock.setActionTimeLock(mock.maxActionTimeLock() + 1, sender=governance.address)
+
+
+def test_time_lock_cannot_exceed_expiration(
+    createMockTimeLock,
+    governance,
+):
+    mock = createMockTimeLock(
+        _minTimeLock = 100,
+        _maxTimeLock = 300,
+        _initialTimeLock = 150,
+        _expiration = 200,
+    )
+
+    assert mock.setActionTimeLock(200, sender=governance.address)
+
+    with boa.reverts("invalid time lock"):
+        mock.setActionTimeLock(201, sender=governance.address)
+
+    assert mock.actionTimeLock() == 200
+
+
+def test_time_lock_action_block_headroom(
+    createMockTimeLock,
+    governance,
+    mock_rando_contract,
+):
+    time_lock = 2
+    expiration = 3
+    mock = createMockTimeLock(
+        _minTimeLock = 1,
+        _maxTimeLock = 3,
+        _initialTimeLock = time_lock,
+        _expiration = expiration,
+    )
+
+    boa.env.evm.patch.block_number = MAX_UINT256 - time_lock + 1
+    with boa.reverts("action confirmation overflow"):
+        mock.addThing(mock_rando_contract, 100, sender=governance.address)
+
+    boa.env.evm.patch.block_number = MAX_UINT256 - time_lock
+    with boa.reverts("action expiration overflow"):
+        mock.addThing(mock_rando_contract, 100, sender=governance.address)
+
+    assert mock.actionId() == 1
+    assert mock.pendingData(mock_rando_contract) == (0, 0)
 
 
 def test_time_lock_sequential_actions(

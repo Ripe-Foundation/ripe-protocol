@@ -20,6 +20,8 @@ asset: public(address)
 balanceOf: public(HashMap[address, uint256]) # user -> shares
 totalSupply: public(uint256)
 allowance: public(HashMap[address, HashMap[address, uint256]])
+# Review-driven test seam: isolate typed PPS reverts without poisoning totalSupply.
+shouldRevertConvertToAssets: public(bool)
 
 # NOTE: this does not include ALL required erc20/4626 methods. 
 # This only includes what we use/need for our strats
@@ -52,7 +54,14 @@ def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
 @view
 @external
 def convertToAssets(_shares: uint256) -> uint256:
+    if self.shouldRevertConvertToAssets:
+        raise # dev: convertToAssets reverted
     return self._sharesToAmount(_shares)
+
+
+@external
+def setShouldRevertConvertToAssets(_shouldRevert: bool):
+    self.shouldRevertConvertToAssets = _shouldRevert
 
 
 @view

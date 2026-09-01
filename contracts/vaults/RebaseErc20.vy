@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -17,7 +17,6 @@ from interfaces import Vault
 import contracts.modules.Addys as addys
 import contracts.vaults.modules.VaultData as vaultData
 import contracts.vaults.modules.SharesVault as sharesVault
-from ethereum.ercs import IERC20
 
 event RebaseErc20VaultDeposit:
     user: indexed(address)
