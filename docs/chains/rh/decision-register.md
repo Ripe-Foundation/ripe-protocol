@@ -1831,7 +1831,52 @@ Accepted residuals, with tests:
 
 This record grants no deployment, configuration, activation, or release
 authority.
+### RH-D047 — Generic Uniswap V2 monitoring is source-authorized and non-admitted
 
+**Status:** Owner-authorized on 29 August 2026 for the exact PR #224
+source, ABI, test, and documentation candidate. Migration execution,
+deployment, replacement, registration, configuration, admission, activation,
+and value-bearing use remain unauthorized.
+
+RH-D047 is the first unallocated identifier in the live integration set: open
+PR #211 owns RH-D044 through RH-D046, while its child PR #223 adds no decision.
+
+`UniswapV2Prices` may expose
+`getPoolMonitoringPrice(asset, pool, partner)` as a stateless direct-monitoring
+view alongside its constructor-bound RIPE/WETH convenience views. The generic
+view returns the asset's USD spot price at 18 decimals by combining the
+caller-supplied pool ratio with PriceDesk's price for the supplied partner. It
+creates no feed or persistent tuple state, and every standard PriceSource
+entrypoint remains permanently inert.
+
+This decision deliberately leaves tuple qualification offchain. The monitoring
+operator must validate factory provenance, token identity and behavior,
+acceptable liquidity, manipulation exposure, and the partner's PriceDesk
+route. The contract performs no factory allowlist or liquidity-floor check. A
+structurally compatible pool can be spoofed, and a genuine pool's reserves can
+be manipulated immediately; neither surface is approved for protocol value.
+
+The API's failure behavior is part of the authorized candidate. Decoded
+semantic invalidity returns zero, including identity mismatch, reserve or
+timestamp bounds, zero reserves, unsupported decimals, absent partner pricing,
+ratio truncation, and unsafe final multiplication. Typed-call failures are not
+converted to zero: EOAs, non-pair contracts, malformed or reverting pool and
+token responses, an invalid RipeHq, and malformed or reverting PriceDesk reads
+revert to the caller. Monitoring consumers must handle that distinction.
+
+The current candidate's runtime template is 4,200 bytes. A constructor-bound
+test deployment is 4,360 bytes with 20,216 bytes of EIP-170 headroom. The
+currently observed live Robinhood instance predates the generic selector.
+Historical and pending deployment modules compile the current source when
+executed, so a future separately authorized execution would deploy this changed
+runtime even without migration-logic changes. This source authorization grants
+no authority to execute either path or change live state.
+
+**Source:**
+[`smart-contract-changes/uniswap-v2-prices.md`](smart-contract-changes/uniswap-v2-prices.md),
+`contracts/priceSources/UniswapV2Prices.vy`,
+`tests/priceSources/uniswap/test_minimal_prices.py`, and
+`tests/deployment/test_abi_export.py`.
 ## Maintenance rule
 
 When an owner decision changes, update:
