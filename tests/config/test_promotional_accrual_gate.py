@@ -1007,7 +1007,7 @@ def test_nonzero_voter_allocation_requires_collection_balance(
     assert mission_control.accrualStartBlock(bravo_token, vault_id) == MAX_UINT256
 
 
-def test_voter_allocation_is_permanent_after_activation(
+def test_voter_allocation_can_change_after_activation(
     switchboard_bravo,
     switchboard_charlie,
     switchboard_golf,
@@ -1055,7 +1055,7 @@ def test_voter_allocation_is_permanent_after_activation(
         20,
     )
 
-    action_id = _start_deposit_allocs(
+    _set_deposit_allocs(
         switchboard_bravo,
         governance,
         mission_control,
@@ -1063,15 +1063,10 @@ def test_voter_allocation_is_permanent_after_activation(
         0,
         21,
     )
-    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    with boa.reverts("promotional voter alloc is permanent"):
-        switchboard_bravo.executePendingAction(
-            action_id,
-            sender=governance.address,
-        )
     config = mission_control.assetConfig(bravo_token)
-    assert config.voterPointsAlloc == 20
+    assert config.voterPointsAlloc == 21
     assert config.stakersPointsAlloc == 0
+    assert mission_control.accrualStartBlock(bravo_token, vault_id) not in (0, MAX_UINT256)
 
 
 def test_activation_protects_reward_vault_and_asset_registration(
