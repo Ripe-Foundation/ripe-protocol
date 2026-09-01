@@ -66,6 +66,9 @@ interface PythPrices:
 interface PriceSource:
     def addPriceSnapshot(_asset: address) -> bool: nonpayable
 
+interface Lootbox:
+    def updateRipeRewards(): nonpayable
+
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
@@ -250,10 +253,6 @@ event PendingRipeRewardsAutoStakeParamsChange:
     confirmationBlock: uint256
     actionId: uint256
 
-event RewardsPointsEnabledModified:
-    arePointsEnabled: bool
-    caller: indexed(address)
-
 event PendingPriorityLiqAssetVaultsChange:
     numPriorityLiqAssetVaults: uint256
     confirmationBlock: uint256
@@ -416,6 +415,7 @@ MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
 CREDIT_ENGINE_ID: constant(uint256) = 13
+LOOTBOX_ID: constant(uint256) = 16
 
 MIN_STALE_TIME: public(immutable(uint256))
 MAX_STALE_TIME: public(immutable(uint256))
@@ -1176,21 +1176,14 @@ def _setPendingRipeRewardsConfig(
     return aid
 
 
-# enable points
+# write ripe rewards config
 
 
-@external
-def setRewardsPointsEnabled(_shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = self._resolveMissionControl(_missionControl)
-    rewardsConfig: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
-    assert rewardsConfig.arePointsEnabled != _shouldEnable # dev: already set
-    rewardsConfig.arePointsEnabled = _shouldEnable
-    extcall MissionControl(mc).setRipeRewardsConfig(rewardsConfig)
-
-    log RewardsPointsEnabledModified(arePointsEnabled=_shouldEnable, caller=msg.sender)
-    return True
+@internal
+def _writeRipeRewardsConfig(_mc: address, _config: cs.RipeRewardsConfig, _settle: bool):
+    if _settle:
+        extcall Lootbox(self._hqAddr(LOOTBOX_ID)).updateRipeRewards()
+    extcall MissionControl(_mc).setRipeRewardsConfig(_config)
 
 
 #######################
@@ -1570,30 +1563,31 @@ def executePendingAction(_aid: uint256) -> bool:
         extcall PythPrices(staticcall PriceDesk(self._hqAddr(PRICE_DESK_ID)).getAddr(PYTH_PRICES_ID)).setMaxConfidenceRatio(ratio)
         log PythMaxConfidenceRatioSet(ratio=ratio)
 
-    elif actionType == ActionType.RIPE_REWARDS_BLOCK:
-        config: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
-        config.ripePerBlock = self.pendingRipeRewardsConfig[_aid].ripePerBlock
-        extcall MissionControl(mc).setRipeRewardsConfig(config)
-        log RipeRewardsPerBlockSet(ripePerBlock=config.ripePerBlock)
-
-    elif actionType == ActionType.RIPE_REWARDS_ALLOCS:
+    elif actionType == ActionType.RIPE_REWARDS_BLOCK or actionType == ActionType.RIPE_REWARDS_ALLOCS or actionType == ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS:
+        assert mc == self._getMissionControlAddr() # dev: not current mission control
         config: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
         p: cs.RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
-        config.borrowersAlloc = p.borrowersAlloc
-        config.stakersAlloc = p.stakersAlloc
-        config.votersAlloc = p.votersAlloc
-        config.genDepositorsAlloc = p.genDepositorsAlloc
-        extcall MissionControl(mc).setRipeRewardsConfig(config)
-        log RipeRewardsAllocsSet(borrowersAlloc=p.borrowersAlloc, stakersAlloc=p.stakersAlloc, votersAlloc=p.votersAlloc, genDepositorsAlloc=p.genDepositorsAlloc)
-
-    elif actionType == ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS:
-        config: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
-        p: cs.RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
-        config.autoStakeRatio = p.autoStakeRatio
-        config.autoStakeDurationRatio = p.autoStakeDurationRatio
-        config.stabPoolRipePerDollarClaimed = p.stabPoolRipePerDollarClaimed
-        extcall MissionControl(mc).setRipeRewardsConfig(config)
-        log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio, stabPoolRipePerDollarClaimed=p.stabPoolRipePerDollarClaimed)
+        settle: bool = False
+        if actionType == ActionType.RIPE_REWARDS_BLOCK:
+            config.ripePerBlock = p.ripePerBlock
+            settle = True
+        elif actionType == ActionType.RIPE_REWARDS_ALLOCS:
+            config.borrowersAlloc = p.borrowersAlloc
+            config.stakersAlloc = p.stakersAlloc
+            config.votersAlloc = p.votersAlloc
+            config.genDepositorsAlloc = p.genDepositorsAlloc
+            settle = True
+        else:
+            config.autoStakeRatio = p.autoStakeRatio
+            config.autoStakeDurationRatio = p.autoStakeDurationRatio
+            config.stabPoolRipePerDollarClaimed = p.stabPoolRipePerDollarClaimed
+        self._writeRipeRewardsConfig(mc, config, settle)
+        if actionType == ActionType.RIPE_REWARDS_BLOCK:
+            log RipeRewardsPerBlockSet(ripePerBlock=config.ripePerBlock)
+        elif actionType == ActionType.RIPE_REWARDS_ALLOCS:
+            log RipeRewardsAllocsSet(borrowersAlloc=p.borrowersAlloc, stakersAlloc=p.stakersAlloc, votersAlloc=p.votersAlloc, genDepositorsAlloc=p.genDepositorsAlloc)
+        else:
+            log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio, stabPoolRipePerDollarClaimed=p.stabPoolRipePerDollarClaimed)
 
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]

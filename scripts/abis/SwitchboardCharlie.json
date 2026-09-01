@@ -64,114 +64,6 @@
     "type": "event"
   },
   {
-    "name": "PendingStartAuctionAction",
-    "inputs": [
-      {
-        "name": "liqUser",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "vaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "confirmationBlock",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "PendingStartManyAuctionsAction",
-    "inputs": [
-      {
-        "name": "numAuctions",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "confirmationBlock",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "PendingPauseAuctionAction",
-    "inputs": [
-      {
-        "name": "liqUser",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "vaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "confirmationBlock",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "PendingPauseManyAuctionsAction",
-    "inputs": [
-      {
-        "name": "numAuctions",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "confirmationBlock",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "PendingTrainingWheelsChange",
     "inputs": [
       {
@@ -247,84 +139,6 @@
       },
       {
         "name": "numAssets",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "StartAuctionExecuted",
-    "inputs": [
-      {
-        "name": "liqUser",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "vaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "success",
-        "type": "bool",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "StartManyAuctionsExecuted",
-    "inputs": [
-      {
-        "name": "numAuctionsStarted",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "PauseAuctionExecuted",
-    "inputs": [
-      {
-        "name": "liqUser",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "vaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "success",
-        "type": "bool",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "PauseManyAuctionsExecuted",
-    "inputs": [
-      {
-        "name": "numAuctionsPaused",
         "type": "uint256",
         "indexed": false
       }
@@ -565,6 +379,33 @@
       },
       {
         "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "AssetDepositPointsCheckpointedAt",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "vaultAddr",
         "type": "address",
         "indexed": true
       },
@@ -1163,6 +1004,33 @@
         "name": "newVaultAddr",
         "type": "address",
         "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RewardVaultIdSet",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "oldVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
       }
     ],
     "anonymous": false,
@@ -1805,6 +1673,27 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "setRewardVaultId",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "setCoreRipeGovVaultId",
     "inputs": [
       {
@@ -2216,6 +2105,31 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "checkpointAssetDepositPointsAt",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "updateManyDepositPoints",
     "inputs": [
       {
@@ -2235,118 +2149,6 @@
       {
         "name": "",
         "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "startAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "startManyAuctions",
-    "inputs": [
-      {
-        "name": "_auctions",
-        "type": "tuple[]",
-        "components": [
-          {
-            "name": "liqUser",
-            "type": "address"
-          },
-          {
-            "name": "vaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "asset",
-            "type": "address"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "pauseAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "pauseManyAuctions",
-    "inputs": [
-      {
-        "name": "_auctions",
-        "type": "tuple[]",
-        "components": [
-          {
-            "name": "liqUser",
-            "type": "address"
-          },
-          {
-            "name": "vaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "asset",
-            "type": "address"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
       }
     ]
   },
@@ -3029,138 +2831,6 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "pendingStartAuctionActions",
-    "inputs": [
-      {
-        "name": "arg0",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "liqUser",
-            "type": "address"
-          },
-          {
-            "name": "vaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "asset",
-            "type": "address"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "pendingStartManyAuctionsActions",
-    "inputs": [
-      {
-        "name": "arg0",
-        "type": "uint256"
-      },
-      {
-        "name": "arg1",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "liqUser",
-            "type": "address"
-          },
-          {
-            "name": "vaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "asset",
-            "type": "address"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "pendingPauseAuctionActions",
-    "inputs": [
-      {
-        "name": "arg0",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "liqUser",
-            "type": "address"
-          },
-          {
-            "name": "vaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "asset",
-            "type": "address"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "pendingPauseManyAuctionsActions",
-    "inputs": [
-      {
-        "name": "arg0",
-        "type": "uint256"
-      },
-      {
-        "name": "arg1",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "liqUser",
-            "type": "address"
-          },
-          {
-            "name": "vaultId",
-            "type": "uint256"
-          },
-          {
-            "name": "asset",
-            "type": "address"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
     "name": "pendingTrainingWheels",
     "inputs": [
       {
@@ -3408,6 +3078,37 @@
       {
         "name": "",
         "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingRewardVault",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "oldVaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "newVaultId",
+            "type": "uint256"
+          }
+        ]
       }
     ]
   },

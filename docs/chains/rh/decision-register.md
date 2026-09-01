@@ -41,13 +41,21 @@ The release-packet checklist has been updated to match.
 
 **The headroom-waiver mechanism is retired.** RH-D026 through RH-D036 describe
 a 200-byte minimum-headroom floor, per-contract exact source/runtime/deployed
-identity pins, and zero-growth reopen-on-change rules. No test enforces any of
-that in any lane — the pins and the floor were removed from
-`tests/test_vault_pointer_runtime_sizes.py`, which now asserts only the EIP-170
-ceiling. Those entries stand as historical accepted-risk records of what was
-approved at the time. Read their sizes, waivers, and "reopens on change"
-language as past tense; none of it creates an obligation on a current PR. The
-only enforced size rule is that a deployed runtime must fit in 24,576 bytes.
+identity pins, and zero-growth reopen-on-change rules. The retired global
+floor and the RH-D026 source/creation/runtime *hash* identities are not
+enforced in any lane. Those entries stand as historical accepted-risk
+records. Read their waivers and "reopens on change" language as past tense;
+none of it creates an obligation on a current PR.
+
+`tests/test_vault_pointer_runtime_sizes.py` currently enforces two live rules:
+the EIP-170 24,576-byte ceiling for every measured contract and an exact
+deployed-runtime byte pin per named contract (`EXPECTED_RUNTIME_BYTES` — a
+one-byte drift fails the gate and must be updated if intentional). On 26 August
+2026 the owner accepted PR #211's exact 24,529-byte Bravo runtime with 47 bytes
+of headroom, superseding RH-D045's Bravo-only 200-byte floor for this candidate.
+Any Bravo source, compiler, dependency, or compiler-output change must be
+remeasured and separately reviewed.
+
 This register does not replace the linked decision records, authorize a new
 phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
@@ -1570,6 +1578,259 @@ full-precision PriceDesk mul-div, clock policy, `staleBlocks`, and
 GREEN-reference activation remain open. This wrap-up grants no
 deployment or activation authority.
 
+### RH-D044 — Human Resources cancellation credit is burn-coupled
+
+**Status:** Owner authorized the burn-coupled Human Resources candidate carried
+by PR #211 on 25 August 2026; integration into `rh` remains pending. A numbered
+decision is used because the fix partially supersedes an earlier explicit,
+owner-approved Group 11 cancellation-credit guarantee; the ordinary bug-fix
+exception does not apply.
+
+Contributor cancellation state and `RipePaycheckCancelled` reporting remain
+unchanged: official pre-cliff cancellation after an early cash still reports
+full original compensation. On the burn path, Human Resources now restores
+the unclaimed amount plus claimed compensation offset by RIPE actually burned
+from the one selected position, then applies the existing uint256
+budget-headroom clamp.
+The non-burn path, zero-credit Ledger call, ABI, storage, and events remain
+unchanged.
+
+The calculation trusts the Contributor clone's `totalClaimed()`, treats burned
+RIPE as fungible, and does not automatically recover claimed capacity left
+unoffset after the one-shot cancellation. No event reports the credited amount;
+operations must reconcile `ripeAvailForHr` before and after cancellation. Any
+later budget adjustment requires separate owner authority and the normal
+timelocked SwitchboardDelta path. Pre-cliff vesting remains possible; whether
+the cliff should gate claiming is a separate unresolved owner policy question.
+This record grants no integration, deployment, configuration, activation,
+budget-adjustment, or release authority.
+
+Source:
+[`user-flow-audit-group-11-trusted-clone-hr-clamp.md`](user-flow-audit-group-11-trusted-clone-hr-clamp.md)
+and draft PR #211.
+
+### RH-D045 — Bravo GREEN keeper uses a caller-supplied PriceDesk ID
+
+**Status:** Owner authorized on 25 August 2026 the Bravo GREEN keeper with a
+caller-supplied PriceDesk ID, GREEN reference snapshots and Curve-driven
+dynamic borrow rates as active at Robinhood launch, and
+`DefaultsRobinhood.increasePerDangerBlock = 60` including shallow-pool
+rate risk. Carried by draft PR #211; not deployed, registered, or
+activated on Robinhood. A numbered decision is used because this adds a new
+externally callable, lite-signer-reachable Switchboard surface and deliberately
+diverges from the constructor-immutable Curve ID used by Teller, CreditEngine,
+and Endaoment. The ordinary bug-fix exception does not apply.
+
+On 26 August 2026 the owner additionally accepted the exact current PR #211
+Bravo runtime at 24,529 deployed bytes, leaving 47 bytes below EIP-170. This
+supersedes the candidate-specific 200-byte Bravo floor recorded above, but not
+the exact-runtime drift pin or the requirement to remeasure and separately
+review any source, compiler, dependency, or compiler-output change.
+
+`SwitchboardBravo.addGreenRefPoolSnapshot(_curvePricesId)` lets current
+governance or a signer authorized by the current MissionControl row's
+`canPerformLiteAction` trigger `CurvePrices.addGreenRefPoolSnapshot()` through
+a typed `extcall`. Bravo's RipeHq address is a constructor immutable
+(`RIPE_HQ_FOR_GOV`); MissionControl (ID 5) and PriceDesk (ID 7) rows are
+reread from that HQ on each call. The PriceDesk source ID remains a call
+argument. On Robinhood the keeper call is `addGreenRefPoolSnapshot(2)`, where
+`2` is `CURVE_PRICES_ID` in [`config/robinhood_launch.py`](../../../config/robinhood_launch.py).
+That is CurvePrices' PriceDesk ID, not Bravo's Switchboard child ID. Bravo was
+chosen because composed Alpha runtime had 14 bytes of EIP-170 headroom; the
+initial keeper-wrapper candidate had 399 bytes after the wrapper (24,177
+deployed bytes). The coupled PR #211 candidate now has 47 bytes (24,529
+deployed bytes), as accepted above. No constructor argument or immutable Curve
+ID was added.
+
+A production keeper at snapshot cadence effectively requires the lite-signer
+grant: `SwitchboardAlpha.setCanPerformLiteAction(keeper, True)` then
+`executePendingAction`. That is two contract calls/steps. With Robinhood's
+zero `actionTimeLock` they can confirm in the same block and may be
+Safe-batched if policy allows; revoke is one immediate call. MissionControl
+accepts any address — use "keeper address/caller" until a credential
+architecture is selected. Governance calling the wrapper directly is a Safe
+transaction per snapshot and is impractical at keeper cadence.
+
+Lite-signer status is a broad, unscoped protocol-operations role, not a
+pause-only grant. Immediate surfaces include:
+
+- **Alpha disable switches** (more consequential than most other listed
+  powers): `setCanDeposit(false)`, `setCanWithdraw(false)`,
+  `setCanBorrow(false)`, `setCanRepay(false)`, `setCanLiquidate(false)`,
+  `setCanRedeemCollateral(false)`, `setCanRedeemInStabPool(false)`,
+  `setCanBuyInAuction(false)`, `setCanClaimInStabPool(false)`,
+  `setCanClaimLoot(false)`, plus generic `addPriceSnapshot`. Pyth/Stork
+  payload pushes exist on Alpha but those sources are not current Robinhood
+  deployments (`PYTH_PRICES_ID = 0` in `robinhood_launch.py`).
+- **Charlie:** pause, blacklist, account lock, debt updates, and loot/reward
+  operations.
+- **Delta:** arbitrary-user deleverage, contributor cash/cancel/freeze, bond
+  disable, and booster removal.
+- **Echo:** Endaoment yield deposit/withdraw, conversions, claims,
+  stabilization, and the explicit fund-transfer entrypoints
+  `transferFundsToEndaomentPsmInEndaoment`, `transferFundsToVaultInEndaoment`,
+  and `transferUsdcToEndaomentFundsInPsm`.
+- **This Bravo wrapper.**
+
+Alpha/Charlie/Delta enable-style paths stay governance-only. Echo PSM-disable
+(`setPsmCanMint(false)`, `setPsmCanRedeem(false)`,
+`setPsmShouldAutoDeposit(false)`) is only a pending action: the lite signer
+may propose it, and governance must still `executePendingAction`.
+
+The intended CurvePrices call is itself privileged and state-changing. The
+caller-supplied ID additionally lets a lite signer make Bravo fire selector
+`0x7cdb0a4d` (`addGreenRefPoolSnapshot()`) at any current PriceDesk row. The
+*unexpected* cross-source collision radius is empty today: disabled rows
+resolve to zero, no production price source has a `__default__` fallback, and
+only CurvePrices exposes the specialized selector. Those unexpected-collision
+guards are repository tests and ABI inventory, not an on-chain invariant. A
+future source that implements the same selector or a `__default__` would
+become reachable without a Bravo change.
+
+GREEN reference snapshots and Curve-driven dynamic borrow rates are
+**active** at Robinhood launch. Teller already calls
+`addGreenRefPoolSnapshot()` on housekeeping paths. This wrapper is only an
+entrypoint: it supplies no scheduler, retries, liveness guarantee, or SLA.
+One valid closed interval after the seeded observation can produce a
+nonzero weighted ratio; the ring need not be full. CreditEngine leaves the
+base rate while `weightedRatio == 0` or `weightedRatio < dangerTrigger`.
+At the threshold, Robinhood's `minDynamicRateBoost = 100%` immediately
+doubles the base rate before the separate per-danger-block slope applies.
+Owner ratifies `DefaultsRobinhood.increasePerDangerBlock = 60` (6× Base's
+10). Runtime's ideal slope is `60 / 1_000_000 = 0.006%` per danger block
+before integer flooring — not `0.60%`. The generic parameter formatter still
+renders raw `10` as `0.10%` and would render raw `60` the same wrong way;
+that display bug is unchanged and is not fixed here.
+
+A nonempty GREEN reference-pool configuration also enables Endaoment
+`stabilizeGreenRefPool`, reachable through Echo by the same lite-signer
+role. That coupled capability is accepted with the live configuration. A
+shallow configured pool is cheap to push past `dangerTrigger`; the immediate
+100% boost plus the per-danger-block slope can then raise borrow rates
+protocol-wide. That risk is accepted with the slope, not deferred.
+
+This supersedes the inactive posture in
+[`curve-launch-activation.md`](curve-launch-activation.md)
+("does not configure … GREEN reference-pool configuration or Teller
+snapshots" / "Curve-driven dynamic rates"), the
+[`block-number-inventory.md`](block-number-inventory.md) overlay banner, BN-011
+("mark Curve integration disabled"), and CAD-001 ("mark explicitly inactive in
+DefaultsRobinhood"). [`status.yaml`](status.yaml),
+[`config/robinhood_blueprint.py`](../../../config/robinhood_blueprint.py), and
+the shared-clock specification still describe snapshots, dynamic rates, or
+raw `60` as inactive or separately gated. Those machine-facing and narrative
+artifacts remain separately stale and are not rewritten here.
+
+Merging this source does not make the wrapper available on the Bravo that
+currently occupies Switchboard child ID 2. The updated Bravo runtime must
+later be deployed, temporary local governance relinquished, and that existing
+child ID 2 slot address-updated — not registered into a new slot. A newly
+deployed candidate is not a valid RIPE caller until that slot is updated.
+Pending Bravo actions on the replaced contract are stranded. After promotion,
+grant the keeper lite-signer role only with the unscoped operations risk
+recorded. Monitor failed receipts as well as
+`GreenRefPoolSnapshotAttempted`: a genuine Curve revert leaves no event, while
+`didUpdate=false` covers same-block duplicates, a paused Curve, missing
+configuration, and other legitimate no-update cases. Robinhood child blocks
+can share an EVM `block.number` (BN-011), so duplicate `false` outcomes can
+be legitimate.
+
+This record does not authorize deployment, registry promotion, lite-signer
+grant, configuration, activation, or release. It does not refresh
+[`curve-launch-activation.md`](curve-launch-activation.md), the block-number
+inventory overlay, CAD-001, [`status.yaml`](status.yaml),
+[`config/robinhood_blueprint.py`](../../../config/robinhood_blueprint.py),
+or Blueprint Bravo anchors.
+
+Source:
+[`smart-contract-changes/switchboard-bravo.md`](smart-contract-changes/switchboard-bravo.md)
+and draft PR #211.
+
+### RH-D046 — Automatic Lootbox reward-allocation checkpoints
+
+**Status:** Owner accepted on 26 August 2026 the PR #211 checkpoint candidate
+and the economic and operational residuals below. Deployment, configuration,
+activation, and release remain separately unauthorized.
+
+SwitchboardBravo now settles Lootbox/Ledger reward and deposit-point clocks for
+every initialized row in the asset's current configured vault list before a
+live allocation write. It checkpoints again after a staker allocation
+`0 <-> nonzero` crossing. Removed, disabled, or otherwise historical rows are
+not auto-discovered; SwitchboardCharlie provides a governor-only explicit-row
+checkpoint for Charlie-pre -> Bravo -> Charlie-post batches. That is a
+governance-visible behavior change: asset `stakersPointsAlloc` /
+`voterPointsAlloc` writes revert while `arePointsEnabled` is false, and the
+active MissionControl path hard-depends on Lootbox, Ledger, and current
+VaultBook-row liveness.
+
+`setAssetConfig` has no paused-Lootbox exemption, so asset allocations
+are frozen during containment for two independent reasons (points
+disabled, Lootbox paused).
+
+The Ledger/Lootbox/MissionControl reward stack and the
+Alpha/Bravo/Charlie/Delta governance paths must be promoted as a matched
+generation or through a separately qualified atomic sequence. Split or manual
+confirmations expose mixed-version incompatibility and are unsupported. New
+Lootbox requires Ledger's `setRipeRewardsAndGlobalDepositPoints`.
+Qualification must prove the exact promotion sequence.
+
+Local `DefaultsLocal.rewardsConfig.arePointsEnabled` is now `True` to
+match production Defaults. That is a test-environment semantic change:
+the `snapshot-gas` auction-purchase ceiling was previously calibrated
+against a points-disabled local deploy (~295k) and understated a live
+points-on purchase by ~96k. The required gas lane now uses a 470k
+ceiling. Recorded here as an explicit re-baseline, not a silent bump.
+
+A Ledger redeploy (the planned RH path) is state-destroying: accrued
+points, rewards, and `lastTouch` are dropped. There is no retained-state
+Ledger upgrade and no identity backfill. Fresh Ledger only.
+
+Accepted residuals, with tests:
+
+1. **Paused-Lootbox containment.** `setRipeRewardsConfig` skips the
+   pre-write settle only when Lootbox is paused **and** the new
+   `ripePerBlock` is 0. That preserves the pause-then-zero runbook.
+   Skipping forfeits every block since Ledger `lastUpdate`, including
+   pre-pause active blocks — the conservative direction. Any other
+   paused RIPE-field change (nonzero rate or bucket allocs) must settle
+   and therefore reverts. A paused Lootbox cannot distribute.
+2. **Current versus historical rows.** Bravo discovers only the asset's current
+   configured vault list and checkpoints every initialized current row. Removed
+   or disabled historical rows require explicit-address Charlie checkpoints.
+   Governance must identify those rows and batch Charlie-pre -> Bravo ->
+   Charlie-post when required; they are not automatically discovered.
+3. **VaultBook replacement.** Bravo resolves the current VaultBook address and
+   current configured rows at execution. Sanctioned
+   `confirmAddressUpdateToRegistry` at a live ID is allowed; replaced vaults are
+   expected to be empty. There is no persisted vault-identity guard.
+4. **Disabled vault.** A zero vault address fails closed only when
+   Lootbox would actually call the vault: `stakersPointsAlloc == 0` and
+   (`isRipeGovVaultId` or `lastBalance != 0`). Emergency zeroing and
+   gen-mode (`stakers == 0`) writes succeed when `lastBalance == 0` and
+   the vault is not RipeGov. A gen-mode row on a disabled vault with
+   nonzero `lastBalance` still blocks every allocation change, including
+   voter-only writes, until the ID is re-pointed or the balance is
+   cleared.
+5. **Points-toggle window.** If no deposit-point update occurs while
+   points are disabled, the first update after re-enable can include
+   that interval. Toggle semantics are unchanged.
+6. **`updateRipeRewards` clock.** Ordinary `updateRipeRewards` callers,
+   including SwitchboardCharlie, now also advance the global
+   deposit-points clock when points are enabled. The formula is the
+   same as `updateDepositPoints`.
+7. **Lootbox selector.** Lootbox uses a dedicated
+   `setRipeRewardsAndGlobalDepositPoints` rather than a default-arg
+   overload. The current exact runtime leaves 74 bytes below EIP-170.
+   Default-arg overloads can checkpoint with zero totals via a partial
+   selector.
+8. **Inactive MissionControl staging.** Bravo automatically checkpoints only
+   when operating through the current MissionControl. Before repointing HQ
+   `MISSION_CONTROL_ID`, governance must prove allocation parity or checkpoint
+   every initialized row atomically with the pointer change; otherwise the next
+   touch can apply incoming allocations across the pre-swap interval.
+
+This record grants no deployment, configuration, activation, or release
+authority.
 ### RH-D047 — Generic Uniswap V2 monitoring is source-authorized and non-admitted
 
 **Status:** Owner-authorized on 29 August 2026 for the exact PR #224
@@ -1616,7 +1877,6 @@ no authority to execute either path or change live state.
 `contracts/priceSources/UniswapV2Prices.vy`,
 `tests/priceSources/uniswap/test_minimal_prices.py`, and
 `tests/deployment/test_abi_export.py`.
-
 ## Maintenance rule
 
 When an owner decision changes, update:

@@ -518,21 +518,31 @@ def refundAfterCancelPaycheck(
     a: addys.Addys = addys._getAddys()
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
+    refundAmount: uint256 = _amount
+    if _shouldBurnPosition:
+
+        # withdraw and burn position
+        vaultId: uint256 = self._getContributorRipeGovVaultId(a.missionControl, msg.sender, _vaultId)
+        ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
+        withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
+        extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
+        actualBurnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
+        if actualBurnAmount != 0:
+            assert extcall RipeToken(a.ripeToken).burn(actualBurnAmount)  # dev: ripe burn failed
+
+        # ripe is fungible here, but claimed compensation capacity is recovered
+        # only to the extent that RIPE was actually burned during this cancellation.
+        claimedAmount: uint256 = min(_amount, staticcall HrContributor(msg.sender).totalClaimed())
+        recoveredClaimedAmount: uint256 = min(claimedAmount, actualBurnAmount)
+        refundAmount = _amount - claimedAmount + recoveredClaimedAmount
+
     budget: uint256 = staticcall Ledger(a.ledger).ripeAvailForHr()
-    creditedAmount: uint256 = min(_amount, max_value(uint256) - budget)
+    creditedAmount: uint256 = min(refundAmount, max_value(uint256) - budget)
     extcall Ledger(a.ledger).refundRipeAfterCancelPaycheck(creditedAmount)
 
     if not _shouldBurnPosition:
         return
 
-    # withdraw and burn position
-    vaultId: uint256 = self._getContributorRipeGovVaultId(a.missionControl, msg.sender, _vaultId)
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
-    withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
-    extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
-    burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
-    if burnAmount != 0:
-        assert extcall RipeToken(a.ripeToken).burn(burnAmount)  # dev: ripe burn failed
     extcall Teller(a.teller).performHousekeeping(True, msg.sender, True, a)
     if _vaultId == 0:
         self.legacyContributorRipeGovVaultId[msg.sender] = 0

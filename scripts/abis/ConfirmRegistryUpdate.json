@@ -1,0 +1,22 @@
+[
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "assertConfirmed",
+    "inputs": [
+      {
+        "name": "_registry",
+        "type": "address"
+      },
+      {
+        "name": "_regId",
+        "type": "uint256"
+      },
+      {
+        "name": "_expected",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  }
+]
