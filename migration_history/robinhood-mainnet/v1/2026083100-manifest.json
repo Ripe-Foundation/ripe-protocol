@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "SwitchboardBravoPr211Candidate2026083100": {
+      "address": "0x622739b982eF1A9d5EdB06839D52EF6E48437BBA",
+      "file": "contracts/config/SwitchboardBravo.vy"
+    }
+  }
+}
