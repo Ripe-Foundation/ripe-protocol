@@ -42,8 +42,6 @@ def test_sc14_swap_collateral_checkpoints_sender(
     alpha_token_whale,
     bravo_token,
     bravo_token_whale,
-    mission_control,
-    switchboard_bravo,
     governance,
     bob,
 ):
@@ -73,9 +71,6 @@ def test_sc14_swap_collateral_checkpoints_sender(
     deposit_amount = 200 * EIGHTEEN_DECIMALS
     performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    mission_control.setRewardVaultId(
-        alpha_token, vault_id, sender=switchboard_bravo.address
-    )
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     before = ledger.userDepositPoints(bob, vault_id, alpha_token)
     assert before.lastBalance == _normalized(deposit_amount)
@@ -130,8 +125,6 @@ def test_sc14_endaoment_deleverage_checkpoints_sender(
     alpha_token_whale,
     bob,
     switchboard_alpha,
-    mission_control,
-    switchboard_bravo,
 ):
     setGeneralConfig()
     setGeneralDebtConfig()
@@ -168,9 +161,6 @@ def test_sc14_endaoment_deleverage_checkpoints_sender(
         get_sgreen=False,
     )
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    mission_control.setRewardVaultId(
-        alpha_token, vault_id, sender=switchboard_bravo.address
-    )
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     before = ledger.userDepositPoints(bob, vault_id, alpha_token)
     assert before.lastBalance == _normalized(deposit_amount)

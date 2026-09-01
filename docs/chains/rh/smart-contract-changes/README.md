@@ -279,11 +279,9 @@ built were extracted from the active tree; both remain recoverable from
 - [`deleverage.md`](deleverage.md) — historical/shared full-payoff and dust
   rationale;
 - [`auction-house.md`](auction-house.md) — historical/shared safe conversion,
-  Stock delivery, and liquidation composition;
+  Stock delivery, and liquidation composition; and
 - [`switchboard-delta.md`](switchboard-delta.md) — historical/shared bounded
-  governance actions; and
-- [`switchboard-bravo.md`](switchboard-bravo.md) — GREEN reference-pool keeper
-  wrapper, caller-supplied PriceDesk ID, and lite-signer launch risk.
+  governance actions.
 
 ## Lifecycle boundary
 

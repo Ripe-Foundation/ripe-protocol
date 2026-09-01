@@ -7,7 +7,7 @@ from conf_utils import assert_reverted_call, filter_logs
 from contracts.modules import Contributor
 
 EIP170_LIMIT = 24_576
-EXPECTED_CONTRIBUTOR_RUNTIME_BYTES = 5_381
+EXPECTED_CONTRIBUTOR_RUNTIME_BYTES = 5_280
 
 
 def _assert_zero_vesting_views(contributor):
@@ -509,20 +509,6 @@ def test_contributor_pending_ripe_transfer_survives_core_vault_rotation(
     assert mission_control.coreRipeGovVaultId() == replacement_vault_id
 
     boa.env.time_travel(blocks=contributor_contract.keyActionDelay())
-    pending_before = contributor_contract.pendingRipeTransfer()
-    claimed_before = contributor_contract.totalClaimed()
-    assert contributor_contract.getClaimable() > 0
-    with boa.reverts("cash vault mismatch"):
-        contributor_contract.confirmRipeTransfer(sender=owner_address)
-    assert contributor_contract.pendingRipeTransfer() == pending_before
-    assert contributor_contract.totalClaimed() == claimed_before
-    assert (
-        alternate_ripe_gov_vault.getTotalAmountForUser(
-            contributor_contract, ripe_token
-        )
-        == 0
-    )
-
     contributor_contract.confirmRipeTransfer(False, sender=owner_address)
 
     assert (
@@ -575,21 +561,6 @@ def test_contributor_can_select_historical_vault_after_core_rotation(
     )
     mission_control.setCoreRipeGovVaultId(
         replacement_vault_id, sender=switchboard_alpha.address
-    )
-
-    claimed_before = contributor_contract.totalClaimed()
-    assert contributor_contract.getClaimable() > 0
-    with boa.reverts("cash vault mismatch"):
-        contributor_contract.initiateRipeTransfer(
-            True, historical_vault_id, sender=owner_address
-        )
-    assert not contributor_contract.hasPendingRipeTransfer()
-    assert contributor_contract.totalClaimed() == claimed_before
-    assert (
-        alternate_ripe_gov_vault.getTotalAmountForUser(
-            contributor_contract, ripe_token
-        )
-        == 0
     )
 
     with boa.reverts("no balance"):

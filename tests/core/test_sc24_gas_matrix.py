@@ -18,10 +18,7 @@ BASIC_CHECKPOINT_CEILING = 66_000
 BASIC_WITHDRAW_CEILING = 202_000
 SHARES_CHECKPOINT_CEILING = 66_000
 REDEMPTION_CEILING = 300_000
-# Calibrated with DefaultsLocal.arePointsEnabled=True (production parity).
-# The previous 295_000 ceiling was measured against a points-disabled local
-# deploy and understated a live auction purchase by ~96k. See RH-D046.
-AUCTION_CEILING = 470_000
+AUCTION_CEILING = 295_000
 STAB_LIQ_CEILINGS = {1: 540_000, 2: 840_000, 5: 1_735_000}
 DELEVERAGE_MANY_CEILING = 400_000
 
@@ -42,17 +39,12 @@ def test_gas_basic_vault_deposit_withdraw_checkpoint(
     teller,
     alpha_token,
     alpha_token_whale,
-    mission_control,
-    switchboard_bravo,
     bob,
 ):
     setGeneralConfig()
     setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    mission_control.setRewardVaultId(
-        alpha_token, vault_id, sender=switchboard_bravo.address
-    )
     amount = 100 * EIGHTEEN_DECIMALS
     performDeposit(bob, amount, alpha_token, alpha_token_whale)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
@@ -89,8 +81,6 @@ def test_gas_shares_vault_checkpoint(
     teller,
     alpha_token,
     alpha_token_whale,
-    mission_control,
-    switchboard_bravo,
     bob,
 ):
     setGeneralConfig()
@@ -102,9 +92,6 @@ def test_gas_shares_vault_checkpoint(
     )
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     vault_id = vault_book.getRegId(rebase_erc20_vault)
-    mission_control.setRewardVaultId(
-        alpha_token, vault_id, sender=switchboard_bravo.address
-    )
     amount = 100 * EIGHTEEN_DECIMALS
     performDeposit(bob, amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
     lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)

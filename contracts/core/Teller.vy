@@ -210,9 +210,6 @@ event UserDelegationSet:
     canClaimLoot: bool
     caller: indexed(address)
 
-event CurveSnapshotFailed:
-    pass
-
 receiptMeasurementActive: transient(bool)
 
 MAX_BALANCE_ACTION: constant(uint256) = 20
@@ -1027,14 +1024,9 @@ def _performHousekeeping(
         assert not staticcall Ledger(_a.ledger).isLockedAccount(_user) # dev: account locked
 
     # update green ref pool snapshot
-    # a call to the zero address succeeds as a no-op when curve prices is not configured. a broken or expensive configured route remains fail-open.
-    if not raw_call(
-            staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID),
-            method_id("addGreenRefPoolSnapshot()"),
-            gas=500_000,
-            revert_on_failure=False,
-        ):
-        log CurveSnapshotFailed()
+    curvePrices: address = staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID)
+    if curvePrices != empty(address):
+        extcall CurvePrices(curvePrices).addGreenRefPoolSnapshot()
 
     # update debt
     if _shouldUpdateDebt:

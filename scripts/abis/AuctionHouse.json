@@ -1696,10 +1696,6 @@
         "type": "bool"
       },
       {
-        "name": "_maxZeroValueAmount",
-        "type": "uint256"
-      },
-      {
         "name": "_a",
         "type": "tuple",
         "components": [

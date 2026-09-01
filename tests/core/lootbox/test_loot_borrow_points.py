@@ -126,13 +126,13 @@ def test_loot_borrow_points_disabled(
     # Update again
     lootbox.updateBorrowPoints(bob, sender=teller.address)
 
-    # Check results - the stored enabled flag does not stop the clock
+    # Check results - no points should accumulate when disabled
     up = ledger.userBorrowPoints(bob)
     gp = ledger.globalBorrowPoints()
     
-    assert up.points == 100 * elapsed
+    assert up.points == 0
     assert up.lastPrincipal == 100  # Principal should still be tracked
-    assert gp.points == 100 * elapsed
+    assert gp.points == 0
     assert gp.lastPrincipal == 100
 
 
@@ -303,11 +303,14 @@ def test_loot_borrow_points_permission_checks(
     with boa.reverts("no perms"):
         lootbox.updateBorrowPoints(bob, sender=alice)
 
-    # Pausing does not stop the clock.
+    # Test paused state
     lootbox.pause(True, sender=switchboard_alpha.address)
-    lootbox.updateBorrowPoints(bob, sender=teller.address)
+    with boa.reverts("contract paused"):
+        lootbox.updateBorrowPoints(bob, sender=teller.address)
 
+    # Unpause and verify it works
     lootbox.pause(False, sender=switchboard_alpha.address)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
 
 
 def test_loot_borrow_points_rapid_debt_changes(
@@ -395,7 +398,8 @@ def test_loot_borrow_points_enabled_disabled_transitions(
     boa.env.time_travel(blocks=10)
     lootbox.updateBorrowPoints(bob, sender=teller.address)
     up = ledger.userBorrowPoints(bob)
-    assert up.points == 100 * 30
+    # Only periods with points enabled should count
+    assert up.points == 100 * 20
 
 
 def test_loot_borrow_points_global_zero_debt(
@@ -607,11 +611,14 @@ def test_reset_user_borrow_points_permissions(
     with boa.reverts("no perms"):
         lootbox.resetUserBorrowPoints(bob, sender=teller.address)
 
-    # Pausing does not block resets.
+    # Test paused state
     lootbox.pause(True, sender=switchboard_alpha.address)
-    lootbox.resetUserBorrowPoints(bob, sender=switchboard_alpha.address)
+    with boa.reverts("contract paused"):
+        lootbox.resetUserBorrowPoints(bob, sender=switchboard_alpha.address)
 
+    # Unpause and verify it works
     lootbox.pause(False, sender=switchboard_alpha.address)
+    lootbox.resetUserBorrowPoints(bob, sender=switchboard_alpha.address)
     
     up = ledger.userBorrowPoints(bob)
     assert up.points == 0
@@ -667,8 +674,8 @@ def test_reset_user_borrow_points_empty_address(
     # Get initial global points
     gp_before = ledger.globalBorrowPoints()
 
-    with boa.reverts("invalid reset"):
-        lootbox.resetUserBorrowPoints(ZERO_ADDRESS, sender=switchboard_alpha.address)
+    # Call reset with empty address - should return early
+    lootbox.resetUserBorrowPoints(ZERO_ADDRESS, sender=switchboard_alpha.address)
 
     # Global points should remain unchanged
     gp_after = ledger.globalBorrowPoints()
@@ -784,3 +791,5 @@ def test_reset_user_borrow_points_consecutive_resets(
     
     assert up_final.points == 0
     assert gp_final.points == 0
+
+

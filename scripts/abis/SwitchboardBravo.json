@@ -1,5 +1,162 @@
 [
   {
+    "name": "NewAssetPending",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "numVaults",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "stakersPointsAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "voterPointsAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "perUserDepositLimit",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "globalDepositLimit",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minDepositBalance",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "debtTermsLtv",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "debtTermsRedemptionThreshold",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "debtTermsLiqThreshold",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "debtTermsLiqFee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "debtTermsBorrowRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "debtTermsDaowry",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "shouldBurnAsPayment",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldTransferToEndaoment",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldSwapInStabPools",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldAuctionInstantly",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "canDeposit",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "canWithdraw",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "canRedeemCollateral",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "canRedeemInStabPool",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "canBuyInAuction",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "canClaimInStabPool",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "specialStabPoolId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionStartDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionMaxDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionDelay",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionDuration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "whitelist",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "isNft",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "PendingAssetDepositParamsChange",
     "inputs": [
       {
@@ -52,6 +209,164 @@
     "type": "event"
   },
   {
+    "name": "PendingAssetLiqConfigChange",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "shouldBurnAsPayment",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldTransferToEndaoment",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldSwapInStabPools",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldAuctionInstantly",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "specialStabPoolId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionStartDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionMaxDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionDelay",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionDuration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingAssetDebtTermsChange",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "ltv",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "redemptionThreshold",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "liqThreshold",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "liqFee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "borrowRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "daowry",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingAssetWhitelistChange",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "whitelist",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "AssetAdded",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "AssetDepositParamsSet",
     "inputs": [
       {
@@ -88,6 +403,122 @@
         "name": "minDepositBalance",
         "type": "uint256",
         "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "AssetLiqConfigSet",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "shouldBurnAsPayment",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldTransferToEndaoment",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldSwapInStabPools",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "shouldAuctionInstantly",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "specialStabPoolId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionStartDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionMaxDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionDelay",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "auctionDuration",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "AssetDebtTermsSet",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "ltv",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "redemptionThreshold",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "liqThreshold",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "liqFee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "borrowRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "daowry",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "WhitelistAssetSet",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "whitelist",
+        "type": "address",
+        "indexed": true
       }
     ],
     "anonymous": false,
@@ -730,6 +1161,1788 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_canBuyInAuction",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_canBuyInAuction",
+        "type": "bool"
+      },
+      {
+        "name": "_canClaimInStabPool",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_canBuyInAuction",
+        "type": "bool"
+      },
+      {
+        "name": "_canClaimInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_canBuyInAuction",
+        "type": "bool"
+      },
+      {
+        "name": "_canClaimInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      },
+      {
+        "name": "_customAuctionParams",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_canBuyInAuction",
+        "type": "bool"
+      },
+      {
+        "name": "_canClaimInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      },
+      {
+        "name": "_customAuctionParams",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_whitelist",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_canBuyInAuction",
+        "type": "bool"
+      },
+      {
+        "name": "_canClaimInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      },
+      {
+        "name": "_customAuctionParams",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_whitelist",
+        "type": "address"
+      },
+      {
+        "name": "_isNft",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_stakersPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_voterPointsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDepositLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDepositBalance",
+        "type": "uint256"
+      },
+      {
+        "name": "_debtTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_canDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_canWithdraw",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemCollateral",
+        "type": "bool"
+      },
+      {
+        "name": "_canRedeemInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_canBuyInAuction",
+        "type": "bool"
+      },
+      {
+        "name": "_canClaimInStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      },
+      {
+        "name": "_customAuctionParams",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_whitelist",
+        "type": "address"
+      },
+      {
+        "name": "_isNft",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "setAssetDepositParams",
     "inputs": [
       {
@@ -800,6 +3013,338 @@
       {
         "name": "_minDepositBalance",
         "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAssetLiqConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAssetLiqConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAssetLiqConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      },
+      {
+        "name": "_customAuctionParams",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAssetLiqConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_shouldBurnAsPayment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldTransferToEndaoment",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldSwapInStabPools",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldAuctionInstantly",
+        "type": "bool"
+      },
+      {
+        "name": "_specialStabPoolId",
+        "type": "uint256"
+      },
+      {
+        "name": "_customAuctionParams",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAssetDebtTerms",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_ltv",
+        "type": "uint256"
+      },
+      {
+        "name": "_redemptionThreshold",
+        "type": "uint256"
+      },
+      {
+        "name": "_liqThreshold",
+        "type": "uint256"
+      },
+      {
+        "name": "_liqFee",
+        "type": "uint256"
+      },
+      {
+        "name": "_borrowRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_daowry",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAssetDebtTerms",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_ltv",
+        "type": "uint256"
+      },
+      {
+        "name": "_redemptionThreshold",
+        "type": "uint256"
+      },
+      {
+        "name": "_liqThreshold",
+        "type": "uint256"
+      },
+      {
+        "name": "_liqFee",
+        "type": "uint256"
+      },
+      {
+        "name": "_borrowRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_daowry",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setWhitelistForAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_whitelist",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setWhitelistForAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_whitelist",
+        "type": "address"
       },
       {
         "name": "_missionControl",

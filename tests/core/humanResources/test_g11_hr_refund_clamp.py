@@ -143,39 +143,6 @@ def test_g11_zero_credit_direct_hr_still_calls_paused_ledger(
     charlie_pause(switchboard_charlie, governance, ledger.address, False)
 
 
-def test_g11_zero_credit_burn_path_still_calls_paused_ledger(
-    contributor_contract,
-    human_resources,
-    ledger,
-    ripe_token,
-    ripe_gov_vault,
-    setupRipeGovVaultConfig,
-    switchboard_alpha,
-    switchboard_charlie,
-    governance,
-):
-    setupRipeGovVaultConfig()
-    c = contributor_contract
-    travel_to_ts(c.startTime() + 1)
-    claimed = c.cashRipeCheck(sender=c.owner())
-    assert claimed > 0
-    assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == claimed
-    supply_before = ripe_token.totalSupply()
-
-    _write_max_alpha(ledger, switchboard_alpha)
-    charlie_pause(switchboard_charlie, governance, ledger.address, True)
-    with pytest.raises(BoaError) as exc:
-        human_resources.refundAfterCancelPaycheck(
-            c.compensation(), True, sender=c.address
-        )
-    assert_reverted_call(exc.value, "not activated", human_resources)
-
-    assert ledger.ripeAvailForHr() == MAX_UINT256
-    assert ripe_gov_vault.getTotalAmountForUser(c, ripe_token) == claimed
-    assert ripe_token.totalSupply() == supply_before
-    charlie_pause(switchboard_charlie, governance, ledger.address, False)
-
-
 def test_g11_zero_credit_official_cancel_paused_ledger_rolls_back(
     contributor_contract,
     setupRipeGovVaultConfig,

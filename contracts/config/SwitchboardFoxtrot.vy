@@ -43,32 +43,12 @@ interface RipeReserveEngine:
 interface RipeReserveVesting:
     def setRemainingAllocationBudget(_amount: uint256): nonpayable
 
-interface AuctionHouse:
-    def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> uint256: nonpayable
-    def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> uint256: nonpayable
-    def pauseAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: nonpayable
-    def startAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: nonpayable
-    def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
-
-interface MissionControl:
-    def canPerformLiteAction(_user: address) -> bool: view
-
-interface PriceDesk:
-    def getAddr(_regId: uint256) -> address: view
-
-interface CurvePrices:
-    def addGreenRefPoolSnapshot() -> bool: nonpayable
-
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
     RESERVE_ENGINE_CONFIG
     RESERVE_VESTING_ALLOCATION_BUDGET_SET
-    START_AUCTION
-    START_MANY_AUCTIONS
-    PAUSE_AUCTION
-    PAUSE_MANY_AUCTIONS
 
 struct ReserveEngineConfig:
     paymentCapPerEpoch: uint256
@@ -87,11 +67,6 @@ struct ReserveEngineConfig:
     minVestingLength: uint256
     maxVestingLength: uint256
     epochLength: uint256
-
-struct FungAuctionConfig:
-    liqUser: address
-    vaultId: uint256
-    asset: address
 
 event PendingReserveEngineConfigSet:
     actionId: uint256
@@ -142,69 +117,13 @@ event ReserveEnginePaymentTokenSet:
 event ReserveEngineCanAcquireRipeSet:
     canAcquireRipe: bool
 
-event PendingStartAuctionAction:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PendingStartManyAuctionsAction:
-    numAuctions: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PendingPauseAuctionAction:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PendingPauseManyAuctionsAction:
-    numAuctions: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
-event StartAuctionExecuted:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    success: bool
-
-event StartManyAuctionsExecuted:
-    numAuctionsStarted: uint256
-
-event PauseAuctionExecuted:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    success: bool
-
-event PauseManyAuctionsExecuted:
-    numAuctionsPaused: uint256
-
-event GreenRefPoolSnapshotAttempted:
-    caller: indexed(address)
-    priceSourceId: indexed(uint256)
-    priceSourceAddr: indexed(address)
-    didUpdate: bool
-
 # pending actions
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingEngineConfig: public(HashMap[uint256, ReserveEngineConfig]) # aid -> config
 pendingVestingAllocationBudget: public(HashMap[uint256, uint256]) # aid -> amount
-pendingStartAuctionActions: public(HashMap[uint256, FungAuctionConfig])
-pendingStartManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
-pendingPauseAuctionActions: public(HashMap[uint256, FungAuctionConfig])
-pendingPauseManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
 
-MISSION_CONTROL_ID: constant(uint256) = 5
-PRICE_DESK_ID: constant(uint256) = 7
 RIPE_RESERVE_ENGINE_ID: constant(uint256) = 26
 RIPE_RESERVE_VESTING_ID: constant(uint256) = 27
-AUCTION_HOUSE_ID: constant(uint256) = 9
-MAX_AUCTIONS: constant(uint256) = 20
 
 
 @deploy
@@ -235,18 +154,6 @@ def _getRipeReserveVestingAddr() -> address:
     vesting: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_RESERVE_VESTING_ID)
     assert vesting != empty(address) and vesting.is_contract # dev: invalid vesting
     return vesting
-
-
-@view
-@internal
-def _getAuctionHouseAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(AUCTION_HOUSE_ID)
-
-
-@view
-@internal
-def _getMissionControlAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
 
 
 #########################
@@ -399,98 +306,6 @@ def setReserveVestingRemainingAllocationBudget(_amount: uint256) -> uint256:
     return aid
 
 
-###################
-# Auction Actions #
-###################
-
-
-@external
-def startAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert empty(address) not in [_liqUser, _asset] # dev: invalid parameters
-
-    auctionHouseAddr: address = self._getAuctionHouseAddr()
-    assert staticcall AuctionHouse(auctionHouseAddr).canStartAuction(_liqUser, _vaultId, _asset) # dev: cannot start auction
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.START_AUCTION
-    self.pendingStartAuctionActions[aid] = FungAuctionConfig(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset,
-    )
-
-    log PendingStartAuctionAction(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset,
-        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
-        actionId=aid,
-    )
-    return aid
-
-
-@external
-def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_auctions) != 0 # dev: no auctions provided
-
-    auctionHouseAddr: address = self._getAuctionHouseAddr()
-    for auction: FungAuctionConfig in _auctions:
-        assert staticcall AuctionHouse(auctionHouseAddr).canStartAuction(auction.liqUser, auction.vaultId, auction.asset) # dev: cannot start auction
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.START_MANY_AUCTIONS
-    self.pendingStartManyAuctionsActions[aid] = _auctions
-
-    log PendingStartManyAuctionsAction(
-        numAuctions=len(_auctions),
-        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
-        actionId=aid,
-    )
-    return aid
-
-
-@external
-def pauseAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert empty(address) not in [_liqUser, _asset] # dev: invalid parameters
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.PAUSE_AUCTION
-    self.pendingPauseAuctionActions[aid] = FungAuctionConfig(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset,
-    )
-
-    log PendingPauseAuctionAction(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset,
-        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
-        actionId=aid,
-    )
-    return aid
-
-
-@external
-def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_auctions) != 0 # dev: no auctions provided
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.PAUSE_MANY_AUCTIONS
-    self.pendingPauseManyAuctionsActions[aid] = _auctions
-
-    log PendingPauseManyAuctionsAction(
-        numAuctions=len(_auctions),
-        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
-        actionId=aid,
-    )
-    return aid
-
-
 #############
 # Execution #
 #############
@@ -524,26 +339,6 @@ def executePendingAction(_aid: uint256) -> bool:
         self.pendingVestingAllocationBudget[_aid] = 0
         log ReserveVestingAllocationBudgetExecuted(actionId=_aid)
 
-    elif actionType == ActionType.START_AUCTION:
-        p: FungAuctionConfig = self.pendingStartAuctionActions[_aid]
-        success: bool = extcall AuctionHouse(self._getAuctionHouseAddr()).startAuction(p.liqUser, p.vaultId, p.asset)
-        log StartAuctionExecuted(liqUser=p.liqUser, vaultId=p.vaultId, asset=p.asset, success=success)
-
-    elif actionType == ActionType.START_MANY_AUCTIONS:
-        auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS] = self.pendingStartManyAuctionsActions[_aid]
-        numStarted: uint256 = extcall AuctionHouse(self._getAuctionHouseAddr()).startManyAuctions(auctions)
-        log StartManyAuctionsExecuted(numAuctionsStarted=numStarted)
-
-    elif actionType == ActionType.PAUSE_AUCTION:
-        p: FungAuctionConfig = self.pendingPauseAuctionActions[_aid]
-        success: bool = extcall AuctionHouse(self._getAuctionHouseAddr()).pauseAuction(p.liqUser, p.vaultId, p.asset)
-        log PauseAuctionExecuted(liqUser=p.liqUser, vaultId=p.vaultId, asset=p.asset, success=success)
-
-    elif actionType == ActionType.PAUSE_MANY_AUCTIONS:
-        auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS] = self.pendingPauseManyAuctionsActions[_aid]
-        numPaused: uint256 = extcall AuctionHouse(self._getAuctionHouseAddr()).pauseManyAuctions(auctions)
-        log PauseManyAuctionsExecuted(numAuctionsPaused=numPaused)
-
     else:
         raise "invalid action"
 
@@ -573,40 +368,7 @@ def _cancelPendingAction(_aid: uint256):
         self.pendingEngineConfig[_aid] = empty(ReserveEngineConfig)
     elif actionType == ActionType.RESERVE_VESTING_ALLOCATION_BUDGET_SET:
         self.pendingVestingAllocationBudget[_aid] = 0
-    elif (
-        actionType == ActionType.START_AUCTION
-        or actionType == ActionType.START_MANY_AUCTIONS
-        or actionType == ActionType.PAUSE_AUCTION
-        or actionType == ActionType.PAUSE_MANY_AUCTIONS
-    ):
-        pass
     else:
         raise "invalid action"
 
     self.actionType[_aid] = empty(ActionType)
-
-
-###########################
-# GREEN Ref Pool Snapshot #
-###########################
-
-
-@external
-def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
-    if not gov._canGovern(msg.sender):
-        assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
-
-    priceDesk: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
-    assert priceDesk != empty(address) # dev: missing price desk
-
-    priceSourceAddr: address = staticcall PriceDesk(priceDesk).getAddr(_curvePricesId)
-    assert priceSourceAddr != empty(address) # dev: invalid price source id
-
-    didUpdate: bool = extcall CurvePrices(priceSourceAddr).addGreenRefPoolSnapshot()
-    log GreenRefPoolSnapshotAttempted(
-        caller=msg.sender,
-        priceSourceId=_curvePricesId,
-        priceSourceAddr=priceSourceAddr,
-        didUpdate=didUpdate,
-    )
-    return didUpdate

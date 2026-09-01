@@ -148,43 +148,6 @@ def test_any_registered_switchboard_may_call_vault_migrator(
     assert target_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
 
 
-def test_generic_migration_skips_globally_deregistered_asset_without_reverting_batch(
-    simple_pair,
-    simple_erc20_vault,
-    alpha_token,
-    bob,
-    mission_control,
-    switchboard_alpha,
-    switchboard_echo,
-    governance,
-    setAssetConfig,
-):
-    target_vault, target_id = simple_pair
-    setAssetConfig(
-        alpha_token,
-        _vaultIds=[SIMPLE_VAULT_ID, target_id],
-        _stakersPointsAlloc=0,
-        _voterPointsAlloc=0,
-    )
-    assert mission_control.deregisterAsset(
-        alpha_token,
-        sender=switchboard_alpha.address,
-    )
-    assert not mission_control.isSupportedAssetInVault(target_id, alpha_token)
-
-    assert switchboard_echo.migrateVaultPositions(
-        [bob],
-        SIMPLE_VAULT_ID,
-        target_id,
-        sender=governance.address,
-    ) == 0
-    assert simple_erc20_vault.getTotalAmountForUser(
-        bob,
-        alpha_token,
-    ) == DEPOSIT_AMOUNT
-    assert target_vault.getTotalAmountForUser(bob, alpha_token) == 0
-
-
 def test_migration_requires_paused_teller(
     teller, simple_pair, alpha_token, bob, switchboard_echo, switchboard_alpha,
 ):

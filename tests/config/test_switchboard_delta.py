@@ -1522,59 +1522,6 @@ def test_ripe_available_edge_cases(switchboard_delta, ledger, governance):
     assert ledger.ripeAvailForRewards() == large_amount
 
 
-def test_delta_rewards_budget_settles_lootbox_before_replace(
-    switchboard_delta,
-    governance,
-    ledger,
-    lootbox,
-    teller,
-    setRipeRewardsConfig,
-):
-    rate = 10
-    old_avail = 10_000
-    new_avail = 999_999
-    setRipeRewardsConfig(True, rate, 100_00, 0, 0, 0)
-    ledger.setRipeAvailForRewards(old_avail, sender=switchboard_delta.address)
-    lootbox.updateRipeRewards(sender=teller.address)
-    before = ledger.ripeRewards()
-
-    action_id = switchboard_delta.setRipeAvailableForRewards(
-        new_avail, sender=governance.address
-    )
-    boa.env.time_travel(blocks=max(switchboard_delta.actionTimeLock(), 5))
-    assert switchboard_delta.executePendingAction(action_id, sender=governance.address)
-
-    settled = ledger.ripeRewards()
-    elapsed = settled.lastUpdate - before.lastUpdate
-    minted = min(elapsed * rate, old_avail)
-    assert settled.lastUpdate == boa.env.evm.patch.block_number
-    assert settled.newRipeRewards == minted
-    assert settled.borrowers == before.borrowers + minted
-    assert ledger.ripeAvailForRewards() == new_avail
-
-    later = 3
-    boa.env.time_travel(blocks=later)
-    after = lootbox.updateRipeRewards(sender=teller.address)
-    assert after.newRipeRewards == later * rate
-    assert ledger.ripeRewards().borrowers == settled.borrowers + later * rate
-
-
-def test_delta_rewards_budget_settles_when_lootbox_paused(
-    switchboard_delta,
-    switchboard_alpha,
-    governance,
-    ledger,
-    lootbox,
-):
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    action_id = switchboard_delta.setRipeAvailableForRewards(1, sender=governance.address)
-    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
-    assert switchboard_delta.executePendingAction(action_id, sender=governance.address)
-    assert ledger.ripeAvailForRewards() == 1
-    assert not switchboard_delta.hasPendingAction(action_id)
-    lootbox.pause(False, sender=switchboard_alpha.address)
-
-
 # ========================================
 # _missionControl Parameter Tests
 # ========================================

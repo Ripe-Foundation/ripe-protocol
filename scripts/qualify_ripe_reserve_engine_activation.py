@@ -18,15 +18,7 @@ BLOCKED_STATUS = "BLOCKED — contract candidate only"
 READY_STATUS = "READY — activation approved"
 EXPECTED_SWITCHBOARDS = tuple(
     f"Switchboard{name}"
-    for name in (
-        "Alpha",
-        "Bravo",
-        "Charlie",
-        "Delta",
-        "Echo",
-        "Foxtrot",
-        "Golf",
-    )
+    for name in ("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot")
 )
 ENGINE_MUTATORS = (
     "setConfig",

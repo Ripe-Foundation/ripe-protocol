@@ -3,7 +3,7 @@ import pytest
 from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import filter_logs, redeem_from_stability_pool, sync_deployed_token
+from conf_utils import filter_logs, redeem_from_stability_pool
 
 
 def _frame_reasons(frame):
@@ -180,12 +180,10 @@ userAssets: HashMap[address, HashMap[uint256, address]]
 indexOfUserAsset: HashMap[address, HashMap[address, uint256]]
 numUserAssets: public(HashMap[address, uint256])
 underSendAmount: public(uint256)
-underSendEnabled: bool
 
 @external
 def setUnderSendAmount(_amount: uint256):
     self.underSendAmount = _amount
-    self.underSendEnabled = True
 
 @internal
 def _register(_user: address, _asset: address):
@@ -214,7 +212,7 @@ def depositTokensInVault(
 def _outflow(_user: address, _asset: address, _amount: uint256) -> (uint256, bool):
     available: uint256 = self.userBalances[_user][_asset]
     sendAmount: uint256 = min(_amount, available)
-    if self.underSendEnabled:
+    if self.underSendAmount != 0:
         sendAmount = min(sendAmount, self.underSendAmount)
     if sendAmount == 0:
         return 0, available == 0
@@ -429,142 +427,6 @@ def test_auction_house_one_wei_takes_one_token_from_multi_token_balance(
     assert bravo_token.balanceOf(alice) == EIGHTEEN_DECIMALS
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == 99 * EIGHTEEN_DECIMALS
     assert green_token.balanceOf(alice) == alice_green_before - 1
-
-
-def test_auction_house_credits_forward_value_of_zero_decimal_delivery(
-    governance,
-    setGeneralConfig,
-    setAssetConfig,
-    setGeneralDebtConfig,
-    createDebtTerms,
-    performDeposit,
-    mock_price_source,
-    teller,
-    credit_engine,
-    bob,
-    alice,
-    sally,
-    alpha_token,
-    alpha_token_whale,
-    green_token,
-    whale,
-    simple_erc20_vault,
-    vault_book,
-):
-    coarse_token = boa.load(
-        "contracts/mock/MockErc20.vy",
-        governance,
-        "Coarse Token",
-        "COARSE",
-        0,
-        10,
-    )
-    sync_deployed_token(coarse_token)
-    _make_bob_auctionable_on_bravo(
-        setGeneralConfig,
-        setAssetConfig,
-        setGeneralDebtConfig,
-        createDebtTerms,
-        performDeposit,
-        mock_price_source,
-        teller,
-        credit_engine,
-        bob,
-        sally,
-        alpha_token,
-        alpha_token_whale,
-        coarse_token,
-        governance.address,
-        green_token,
-        10,
-        12 * EIGHTEEN_DECIMALS // 100,
-    )
-    mock_price_source.setPrice(coarse_token, 3 * EIGHTEEN_DECIMALS)
-
-    _fund_alice(green_token, whale, teller, alice, 5 * EIGHTEEN_DECIMALS)
-    vault_id = vault_book.getRegId(simple_erc20_vault)
-    green_spent = teller.buyManyFungibleAuctions(
-        [(bob, vault_id, coarse_token, MAX_UINT256)],
-        5 * EIGHTEEN_DECIMALS,
-        False,
-        False,
-        False,
-        alice,
-        sender=alice,
-    )
-
-    assert green_spent == 3 * EIGHTEEN_DECIMALS
-    log = filter_logs(teller, "FungAuctionPurchased")[0]
-    assert log.collateralAmountSent == 1
-    assert log.collateralUsdValueSent == 3 * EIGHTEEN_DECIMALS
-    assert coarse_token.balanceOf(alice) == 1
-
-
-def test_auction_house_full_quote_normalizes_one_wei_inverse_roundtrip(
-    setGeneralConfig,
-    setAssetConfig,
-    setGeneralDebtConfig,
-    createDebtTerms,
-    performDeposit,
-    mock_price_source,
-    teller,
-    credit_engine,
-    bob,
-    alice,
-    sally,
-    alpha_token,
-    alpha_token_whale,
-    bravo_token,
-    bravo_token_whale,
-    green_token,
-    whale,
-    simple_erc20_vault,
-    vault_book,
-    price_desk,
-):
-    _make_bob_auctionable_on_bravo(
-        setGeneralConfig,
-        setAssetConfig,
-        setGeneralDebtConfig,
-        createDebtTerms,
-        performDeposit,
-        mock_price_source,
-        teller,
-        credit_engine,
-        bob,
-        sally,
-        alpha_token,
-        alpha_token_whale,
-        bravo_token,
-        bravo_token_whale,
-        green_token,
-        100 * EIGHTEEN_DECIMALS,
-        12 * EIGHTEEN_DECIMALS // 100,
-    )
-    target = 5 * EIGHTEEN_DECIMALS
-    mock_price_source.setPrice(bravo_token, 6 * EIGHTEEN_DECIMALS // 10)
-    quoted_amount = price_desk.getAssetAmount(bravo_token, target, True)
-    assert price_desk.getUsdValue(bravo_token, quoted_amount, True) == target - 1
-
-    alice_green_before = _fund_alice(green_token, whale, teller, alice, target)
-    vault_id = vault_book.getRegId(simple_erc20_vault)
-    green_spent = teller.buyManyFungibleAuctions(
-        [(bob, vault_id, bravo_token, MAX_UINT256)],
-        target,
-        False,
-        False,
-        False,
-        alice,
-        sender=alice,
-    )
-
-    expected_value = target
-    assert green_spent == expected_value
-    log = filter_logs(teller, "FungAuctionPurchased")[0]
-    assert log.collateralAmountSent == quoted_amount
-    assert log.collateralUsdValueSent == expected_value
-    assert log.greenSpent == expected_value
-    assert green_token.balanceOf(alice) == alice_green_before - expected_value
 
 
 def test_auction_house_dust_only_purchase_reverts_no_green_spent(
@@ -966,30 +828,7 @@ def test_wsuper_price_desk_auction_house_tx(
     assert price_desk.getPrice(bravo_token) == EIGHTEEN_DECIMALS
 
 
-@pytest.mark.parametrize(
-    "settlement_price,under_send,payment_amount,expected_reason,expected_credit",
-    [
-        (1, 1, 100 * EIGHTEEN_DECIMALS, "amounts do not match up", None),
-        # Regression: a zero send against a one-wei target must not be rounded
-        # from target - 1 into one wei of collateral credit.
-        (1, 0, 1, "no green spent", None),
-        # Exact $1 quote minus one raw unit may settle, but the buyer must pay
-        # only the forward value delivered.
-        (
-            EIGHTEEN_DECIMALS,
-            EIGHTEEN_DECIMALS - 1,
-            EIGHTEEN_DECIMALS,
-            None,
-            EIGHTEEN_DECIMALS - 1,
-        ),
-    ],
-)
-def test_auction_house_undersend_vault_settles_actual_value_or_reverts(
-    settlement_price,
-    under_send,
-    payment_amount,
-    expected_reason,
-    expected_credit,
+def test_auction_house_undersend_vault_hits_zero_usd_backstop(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -1003,7 +842,6 @@ def test_auction_house_undersend_vault_settles_actual_value_or_reverts(
     vault_book,
     governance,
     lootbox,
-    price_desk,
 ):
     with boa.env.anchor():
         vault = boa.loads(UNDERSEND_VAULT_SOURCE, name="undersend_vault")
@@ -1041,12 +879,8 @@ def test_auction_house_undersend_vault_settles_actual_value_or_reverts(
         mock_price_source.setPrice(token, 12 * EIGHTEEN_DECIMALS // 100)
         assert credit_engine.canLiquidateUser(borrower)
         teller.liquidateUser(borrower, False, sender=keeper)
-        mock_price_source.setPrice(token, settlement_price)
-        vault.setUnderSendAmount(under_send)
-        # PriceDesk's deliberate dust floor is exactly why the amount-domain
-        # post-transfer guard is required.
-        if settlement_price == 1 and under_send != 0:
-            assert price_desk.getUsdValue(token, under_send, True) == 1
+        mock_price_source.setPrice(token, 1)
+        vault.setUnderSendAmount(1)
         _fund_alice(green_token, whale, teller, buyer, 100 * EIGHTEEN_DECIMALS)
         before = {
             "debt": credit_engine.getUserDebtAmount(borrower),
@@ -1057,44 +891,25 @@ def test_auction_house_undersend_vault_settles_actual_value_or_reverts(
             "has_auc": ledger.hasFungibleAuction(borrower, vault_id, token),
             "points": lootbox.getLatestDepositPoints(borrower, vault_id, token),
         }
-        if expected_reason is not None:
-            with boa.reverts(expected_reason):
-                teller.buyManyFungibleAuctions(
-                    [(borrower, vault_id, token.address, MAX_UINT256)],
-                    payment_amount,
-                    False,
-                    False,
-                    False,
-                    buyer,
-                    sender=buyer,
-                )
-            assert {
-                "debt": credit_engine.getUserDebtAmount(borrower),
-                "buyer_green": green_token.balanceOf(buyer),
-                "buyer_token": token.balanceOf(buyer),
-                "borrower_token": vault.getTotalAmountForUser(borrower, token),
-                "vault_token": token.balanceOf(vault),
-                "has_auc": ledger.hasFungibleAuction(borrower, vault_id, token),
-                "points": lootbox.getLatestDepositPoints(borrower, vault_id, token),
-            } == before
-        else:
-            green_spent = teller.buyManyFungibleAuctions(
+        with boa.reverts("amounts do not match up"):
+            teller.buyManyFungibleAuctions(
                 [(borrower, vault_id, token.address, MAX_UINT256)],
-                payment_amount,
+                100 * EIGHTEEN_DECIMALS,
                 False,
                 False,
                 False,
                 buyer,
                 sender=buyer,
             )
-            assert green_spent == expected_credit
-            log = filter_logs(teller, "FungAuctionPurchased")[0]
-            assert log.collateralAmountSent == under_send
-            assert log.collateralUsdValueSent == expected_credit
-            assert log.greenSpent == expected_credit
-            assert green_token.balanceOf(buyer) == before["buyer_green"] - expected_credit
-            assert token.balanceOf(buyer) == before["buyer_token"] + under_send
-            assert vault.getTotalAmountForUser(borrower, token) == before["borrower_token"] - under_send
+        assert {
+            "debt": credit_engine.getUserDebtAmount(borrower),
+            "buyer_green": green_token.balanceOf(buyer),
+            "buyer_token": token.balanceOf(buyer),
+            "borrower_token": vault.getTotalAmountForUser(borrower, token),
+            "vault_token": token.balanceOf(vault),
+            "has_auc": ledger.hasFungibleAuction(borrower, vault_id, token),
+            "points": lootbox.getLatestDepositPoints(borrower, vault_id, token),
+        } == before
 
 
 def test_auction_house_shares_vault_dust_preview_is_skipped(

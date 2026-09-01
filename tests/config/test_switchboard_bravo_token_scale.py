@@ -66,12 +66,12 @@ def _token(decimals=18):
     return boa.loads(DECIMALS_TOKEN, decimals)
 
 
-def _add_fungible(switchboard_golf, governance, asset, mission_control=ZERO_ADDRESS):
-    return switchboard_golf.addAsset(
+def _add_fungible(switchboard_bravo, governance, asset, mission_control=ZERO_ADDRESS):
+    return switchboard_bravo.addAsset(
         asset,
         [1],
-        0,
-        0,
+        50_00,
+        30_00,
         1000,
         10000,
         0,
@@ -95,12 +95,12 @@ def _add_fungible(switchboard_golf, governance, asset, mission_control=ZERO_ADDR
     )
 
 
-def _add_nft(switchboard_golf, governance, asset):
-    return switchboard_golf.addAsset(
+def _add_nft(switchboard_bravo, governance, asset):
+    return switchboard_bravo.addAsset(
         asset,
         [1],
-        0,
-        0,
+        50_00,
+        30_00,
         1000,
         10000,
         0,
@@ -133,7 +133,7 @@ def _feed(mock_price_source, token):
 
 
 def test_fungible_add_new_stores_config_and_scale(
-    switchboard_golf,
+    switchboard_bravo,
     mission_control,
     governance,
     price_desk,
@@ -141,28 +141,28 @@ def test_fungible_add_new_stores_config_and_scale(
 ):
     token = _token(8)
     assert price_desk.tokenScale(token) == 0
-    action_id = _add_fungible(switchboard_golf, governance, token)
-    assert _execute(switchboard_golf, governance, action_id)
+    action_id = _add_fungible(switchboard_bravo, governance, token)
+    assert _execute(switchboard_bravo, governance, action_id)
     assert mission_control.isSupportedAsset(token.address)
     assert price_desk.tokenScale(token) == 10**8
 
 
 def test_fungible_add_new_does_not_need_a_feed(
-    switchboard_golf,
+    switchboard_bravo,
     mission_control,
     governance,
     price_desk,
     ripe_hq,
 ):
     token = _token(18)
-    action_id = _add_fungible(switchboard_golf, governance, token)
-    assert _execute(switchboard_golf, governance, action_id)
+    action_id = _add_fungible(switchboard_bravo, governance, token)
+    assert _execute(switchboard_bravo, governance, action_id)
     assert mission_control.isSupportedAsset(token.address)
     assert price_desk.tokenScale(token) == EIGHTEEN_DECIMALS
 
 
 def test_preseeded_scale_skips_decimals_and_succeeds(
-    switchboard_golf,
+    switchboard_bravo,
     mission_control,
     governance,
     price_desk,
@@ -171,29 +171,29 @@ def test_preseeded_scale_skips_decimals_and_succeeds(
     token = _token(8)
     price_desk.syncTokenScale(token, sender=governance.address)
     token.setShouldRevert(True)
-    action_id = _add_fungible(switchboard_golf, governance, token)
-    assert _execute(switchboard_golf, governance, action_id)
+    action_id = _add_fungible(switchboard_bravo, governance, token)
+    assert _execute(switchboard_bravo, governance, action_id)
     assert mission_control.isSupportedAsset(token.address)
     assert price_desk.tokenScale(token) == 10**8
 
 
 def test_nft_admission_does_not_require_scale(
-    switchboard_golf,
+    switchboard_bravo,
     mission_control,
     governance,
     price_desk,
     mock_rando_contract,
     ripe_hq,
 ):
-    action_id = _add_nft(switchboard_golf, governance, mock_rando_contract)
-    assert _execute(switchboard_golf, governance, action_id)
+    action_id = _add_nft(switchboard_bravo, governance, mock_rando_contract)
+    assert _execute(switchboard_bravo, governance, action_id)
     assert mission_control.isSupportedAsset(mock_rando_contract.address)
     assert mission_control.assetConfig(mock_rando_contract.address).isNft
     assert price_desk.tokenScale(mock_rando_contract) == 0
 
 
 def test_sync_failure_rolls_back_mission_control(
-    switchboard_golf,
+    switchboard_bravo,
     mission_control,
     governance,
     price_desk,
@@ -203,20 +203,20 @@ def test_sync_failure_rolls_back_mission_control(
     token = _token(18)
     _feed(mock_price_source, token)
     token.setShouldRevert(True)
-    action_id = _add_fungible(switchboard_golf, governance, token)
-    pending_before = switchboard_golf.pendingAssetConfig(action_id)
-    action_type_before = switchboard_golf.actionType(action_id)
+    action_id = _add_fungible(switchboard_bravo, governance, token)
+    pending_before = switchboard_bravo.pendingAssetConfig(action_id)
+    action_type_before = switchboard_bravo.actionType(action_id)
     with boa.reverts("decimals revert"):
-        _execute(switchboard_golf, governance, action_id)
+        _execute(switchboard_bravo, governance, action_id)
     assert not mission_control.isSupportedAsset(token.address)
     assert price_desk.tokenScale(token) == 0
-    assert switchboard_golf.hasPendingAction(action_id)
-    assert switchboard_golf.actionType(action_id) == action_type_before
-    assert switchboard_golf.pendingAssetConfig(action_id) == pending_before
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert switchboard_bravo.actionType(action_id) == action_type_before
+    assert switchboard_bravo.pendingAssetConfig(action_id) == pending_before
 
 
 def test_missing_target_price_desk_fails_atomically(
-    switchboard_golf,
+    switchboard_bravo,
     mission_control,
     governance,
     switchboard,
@@ -231,25 +231,25 @@ def test_missing_target_price_desk_fails_atomically(
         defaults,
         name="missing_desk_mission_control",
     )
-    replacement.setCoreRipeGovVaultId(2, sender=switchboard_golf.address)
-    replacement.setPreferredStabVaultId(1, sender=switchboard_golf.address)
+    replacement.setCoreRipeGovVaultId(2, sender=switchboard_bravo.address)
+    replacement.setPreferredStabVaultId(1, sender=switchboard_bravo.address)
     action_id = _add_fungible(
-        switchboard_golf,
+        switchboard_bravo,
         governance,
         token,
         replacement.address,
     )
-    pending_before = switchboard_golf.pendingAssetConfig(action_id)
+    pending_before = switchboard_bravo.pendingAssetConfig(action_id)
     with boa.reverts("missing price desk"):
-        _execute(switchboard_golf, governance, action_id)
+        _execute(switchboard_bravo, governance, action_id)
     assert not replacement.isSupportedAsset(token.address)
     assert not mission_control.isSupportedAsset(token.address)
-    assert switchboard_golf.hasPendingAction(action_id)
-    assert switchboard_golf.pendingAssetConfig(action_id) == pending_before
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert switchboard_bravo.pendingAssetConfig(action_id) == pending_before
 
 
 def test_replacement_mission_control_updates_only_its_price_desk(
-    switchboard_golf,
+    switchboard_bravo,
     mission_control,
     governance,
     switchboard,
@@ -275,17 +275,17 @@ def test_replacement_mission_control_updates_only_its_price_desk(
         defaults,
         name="replacement_mission_control",
     )
-    replacement.setCoreRipeGovVaultId(2, sender=switchboard_golf.address)
-    replacement.setPreferredStabVaultId(1, sender=switchboard_golf.address)
+    replacement.setCoreRipeGovVaultId(2, sender=switchboard_bravo.address)
+    replacement.setPreferredStabVaultId(1, sender=switchboard_bravo.address)
 
     default_scale_before = price_desk.tokenScale(token)
     action_id = _add_fungible(
-        switchboard_golf,
+        switchboard_bravo,
         governance,
         token,
         replacement.address,
     )
-    assert _execute(switchboard_golf, governance, action_id)
+    assert _execute(switchboard_bravo, governance, action_id)
     assert replacement.isSupportedAsset(token.address)
     assert not mission_control.isSupportedAsset(token.address)
     assert other_desk.tokenScale(token) == 10**8
@@ -294,28 +294,27 @@ def test_replacement_mission_control_updates_only_its_price_desk(
 
 def test_non_add_new_actions_do_not_change_scale(
     switchboard_bravo,
-    switchboard_golf,
     mission_control,
     governance,
     price_desk,
     ripe_hq,
 ):
     token = _token(8)
-    add_id = _add_fungible(switchboard_golf, governance, token)
-    assert _execute(switchboard_golf, governance, add_id)
+    add_id = _add_fungible(switchboard_bravo, governance, token)
+    assert _execute(switchboard_bravo, governance, add_id)
     assert price_desk.tokenScale(token) == 10**8
 
     deposit_id = switchboard_bravo.setAssetDepositParams(
         token,
-        [1],
-        0,
-        0,
+        [2, 3],
+        40_00,
+        35_00,
         2000,
         20000,
         0,
         sender=governance.address,
     )
-    debt_id = switchboard_golf.setAssetDebtTerms(
+    debt_id = switchboard_bravo.setAssetDebtTerms(
         token,
         70_00,
         75_00,
@@ -325,13 +324,8 @@ def test_non_add_new_actions_do_not_change_scale(
         3_00,
         sender=governance.address,
     )
-    boa.env.time_travel(
-        blocks=max(
-            switchboard_bravo.actionTimeLock(),
-            switchboard_golf.actionTimeLock(),
-        )
-    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
     assert switchboard_bravo.executePendingAction(deposit_id, sender=governance.address)
-    assert switchboard_golf.executePendingAction(debt_id, sender=governance.address)
+    assert switchboard_bravo.executePendingAction(debt_id, sender=governance.address)
     assert price_desk.tokenScale(token) == 10**8
     assert mission_control.assetConfig(token.address).perUserDepositLimit == 2000

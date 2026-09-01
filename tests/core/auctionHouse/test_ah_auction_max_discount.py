@@ -551,7 +551,6 @@ def test_sc30_stored_overflowing_window_purchases_at_max_discount(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
-    setRipeRewardsConfig,
     createDebtTerms,
     createAuctionParams,
     performDeposit,
@@ -563,17 +562,12 @@ def test_sc30_stored_overflowing_window_purchases_at_max_discount(
     alpha_token_whale,
     green_token,
     whale,
-    lootbox,
-    mission_control,
-    switchboard_bravo,
     bob,
     alice,
     sally,
 ):
     # Switchboard now rejects this duration. A stored auction in the old
     # overflowing domain must still settle at maxDiscount instead of revert.
-    # The test jumps block_number into the overflow domain. This case is about
-    # discount math, so the auction asset must not retain an active earner.
     start_discount = 0
     max_discount = 50_00
     auction = _open_auction(
@@ -593,10 +587,6 @@ def test_sc30_stored_overflowing_window_purchases_at_max_discount(
         start_discount,
         max_discount,
         20,
-    )
-    setRipeRewardsConfig(False, 0, 0, 0, 0, 0)
-    mission_control.setRewardVaultId(
-        alpha_token, 0, sender=switchboard_bravo.address
     )
     overflowing_duration = MAX_UINT256 // max_discount + 2
     stored = ledger.getFungibleAuction(bob, auction.vaultId, alpha_token)
@@ -618,47 +608,6 @@ def test_sc30_stored_overflowing_window_purchases_at_max_discount(
     )
     overflow_block = stored.startBlock + MAX_UINT256 // max_discount + 1
     boa.env.evm.patch.block_number = overflow_block
-
-    # This synthetic block jump targets only the auction interpolation. Settle
-    # the independent continuous point clocks at the same boundary so their
-    # deliberately huge elapsed window does not become part of this test.
-    user_points = ledger.userDepositPoints(bob, auction.vaultId, alpha_token)
-    asset_points = ledger.assetDepositPoints(auction.vaultId, alpha_token)
-    global_points = ledger.globalDepositPoints()
-    rewards = ledger.ripeRewards()
-    settled_rewards = (
-        rewards.borrowers,
-        rewards.stakers,
-        rewards.voters,
-        rewards.genDepositors,
-        rewards.newRipeRewards,
-        overflow_block,
-    )
-    ledger.setDepositPointsAndRipeRewards(
-        bob,
-        auction.vaultId,
-        alpha_token,
-        (user_points.balancePoints, user_points.lastBalance, overflow_block),
-        (
-            asset_points.balancePoints,
-            asset_points.lastBalance,
-            asset_points.lastUsdValue,
-            asset_points.ripeStakerPoints,
-            asset_points.ripeVotePoints,
-            asset_points.ripeGenPoints,
-            overflow_block,
-            asset_points.precision,
-        ),
-        (
-            global_points.lastUsdValue,
-            global_points.ripeStakerPoints,
-            global_points.ripeVotePoints,
-            global_points.ripeGenPoints,
-            overflow_block,
-        ),
-        settled_rewards,
-        sender=lootbox.address,
-    )
     price = 40 * EIGHTEEN_DECIMALS // 100
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)

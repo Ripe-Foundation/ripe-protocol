@@ -198,10 +198,7 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
         file=sys.stderr,
     )
     boa.fork(rpc, block_identifier=block)
-    # Replacement Defaults binds the Contributor blueprint at deployment.
-    # Reuse the live template here so the verifier compares only snapshotted
-    # configuration; the real migration intentionally supplies a fresh one.
-    defaults = boa.load(str(defaults_path), live_call("hrConfig")[0])
+    defaults = boa.load(str(defaults_path))
     replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, defaults.address)
 
     mismatches: list[tuple[str, object, object]] = []

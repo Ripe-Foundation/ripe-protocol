@@ -301,11 +301,11 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     # The post-claim Lootbox checkpoint adds one strict NAV traversal per
     # distinct stability asset, after all batch mutations. F17's aggregate
     # custody check adds one balance read before each claim reduction. At this
-    # ceiling the delivered-value quote plus fragmentation-safe inverse check
-    # makes the measured paths single_claim=1,339,047 and claim_many=8,770,471.
-    # The ceilings retain about 3.7% local-EVM headroom.
-    assert single_claim_gas < 1_390_000
-    assert claim_many_gas < 9_100_000
+    # ceiling the measured paths are single_claim=1,280,407 and
+    # claim_many=8,042,519. The ceilings retain 5.43% and 3.20% local-EVM
+    # headroom, respectively.
+    assert single_claim_gas < 1_350_000
+    assert claim_many_gas < 8_300_000
     # Preflight and iteration each traverse the bounded claim set once. The
     # iterator must not repeat the strict NAV traversal after readiness passes.
     assert liquidation_preflight_gas < 600_000
@@ -990,7 +990,7 @@ def test_prune_skips_unpriced_pair_and_continues_batch_while_paused_or_unpaused(
     charlie_balance = stability_pool.claimableBalances(alpha_token, charlie_token)
     bravo_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
     mock_price_source.setPrice(bravo_token, 0)
-    mock_price_source.setPrice(charlie_token, 2 * 10**17)
+    mock_price_source.setPrice(charlie_token, 4 * 10**17)
 
     stability_pool.pruneClaimableAssets(
         alpha_token,
@@ -2272,7 +2272,7 @@ def test_claim_data_model_tracks_dust_claim_reactivation_and_zero_removal(
         100 * 10**6,
     )
 
-    partial_claim = ACTIVATION_THRESHOLD - (RETENTION_THRESHOLD - 1)
+    partial_claim = 6 * 10**16
     claim = _deploy_claim_token(
         governance,
         alice,
@@ -4595,10 +4595,7 @@ def test_der02_appreciated_post_exit_dormant_pair_uses_paused_activation(
             alpha_token, bravo_token
         ) == CLAIM_ASSET_DORMANT
 
-        mock_price_source.setPrice(
-            bravo_token,
-            ACTIVATION_THRESHOLD * EIGHTEEN_DECIMALS // RETENTION_THRESHOLD,
-        )
+        mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
         assert stability_pool.getTotalValue(alpha_token) == 0
         stability_pool.activateClaimAssets(
             alpha_token, [bravo_token], sender=alice
@@ -4996,16 +4993,13 @@ def test_der02_dormant_price_sensitivity_and_replenishment_reactivation(
 
         # Appreciation through the activation value does not auto-enumerate a
         # dormant pair; depreciation likewise leaves its raw liability intact.
-        activation_price = (
-            ACTIVATION_THRESHOLD * EIGHTEEN_DECIMALS // RETENTION_THRESHOLD
-        )
-        mock_price_source.setPrice(bravo_token, activation_price)
+        mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
         assert stability_pool.getClaimAssetState(
             alpha_token, bravo_token
         ) == CLAIM_ASSET_DORMANT
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
         assert (
-            RETENTION_THRESHOLD * activation_price
+            RETENTION_THRESHOLD * 2 * EIGHTEEN_DECIMALS
             // EIGHTEEN_DECIMALS
             == ACTIVATION_THRESHOLD
         )

@@ -14,11 +14,17 @@ from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 _C2_INTERPRETER_PATH = os.environ.get("RIPE_C2_MEASUREMENT_INTERPRETER")
-_C2_REPO_ROOT = Path(__file__).resolve().parents[3]
 C2_MEASUREMENT_INTERPRETER = (
     Path(_C2_INTERPRETER_PATH).resolve()
     if _C2_INTERPRETER_PATH
-    else (_C2_REPO_ROOT / ".venv" / "bin" / "python").resolve()
+    else (
+        Path.home()
+        / "dev"
+        / "ripe-protocol-validation-envs"
+        / "rh-wave2-py312"
+        / "bin"
+        / "python"
+    ).resolve()
 )
 
 
@@ -165,11 +171,6 @@ def isStabVaultId(_vaultId: uint256) -> bool:
 
 @view
 @external
-def indexOfAsset(_asset: address) -> uint256:
-    return 1 if _asset == allowed_asset else 0
-
-@view
-@external
 def getDebtTerms(_asset: address) -> cs.DebtTerms:
     assert _asset == allowed_asset, "zero-position terms lookup"
     return terms
@@ -208,19 +209,6 @@ def getUserAssetAndAmountAtIndex(
     if _index == 0 or _index > position_count:
         return empty(address), 0
     return asset, position_amount
-
-@view
-@external
-def doesUserHaveBalance(
-    _user: address,
-    _asset: address,
-) -> bool:
-    return _asset == asset
-
-@view
-@external
-def getTotalAmountForVault(_asset: address) -> uint256:
-    return 0
 """
 
 
@@ -671,13 +659,7 @@ def test_existing_stab_and_basic_vault_empty_zero_remain_absent(
 ):
     setGeneralConfig()
     setGeneralDebtConfig()
-    setAssetConfig(
-        alpha_token,
-        _vaultIds=[1, 3],
-        _stakersPointsAlloc=0,
-        _voterPointsAlloc=0,
-        _debtTerms=createDebtTerms(),
-    )
+    setAssetConfig(alpha_token, _vaultIds=[1, 3], _debtTerms=createDebtTerms())
     ledger.addVaultToUser(bob, 1, sender=teller.address)
     ledger.addVaultToUser(bob, 3, sender=teller.address)
 
@@ -935,7 +917,7 @@ def test_c2_marginal_gas_protocol(
         Path("contracts/core/CreditEngine.vy").read_bytes()
     ).hexdigest()
     assert source_sha256 == (
-        "f0811ea1d20d8c68853608bc2fbef03168c6c3e23228d84c9304b6bb0f1b8688"
+        "75b0e9397e8eb15dd8246c4816b96585a4c057e9dee19c2a824cf1db4b7069c0"
     )
     manifest_rows = sorted(
         (
@@ -952,15 +934,15 @@ def test_c2_marginal_gas_protocol(
         f"{name}=={version}" for name, version in manifest_rows
     ) + "\n"
     assert hashlib.sha256(manifest.encode()).hexdigest() == (
-        "5df5fbc4e94b394f4fbc26a7b2877c731ee33fe7db267a734010c6039ac61138"
+        "9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92"
     )
     interpreter = Path(sys.executable).resolve()
     assert interpreter == C2_MEASUREMENT_INTERPRETER
     assert hashlib.sha256(interpreter.read_bytes()).hexdigest() == (
-        "e2605291e058fdbe3102e8185d0ac5fe0e063398de617010a6af3a42a78f05e3"
+        "d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765"
     )
     assert hashlib.sha256(Path("requirements.txt").read_bytes()).hexdigest() == (
-        "4f0097670e618e8210fc7d961d851df643332b3b52d156a0a0b9171e86d1906f"
+        "214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010"
     )
     protocol = Path(
         "docs/chains/rh/hardening/creditengine-gas-measurements.md"
@@ -1011,7 +993,6 @@ def test_c2_marginal_gas_protocol(
                 assert warm_up.collateralVal == expected_value
                 assert warm_up.totalMaxDebt == expected_value // 2
                 assert warm_up.debtTerms.ltv == 50_00
-                assert warm_up.hasQuarantinedAsset == (position_amount == 0)
 
                 observations = []
                 price_calls = []

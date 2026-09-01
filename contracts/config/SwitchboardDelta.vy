@@ -67,7 +67,6 @@ interface Lootbox:
     def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256): nonpayable
     def resetAssetPoints(_asset: address, _vaultId: uint256): nonpayable
     def resetUserBorrowPoints(_user: address): nonpayable
-    def updateRipeRewards(): nonpayable
 
 interface Teller:
     def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
@@ -1485,7 +1484,6 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.RIPE_AVAIL_REWARDS:
         amount: uint256 = self.pendingRipeAvailable[_aid]
-        extcall Lootbox(self._getLootboxAddr()).updateRipeRewards()
         extcall Ledger(self._getLedgerAddr()).setRipeAvailForRewards(amount)
         log RipeAvailableForRewardsSet(amount=amount)
 

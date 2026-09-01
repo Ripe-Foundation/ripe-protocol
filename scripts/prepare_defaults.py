@@ -265,7 +265,7 @@ HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-pro
 #   chain id: {chain_id}
 #   snapshot block: {block_number}
 #   snapshot block hash: {block_hash}
-#   snapshot finality: {snapshot_finality}
+#   snapshot finality: verified against the provider finalized tag
 #   MissionControl: {mission_control_address}
 #   MissionControl code sha256: {mission_control_code_sha256}
 #   Ledger: {ledger_address}
@@ -345,7 +345,6 @@ class SnapshotProvenance:
     chain_id: int
     block_number: int
     block_hash: str
-    snapshot_finality: str
     manifest_sha256: str
     generator_sha256: str
     compiler_version: str
@@ -380,7 +379,6 @@ class SnapshotProvenance:
             chain_id=self.chain_id,
             block_number=self.block_number,
             block_hash=self.block_hash,
-            snapshot_finality=self.snapshot_finality,
             mission_control_address=self.mission_control_address,
             mission_control_code_sha256=self.mission_control_code_sha256,
             ledger_address=self.ledger_address,
@@ -637,9 +635,8 @@ def select_snapshot(
     generator_bytes: bytes,
     abi_inputs: AbiInputs,
     network: Network = DEFAULT_NETWORK,
-    allow_unfinalized: bool = False,
 ) -> SnapshotProvenance:
-    """Bind all reads to one exact block, finalized unless explicitly allowed."""
+    """Bind all reads to one provider-acknowledged finalized block."""
     if (
         isinstance(block_number, bool)
         or not isinstance(block_number, int)
@@ -665,7 +662,7 @@ def select_snapshot(
     except Exception as exc:
         raise SnapshotError("provider did not return an explicit finalized block") from exc
     finalized_number, _ = _block_identity(finalized, "finalized block")
-    if block_number > finalized_number and not allow_unfinalized:
+    if block_number > finalized_number:
         raise SnapshotError(
             f"requested block {block_number} is newer than finalized block "
             f"{finalized_number}"
@@ -685,11 +682,6 @@ def select_snapshot(
         chain_id=chain_id,
         block_number=block_number,
         block_hash=block_hash,
-        snapshot_finality=(
-            "unfinalized current-state snapshot explicitly requested"
-            if block_number > finalized_number
-            else "verified against the provider finalized tag"
-        ),
         manifest_sha256=_sha256(manifest_bytes),
         generator_sha256=_sha256(generator_bytes),
         compiler_version=abi_inputs.compiler_version,
@@ -724,11 +716,7 @@ def verify_snapshot(w3, snapshot: SnapshotProvenance) -> None:
             "provider no longer returns an explicit finalized block"
         ) from exc
     finalized_number, _ = _block_identity(finalized, "finalized block")
-    if (
-        finalized_number < snapshot.block_number
-        and snapshot.snapshot_finality
-        != "unfinalized current-state snapshot explicitly requested"
-    ):
+    if finalized_number < snapshot.block_number:
         raise SnapshotError(
             f"selected block {snapshot.block_number} is no longer finalized"
         )
@@ -1145,11 +1133,6 @@ def main() -> int:
         help="Exact snapshot block; it must already be finalized.",
     )
     parser.add_argument(
-        "--allow-unfinalized",
-        action="store_true",
-        help="Allow an exact current block newer than the provider finalized tag.",
-    )
-    parser.add_argument(
         "--output",
         type=Path,
         help="Write somewhere other than the network's default target.",
@@ -1182,14 +1165,13 @@ def main() -> int:
             generator_bytes=Path(__file__).read_bytes(),
             abi_inputs=abi_inputs,
             network=network,
-            allow_unfinalized=args.allow_unfinalized,
         )
         # The URL carries a provider key, so it is never printed. Status goes
         # to stderr so `--dry-run > file` writes only the contract.
         print(
             f"reading {network.display_name} chain {snapshot.chain_id} at snapshot "
             f"block {snapshot.block_number} ({snapshot.block_hash}); "
-            f"{snapshot.snapshot_finality}",
+            "verified finalized",
             file=sys.stderr,
         )
         result = build(

@@ -5,27 +5,27 @@
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 49396516
+# Regenerate with:  python scripts/prepare_defaults.py --network robinhood-mainnet --block-number 42563001
 #
 # Snapshot provenance:
 #   repository: ripe-foundation/ripe-protocol
 #   generator: scripts/prepare_defaults.py
-#   generator sha256: 53c7c9f3849ea7a64a6f115746a2f5a4db1d0c77e860c3417f2edfe4fa8f8065
-#   manifest sha256: 74af5666f5616de0b2c4fa27d6a090b29dc0aeb65a506c054f505c9c9e70becc
+#   generator sha256: 3cde50cbfa9ae90bdc008bff6f512c9d54acdb38977083d4e5e2b89487ef6659
+#   manifest sha256: 7c447715fce4c58e3e05ce94fe2bf3e80369cd13dc43d9995dab6c4795cfa7bf
 #   Vyper compiler: 0.4.3+commit.bff19ea2
 #   Vyper compiler identity sha256: 208c7c41102f13ea781980bf0647dd003d334d34fb02b48f043459c8584aafe0
-#   MissionControl compiler-input integrity: c48be913377d2bc0fea7a60131f684ca1e0acc112fd99fa780c1c99769b0dfbd
-#   MissionControl canonical ABI sha256: 7d66b877f306002d949d08716cd2d5a9a08d1216acaf1ec6579d940df99d3737
-#   Ledger compiler-input integrity: 266f985b2ae1049342bac32e9bcd6d0f330ced7e55fcb5cb2456b53da8646e04
+#   MissionControl compiler-input integrity: e2289aa22fb374456f4e2c74119ed084180c40d085007db3a414199e940b50b0
+#   MissionControl canonical ABI sha256: 9778661b26a575626b7319a95f81281d39be6d4d081250f27be26f32de138903
+#   Ledger compiler-input integrity: 1f19f2370f430fc10611425f4c4b81cc6f2cd9d87d25cd30843a96adefd57476
 #   Ledger canonical ABI sha256: 2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c
 #   chain id: 4663
-#   snapshot block: 49396516
-#   snapshot block hash: 0x41eb9947675bb181bbcdb8d09256da08fdcfc0be3318f41da44f890e8dcf0731
-#   snapshot finality: unfinalized current-state snapshot explicitly requested
-#   MissionControl: 0x6445Faf17Bf8CE20ea8f038E028078F1E6B87faC
-#   MissionControl code sha256: 03d1d6a795d5d3fb0103c4a94d3e8d2c7b50f8be9b0f51dfa1c010ae4891b892
-#   Ledger: 0x7E1d751D168f09761b88651A4c78C996354FaeB1
-#   Ledger code sha256: ec685ddaccc1ae0a7a2547ad886ec66d4e8a3a816062ce75ce8f61e6f950561b
+#   snapshot block: 42563001
+#   snapshot block hash: 0x9e99f47a4f3d7063150fe69b81e909865e299f61deae423118c15e4a3662ba42
+#   snapshot finality: verified against the provider finalized tag
+#   MissionControl: 0x5B8b85cD2f56D1a99691de784FB50c0bf2FA3baC
+#   MissionControl code sha256: b2a7de7b9bff3ce544576a9988fff25ea5fca5119f2047d5931b1e9536b59a99
+#   Ledger: 0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d
+#   Ledger code sha256: 915e54b1263edf468241d8b1a90682385004d4cca0a0f42536a1b21ba2640f70
 #
 # This is the defaults contract for REPLACING a MissionControl or Ledger that
 # already exists. DefaultsRobinhood.vy remains the launch config for a
@@ -37,11 +37,8 @@
 # override, allowing future clones to use the replacement generation.
 # MissionControl and Ledger copy these values into storage at construction.
 #
-# MissionControl per-user state that Defaults has no slot for -- userConfig and
+# MissionControl state that Defaults has no slot for -- userConfig and
 # userDelegation -- does NOT survive the redeploy and is not represented here.
-# Vault pointers and historical vault classifications are also not carried;
-# verify_defaults.py must exact-match their observable live state before this
-# contract is used for a replacement.
 #
 # Percentages are basis points (100_00 == 100%). Durations are in
 # `block.number`, which on this Arbitrum L2 advances roughly every 12s -- it
@@ -68,15 +65,6 @@ AAPL: constant(address) = 0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9
 GOOGL: constant(address) = 0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3
 GME: constant(address) = 0x1b0E319c6A659F002271B69dB8A7df2F911c153E
 RIPE_WETH_LP: constant(address) = 0xba6F6CBa1a4104000847d4fdccB676E99166CEcE
-UNI_V2: constant(address) = 0x9b8537bE0FD5cf9B2AD495C5A85130D5bAe4769D
-CASHCAT: constant(address) = 0x020bfC650A365f8BB26819deAAbF3E21291018b4
-PONS: constant(address) = 0x39dBED3a2bd333467115dE45665cC57F813C4571
-STONKBROKER: constant(address) = 0xe934e36A439C94017B64a3FecE66AF12099aBF50
-INDEX: constant(address) = 0x56910D4409F3a0C78C64DD8D0545FF0705389870
-PRINTER: constant(address) = 0x85a574f2fF0795685F58d1D7B0D4b51F148Ac489
-AI: constant(address) = 0x2E8c31162b855A2ffa90F6F8634643Ad6F111e18
-S_NET: constant(address) = 0xb773ec2C326B7f98a5a83fc098825492F020a4c7
-QUOTRON: constant(address) = 0x5a86828Efd322bfb16d93cFeD16EE9BC14940D7F
 USDG: constant(address) = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
 TRAINING_WHEELS: constant(address) = 0x987DEa46AEfA442B67Faa5Db6F71024e5be01406
 CONTRIB_TEMPLATE: immutable(address)
@@ -112,11 +100,11 @@ def genConfig() -> cs.GenConfig:
 @external
 def genDebtConfig() -> cs.GenDebtConfig:
     return cs.GenDebtConfig(
-        perUserDebtLimit=1000000000000000000000,
-        globalDebtLimit=20000000000000000000000,
+        perUserDebtLimit=50000000000000000000,
+        globalDebtLimit=500000000000000000000,
         minDebtAmount=1000000000000000000,
-        numAllowedBorrowers=1000,
-        maxBorrowPerInterval=1000000000000000000000,
+        numAllowedBorrowers=20,
+        maxBorrowPerInterval=25000000000000000000,
         numBlocksPerInterval=7200,
         minDynamicRateBoost=10000,
         maxDynamicRateBoost=50000,
@@ -141,7 +129,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
 @view
 @external
 def ripeAvailForRewards() -> uint256:
-    return 999469659533333333337998
+    return 999857828800000000000000
 
 
 @view
@@ -177,10 +165,10 @@ def ripeBondConfig() -> cs.RipeBondConfig:
 def rewardsConfig() -> cs.RipeRewardsConfig:
     return cs.RipeRewardsConfig(
         arePointsEnabled=True,
-        ripePerBlock=41666666666666666,
+        ripePerBlock=900000000000000,
         borrowersAlloc=1000,
-        stakersAlloc=8090,
-        votersAlloc=10,
+        stakersAlloc=9000,
+        votersAlloc=0,
         genDepositorsAlloc=0,
         autoStakeRatio=7500,
         autoStakeDurationRatio=3300,
@@ -196,7 +184,7 @@ def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
             asset=RIPE_TOKEN,
             config=cs.RipeGovVaultConfig(
                 lockTerms=cs.LockTerms(
-                    minLockDuration=0,
+                    minLockDuration=7200,
                     maxLockDuration=7884000,
                     maxLockBoost=20000,
                     canExit=True,
@@ -210,21 +198,7 @@ def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
             asset=RIPE_WETH_LP,
             config=cs.RipeGovVaultConfig(
                 lockTerms=cs.LockTerms(
-                    minLockDuration=0,
-                    maxLockDuration=7884000,
-                    maxLockBoost=20000,
-                    canExit=True,
-                    exitFee=8000,
-                ),
-                assetWeight=15000,
-                shouldFreezeWhenBadDebt=True,
-            ),
-        ),
-        cs.RipeGovVaultConfigEntry(
-            asset=UNI_V2,
-            config=cs.RipeGovVaultConfig(
-                lockTerms=cs.LockTerms(
-                    minLockDuration=0,
+                    minLockDuration=7200,
                     maxLockDuration=7884000,
                     maxLockBoost=20000,
                     canExit=True,
@@ -312,7 +286,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # RipeToken
         cs.AssetConfigEntry(asset=RIPE_TOKEN, config=cs.AssetConfig(
             vaultIds=[2],
-            stakersPointsAlloc=1000,
+            stakersPointsAlloc=1500,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
@@ -349,7 +323,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # SavingsGreen
         cs.AssetConfigEntry(asset=SGREEN_TOKEN, config=cs.AssetConfig(
             vaultIds=[1],
-            stakersPointsAlloc=1000,
+            stakersPointsAlloc=1500,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
@@ -423,7 +397,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # GreenUsdgPool
         cs.AssetConfigEntry(asset=GREEN_USDG_LP, config=cs.AssetConfig(
             vaultIds=[1],
-            stakersPointsAlloc=4500,
+            stakersPointsAlloc=2500,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
@@ -682,44 +656,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
         # RIPE_WETH_LP
         cs.AssetConfigEntry(asset=RIPE_WETH_LP, config=cs.AssetConfig(
             vaultIds=[2],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=0,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=False,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=True,
-            canBuyInAuction=True,
-            canClaimInStabPool=True,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=empty(address),
-            isNft=False,
-        )),
-        # UNI-V2
-        cs.AssetConfigEntry(asset=UNI_V2, config=cs.AssetConfig(
-            vaultIds=[2],
-            stakersPointsAlloc=2500,
+            stakersPointsAlloc=4500,
             voterPointsAlloc=0,
             perUserDepositLimit=100000000000000000000000000,
             globalDepositLimit=1000000000000000000000000000,
@@ -751,302 +688,6 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
                 duration=0,
             ),
             whitelist=empty(address),
-            isNft=False,
-        )),
-        # CASHCAT
-        cs.AssetConfigEntry(asset=CASHCAT, config=cs.AssetConfig(
-            vaultIds=[4],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
-            isNft=False,
-        )),
-        # PONS
-        cs.AssetConfigEntry(asset=PONS, config=cs.AssetConfig(
-            vaultIds=[4],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
-            isNft=False,
-        )),
-        # STONKBROKER
-        cs.AssetConfigEntry(asset=STONKBROKER, config=cs.AssetConfig(
-            vaultIds=[4],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
-            isNft=False,
-        )),
-        # Index
-        cs.AssetConfigEntry(asset=INDEX, config=cs.AssetConfig(
-            vaultIds=[4],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
-            isNft=False,
-        )),
-        # PRINTER
-        cs.AssetConfigEntry(asset=PRINTER, config=cs.AssetConfig(
-            vaultIds=[4],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
-            isNft=False,
-        )),
-        # AI
-        cs.AssetConfigEntry(asset=AI, config=cs.AssetConfig(
-            vaultIds=[4],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
-            isNft=False,
-        )),
-        # sNET
-        cs.AssetConfigEntry(asset=S_NET, config=cs.AssetConfig(
-            vaultIds=[5],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000,
-            globalDepositLimit=1000000000000000000,
-            minDepositBalance=1000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
-            isNft=False,
-        )),
-        # QUOTRON
-        cs.AssetConfigEntry(asset=QUOTRON, config=cs.AssetConfig(
-            vaultIds=[4],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=1000,
-            perUserDepositLimit=100000000000000000000000000,
-            globalDepositLimit=1000000000000000000000000000,
-            minDepositBalance=1000000000000000,
-            debtTerms=cs.DebtTerms(
-                ltv=0,
-                redemptionThreshold=0,
-                liqThreshold=0,
-                liqFee=0,
-                borrowRate=0,
-                daowry=0,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=False,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=False,
-            canBuyInAuction=False,
-            canClaimInStabPool=False,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=TRAINING_WHEELS,
             isNft=False,
         )),
     ]

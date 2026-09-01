@@ -6,13 +6,11 @@ on:
       - master
       - rh
       - rh-audit-remediation
-      - codex/rh-reviewed-correctness-fixes
   merge_group:
     branches:
       - master
       - rh
       - rh-audit-remediation
-      - codex/rh-reviewed-correctness-fixes
   push:
     # Push runs the full job set -- the same jobs as pull_request and
     # merge_group, not a reduced one.

@@ -1,8 +1,0 @@
-{
-  "contracts": {
-    "VaultBookStaged2026082601": {
-      "address": "0x559E53F42b68b4995732Dba4aF300796761DBC19",
-      "file": "contracts/registries/VaultBook.vy"
-    }
-  }
-}

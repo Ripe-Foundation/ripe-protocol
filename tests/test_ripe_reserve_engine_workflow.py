@@ -66,8 +66,6 @@ def test_feature_workflow_runs_all_critical_suites_and_per_contract_coverage():
     for required in (
         "tests/core/ripeReserveEngine",
         "tests/config/test_switchboard_foxtrot.py",
-        "tests/config/test_switchboard_bravo_green_snapshot.py",
-        "tests/config/test_promotional_accrual_gate.py",
         "tests/deployment/test_ripe_reserve_engine_activation.py",
         "tests/deployment/test_abi_export.py",
         "tests/test_ripe_reserve_engine_workflow.py",

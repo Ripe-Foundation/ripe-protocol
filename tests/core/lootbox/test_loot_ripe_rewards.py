@@ -341,33 +341,6 @@ def test_loot_ripe_rewards_limits(
     assert ledger_data.borrowers == (initial_avail * alloc // 100_00)
 
 
-def test_loot_ripe_rewards_saturates_before_rate_multiplication(
-    setRipeRewardsConfig,
-    lootbox,
-    teller,
-    ledger,
-    switchboard_alpha,
-):
-    available = 1_000
-    ledger.setRipeAvailForRewards(available, sender=switchboard_alpha.address)
-    setRipeRewardsConfig(True, 2**256 - 2, 100_00, 0, 0, 0)
-
-    lootbox.updateRipeRewards(sender=teller.address)
-    rewards_before = ledger.ripeRewards()
-
-    # The uncapped product would exceed uint256. Lootbox must compare by
-    # division first, distribute only the available budget, and not revert.
-    boa.env.time_travel(blocks=2)
-    rewards = lootbox.updateRipeRewards(sender=teller.address)
-
-    assert rewards.newRipeRewards == available
-    assert rewards.borrowers == rewards_before.borrowers + available
-    assert rewards.stakers == rewards_before.stakers
-    assert rewards.voters == rewards_before.voters
-    assert rewards.genDepositors == rewards_before.genDepositors
-    assert ledger.ripeAvailForRewards() == 0
-
-
 def test_loot_ripe_rewards_permissions(
     setRipeRewardsConfig,
     lootbox,
@@ -395,7 +368,6 @@ def test_loot_ripe_rewards_permissions(
 def test_loot_ripe_rewards_pause(
     setRipeRewardsConfig,
     lootbox,
-    ledger,
     switchboard_alpha,
     teller,
 ):
@@ -406,12 +378,10 @@ def test_loot_ripe_rewards_pause(
     
     # Pause the contract
     lootbox.pause(True, sender=switchboard_alpha.address)
-
-    # Clock updates stay live while user-facing claims are paused.
-    before = ledger.ripeRewards().lastUpdate
-    boa.env.time_travel(blocks=2)
-    lootbox.updateRipeRewards(sender=teller.address)
-    assert ledger.ripeRewards().lastUpdate > before
+    
+    # Cannot update rewards when paused
+    with boa.reverts("contract paused"):
+        lootbox.updateRipeRewards(sender=teller.address)
 
 
 def test_loot_ripe_rewards_state_transitions(

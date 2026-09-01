@@ -195,13 +195,11 @@ def test_python_workflow_routes_validation_jobs_on_automatic_events():
         "master",
         "rh",
         "rh-audit-remediation",
-        "codex/rh-reviewed-correctness-fixes",
     ]
     assert workflow["on"]["merge_group"]["branches"] == [
         "master",
         "rh",
         "rh-audit-remediation",
-        "codex/rh-reviewed-correctness-fixes",
     ]
     assert workflow["on"]["push"]["branches"] == [
         "master",

@@ -59,16 +59,20 @@ updateRipeRewards sets lastUpdate and distributes zero. Accrual begins only
 after that checkpoint. A later update recognizes all elapsed blocks at the
 reward rate current when that later update executes.
 
-Lootbox pause blocks claims and Underscore only. Deposit, borrow, and RIPE
-clocks (`updateDepositPoints`, `updateBorrowPoints`, `updateRipeRewards`,
-`reset*`) keep running. Pause does not zero `ripePerBlock` and does not freeze
-accrual. `SwitchboardAlpha.setRewardsPointsEnabled` does not exist; stored
-`arePointsEnabled` is inert. If `ripePerBlock` is still nonzero, the next
-clock update distributes the elapsed interval at that rate even while Lootbox
-is paused. A safe transition therefore confirms `setRipePerBlock(0)` (and the
-Stability rate zero) before treating emissions as contained. Then an
-explicitly bound registered RIPE contract caller may run a zero-rate
-checkpoint.
+Lootbox pause blocks accounting calls; it does not zero the configured rate or
+advance lastUpdate. If Lootbox is unpaused while the old rate is still nonzero,
+the next update backfills the paused interval. A safe transition therefore
+keeps Lootbox paused until both zero-rate actions are confirmed and verified.
+Only then may governance unpause it for a zero-rate checkpoint, by an explicitly
+bound registered RIPE contract caller, before any new nonzero rate can take
+effect.
+
+Disabling points preserves stored points. An affected point update while points
+are disabled advances its checkpoint without adding points and thereby skips
+that disabled interval. Re-enabling before the disabled-state checkpoint can
+recognize the still-uncheckpointed interval. The initial global and points
+checkpoint procedure is therefore an open operational procedure and operator
+binding, not an inferred deployment step.
 
 The Lootbox emission path and Stability claim path both decrement Ledger's
 ripeAvailForRewards. Budget exhaustion produces zero new emission and zero new
@@ -87,35 +91,35 @@ Execute and verify in this order:
 
 1. Call SwitchboardCharlie.pause(Lootbox, true) first. Governance or an already
    qualified lite signer may pause immediately. Only governance may unpause.
-   Verify Lootbox is paused. This stops claims and Underscore only; clocks
-   still run.
+   Verify Lootbox is paused.
 2. Immediately call SwitchboardAlpha.setCanClaimLoot(false). Verify
    canClaimLoot=false.
 3. Immediately call SwitchboardAlpha.setCanClaimInStabPool(false). Verify the
    separate Stability claim gate is false.
-4. Governance calls SwitchboardAlpha.setRipePerBlock(0). This is the emission
-   stop. Record the returned action ID and the emitted/read confirmation block.
-   After post-setup initialization the confirmation delay must be at least the
-   Robinhood minimum of **600 blocks**.
-5. Governance reads the current auto-stake ratio and duration ratio, then calls
+4. Immediately call SwitchboardAlpha.setRewardsPointsEnabled(false). Verify
+   points are disabled; do not represent stored points as erased.
+5. Governance calls SwitchboardAlpha.setRipePerBlock(0). Record the returned
+   action ID and the emitted/read confirmation block. After post-setup
+   initialization the confirmation delay must be at least the Robinhood minimum
+   of **600 blocks**.
+6. Governance reads the current auto-stake ratio and duration ratio, then calls
    SwitchboardAlpha.setAutoStakeParams(currentRatio, currentDurationRatio, 0).
    Record this distinct action ID and confirmation block. The two ratios must be
    passed unchanged; only the Stability rate is zeroed. This action also has the
    exact 600-block minimum.
-6. Do not execute either action early. Keep Lootbox paused and both claim gates
-   disabled until both recorded confirmation blocks. Do not call
-   `setRewardsPointsEnabled`; that function is gone.
-7. Governance executes both pending actions before expiration. Verify each
+7. Do not execute either action early. Keep Lootbox paused, both claim gates
+   disabled, and points disabled until both recorded confirmation blocks.
+8. Governance executes both pending actions before expiration. Verify each
    pending action is cleared, ripePerBlock=0,
    stabPoolRipePerDollarClaimed=0, and both auto-stake ratios are unchanged.
    Keep Lootbox paused after this verification.
-8. RipeHq.setMintingEnabled(false) is a last-resort, governance-only, immediate
+9. RipeHq.setMintingEnabled(false) is a last-resort, governance-only, immediate
    global breaker. It disables GREEN and RIPE mint permission across the
    system. It is not a routine reward step and does not erase accrued reward
    accounting.
 
-The containment end state is: Lootbox paused (claims blocked, clocks still
-live); both claim gates off; both reward rates confirmed zero.
+The containment end state is: Lootbox paused; Lootbox claims, Stability claims,
+and points disabled; both reward rates confirmed zero.
 
 ## Re-enable conditions
 
@@ -128,16 +132,16 @@ blocks for any nonzero restart.
 While both claim gates remain disabled, keep Lootbox paused through any restart
 timelock. At confirmed zero, governance may unpause Lootbox and an explicitly
 bound registered RIPE contract caller must perform a zero-rate global
-checkpoint. Verify zero distribution and unchanged budget. Immediately
-before executing a new nonzero rate, perform the final zero-rate global
-checkpoint so the new rate cannot apply retroactively. Do not re-enable
-Lootbox or Stability claims until the owner accepts the restart. There is no
-points-disable flag to flip.
+checkpoint. Verify zero distribution and unchanged budget. Checkpoint affected
+point paths while disabled. Immediately before executing a new nonzero rate,
+perform the final zero-rate checkpoint so the new rate cannot apply
+retroactively. Enable points and Lootbox claims only after config and checkpoint
+verification. Enable Stability claims only after the approved shared-budget
+policy and every operational claim-gate prerequisite are verified.
 
 ## Operational prerequisites still open
 
-- owner-approved reward-configuration checkpoint procedure;
-- owner-approved zero-rate and claim-gate re-enable procedure;
+- initial global and points checkpoint procedure;
 - exact governance identity, any qualified lite-signer identity, and the
   registered RIPE checkpoint-caller identity;
 - operational acceptance of the emergency runbook;
