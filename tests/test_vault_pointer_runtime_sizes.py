@@ -8,7 +8,7 @@ EIP170_LIMIT = 24_576
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
 # Tight EIP-170 headrooms vs 24,576: AuctionHouse 12, Deleverage 17,
-# Teller 24, CreditEngine 33, Lootbox 165, Alpha 586, Golf 3,644.
+# Teller 24, CreditEngine 33, Lootbox 165, Alpha 614, Golf 3,644.
 # Charlie is 22,317 / 2,259 free. MissionControl is 18,948. Ledger is
 # 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
 # Deleverage without remeasuring.
@@ -19,7 +19,7 @@ EIP170_LIMIT = 24_576
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 18948,
     "DefaultsLocal": 1200,
-    "SwitchboardAlpha": 23990,
+    "SwitchboardAlpha": 23962,
     "SwitchboardBravo": 16441,
     "SwitchboardCharlie": 22317,
     "SwitchboardEcho": 23930,

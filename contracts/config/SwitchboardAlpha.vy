@@ -1389,7 +1389,7 @@ def setRipeGovVaultConfig(
         canExit=_canExit,
         exitFee=_exitFee,
     )
-    assert self._isValidRipeVaultConfig(_asset, _assetWeight, lockTerms, mc) # dev: invalid ripe vault config
+    assert self._isValidRipeVaultConfig(_asset, lockTerms, mc) # dev: invalid ripe vault config
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_VAULT_CONFIG
@@ -1418,7 +1418,7 @@ def setRipeGovVaultConfig(
 
 @view
 @internal
-def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: cs.LockTerms, _missionControl: address) -> bool:
+def _isValidRipeVaultConfig(_asset: address, _lockTerms: cs.LockTerms, _missionControl: address) -> bool:
     if _asset == empty(address):
         return False
 
@@ -1429,9 +1429,6 @@ def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: 
     if coreRipeGovVaultId == 0:
         return False
     if not staticcall MissionControl(_missionControl).isSupportedAssetInVault(coreRipeGovVaultId, _asset):
-        return False
-
-    if _assetWeight > 500_00: # max 500%
         return False
 
     # maxLockBoost (1000%) is the largest downstream duration multiplier.
