@@ -145,7 +145,7 @@ def test_solidity_input_is_explicitly_unsupported(tmp_path):
 @pytest.mark.artifact
 def test_repository_default_abi_directory_is_byte_current():
     report = check_abis(ROOT / "contracts", ROOT / "scripts" / "abis")
-    assert len(report.exported) == 59
+    assert len(report.exported) == 60
     exported_names = {path.name for path in report.exported}
     assert exported_names >= {
         "Addys.json",
@@ -159,6 +159,7 @@ def test_repository_default_abi_directory_is_byte_current():
         "SwitchboardFoxtrot.json",
         "SwitchboardGolf.json",
         "UniswapV2Prices.json",
+        "UniswapV3TwapPrices.json",
         "VaultMigrator.json",
     }
     assert "GuardedErc20.json" not in exported_names
@@ -173,6 +174,7 @@ def test_repository_default_abi_directory_is_byte_current():
         "modules/DeptBasics.vy",
         "modules/TimeLock.vy",
         "priceSources/modules/PriceSourceData.vy",
+        "priceSources/modules/UniswapV3TwapMath.vy",
         "registries/modules/AddressRegistry.vy",
         "tokens/modules/Erc4626Token.vy",
         "vaults/modules/BasicVault.vy",

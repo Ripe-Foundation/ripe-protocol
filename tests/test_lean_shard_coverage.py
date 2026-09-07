@@ -549,6 +549,7 @@ def test_python_workflow_enforces_all_snapshot_gas_suites():
         "tests/priceSources/curve/test_robinhood_launch_route.py",
         "tests/core/test_sc24_gas_matrix.py",
         "tests/registries/test_price_desk_gas.py",
+        "tests/priceSources/uniswap_v3/test_twap_gas.py",
         (
             "tests/registries/test_price_desk_aggregate_protocol_gas.py::"
             "test_aggregate_protocol_gas[valuation-intended_prompt]"
