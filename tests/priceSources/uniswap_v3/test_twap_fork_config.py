@@ -1,14 +1,14 @@
 import pytest
-from .fork_worker import configuration,pin
+from .fork_worker import configuration
 
 
 @pytest.mark.parametrize('env',[{}, {'RIPE_TWAP_PIN_MODE':'automatic'}, {'RIPE_TWAP_PIN_MODE':'pinned','RIPE_TWAP_BLOCK':'1'}, {'RIPE_TWAP_PIN_MODE':'pinned','RIPE_TWAP_BLOCK_HASH':'0x'+'ab'*32}, {'RIPE_TWAP_PIN_MODE':'fresh','RIPE_TWAP_BLOCK':'1'}, {'RIPE_TWAP_PIN_MODE':'fresh','RIPE_TWAP_BLOCK_HASH':'0x'+'ab'*32}])
 def test_fork_modes_fail_closed_on_incomplete_or_mixed_pins(env):
-    with pytest.raises(ValueError):configuration({'RIPE_TWAP_RPC_URL':'https://example.invalid',**env})
+    with pytest.raises(ValueError):configuration({'RIPE_TWAP_RPC_URL':'https://example.invalid','RIPE_TWAP_FORK_OUTPUT':'inputs.json',**env})
 
 
 def test_fork_provider_selection_is_explicit():
-    base={'RIPE_TWAP_RPC_URL':'https://fresh.invalid','RIPE_TWAP_ARCHIVE_RPC_URL':'https://archive.invalid'}
+    base={'RIPE_TWAP_RPC_URL':'https://fresh.invalid','RIPE_TWAP_ARCHIVE_RPC_URL':'https://archive.invalid','RIPE_TWAP_FORK_OUTPUT':'inputs.json'}
     assert configuration({**base,'RIPE_TWAP_PIN_MODE':'fresh'})[1]=='https://fresh.invalid'
     pinned={**base,'RIPE_TWAP_PIN_MODE':'pinned','RIPE_TWAP_BLOCK':'57037442','RIPE_TWAP_BLOCK_HASH':'0x'+'ab'*32}
     assert configuration(pinned)[1]=='https://archive.invalid'
@@ -86,8 +86,10 @@ time.sleep(60)
 ''')
     path=tmp_path/'inputs.json'
     env={**os.environ,'RIPE_TWAP_FORK_OUTPUT':str(path),'TWAP_TEST_HELPERS':str(Path(__file__).parent)}
-    data=run_worker([sys.executable,str(worker)],cwd=tmp_path,env=env,timeout=2,
-                    initial=initial_results('pinned',['TEST','WAITING'],{}))
+    with pytest.raises(RuntimeError,match='did not complete: timeout'):
+        run_worker([sys.executable,str(worker)],cwd=tmp_path,env=env,timeout=5,
+                   initial=initial_results('pinned',['TEST','WAITING'],{}))
+    data=json.loads(path.read_text())
     assert data['stage']=='timeout' and data['pin']['block']==7
     assert data['cases'][0]['status']=='passed' and data['cases'][0]['source_gas']==12345
     assert data['cases'][0]['raw']=={'round':'0x1234'}
@@ -114,7 +116,7 @@ def test_exception_diagnostics_keep_description_and_redact_sensitive_context():
     assert exception_reason(error)=='RuntimeError: price source not executable'
 
 
-@pytest.mark.parametrize('fault',['price','usd_conversion','asset_conversion','exception','unavailable'])
+@pytest.mark.parametrize('fault',['price','usd_conversion','asset_conversion','exception','unavailable','gas_target','size_target','hard_gas','hard_size'])
 def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monkeypatch,fault):
     import json
     from pathlib import Path
@@ -146,6 +148,17 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
         name='getUsdValue' if fault=='usd_conversion' else 'getAssetAmount'
         original=getattr(g.desk,name)
         monkeypatch.setattr(g.desk,name,lambda *args:original(*args)+1)
+    elif fault in ('gas_target','hard_gas'):
+        # Inject measured costs at the reporting boundary; actual EVM price and
+        # conversions still run. The gas suite separately enforces real caps.
+        from types import SimpleNamespace
+        original_calls=worker.calls
+        def measured_calls(*args):
+            return [SimpleNamespace(msg=c.msg,children=c.children,output=c.output,is_error=c.is_error,
+                    get_gas_used=lambda:210001 if fault=='gas_target' else 250000) for c in original_calls(*args)]
+        monkeypatch.setattr(worker,'calls',measured_calls)
+    elif fault in ('size_target','hard_size'):
+        monkeypatch.setattr(worker,'deployed_size',lambda s:22501 if fault=='size_target' else 24577)
     elif fault=='exception':
         def rejected(*args):raise RuntimeError('descriptive injected constructor failure')
         monkeypatch.setattr(worker,'source',rejected)
@@ -154,15 +167,24 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
         del pool.responses['observe(uint32[])'];pool.install()
     path=tmp_path/'case.json'
     save=lambda:atomic_save(path,case)
-    if fault=='unavailable':
+    if fault in ('unavailable','gas_target','size_target'):
         worker.qualify_case(g,ref,asset,case,save)
-        assert case['status']=='unavailable' and case['behavior_passed']
+        assert case['status']==('unavailable' if fault=='unavailable' else 'passed')
+        assert case['behavior_passed']
+        if fault!='unavailable':
+            assert case['actual']==case['reference']==case['usd_value']==captured['actual']
+            assert case['asset_amount']==case['token_scale']
+            assert case['target_overrun']=={'source_gas':int(fault=='gas_target'),'deployed_bytes':int(fault=='size_target')}
     else:
         with pytest.raises((AssertionError,RuntimeError)) as caught:
             worker.qualify_case(g,ref,asset,case,save)
         failure(case,caught.value);save()
         assert case['status']=='failed' and not case['behavior_passed']
-        if fault=='exception':
+        if fault in ('hard_gas','hard_size'):
+            assert case['stage']==('price' if fault=='hard_gas' else 'constructor')
+            assert ('hard stipend' if fault=='hard_gas' else 'EIP-170') in case['reason']
+            assert case['target_overrun']['source_gas' if fault=='hard_gas' else 'deployed_bytes']>0
+        elif fault=='exception':
             assert case['stage']=='constructor' and 'descriptive injected constructor failure' in case['reason']
         else:
             assert case['stage']==fault
@@ -175,3 +197,98 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
             if fault=='usd_conversion':assert case['usd_value']==case['reference']+1
             if fault=='asset_conversion':assert case['asset_amount']==case['token_scale']+1
     assert json.loads(path.read_text())==case
+
+
+@pytest.mark.parametrize('output',[None,'','  '])
+def test_output_path_is_required_configuration(output):
+    env={'RIPE_TWAP_PIN_MODE':'fresh','RIPE_TWAP_RPC_URL':'https://example.invalid'}
+    if output is not None:env['RIPE_TWAP_FORK_OUTPUT']=output
+    with pytest.raises(ValueError,match='RIPE_TWAP_FORK_OUTPUT is required'):configuration(env)
+
+
+def test_direct_worker_missing_output_reports_clean_config_error(tmp_path):
+    import os,subprocess,sys
+    from pathlib import Path
+    env={key:value for key,value in os.environ.items() if not key.startswith('RIPE_TWAP_')}
+    env.update(RIPE_TWAP_PIN_MODE='fresh',RIPE_TWAP_RPC_URL='https://example.invalid',PYTHONDONTWRITEBYTECODE='1')
+    worker=Path(__file__).parent/'fork_worker.py'
+    result=subprocess.run([sys.executable,str(worker)],cwd=tmp_path,env=env,text=True,capture_output=True,timeout=30)
+    assert result.returncode==2
+    assert result.stderr.strip()=='TWAP_FORK_CONFIG_ERROR RIPE_TWAP_FORK_OUTPUT is required'
+    assert 'KeyError' not in result.stderr and 'Traceback' not in result.stderr
+
+
+@pytest.mark.parametrize('configured',[False,True])
+def test_requests_connection_errors_redact_host_and_relative_url(configured):
+    from .fork_results import sanitized
+    message="HTTPSConnectionPool(host='archive.example.invalid', port=443): Max retries exceeded with url: /v2/SECRETKEY123abc?api_key=QUERYSECRET (Caused by NewConnectionError('connection refused'))"
+    urls=('https://archive.example.invalid/v2/SECRETKEY123abc?api_key=QUERYSECRET',) if configured else ()
+    result=sanitized(message,urls)
+    assert 'connection refused' in result
+    for secret in ('archive.example.invalid','SECRETKEY123abc','QUERYSECRET','/v2/'):
+        assert secret not in result
+
+
+def test_configured_endpoint_fragments_are_redacted_from_saved_rpc_errors(tmp_path,monkeypatch):
+    import json
+    import requests
+    from types import SimpleNamespace
+    from .fork_worker import Rpc,InfrastructureError
+    from .fork_results import atomic_save,failure,sanitized
+    url='https://archive.example.invalid/v2/SECRETKEY123abc?api_key=QUERYSECRET'
+    # Exercise real requests exception handling and finite retries without RPC.
+    message="HTTPSConnectionPool(host='archive.example.invalid', port=443): Max retries exceeded with url: /v2/SECRETKEY123abc?api_key=QUERYSECRET (Caused by NewConnectionError('failed to resolve archive.example.invalid at /v2/SECRETKEY123abc'))"
+    def disconnected(*args,**kwargs):raise requests.ConnectionError(message)
+    rpc=Rpc(url);rpc.session=SimpleNamespace(post=disconnected)
+    import sys
+    monkeypatch.setattr(sys.modules[Rpc.__module__].time,'sleep',lambda delay:None)
+    with pytest.raises(InfrastructureError) as caught:rpc.call('eth_call',[])
+    case={'stage':'rpc:round','raw':{}}
+    failure(case,caught.value,infrastructure=True,rpc_urls=(url,))
+    path=tmp_path/'inputs.json';atomic_save(path,case)
+    reported=json.dumps(case)
+    assert 'failed to resolve' in case['reason']
+    for value in (str(caught.value),path.read_text(),reported,
+                  sanitized('unlabelled archive.example.invalid /v2/SECRETKEY123abc api_key=QUERYSECRET',(url,))):
+        for secret in ('archive.example.invalid','SECRETKEY123abc','QUERYSECRET','/v2/'):
+            assert secret not in value
+
+
+def test_nonzero_exit_keeps_fatal_stderr_after_verbose_stdout(tmp_path):
+    import os,sys
+    from .fork_results import run_worker,initial_results
+    path=tmp_path/'inputs.json'
+    endpoint='https://archive.example.invalid/v2/SECRETKEY123abc'
+    env={**os.environ,'RIPE_TWAP_FORK_OUTPUT':str(path),'RIPE_TWAP_ARCHIVE_RPC_URL':endpoint}
+    worker=tmp_path/'fatal_worker.py'
+    worker.write_text('''import sys
+print('verbose case output ' * 1000)
+print('trace context ' * 1000, file=sys.stderr)
+print("FatalDiagnosticMarker: HTTPSConnectionPool(host='archive.example.invalid'): Max retries exceeded with url: /v2/SECRETKEY123abc",file=sys.stderr)
+raise SystemExit(7)
+''')
+    with pytest.raises(RuntimeError) as caught:
+        run_worker([sys.executable,str(worker)],cwd=tmp_path,env=env,
+                   initial=initial_results('pinned',['TEST'],{}))
+    message=str(caught.value)
+    assert 'FatalDiagnosticMarker' in message and 'exited 7' in message
+    assert message.index('FatalDiagnosticMarker')<message.index('; stdout:')
+    assert 'verbose case output' in message and len(message)<1000
+    for secret in ('archive.example.invalid','SECRETKEY123abc','/v2/'):
+        assert secret not in message
+    assert path.is_file()
+
+
+def test_empty_timeout_is_incomplete_and_completed_missing_state_stays_unverified(tmp_path,monkeypatch):
+    import json,subprocess
+    from .fork_results import initial_results,require_complete,run_worker
+    path=tmp_path/'inputs.json'
+    def timed_out(*args,**kwargs):raise subprocess.TimeoutExpired('test worker',600)
+    monkeypatch.setattr(subprocess,'run',timed_out)
+    with pytest.raises(RuntimeError,match='did not complete: timeout'):
+        run_worker(['test-worker'],cwd=tmp_path,env={'RIPE_TWAP_FORK_OUTPUT':str(path)},
+                   initial=initial_results('pinned',['TEST'],{}))
+    data=json.loads(path.read_text())
+    assert data['stage']=='timeout' and all(c['status']=='unverified' for c in data['cases'])
+    data['stage']='complete'
+    assert require_complete(data) is data

@@ -186,9 +186,12 @@ def test_reverse_order_lifecycle_poisoning_and_amount_recovery(lab):
     a.setDecimals(6)
     lab.g.desk.syncTokenScale(a,sender=boa.env.generate_address())
     a.setDecimals(18)
-    assert s.getPriceAndHasFeed(a)==(0,True)
+    from types import SimpleNamespace
+    unavailable(SimpleNamespace(s=s,asset=a,g=lab.g))
     for method in ('getUsdValue','getAssetAmount'):
         assert getattr(lab.g.desk,method)(a,10**18)==0
+        with boa.reverts('has price config, no price'):
+            getattr(lab.g.desk,method)(a,10**18,True)
     lab.g.desk.syncTokenScale(a,sender=lab.g.gov)
     assert lab.g.desk.getUsdValue(a,3*10**18,True)==3*expected
     assert lab.g.desk.getAssetAmount(a,3*expected,True)==3*10**18

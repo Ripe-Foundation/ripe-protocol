@@ -351,3 +351,22 @@ def test_matching_nonzero_scale_accepts_first_add_and_update(lab):
     advance_timelock_blocks(2)
     assert lab.s.confirmPriceFeedUpdate(lab.asset,sender=lab.g.gov)
     assert lab.g.desk.getUsdValue(lab.asset,2*10**18,True)==2*10**18
+
+
+@pytest.mark.parametrize('kind',[1,2,3])
+def test_defensive_confirmation_active_state_guards(lab,kind):
+    from eth_utils import keccak
+    start(lab,kind)
+    # Synthetic storage fault: public lifecycle/pending collision rules prevent
+    # these states. Exercise the confirm-time defense independently of proposal.
+    position=lab.s.compiler_data.storage_layout['storage_layout']['configs']['slot']
+    slot=int.from_bytes(keccak(words(position,lab.asset.address)),'big')
+    pool=lab.pool.address if kind==1 else ZERO
+    boa.env.evm.set_storage(lab.s.address,slot,int(pool,16))
+    assert lab.s.getFeedConfig(lab.asset).params.pool==pool
+    advance_timelock_blocks(2)
+    before=state(lab.s,lab.asset)
+    with boa.reverts('feed already exists' if kind==1 else 'no active feed'):
+        getattr(lab.s,CONFIRM[kind])(lab.asset,sender=lab.g.gov)
+    assert lab.s._computation.get_log_entries()==()
+    assert state(lab.s,lab.asset)==before

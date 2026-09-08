@@ -1,7 +1,8 @@
 # Uniswap V3 TWAP tests
 
 Run from the repository root with Python 3.12, Vyper 0.4.3, Titanoboa 0.2.7
-and the pinned pytest-xdist 3.8.0. Set `RIPE_TWAP_PYTHON` to that interpreter.
+and, for parallel runs, pytest-xdist 3.8.0. Set `RIPE_TWAP_PYTHON` to that
+interpreter. Without xdist, omit `-n 4 --dist loadfile` for the serial fallback.
 
 ```sh
 export PYTHONDONTWRITEBYTECODE=1
@@ -31,7 +32,8 @@ Ordinary CI uses offline artifacts without downloads or RPC. Artifact JSON pins
 sources, executable hashes, immutable offsets and storage layout: V3 solc
 0.7.6/Istanbul, V4 solc 0.8.26/Cancun, optimizer 800 runs. Compiled comparisons
 cover 303 ticks and 2,424 quotes; fuzz covers 2,048 signed-floor cases (all four
-sign/exactness strata) and 2,048 mulDiv cases (four guaranteed overflow strata).
+sign/exactness strata) and 512 mulDiv cases each for valid intermediate
+overflow, quotient overflow, zero divisor, and ordinary non-overflow arithmetic.
 
 Production math retains the pinned MIT V4 notice in its Vyper module. Separate
 V3 references/fixtures retain GPL-2.0-or-later notices, core LICENSE and the GPL
@@ -49,12 +51,13 @@ model predicts a subset of measured observation slots, not the live read order.
 Cold tests reset metering, transient storage and access journals, preserving
 snapshot IDs in an empty journal. Only sender/top-level recipient are warmed;
 SLOAD controls prove cold/warm/cold. The private journal recipe has an explicit
-version/layout guard. Gas excludes intrinsic cost and chain data fees. Tests
-enforce 210,000 source gas and 22,500 deployed bytes; any D2 exception must be
-named, bounded and explained in `gas_tools.py`. The deliberate cumulative-burn
+version/layout guard. Gas excludes intrinsic cost and chain data fees. Local
+stress tests enforce 210,000 source gas and 22,500 deployed bytes; D2 exceptions
+are named, bounded and explained in `gas_tools.py`. The deliberate cumulative-burn
 failure has one such exception; hard stipend/EIP-170 limits always apply.
 The 27 gas tests took 11.66s on Python 3.12.13/arm64 with a warm compile cache,
-within the five-minute target and unchanged 30-minute CI job. Final source size
+within the five-minute target; the combined 35-test gas selection took 57.59s
+with four workers, within the unchanged 30-minute CI job. Final source size
 is 20,635 bytes; canonical peak cold direct/forwarded source gas is 170,809/156,699.
 
 Fork workers deploy the graph after selecting the pin. Laboratory liquidity
@@ -73,6 +76,9 @@ unverified with no fresh fallback. RPC retries/timeouts are finite. Atomic
 checkpoints retain raw replies, stages, measured mismatches and sanitized reasons.
 Dependency traces include forwarded/used gas, headroom and nested proxy calls.
 Each completed case and the final run recheck the pinned header. A 600s worker
-timeout retains verified cases and marks unfinished work unverified. Expected
-route rejection is `unavailable`; a behavior mismatch is `failed`. Passing
+timeout retains evidence but fails qualification as incomplete. Direct worker
+invocation requires `RIPE_TWAP_FORK_OUTPUT`; pytest supplies it automatically.
+Live target overruns are disclosed in `target_overrun` while correct results
+remain passed; hard limits and safety assertions still fail qualification.
+Expected rejection is `unavailable`; a behavior mismatch is `failed`. Passing
 laboratory tests does not qualify production routes or approve borrowing.

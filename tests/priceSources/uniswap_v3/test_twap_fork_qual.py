@@ -6,6 +6,7 @@ import sys
 
 import pytest
 from .fork_results import run_worker,initial_results
+from .fork_inputs import VECTORS,LAB
 
 BASE=Path(__file__).resolve().parent
 
@@ -21,13 +22,13 @@ def fork_results(tmp_path_factory):
     env['PYTHONDONTWRITEBYTECODE']='1'
     env['RIPE_TWAP_FORK_OUTPUT']=str(tmp_path_factory.mktemp('twap-fork')/'inputs.json')
     data=run_worker([sys.executable,str(BASE/'fork_worker.py')],cwd=BASE.parents[2],env=env,
-                    initial=initial_results(env.get('RIPE_TWAP_PIN_MODE'),['PONS','CASHCAT','AI','INDEX'],{}))
-    assert len(data['cases'])==12
+                    initial=initial_results(env.get('RIPE_TWAP_PIN_MODE'),[a['label'] for a in VECTORS['assets']],LAB))
+    assert len(data['cases'])==3*len(VECTORS['assets'])
     return data
 
 
 @pytest.mark.fork_qualification
-@pytest.mark.parametrize('asset',['PONS','CASHCAT','AI','INDEX'])
+@pytest.mark.parametrize('asset',[a['label'] for a in VECTORS['assets']])
 @pytest.mark.parametrize('window',[1800,3600,14400])
 def test_primary_pool_at_explicit_pin(fork_results,asset,window):
     case=next(c for c in fork_results['cases'] if c['asset']==asset and c['window']==window)

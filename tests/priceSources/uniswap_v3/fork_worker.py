@@ -18,11 +18,10 @@ from boa.interpret import set_cache_dir
 from conf_utils import advance_timelock_blocks
 from priceSources.uniswap_v3.graph import make_graph,source,params,register,SOURCE
 from priceSources.uniswap_v3.compiled import deploy,artifact
-from priceSources.uniswap_v3.gas_tools import cold,calls,dependency_trace,assert_source_budget,assert_deployed_size
-from priceSources.uniswap_v3.fork_results import atomic_save,initial_results,failure,sanitized,exception_reason
+from priceSources.uniswap_v3.gas_tools import cold,calls,dependency_trace,assert_source_hard_limit,assert_size_hard_limit,target_overruns
+from priceSources.uniswap_v3.fork_results import atomic_save,initial_results,failure,sanitized,exception_reason,rpc_endpoints
 
-VECTORS=json.loads((ROOT/'docs/priceSources/uniswap-v3-twap-reference-vectors.json').read_text())
-LAB={'minCurrentLiquidity':1,'minHarmonicLiquidity':1,'maxObservationAgeSeconds':3600,'quoteStaleTime':0,'localGraphGlobalQuoteAge':86400}
+from priceSources.uniswap_v3.fork_inputs import VECTORS,LAB
 
 
 class InfrastructureError(Exception):
@@ -50,6 +49,8 @@ def configuration(env):
         raise ValueError('RIPE_TWAP_PIN_MODE must explicitly be fresh or pinned')
     if not rpc or not rpc.startswith(('https://','http://')):
         raise ValueError('explicit RPC endpoint required')
+    if not env.get('RIPE_TWAP_FORK_OUTPUT','').strip():
+        raise ValueError('RIPE_TWAP_FORK_OUTPUT is required')
     return mode,rpc,block,block_hash
 
 
@@ -67,14 +68,14 @@ class Rpc:
                 data=response.json()
                 if 'error' in data:
                     error=data['error']
-                    message=sanitized(error.get('message','RPC error'))
+                    message=sanitized(error.get('message','RPC error'),(self.url,))
                     if method=='eth_call' and (error.get('code')==3 or 'execution reverted' in message.lower()):
                         raise HistoricalCallRevert(message)
                     raise InfrastructureError(f'RPC {error.get("code")}: {message}')
                 if 'result' not in data:raise InfrastructureError('missing RPC result')
                 return data['result']
             except (requests.RequestException,ValueError) as exc:
-                if attempt==2:raise InfrastructureError(exception_reason(exc)) from None
+                if attempt==2:raise InfrastructureError(exception_reason(exc,(self.url,))) from None
                 time.sleep(attempt+1)
         raise InfrastructureError('bounded RPC retries exhausted')
     def eth_call(self,address,signature,types,args,block):
@@ -115,7 +116,7 @@ def collect(rpc,a,window,pin,raw=None,checkpoint=lambda:None,stage=lambda name:N
     try:
         read('observe',a['pool'],'observe(uint32[])',['uint32[]'],[[window,0]])
     except HistoricalCallRevert as exc:
-        raw['observe_revert']=exception_reason(exc)
+        raw['observe_revert']=exception_reason(exc,(getattr(rpc,'url',''),))
         checkpoint()
     fee=decode(['uint24'],bytes.fromhex(raw['fee'][2:]))[0]
     read('canonicalPool',VECTORS['factory'],'getPool(address,address,uint24)',['address','address','uint24'],[a['asset'],VECTORS['weth'],fee])
@@ -159,6 +160,10 @@ def check_header(rpc,selected):
     return 'matched' if last and int(last['number'],16)==selected['block'] and last['hash'].lower()==selected['hash'].lower() and int(last['timestamp'],16)==selected['timestamp'] else 'mismatch'
 
 
+def deployed_size(contract):
+    return len(boa.env.get_code(contract.address))
+
+
 def qualify_case(g,ref,a,case,checkpoint):
     """Measure before asserting, so mismatches remain independently reviewable."""
     def stage(name):
@@ -172,9 +177,10 @@ def qualify_case(g,ref,a,case,checkpoint):
     with boa.env.anchor():
         stage('constructor')
         s=source(g,VECTORS['factory'],VECTORS['weth'],VECTORS['anchor']['address'])
-        case['deployed_bytes']=len(boa.env.get_code(s.address))
+        case['deployed_bytes']=deployed_size(s)
+        case['target_overrun']=target_overruns(size=case['deployed_bytes'])
         checkpoint()
-        assert_deployed_size(case['deployed_bytes'])
+        assert_size_hard_limit(case['deployed_bytes'])
         stage('proposal')
         if expected==0:
             with boa.reverts('invalid feed'):
@@ -204,11 +210,13 @@ def qualify_case(g,ref,a,case,checkpoint):
         case['source_calls']=[{'gas_forwarded':c.msg.gas,'gas_used':c.get_gas_used(),
                                'failed':c.is_error,'output':'0x'+c.output.hex(),
                                'dependencies':dependency_trace(c)} for c in children]
-        if len(children)==1:case['source_gas']=children[0].get_gas_used()
+        if len(children)==1:
+            case['source_gas']=children[0].get_gas_used()
+            case['target_overrun']=target_overruns(gas=case['source_gas'],size=case['deployed_bytes'])
         checkpoint()
         assert case['actual']==expected, 'price mismatch against compiled reference'
         assert len(children)==1 and children[0].msg.gas==250000, 'unexpected source call stipend/count'
-        assert_source_budget(case['source_gas'])
+        assert_source_hard_limit(case['source_gas'])
         stage('usd_conversion')
         case['usd_value']=g.desk.getUsdValue(a['asset'],scale,True)
         checkpoint()
@@ -224,6 +232,7 @@ def qualify_case(g,ref,a,case,checkpoint):
 
 def run():
     mode,url,block,block_hash=configuration(os.environ)
+    urls=rpc_endpoints(os.environ)
     path=os.environ['RIPE_TWAP_FORK_OUTPUT']
     output=initial_results(mode,[a['label'] for a in VECTORS['assets']],LAB)
     def save():atomic_save(path,output)
@@ -267,9 +276,9 @@ def run():
                     collect(rpc,a,case['window'],selected,case['raw'],save,case_stage)
                     qualify_case(g,ref,a,case,save)
                 except infrastructure as exc:
-                    failure(case,exc,infrastructure=True)
+                    failure(case,exc,infrastructure=True,rpc_urls=urls)
                 except Exception as exc:
-                    failure(case,exc)
+                    failure(case,exc,rpc_urls=urls)
                 save()
                 # Each completed measurement has its own post-read header check,
                 # so a later process timeout need not discard verified cases.
@@ -277,7 +286,7 @@ def run():
                     case['header_consistency']=check_header(rpc,selected)
                 except infrastructure as exc:
                     case['header_consistency']='unverified'
-                    case['header_reason']=exception_reason(exc)
+                    case['header_reason']=exception_reason(exc,urls)
                 if case['header_consistency']!='matched':
                     case['observed_status']=case['status']
                     case.update(status='unverified',behavior_passed=False,
@@ -288,12 +297,12 @@ def run():
         for case in output['cases']:
             if case['stage']=='pending':
                 case['stage']=output['stage']
-                failure(case,exc,infrastructure=True)
+                failure(case,exc,infrastructure=True,rpc_urls=urls)
         save()
     stage('end_header')
     if selected:
         try:output['header_consistency']=check_header(rpc,selected)
-        except infrastructure as exc:output['header_reason']=exception_reason(exc)
+        except infrastructure as exc:output['header_reason']=exception_reason(exc,urls)
     if output['header_consistency']!='matched':
         for case in output['cases']:
             case['observed_status']=case['status']
@@ -307,5 +316,5 @@ def run():
 if __name__=='__main__':
     try:raise SystemExit(run())
     except ValueError as exc:
-        print('TWAP_FORK_CONFIG_ERROR '+sanitized(exc),file=sys.stderr)
+        print('TWAP_FORK_CONFIG_ERROR '+sanitized(exc,rpc_endpoints(os.environ)),file=sys.stderr)
         raise SystemExit(2)

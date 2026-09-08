@@ -69,23 +69,43 @@ TARGET_EXCEPTIONS={
 SIZE_TARGET_EXCEPTIONS={}  # Future D2 exceptions must name a (bound, reason).
 
 
+SOURCE_TARGET=210000
+SOURCE_HARD_LIMIT=250000
+SIZE_TARGET=22500
+SIZE_HARD_LIMIT=24576
+
+
+def target_overruns(gas=None,size=None):
+    """D2 disclosure for live fork measurements; zero means within target."""
+    return {key:max(0,value-target) for key,value,target in
+            (('source_gas',gas,SOURCE_TARGET),('deployed_bytes',size,SIZE_TARGET)) if value is not None}
+
+
+def assert_source_hard_limit(gas):
+    assert gas<SOURCE_HARD_LIMIT, f'source hard stipend exceeded: {gas}'
+
+
+def assert_size_hard_limit(size):
+    assert size<=SIZE_HARD_LIMIT, f'EIP-170 size exceeded: {size}'
+
+
 def assert_source_budget(gas, exception=None):
-    assert gas<250000, f'source hard stipend exceeded: {gas}'
-    limit=210000
+    assert_source_hard_limit(gas)
+    limit=SOURCE_TARGET
     if exception is not None:
         assert exception in TARGET_EXCEPTIONS, 'unknown gas target exception'
         limit,reason=TARGET_EXCEPTIONS[exception]
-        assert reason.strip() and 210000<limit<250000
+        assert reason.strip() and SOURCE_TARGET<limit<SOURCE_HARD_LIMIT
     assert gas<=limit, f'source engineering target exceeded: {gas} > {limit}; requires an explicit bounded exception'
 
 
 def assert_deployed_size(size, exception=None):
-    assert size<=24576, f'EIP-170 size exceeded: {size}'
-    limit=22500
+    assert_size_hard_limit(size)
+    limit=SIZE_TARGET
     if exception is not None:
         assert exception in SIZE_TARGET_EXCEPTIONS, 'unknown size target exception'
         limit,reason=SIZE_TARGET_EXCEPTIONS[exception]
-        assert reason.strip() and 22500<limit<=24576
+        assert reason.strip() and SIZE_TARGET<limit<=SIZE_HARD_LIMIT
     assert size<=limit, f'deployed-size engineering target exceeded: {size} > {limit}'
 
 

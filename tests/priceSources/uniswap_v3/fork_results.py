@@ -5,24 +5,41 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+from urllib.parse import unquote,urlsplit
 
 
-def sanitized(message):
+def rpc_endpoints(env):
+    return tuple(env[key] for key in ('RIPE_TWAP_RPC_URL','RIPE_TWAP_ARCHIVE_RPC_URL') if env.get(key))
+
+
+def sanitized(message,rpc_urls=(),limit=600):
     text=str(message)
+    # Providers may report a bare host/path, without the URL scheme or labels.
+    fragments=set()
+    for url in rpc_urls:
+        fragments.update((url,unquote(url)))
+        try:parts=urlsplit(url)
+        except ValueError:continue
+        fragments.update((parts.netloc,parts.hostname,parts.path,unquote(parts.path),parts.query,unquote(parts.query)))
+    for fragment in sorted(fragments-{None,'','/'},key=len,reverse=True):
+        text=re.sub(re.escape(fragment),'<rpc-endpoint>',text,flags=re.I)
+    # requests/urllib3 split endpoints into HTTPSConnectionPool(host=...) and
+    # "Max retries exceeded with url: /v2/API_KEY". Both fragments are private.
+    text=re.sub(r'''(?i)\bhost\s*=\s*(?:'[^']*'|"[^"]*"|[^,\s)]+)''','host=<rpc-host>',text)
+    text=re.sub(r'''(?i)\burl\s*[:=]\s*(?:'[^']*'|"[^"]*"|[^\s,)]+)''','url=<rpc-path>',text)
     text=re.sub(r'https?://[^\s\]\[<>\"\')]+','<rpc-url>',text,flags=re.I)
     text=re.sub(r'(?<!\w)/(?:Users|home|private|tmp|var|opt)/[^\s\]\[<>\"\')]+','<local-path>',text)
     text=re.sub(r'(?i)\b(Bearer)\s+[^\s,;]+',r'\1 <redacted>',text)
     text=re.sub(r'(?i)\b(api[_-]?key|token|password|authorization)\s*[=:]\s*[^\s,;]+',r'\1=<redacted>',text)
-    return text[:600]
+    return text if limit is None else text[:limit]
 
 
-def exception_reason(exc):
+def exception_reason(exc,rpc_urls=()):
     # BoaError.__str__ includes local source paths, storage and full traces.
-    # Prefer its concise developer reason, then sanitize a plain exception.
     trace=getattr(exc,'stack_trace',None)
     try:reason=getattr(trace,'dev_reason',None) if trace is not None else None
     except (AttributeError,IndexError):reason=None
-    return sanitized(f'{type(exc).__name__}: {reason or str(exc)}')
+    return sanitized(f'{type(exc).__name__}: {reason or str(exc)}',rpc_urls)
 
 
 def atomic_save(path,data):
@@ -47,15 +64,20 @@ def initial_results(mode,assets,laboratory):
                      for a in assets for w in (1800,3600,14400)]}
 
 
-def failure(case,exc,infrastructure=False):
+def failure(case,exc,infrastructure=False,rpc_urls=()):
     case.update(status='unverified' if infrastructure else 'failed',
-                behavior_passed=False,reason=exception_reason(exc))
+                behavior_passed=False,reason=exception_reason(exc,rpc_urls))
+
+
+def require_complete(data):
+    if data['stage']!='complete':
+        raise RuntimeError('fork worker did not complete: '+data['stage']+'; partial evidence retained')
+    return data
 
 
 def run_worker(command,*,cwd,env,timeout=600,initial):
-    """On timeout retain verified completed cases and every saved partial input."""
+    """Retain timeout evidence and fail incomplete worker execution."""
     path=Path(env['RIPE_TWAP_FORK_OUTPUT'])
-    # Overwrite any previous run before starting a new worker.
     atomic_save(path,initial)
     try:
         result=subprocess.run(command,cwd=cwd,env=env,text=True,capture_output=True,timeout=timeout)
@@ -70,9 +92,13 @@ def run_worker(command,*,cwd,env,timeout=600,initial):
             case.update(status='unverified',behavior_passed=False,
                         reason=f'worker deadline exceeded ({timeout}s) during '+case['stage'])
         atomic_save(path,data)
-        return data
+        return require_complete(data)
     if result.returncode:
-        raise RuntimeError(sanitized(f'fork worker exited {result.returncode}: {result.stdout[-1500:]} {result.stderr[-1500:]}'))
+        # Sanitize before truncating, so truncation cannot expose a key fragment.
+        # Bound streams separately and put the fatal stderr tail first.
+        urls=rpc_endpoints(env)
+        stderr=sanitized(result.stderr,urls,limit=None)[-600:]
+        stdout=sanitized(result.stdout,urls,limit=None)[-300:]
+        raise RuntimeError(f'fork worker exited {result.returncode}; stderr: {stderr}; stdout: {stdout}')
     data=json.loads(path.read_text())
-    assert data['stage']=='complete', 'worker exited without completing or reporting a deadline'
-    return data
+    return require_complete(data)
