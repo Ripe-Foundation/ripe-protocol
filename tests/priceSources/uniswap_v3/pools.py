@@ -98,7 +98,7 @@ def seed_ring(pool, cardinality, *, index=None, initialized=None, spacing=4, tic
 
 
 def search_indices(ring,window):
-    """Expected canonical search slots, independently expressed in linear time."""
+    """Independent expected slot set; does not prove actual read order."""
     target=boa.env.timestamp-window
     newest=(ring['oldest']+(ring['initialized']-1)*ring['spacing'])
     if target>=newest:

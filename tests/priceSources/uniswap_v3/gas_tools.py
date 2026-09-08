@@ -1,16 +1,30 @@
 """Pinned Titanoboa 0.2.7 transaction-level coldness recipe and trace helpers."""
 from contextlib import contextmanager
 import boa
+from importlib.metadata import version
+
+
+def access_checkpoints(state):
+    message='TWAP cold reset requires Titanoboa 0.2.7 access-journal layout; review the recipe and rerun the SLOAD control before upgrading'
+    if version('titanoboa')!='0.2.7':
+        raise RuntimeError(message)
+    try:
+        journal=state._account_db._journal_accessed_state
+        checkpoints=list(journal._journal._checkpoint_stack)
+        assert callable(journal.record)
+        return checkpoints
+    except (AttributeError,TypeError,AssertionError) as exc:
+        raise RuntimeError(message) from exc
 
 
 def cold(target, sender=None):
     boa.env.reset_gas_metering_behavior()
     state=boa.env.evm.vm.state
+    checkpoints=access_checkpoints(state)
     state.clear_transient_storage()
     # reset_gas_used replaces the access journal. Recreate outstanding Boa/
     # pytest checkpoint IDs with EMPTY access state, so later snapshot rollback
     # remains possible without restoring any warm accounts or slots here.
-    checkpoints=list(state._account_db._journal_accessed_state._journal._checkpoint_stack)
     boa.env.reset_gas_used()
     for checkpoint in checkpoints:
         state._account_db._journal_accessed_state.record(checkpoint)
@@ -43,3 +57,45 @@ def storage_reads():
         yield reads
     finally:
         state.get_storage=original
+
+
+# Engineering target exceptions must be named, bounded and explained in source.
+# This deliberately over-budget synthetic route must fail cleanly under the
+# unchanged stipend; it is not an admitted canonical/live success benchmark.
+TARGET_EXCEPTIONS={
+    'synthetic_dependency_reserve':(235000,'Cumulative valid dependency burns force the reserved-gas unavailable return.')
+}
+
+SIZE_TARGET_EXCEPTIONS={}  # Future D2 exceptions must name a (bound, reason).
+
+
+def assert_source_budget(gas, exception=None):
+    assert gas<250000, f'source hard stipend exceeded: {gas}'
+    limit=210000
+    if exception is not None:
+        assert exception in TARGET_EXCEPTIONS, 'unknown gas target exception'
+        limit,reason=TARGET_EXCEPTIONS[exception]
+        assert reason.strip() and 210000<limit<250000
+    assert gas<=limit, f'source engineering target exceeded: {gas} > {limit}; requires an explicit bounded exception'
+
+
+def assert_deployed_size(size, exception=None):
+    assert size<=24576, f'EIP-170 size exceeded: {size}'
+    limit=22500
+    if exception is not None:
+        assert exception in SIZE_TARGET_EXCEPTIONS, 'unknown size target exception'
+        limit,reason=SIZE_TARGET_EXCEPTIONS[exception]
+        assert reason.strip() and 22500<limit<=24576
+    assert size<=limit, f'deployed-size engineering target exceeded: {size} > {limit}'
+
+
+def dependency_trace(computation):
+    """Immediate source calls; gas used includes nested proxy/delegate calls."""
+    def item(c):
+        used=c.get_gas_used()
+        return {'target':'0x'+c.msg.code_address.hex(),
+                'selector':'0x'+bytes(c.msg.data[:4]).hex(),
+                'gas_forwarded':c.msg.gas,'gas_used':used,
+                'gas_headroom':c.msg.gas-used,'failed':c.is_error,
+                'return_bytes':len(c.output),'children':[item(d) for d in c.children]}
+    return [item(c) for c in computation.children]

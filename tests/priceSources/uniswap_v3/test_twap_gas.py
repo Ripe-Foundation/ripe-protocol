@@ -8,10 +8,10 @@ import boa
 import pytest
 from conf_utils import advance_timelock_blocks
 
-from .graph import make_graph,source,admit,params,rotate_desk,register
+from .graph import make_graph,source,admit,params,temporary_desk,register
 from .pools import organic_pool,seed_ring,search_indices,assert_runtime,SLOTS
-from .gas_tools import cold,calls,storage_reads,walk
-from .raw import Raw,words,word,selector
+from .gas_tools import cold,calls,storage_reads,walk,assert_source_budget,assert_deployed_size
+from .raw import Raw,words,word,selector,costly_valid_dependencies
 
 pytestmark=pytest.mark.gas
 
@@ -65,12 +65,13 @@ def test_canonical_deep_cold_ring_reads(gas_lab,count,index,initialized,window):
     child=calls(comp,l.s)[0]
     observe=[c for c in calls(child,l.p) if bytes(c.msg.data[:4])==selector('observe(uint32[])')][0]
     touched={slot-SLOTS['observations'] for address,slot in reads if address==bytes.fromhex(l.p.address[2:]) and slot>=SLOTS['observations']}
+    # Independent model predicts a subset of touched slots, not live search order.
     assert set(expected_indices)<=touched
     assert len(touched)>=20 and len(expected_indices)//2>=10
     assert child.msg.gas==250000 and not child.is_error
     assert child.output==words(2500*10**18,1)
-    assert child.get_gas_used()<250000
-    print(f'TWAP_COLD ring={count} index={ring["index"]} initialized={ring["initialized"]} window={window} depth={len(expected_indices)//2} observation_slots={len(touched)} source={child.get_gas_used()} desk={comp.get_gas_used()} observe={observe.get_gas_used()} source_target_overrun={max(0,child.get_gas_used()-210000)}')
+    assert_source_budget(child.get_gas_used())
+    print(f'TWAP_COLD ring={count} index={ring["index"]} initialized={ring["initialized"]} window={window} model_depth={len(expected_indices)//2} observation_slots={len(touched)} source={child.get_gas_used()} desk={comp.get_gas_used()} observe={observe.get_gas_used()} source_target_overrun={max(0,child.get_gas_used()-210000)}')
 
 
 @pytest.mark.parametrize('local',[0,3600])
@@ -89,7 +90,7 @@ def test_cold_and_in_transaction_warm_policy_paths(gas_lab,local,target):
         direct=l.g.desk._computation
     source_call=calls(direct,l.s)[0]
     assert len(source_call.children)==(11 if target=='source' and local==0 else 9)
-    assert source_call.get_gas_used()<250000
+    assert_source_budget(source_call.get_gas_used())
     cold(probe)
     before=boa.env.evm.vm.state
     assert not before.is_address_warm(bytes.fromhex(dest.address[2:]))
@@ -100,6 +101,7 @@ def test_cold_and_in_transaction_warm_policy_paths(gas_lab,local,target):
     assert len(children)==2
     child_costs=[c.get_gas_used() for c in children]
     source_costs=[calls(c,l.s)[0].get_gas_used() for c in children]
+    for cost in source_costs:assert_source_budget(cost)
     assert source_costs[1]<source_costs[0]
     dependency_costs=[[{'selector':bytes(d.msg.data[:4]).hex(),'gas':d.get_gas_used()} for d in calls(c,l.s)[0].children] for c in children]
     print('TWAP_DEPENDENCIES '+json.dumps({'target':target,'local':local,'call_counts':list(map(len,dependency_costs)),'cold_warm_calls':dependency_costs},sort_keys=True))
@@ -117,7 +119,7 @@ def test_expensive_successful_observe_then_late_dependency_failure(gas_lab,fault
     observe=[c for c in calls(child,l.p) if bytes(c.msg.data[:4])==selector('observe(uint32[])')][0]
     assert not observe.is_error and len(observe.output)==256 and observe.get_gas_used()>80000
     assert not child.is_error and child.output==words(0,1)
-    assert child.get_gas_used()<250000
+    assert_source_budget(child.get_gas_used())
     print(f'TWAP_LATE_FAILURE kind={fault} observe={observe.get_gas_used()} source={child.get_gas_used()} desk={comp.get_gas_used()}')
 
 
@@ -131,24 +133,26 @@ def test_legitimate_old_is_distinct_from_exhausted_observe(gas_lab):
     assert observe.is_error and b'OLD' in observe.output
     assert observe.get_gas_used()<120000
     assert child.output==words(0,1)
+    assert_source_budget(child.get_gas_used())
 
 
 def test_cold_current_desk_rotation(gas_lab):
-    l=gas_lab;g=l.g;old=g.desk
-    rotate_desk(g);register(g.desk,l.s,g.gov)
-    g.desk.syncTokenScale(l.a.address,sender=g.local)
-    cold(g.desk)
-    assert g.desk.getPrice(l.a.address,True)==2500*10**18
-    child=calls(g.desk._computation,l.s)[0]
-    assert child.output==words(2500*10**18,1)
-    print(f'TWAP_ROTATED source={child.get_gas_used()} desk={g.desk._computation.get_gas_used()}')
-    g.desk=old
+    l=gas_lab;g=l.g
+    with temporary_desk(g):
+        register(g.desk,l.s,g.gov)
+        g.desk.syncTokenScale(l.a.address,sender=g.local)
+        cold(g.desk)
+        assert g.desk.getPrice(l.a.address,True)==2500*10**18
+        child=calls(g.desk._computation,l.s)[0]
+        assert child.output==words(2500*10**18,1)
+        assert_source_budget(child.get_gas_used())
+        print(f'TWAP_ROTATED source={child.get_gas_used()} desk={g.desk._computation.get_gas_used()}')
 
 
 def test_final_deployed_size_coverage_and_noop_snapshot(gas_lab):
     l=gas_lab
     deployed=len(boa.env.get_code(l.s.address))
-    assert deployed<=24576
+    assert_deployed_size(deployed)
     cold(l.s)
     assert l.s.hasPriceFeed(l.a.address,gas=75000)
     coverage=l.s._computation.get_gas_used()
@@ -181,13 +185,15 @@ def test_early_dependency_failure_reserve_at_real_call_positions(gas_lab,fault):
         cold(l.s)
         assert l.s.getPriceAndHasFeed(l.a.address,gas=250000)==(0,True)
         child=l.s._computation
-        assert not child.is_error and child.get_gas_used()<250000
+        assert not child.is_error
+        assert_source_budget(child.get_gas_used())
         print(f'TWAP_EARLY_FAILURE fault={fault} source={child.get_gas_used()}')
         return
     cold(l.g.desk)
     assert l.g.desk.getPrice(l.a.address)==0
     child=calls(l.g.desk._computation,l.s)[0]
     assert child.msg.gas==250000 and child.output==words(0,1) and not child.is_error
+    assert_source_budget(child.get_gas_used())
     assert calls(child,l.p)==[]
     print(f'TWAP_EARLY_FAILURE fault={fault} source={child.get_gas_used()} desk={l.g.desk._computation.get_gas_used()}')
 
@@ -196,11 +202,10 @@ def test_early_dependency_failure_reserve_at_real_call_positions(gas_lab,fault):
 def test_deep_ring_with_dense_tick_bits_and_both_quote_precision_branches(gas_lab,tick,reverse):
     """Nineteen selected multiplier bits; positive quotes in both token orders."""
     from .compiled import deploy
-    l=gas_lab;g=l.g;old=g.desk
+    l=gas_lab;g=l.g
     seed_ring(l.p,65535,tick=tick)
     asset,weth=(l.w,l.a) if reverse else (l.a,l.w)
-    try:
-        rotate_desk(g)
+    with temporary_desk(g):
         s=source(g,l.p.factory(),weth,l.anchor)
         ref=deploy('v3','Reference')
         sqrt=ref.sqrt(tick)
@@ -211,11 +216,23 @@ def test_deep_ring_with_dense_tick_bits_and_both_quote_precision_branches(gas_la
         cold(s)
         assert s.getPriceAndHasFeed(asset.address)==(expected,True)
         direct=s._computation.get_gas_used()
+        assert_source_budget(direct)
         cold(g.desk)
         assert g.desk.getPrice(asset.address,True)==expected
         comp=g.desk._computation;child=calls(comp,s)[0]
         assert child.msg.gas==250000 and child.output==words(expected,1) and not child.is_error
-        assert child.get_gas_used()<250000
+        assert_source_budget(child.get_gas_used())
         print(f'TWAP_DENSE_TICK tick={tick} reverse={reverse} direct_source={direct} forwarded_source={child.get_gas_used()} desk={comp.get_gas_used()} source_target_overrun={max(0,direct-210000,child.get_gas_used()-210000)}')
-    finally:
-        g.desk=old
+
+
+def test_cumulative_dependency_burn_preserves_unavailable_return_under_desk_stipend(active):
+    l=active
+    costly_valid_dependencies(l)
+    cold(l.g.desk)
+    assert l.g.desk.getPrice(l.asset)==0
+    child=calls(l.g.desk._computation,l.s)[0]
+    assert child.msg.gas==250000
+    assert not child.is_error and child.output==words(0,1)
+    assert_source_budget(child.get_gas_used(),exception='synthetic_dependency_reserve')
+    assert child.get_gas_used()>210000  # Non-vacuous cumulative pressure.
+    print(f'TWAP_RESERVE source={child.get_gas_used()} returned_unavailable=True')

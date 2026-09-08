@@ -88,3 +88,17 @@ class Pool(Raw):
         self.set('liquidity()', word(liquidity))
         self.set('observations(uint256)', words((boa.env.timestamp-age)%2**32, 0, 0, 1))
         self.set('observe(uint32[])', words(64,160,2,past,past+tick*window,2,spl_past,spl_past+window*2**128//max(1,liquidity)))
+
+
+def costly_valid_dependencies(l):
+    """Synthetic valid return bytes near individual caps; no stipend override."""
+    # Pinned Prague loop cost is 26 gas/iteration: 550/1120/4550 burn
+    # 14,300/29,120/118,300 gas, leaving dispatch/copy room below the
+    # 15k/30k/120k caps. Recalibrate after opcode/compiler changes; the
+    # direct-positive and desk-unavailable assertions must both keep firing.
+    Raw({'decimals()':(word(18),550)},address=l.asset.address)
+    Raw({'decimals()':(word(8),550),
+         'latestRoundData()':(words(1,10**8,0,boa.env.timestamp,1),1120)},address=l.anchor.address)
+    for signature in ('slot0()','liquidity()','observations(uint256)'):
+        l.pool.set(signature,(l.pool.responses[signature],550))
+    l.pool.set('observe(uint32[])',(l.pool.responses['observe(uint32[])'],4550))

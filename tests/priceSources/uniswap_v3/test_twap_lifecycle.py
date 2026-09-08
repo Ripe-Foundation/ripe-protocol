@@ -1,5 +1,6 @@
 import boa
 import pytest
+from .helpers import state
 from conf_utils import advance_timelock_blocks,filter_logs
 
 from .graph import SOURCE,source,params,admit,ZERO,ETH
@@ -8,11 +9,6 @@ from .gas_tools import calls,walk
 
 CONFIRM={1:'confirmNewPriceFeed',2:'confirmPriceFeedUpdate',3:'confirmDisablePriceFeed'}
 CANCEL={1:'cancelNewPendingPriceFeed',2:'cancelPriceFeedUpdate',3:'cancelDisablePriceFeed'}
-
-
-def state(s,a):
-    p=s.getPendingFeed(a)
-    return (s.getFeedConfig(a),p,s.getBoundAssetDecimals(a),tuple(s.getPricedAssets()),s.numAssets(),s.indexOfAsset(a),s.hasPriceFeed(a),s.hasPendingPriceFeedUpdate(a),s.pendingActions(p.actionId),s.actionId())
 
 
 def start(lab,kind):
@@ -264,6 +260,12 @@ def test_capacity_competing_pending_and_first_middle_last_removal(lab):
     assert len(lab.s.getPricedAssets())==50 and lab.s.numAssets()==51
     lab.s.cancelNewPendingPriceFeed(tokens[50][0],sender=lab.g.gov)
     with boa.reverts('too many assets'):lab.s.addNewPriceFeed(tokens[50][0],params(tokens[50][1]),sender=lab.g.gov)
+    # Capacity is deliberately checked before numeric/metadata validation.
+    before=state(lab.s,tokens[50][0])
+    with boa.reverts('too many assets'):
+        lab.s.addNewPriceFeed(tokens[50][0],params(ZERO,window=0),sender=lab.g.gov)
+    assert lab.s._computation.get_log_entries()==()
+    assert state(lab.s,tokens[50][0])==before
     for index in (0,24,49):
         asset=lab.s.getPricedAssets()[index]
         token,pool=next((t,p) for t,p in tokens if t.address==asset)
@@ -275,3 +277,77 @@ def test_capacity_competing_pending_and_first_middle_last_removal(lab):
         assets=lab.s.getPricedAssets()
         assert len(assets)==len(set(assets))==50
         for i,a in enumerate(assets,1):assert lab.s.indexOfAsset(a)==i
+
+
+@pytest.mark.parametrize('operation',['add','update','disable'])
+def test_active_feed_predicates_reject_without_any_state_change(lab,operation):
+    s,a,g=lab.s,lab.asset,lab.g
+    if operation=='add':
+        admit(g,s,a,params(lab.pool))
+    before=state(s,a)
+    reason='feed already exists' if operation=='add' else 'no active feed'
+    with boa.reverts(reason):
+        if operation=='add':s.addNewPriceFeed(a,params(lab.pool),sender=g.gov)
+        elif operation=='update':s.updatePriceFeed(a,params(lab.pool),sender=g.gov)
+        else:s.disablePriceFeed(a,sender=g.gov)
+    assert s._computation.get_log_entries()==()
+    assert state(s,a)==before
+
+
+@pytest.mark.parametrize('kind',[1,2])
+def test_bound_decimals_drift_after_proposal_reaches_confirmation_guard(active,kind):
+    l=active
+    if kind==1:
+        l.s.disablePriceFeed(l.asset,sender=l.g.gov)
+        advance_timelock_blocks(2)
+        l.s.confirmDisablePriceFeed(l.asset,sender=l.g.gov)
+        l.s.addNewPriceFeed(l.asset,params(l.pool),sender=l.g.gov)
+    else:
+        l.s.updatePriceFeed(l.asset,params(l.pool,age=4000),sender=l.g.gov)
+    before=state(l.s,l.asset)
+    l.asset.setDecimals(6)
+    advance_timelock_blocks(2)
+    with boa.reverts('asset decimals changed'):
+        getattr(l.s,CONFIRM[kind])(l.asset,sender=l.g.gov)
+    assert l.s._computation.get_log_entries()==()
+    assert state(l.s,l.asset)==before
+    l.asset.setDecimals(18)
+    assert getattr(l.s,CONFIRM[kind])(l.asset,sender=l.g.gov)
+
+
+def test_pending_window_update_keeps_old_price_until_confirmation(lab):
+    from .compiled import deploy
+    ref=deploy('v3','Reference')
+    # Fixed cumulative delta gives mean tick 100 at 1800s and 50 at 3600s.
+    lab.pool.set_history(tick=100)
+    old=ref.quote(100,10**18,lab.asset.address,lab.weth.address)
+    new=ref.quote(50,10**18,lab.asset.address,lab.weth.address)
+    assert old!=new and admit(lab.g,lab.s,lab.asset,params(lab.pool))==old
+    lab.s.updatePriceFeed(lab.asset,params(lab.pool,window=3600),sender=lab.g.gov)
+    assert lab.s.getPendingFeed(lab.asset).config.params.twapWindowSeconds==3600
+    assert lab.s.getFeedConfig(lab.asset).params.twapWindowSeconds==1800
+    assert lab.s.getPrice(lab.asset)==lab.g.desk.getPrice(lab.asset,True)==old
+    advance_timelock_blocks(2)
+    assert lab.s.confirmPriceFeedUpdate(lab.asset,sender=lab.g.gov)
+    assert lab.s.getFeedConfig(lab.asset).params.twapWindowSeconds==3600
+    assert lab.s.getPrice(lab.asset)==lab.g.desk.getPrice(lab.asset,True)==new
+
+
+@pytest.mark.parametrize('decimals',[0,18])
+def test_constructor_accepts_anchor_decimal_endpoints_and_normalizes(lab,decimals):
+    lab.anchor.setDecimals(decimals)
+    lab.anchor.setMockData(3*10**decimals)
+    s=source(lab.g,lab.factory,lab.weth,lab.anchor)
+    assert s.anchorDecimals()==decimals
+    assert admit(lab.g,s,lab.asset,params(lab.pool))==3*10**18
+    assert lab.g.desk.getPrice(lab.asset,True)==3*10**18
+
+
+def test_matching_nonzero_scale_accepts_first_add_and_update(lab):
+    lab.g.desk.syncTokenScale(lab.asset,sender=lab.g.gov)
+    assert lab.g.desk.tokenScale(lab.asset)==10**18
+    assert admit(lab.g,lab.s,lab.asset,params(lab.pool))==10**18
+    lab.s.updatePriceFeed(lab.asset,params(lab.pool,age=4000),sender=lab.g.gov)
+    advance_timelock_blocks(2)
+    assert lab.s.confirmPriceFeedUpdate(lab.asset,sender=lab.g.gov)
+    assert lab.g.desk.getUsdValue(lab.asset,2*10**18,True)==2*10**18

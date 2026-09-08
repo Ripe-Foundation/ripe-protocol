@@ -4,9 +4,9 @@ import pytest
 from conf_utils import advance_timelock_blocks
 
 from .graph import source,params,admit
-from .raw import Raw,word,words,selector
+from .raw import Raw,word,words,selector,costly_valid_dependencies
 from .gas_tools import cold,calls
-from .test_twap_lifecycle import state
+from .helpers import state
 
 
 @pytest.mark.parametrize('dependency',['asset','anchor','factory','pool_factory','token0','token1','fee'])
@@ -86,16 +86,6 @@ def test_full_source_usd_normalization_and_512_bit_composition(active,case,math)
         assert 10**18*expected>=2**256
     else:
         with boa.reverts('has price config, no price'):l.g.desk.getPrice(l.asset,True)
-
-
-def costly_valid_dependencies(l):
-    """Synthetic valid return bytes near individual caps; no stipend override."""
-    Raw({'decimals()':(word(18),550)},address=l.asset.address)
-    Raw({'decimals()':(word(8),550),
-         'latestRoundData()':(words(1,10**8,0,boa.env.timestamp,1),1120)},address=l.anchor.address)
-    for signature in ('slot0()','liquidity()','observations(uint256)'):
-        l.pool.set(signature,(l.pool.responses[signature],550))
-    l.pool.set('observe(uint32[])',(l.pool.responses['observe(uint32[])'],4550))
 
 
 def test_direct_success_but_actual_desk_stipend_failure_rejects_confirmation(active):

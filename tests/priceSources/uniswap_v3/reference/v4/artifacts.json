@@ -109,9 +109,7 @@
           "enabled": true,
           "runs": 800
         },
-        "remappings": [
-          "@uniswap/v3-core/=vendor/v3-core/"
-        ]
+        "remappings": []
       },
       "storageLayout": {
         "storage": [],
@@ -120,8 +118,8 @@
     }
   },
   "sources": {
-    "tests/priceSources/uniswap_v3/reference/v4/foundry.toml": "ec48c2ca1e964b3481c861029d5c73fdaf0eb8e4ac8b0145ea60d6ac08aadf94",
-    "tests/priceSources/uniswap_v3/reference/v4/src/Reference.sol": "8a33fd49fdfe146240489354551dfd652a350de46028ea6dd968ec00855d524c",
+    "tests/priceSources/uniswap_v3/reference/v4/foundry.toml": "45d51a9d4c7bcf6c33ea23d9c7d19c575914c7b5c7bca4649a72298f548d2fa1",
+    "tests/priceSources/uniswap_v3/reference/v4/src/Reference.sol": "fbc7f2fa2547247432ec4974b7bffd73e023ff584d5facf820010995878662d6",
     "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/licenses/MIT_LICENSE": "b7b0c4379346af0701f5e4df9c861295d4a3af91dc3b15eb4356ebc571303df9",
     "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/src/libraries/BitMath.sol": "e8a45eb3d57f9427fc47bbb2543c1a6a5f394113b378123ac7ca9f113a7502b4",
     "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/src/libraries/CustomRevert.sol": "9d3dbe6b742cb1ac30f57df89d879ade9649389de1165fc637114bd062d39fca",

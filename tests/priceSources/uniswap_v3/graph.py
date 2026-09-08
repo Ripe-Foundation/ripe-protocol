@@ -1,5 +1,6 @@
 """Plain local graph helper. Call only AFTER selecting the Boa environment."""
 from types import SimpleNamespace
+from contextlib import contextmanager
 import boa
 from conf_utils import advance_timelock_blocks
 
@@ -54,6 +55,17 @@ def rotate_desk(g, desk=None):
     assert g.hq.confirmAddressUpdateToRegistry(7, sender=g.gov)
     g.desk = desk
     return desk
+
+
+@contextmanager
+def temporary_desk(g, desk=None):
+    """Restore both the registry and Python pointer, including on assertions."""
+    old=g.desk
+    with boa.env.anchor():
+        try:
+            yield rotate_desk(g,desk)
+        finally:
+            g.desk=old
 
 
 def source(g, factory, weth, anchor):

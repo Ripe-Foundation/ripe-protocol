@@ -83,18 +83,19 @@ def test_muldiv_boundaries_against_compiled_and_integer(math):
 def test_fuzz_floor_and_narrow_wrap(math):
     rng=random.Random(0x56F1000)
     count=2048
-    remainders={-1:0,1:0}
-    for i in range(count):
+    strata={(sign,remainder):0 for sign in (-1,1) for remainder in (False,True)}
+    schedule=list(strata)*512
+    rng.shuffle(schedule)
+    for sign,remainder in schedule:
         w=rng.randint(1800,14400)
-        delta=rng.randint(0,887270)*w + (rng.randint(1,w-1) if i%4 else 0)
-        sign=-1 if i%2 else 1
+        delta=rng.randint(0,887270)*w + (rng.randint(1,w-1) if remainder else 0)
         delta*=sign
-        remainders[sign]+=bool(delta%w)
+        strata[sign,bool(delta%w)]+=1
         past=rng.choice([-2**55,2**55-1,rng.randrange(-2**55,2**55)])
         current=(past+delta+2**55)%2**56-2**55
         assert math.mean(past,current,w)==(True,delta//w)
-    assert min(remainders.values()) >= 500
-    print(f'FUZZ signed_floor={count} signed_remainders={remainders} seed=0x56f1000')
+    assert all(n==512 for n in strata.values())
+    print(f'FUZZ signed_floor={count} sign_exact_remainder={strata} seed=0x56f1000')
 
 
 @pytest.mark.fuzz
@@ -102,7 +103,8 @@ def test_fuzz_muldiv(math):
     rng=random.Random(0x5121000)
     counts={'overflow_valid':0,'overflow_invalid':0,'zero_divisor':0,'ordinary':0}
     for i in range(2048):
-        a,b=rng.getrandbits(256),rng.getrandbits(256)
+        a,b=(2**255 | rng.getrandbits(255)),(2**255 | rng.getrandbits(255))
+        assert a*b>U256
         if i%4==0:
             d=rng.randrange((a*b>>256)+1,2**256)
         elif i%4==1:

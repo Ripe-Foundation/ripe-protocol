@@ -3,21 +3,13 @@ from pathlib import Path
 
 import boa
 import pytest
+from .helpers import unavailable
 
 from .graph import admit,params,set_policy,ZERO
 from .raw import Raw,words,word,selector
 from .gas_tools import cold,calls,walk
 
 ROOT=Path(__file__).resolve().parents[3]
-
-
-def unavailable(lab):
-    s,a,g=lab.s,lab.asset,lab.g
-    assert s.getPriceAndHasFeed(a)==(0,True)
-    assert s.hasPriceFeed(a)
-    assert g.desk.getPrice(a)==0
-    with boa.reverts('has price config, no price'):
-        g.desk.getPrice(a,True)
 
 
 @pytest.mark.parametrize('age,ceiling,valid',[(1799,3600,True),(1800,3600,True),(1801,3600,True),(3000,3600,True),(3600,3600,True),(3601,3600,False),(1801,1800,False),(8*3600,86400,True)])
@@ -220,3 +212,14 @@ def test_frozen_rows_through_source_and_actual_desk(lab,asset_index,vector_index
     set_policy(lab.g,1800)
     assert s.getPriceAndHasFeed(token)==(0,True)
     assert lab.g.desk.getPrice(token)==0
+
+
+@pytest.mark.parametrize('age,valid',[(1800,True),(1801,False),(2958,False)])
+def test_explicit_1800_anchor_age_overrides_permissive_global_policy(lab,age,valid):
+    admit(lab.g,lab.s,lab.asset,params(lab.pool,quote_age=1800))
+    assert lab.g.mc.getPriceStaleTime()==86400
+    lab.anchor.setMockData(10**8,1,1,0,boa.env.timestamp-age)
+    lab.pool.set_history(age=0)
+    assert lab.s.getFeedConfig(lab.asset).params.quoteStaleTime==1800
+    if valid:assert lab.g.desk.getPrice(lab.asset,True)==10**18
+    else:unavailable(lab)

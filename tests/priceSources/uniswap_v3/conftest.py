@@ -37,15 +37,20 @@ def lab():
 
 
 @pytest.fixture(autouse=True)
-def restore_raw_fixture(request):
-    # Python fixture dictionaries are not reverted by Boa's EVM snapshot.
-    if 'lab' in request.fixturenames:
-        lab=request.getfixturevalue('lab')
-        original=dict(lab.pool.responses)
+def restore_python_fixture_state(request):
+    # Boa snapshots revert EVM state, but not module-scoped Python objects.
+    saved=[]
+    for name in ('lab','gas_lab'):
+        if name in request.fixturenames:
+            lab=request.getfixturevalue(name)
+            saved.append((lab,lab.g.desk,dict(lab.pool.responses) if name=='lab' else None))
+    try:
         yield
-        lab.pool.responses=original
-    else:
-        yield
+    finally:
+        for lab,desk,responses in saved:
+            lab.g.desk=desk
+            if responses is not None:
+                lab.pool.responses=responses
 
 
 @pytest.fixture

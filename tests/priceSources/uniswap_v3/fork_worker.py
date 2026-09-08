@@ -18,7 +18,8 @@ from boa.interpret import set_cache_dir
 from conf_utils import advance_timelock_blocks
 from priceSources.uniswap_v3.graph import make_graph,source,params,register,SOURCE
 from priceSources.uniswap_v3.compiled import deploy,artifact
-from priceSources.uniswap_v3.gas_tools import cold,calls
+from priceSources.uniswap_v3.gas_tools import cold,calls,dependency_trace,assert_source_budget,assert_deployed_size
+from priceSources.uniswap_v3.fork_results import atomic_save,initial_results,failure,sanitized,exception_reason
 
 VECTORS=json.loads((ROOT/'docs/priceSources/uniswap-v3-twap-reference-vectors.json').read_text())
 LAB={'minCurrentLiquidity':1,'minHarmonicLiquidity':1,'maxObservationAgeSeconds':3600,'quoteStaleTime':0,'localGraphGlobalQuoteAge':86400}
@@ -66,15 +67,14 @@ class Rpc:
                 data=response.json()
                 if 'error' in data:
                     error=data['error']
-                    message=str(error.get('message','RPC error'))[:180]
-                    if 'http' in message:message='provider RPC error'
+                    message=sanitized(error.get('message','RPC error'))
                     if method=='eth_call' and (error.get('code')==3 or 'execution reverted' in message.lower()):
                         raise HistoricalCallRevert(message)
                     raise InfrastructureError(f'RPC {error.get("code")}: {message}')
                 if 'result' not in data:raise InfrastructureError('missing RPC result')
                 return data['result']
             except (requests.RequestException,ValueError) as exc:
-                if attempt==2:raise InfrastructureError(type(exc).__name__) from None
+                if attempt==2:raise InfrastructureError(exception_reason(exc)) from None
                 time.sleep(attempt+1)
         raise InfrastructureError('bounded RPC retries exhausted')
     def eth_call(self,address,signature,types,args,block):
@@ -96,11 +96,13 @@ def pin(rpc,mode,block,block_hash):
     return {'block':block,'hash':header['hash'],'timestamp':int(header['timestamp'],16)}
 
 
-def collect(rpc,a,window,pin,raw=None):
+def collect(rpc,a,window,pin,raw=None,checkpoint=lambda:None,stage=lambda name:None):
     block=pin['block']
     raw={} if raw is None else raw
     def read(key,address,signature,types=(),args=()):
+        stage('rpc:'+key)
         raw[key]=rpc.eth_call(address,signature,types,args,block)
+        checkpoint()  # Persist even if decoding the just-received bytes fails.
         return bytes.fromhex(raw[key][2:])
     read('assetDecimals',a['asset'],'decimals()')
     read('wethDecimals',VECTORS['weth'],'decimals()')
@@ -113,13 +115,16 @@ def collect(rpc,a,window,pin,raw=None):
     try:
         read('observe',a['pool'],'observe(uint32[])',['uint32[]'],[[window,0]])
     except HistoricalCallRevert as exc:
-        raw['observe_revert']=str(exc)
+        raw['observe_revert']=exception_reason(exc)
+        checkpoint()
     fee=decode(['uint24'],bytes.fromhex(raw['fee'][2:]))[0]
     read('canonicalPool',VECTORS['factory'],'getPool(address,address,uint24)',['address','address','uint24'],[a['asset'],VECTORS['weth'],fee])
+    stage('rpc:poolRuntime')
     code=rpc.call('eth_getCode',[a['pool'],hex(block)])
     import hashlib
     raw['poolRuntimeSha256']=hashlib.sha256(bytes.fromhex(code[2:])).hexdigest()
     raw['poolRuntimeBytes']=len(bytes.fromhex(code[2:]))
+    checkpoint()
     return raw
 
 
@@ -149,76 +154,152 @@ def reference_price(raw,a,window,timestamp,ref):
     return result if usd<2**256 and result<2**256 else 0
 
 
+def check_header(rpc,selected):
+    last=rpc.call('eth_getBlockByNumber',[hex(selected['block']),False])
+    return 'matched' if last and int(last['number'],16)==selected['block'] and last['hash'].lower()==selected['hash'].lower() and int(last['timestamp'],16)==selected['timestamp'] else 'mismatch'
+
+
+def qualify_case(g,ref,a,case,checkpoint):
+    """Measure before asserting, so mismatches remain independently reviewable."""
+    def stage(name):
+        case['stage']=name
+        checkpoint()
+    selected=case['pin'];window=case['window']
+    stage('reference')
+    expected=reference_price(case['raw'],a,window,selected['timestamp'],ref)
+    case['reference']=expected
+    checkpoint()
+    with boa.env.anchor():
+        stage('constructor')
+        s=source(g,VECTORS['factory'],VECTORS['weth'],VECTORS['anchor']['address'])
+        case['deployed_bytes']=len(boa.env.get_code(s.address))
+        checkpoint()
+        assert_deployed_size(case['deployed_bytes'])
+        stage('proposal')
+        if expected==0:
+            with boa.reverts('invalid feed'):
+                s.addNewPriceFeed(a['asset'],params(a['pool'],window=window),sender=g.gov)
+            case.update(status='unavailable',behavior_passed=True,
+                        reason='route unavailable under laboratory guards; admission rejected as expected')
+            checkpoint()
+            return
+        assert s.addNewPriceFeed(a['asset'],params(a['pool'],window=window),sender=g.gov)
+        stage('confirmation')
+        advance_timelock_blocks(s.actionTimeLock())
+        assert s.confirmNewPriceFeed(a['asset'],sender=g.gov)
+        stage('registration')
+        register(g.desk,s,g.gov)
+        g.desk.syncTokenScale(a['asset'],sender=g.local)
+        scale=g.desk.tokenScale(a['asset'])
+        case['token_scale']=scale
+        checkpoint()
+        assert scale==10**decode(['uint8'],bytes.fromhex(case['raw']['assetDecimals'][2:]))[0], 'asset scale mismatch'
+        assert boa.env.timestamp==selected['timestamp'], 'local timestamp drift'
+        stage('price')
+        cold(g.desk)
+        case['actual']=g.desk.getPrice(a['asset'])
+        comp=g.desk._computation
+        children=calls(comp,s)
+        case['desk_gas']=comp.get_gas_used()
+        case['source_calls']=[{'gas_forwarded':c.msg.gas,'gas_used':c.get_gas_used(),
+                               'failed':c.is_error,'output':'0x'+c.output.hex(),
+                               'dependencies':dependency_trace(c)} for c in children]
+        if len(children)==1:case['source_gas']=children[0].get_gas_used()
+        checkpoint()
+        assert case['actual']==expected, 'price mismatch against compiled reference'
+        assert len(children)==1 and children[0].msg.gas==250000, 'unexpected source call stipend/count'
+        assert_source_budget(case['source_gas'])
+        stage('usd_conversion')
+        case['usd_value']=g.desk.getUsdValue(a['asset'],scale,True)
+        checkpoint()
+        assert case['usd_value']==expected, 'USD conversion mismatch'
+        stage('asset_conversion')
+        case['asset_amount']=g.desk.getAssetAmount(a['asset'],expected,True)
+        checkpoint()
+        assert case['asset_amount']==scale, 'asset conversion mismatch'
+        case.update(status='passed',behavior_passed=True,
+                    reason='local source and actual desk matched compiled reference at fixed pin')
+        checkpoint()
+
+
 def run():
     mode,url,block,block_hash=configuration(os.environ)
+    path=os.environ['RIPE_TWAP_FORK_OUTPUT']
+    output=initial_results(mode,[a['label'] for a in VECTORS['assets']],LAB)
+    def save():atomic_save(path,output)
+    def stage(name):
+        output['stage']=name
+        save()
+    save()
     if cache:=os.environ.get('RIPE_BOA_CACHE_DIR'):set_cache_dir(cache)
-    # Prepare local compilation before choosing a fresh header; no deployment.
-    for path in (SOURCE,'contracts/registries/RipeHq.vy','contracts/registries/PriceDesk.vy','contracts/registries/Switchboard.vy','contracts/data/MissionControl.vy'):
-        boa.load_partial(str(ROOT/path))
-    artifact('v3','Reference')
-    rpc=Rpc(url);selected=None;results=[]
-    cases=[(a,w) for a in VECTORS['assets'] for w in (1800,3600,14400)]
+    rpc=Rpc(url);selected=None
+    infrastructure=(InfrastructureError,boa.rpc.RPCError,requests.RequestException)
     try:
+        stage('compilation')
+        # Compile before selecting a fresh pin, without any deployments.
+        for contract in (SOURCE,'contracts/registries/RipeHq.vy','contracts/registries/PriceDesk.vy','contracts/registries/Switchboard.vy','contracts/data/MissionControl.vy'):
+            boa.load_partial(str(ROOT/contract))
+        artifact('v3','Reference')
+        stage('pin')
         selected=pin(rpc,mode,block,block_hash)
-        # Explicit historical-state preflight before any expensive graph setup.
+        output['pin']=selected
+        for case in output['cases']:case['pin']=selected
+        save()
+        stage('historical_state')
         code=rpc.call('eth_getCode',[VECTORS['factory'],hex(selected['block'])])
         if code=='0x':raise InfrastructureError('factory has no code at pin')
+        stage('local_graph')
         boa.rpc.TIMEOUT=15
         with boa.fork(url,block_identifier=selected['block'],cache_dir=os.environ.get('RIPE_TWAP_FORK_CACHE') or None):
-            assert boa.env.timestamp==selected['timestamp']
-            g=make_graph()
-            ref=deploy('v3','Reference')
-            assert boa.env.timestamp==selected['timestamp']
+            assert boa.env.timestamp==selected['timestamp'], 'fork timestamp mismatch'
+            g=make_graph();ref=deploy('v3','Reference')
+            assert boa.env.timestamp==selected['timestamp'], 'graph timestamp drift'
             number=boa.env.evm.patch.block_number
-            for a,window in cases:
-                case={'asset':a['label'],'window':window,'pin':selected,'laboratory':LAB,'raw':{},'status':'unverified'}
-                try:
-                    collect(rpc,a,window,selected,case['raw'])
-                    expected=reference_price(case['raw'],a,window,selected['timestamp'],ref)
-                    case['reference']=expected
-                    with boa.env.anchor():
-                        s=source(g,VECTORS['factory'],VECTORS['weth'],VECTORS['anchor']['address'])
-                        if expected==0:
-                            with boa.reverts('invalid feed'):s.addNewPriceFeed(a['asset'],params(a['pool'],window=window),sender=g.gov)
-                            case.update(actual=0,status='failed',behavior_passed=True,reason='route unavailable under laboratory guards; admission rejected as expected')
-                        else:
-                            assert s.addNewPriceFeed(a['asset'],params(a['pool'],window=window),sender=g.gov)
-                            advance_timelock_blocks(s.actionTimeLock())
-                            assert s.confirmNewPriceFeed(a['asset'],sender=g.gov)
-                            register(g.desk,s,g.gov)
-                            g.desk.syncTokenScale(a['asset'],sender=g.local)
-                            assert g.desk.tokenScale(a['asset'])==10**18
-                            assert boa.env.timestamp==selected['timestamp']
-                            cold(g.desk)
-                            actual=g.desk.getPrice(a['asset'],True)
-                            comp=g.desk._computation
-                            assert actual==expected
-                            assert g.desk.getUsdValue(a['asset'],10**18,True)==expected
-                            assert g.desk.getAssetAmount(a['asset'],expected,True)==10**18
-                            case.update(actual=actual,status='passed',behavior_passed=True,source_gas=calls(comp,s)[0].get_gas_used(),desk_gas=comp.get_gas_used(),deployed_bytes=len(boa.env.get_code(s.address)),reason='local source and actual desk matched compiled reference at fixed pin')
-                except (InfrastructureError,boa.rpc.RPCError,requests.RequestException) as exc:
-                    case['reason']=str(exc)[:180] if isinstance(exc,InfrastructureError) else type(exc).__name__
-                except Exception as exc:
-                    case.update(status='failed',behavior_passed=False,reason=type(exc).__name__)
+            stage('cases')
+            for case in output['cases']:
+                a=next(a for a in VECTORS['assets'] if a['label']==case['asset'])
                 case['local_number_at_setup']=number
                 case['clock_note']='Boa emulates NUMBER from child header; no claim about live EVM NUMBER'
-                results.append(case)
+                def case_stage(name):
+                    case['stage']=name
+                    save()
+                try:
+                    collect(rpc,a,case['window'],selected,case['raw'],save,case_stage)
+                    qualify_case(g,ref,a,case,save)
+                except infrastructure as exc:
+                    failure(case,exc,infrastructure=True)
+                except Exception as exc:
+                    failure(case,exc)
+                save()
+                # Each completed measurement has its own post-read header check,
+                # so a later process timeout need not discard verified cases.
+                try:
+                    case['header_consistency']=check_header(rpc,selected)
+                except infrastructure as exc:
+                    case['header_consistency']='unverified'
+                    case['header_reason']=exception_reason(exc)
+                if case['header_consistency']!='matched':
+                    case['observed_status']=case['status']
+                    case.update(status='unverified',behavior_passed=False,
+                                reason='case header consistency '+case['header_consistency']+'; '+case['reason'])
+                save()
                 print('TWAP_FORK_CASE '+json.dumps({k:v for k,v in case.items() if k!='raw'},sort_keys=True),flush=True)
-    except (InfrastructureError,boa.rpc.RPCError,requests.RequestException) as exc:
-        reason=str(exc)[:180] if isinstance(exc,InfrastructureError) else type(exc).__name__
-        results=[{'asset':a['label'],'window':w,'pin':selected,'laboratory':LAB,'status':'unverified','reason':reason,'raw':{}} for a,w in cases]
-    consistency='unverified'
+    except infrastructure as exc:
+        for case in output['cases']:
+            if case['stage']=='pending':
+                case['stage']=output['stage']
+                failure(case,exc,infrastructure=True)
+        save()
+    stage('end_header')
     if selected:
-        try:
-            last=rpc.call('eth_getBlockByNumber',[hex(selected['block']),False])
-            consistency='matched' if last and last['hash']==selected['hash'] and int(last['timestamp'],16)==selected['timestamp'] else 'mismatch'
-        except InfrastructureError:pass
-    if consistency!='matched':
-        for case in results:
-            case.update(status='unverified',reason='end-header consistency '+consistency+'; '+case.get('reason',''))
-    output={'mode':mode,'pin':selected,'header_consistency':consistency,'cases':results}
-    if path:=os.environ.get('RIPE_TWAP_FORK_OUTPUT'):
-        Path(path).write_text(json.dumps(output,indent=2)+'\n')
+        try:output['header_consistency']=check_header(rpc,selected)
+        except infrastructure as exc:output['header_reason']=exception_reason(exc)
+    if output['header_consistency']!='matched':
+        for case in output['cases']:
+            case['observed_status']=case['status']
+            case.update(status='unverified',behavior_passed=False,
+                        reason='end-header consistency '+output['header_consistency']+'; '+case.get('reason',''))
+    stage('complete')
     print('TWAP_FORK_RESULT '+json.dumps(output,sort_keys=True),flush=True)
     return 0
 
@@ -226,5 +307,5 @@ def run():
 if __name__=='__main__':
     try:raise SystemExit(run())
     except ValueError as exc:
-        print('TWAP_FORK_CONFIG_ERROR '+str(exc),file=sys.stderr)
+        print('TWAP_FORK_CONFIG_ERROR '+sanitized(exc),file=sys.stderr)
         raise SystemExit(2)

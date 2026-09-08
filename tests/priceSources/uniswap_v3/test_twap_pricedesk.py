@@ -1,10 +1,11 @@
 import boa
+from contextlib import nullcontext
 import pytest
 from conf_utils import advance_timelock_blocks
 
-from .graph import admit,params,register,rotate_desk,source,ZERO
+from .graph import admit,params,register,temporary_desk,source,ZERO
 from .raw import words,word,Raw
-from .test_twap_price_path import unavailable
+from .helpers import unavailable,state
 
 
 @pytest.mark.parametrize('decimals',[0,6,9,18])
@@ -33,51 +34,50 @@ def test_permissionless_scale_poisoning_restoration_and_explicit_recovery(lab,ro
     g,s,a=lab.g,lab.s,lab.asset
     admit(g,s,a,params(lab.pool))
     old_desk=g.desk
-    if rotate:
-        rotate_desk(g)
-        register(g.desk,s,g.gov)
-    assert g.desk.tokenScale(a)==0
-    outsider=boa.env.generate_address()
-    a.setDecimals(6)
-    assert s.getPriceAndHasFeed(a)==(0,True)
-    assert g.desk.hasPriceFeed(a)
-    g.desk.syncTokenScale(a,sender=outsider)
-    assert g.desk.tokenScale(a)==10**6
-    a.setDecimals(18)
-    unavailable(lab)
-    assert s.getPriceAndHasFeed(a,0,old_desk.address,sender=old_desk.address)==(0,True)
-    for method,amount in [('getUsdValue',10**18),('getAssetAmount',10**18)]:
-        fn=getattr(g.desk,method)
-        assert fn(a,amount)==0
-        with boa.reverts('has price config, no price'):fn(a,amount,True)
-    # ensure_token_scale and Golf's zero-only auto-sync cannot repair this state.
-    with boa.reverts('already set'):g.desk.syncTokenScale(a,sender=outsider)
-    caller=g.local if repair=='governor' else g.actor.address
-    g.desk.syncTokenScale(a,sender=caller)
-    assert g.desk.tokenScale(a)==10**18
-    assert s.getPrice(a)==10**18
-    assert g.desk.getUsdValue(a,10**18,True)==10**18  # never erroneous 10**30
-    assert g.desk.getAssetAmount(a,10**18,True)==10**18
-    if rotate:
-        assert s.getPriceAndHasFeed(a,86400,old_desk.address,sender=old_desk.address)==(0,True)
-        assert s.getPriceAndHasFeed(a,86400,g.desk.address,sender=g.desk.address)==(10**18,True)
-        assert s.getPrice(a,0,old_desk.address,sender=old_desk.address)==10**18
-    g.desk=old_desk
+    with temporary_desk(g) if rotate else nullcontext():
+        if rotate:register(g.desk,s,g.gov)
+        assert g.desk.tokenScale(a)==0
+        outsider=boa.env.generate_address()
+        a.setDecimals(6)
+        assert s.getPriceAndHasFeed(a)==(0,True)
+        assert g.desk.hasPriceFeed(a)
+        g.desk.syncTokenScale(a,sender=outsider)
+        assert g.desk.tokenScale(a)==10**6
+        a.setDecimals(18)
+        unavailable(lab)
+        assert s.getPriceAndHasFeed(a,0,old_desk.address,sender=old_desk.address)==(0,True)
+        for method,amount in [('getUsdValue',10**18),('getAssetAmount',10**18)]:
+            fn=getattr(g.desk,method)
+            assert fn(a,amount)==0
+            with boa.reverts('has price config, no price'):fn(a,amount,True)
+        # ensure_token_scale and Golf's zero-only auto-sync cannot repair this state.
+        with boa.reverts('already set'):g.desk.syncTokenScale(a,sender=outsider)
+        caller=g.local if repair=='governor' else g.actor.address
+        g.desk.syncTokenScale(a,sender=caller)
+        assert g.desk.tokenScale(a)==10**18
+        assert s.getPrice(a)==10**18
+        assert g.desk.getUsdValue(a,10**18,True)==10**18  # never erroneous 10**30
+        assert g.desk.getAssetAmount(a,10**18,True)==10**18
+        if rotate:
+            assert s.getPriceAndHasFeed(a,86400,old_desk.address,sender=old_desk.address)==(0,True)
+            assert s.getPriceAndHasFeed(a,86400,g.desk.address,sender=g.desk.address)==(10**18,True)
+            assert s.getPrice(a,0,old_desk.address,sender=old_desk.address)==10**18
+
 
 
 def test_current_desk_rotation_checks_existing_wrong_scale(active):
     l=active;g=l.g;old=g.desk
     new=boa.load('contracts/registries/PriceDesk.vy',g.hq,g.local,old.ETH(),1,100)
     l.asset.setDecimals(6);new.syncTokenScale(l.asset,sender=g.local);l.asset.setDecimals(18)
-    rotate_desk(g,new)
-    assert l.s.getPriceAndHasFeed(l.asset)==(0,True)
-    register(new,l.s,g.gov)
-    assert new.getPrice(l.asset)==0
-    new.syncTokenScale(l.asset,sender=g.local)
-    assert new.getUsdValue(l.asset,10**18,True)==10**18
-    assert new.getAssetAmount(l.asset,10**18,True)==10**18
-    assert old.getPrice(l.asset)==0
-    g.desk=old
+    with temporary_desk(g,new):
+        assert l.s.getPriceAndHasFeed(l.asset)==(0,True)
+        register(new,l.s,g.gov)
+        assert new.getPrice(l.asset)==0
+        new.syncTokenScale(l.asset,sender=g.local)
+        assert new.getUsdValue(l.asset,10**18,True)==10**18
+        assert new.getAssetAmount(l.asset,10**18,True)==10**18
+        assert old.getPrice(l.asset)==0
+
 
 
 @pytest.mark.parametrize('initial',[0,6,9,18])
@@ -173,3 +173,66 @@ def test_snapshot_and_coverage_are_storage_only_even_during_outage(active):
     assert l.s.hasPriceFeed(l.asset,gas=75000)
     assert l.s._computation.children==[]
     assert l.s.getFeedConfig(l.asset)==before
+
+
+def test_reverse_order_lifecycle_poisoning_and_amount_recovery(lab):
+    from .compiled import deploy
+    a,w=lab.weth,lab.asset
+    s=source(lab.g,lab.factory,w,lab.anchor)
+    lab.pool.set_history(tick=37)
+    expected=deploy('v3','Reference').quote(37,10**18,a.address,w.address)
+    assert admit(lab.g,s,a,params(lab.pool))==expected
+    assert not s.getFeedConfig(a).assetIsToken0
+    a.setDecimals(6)
+    lab.g.desk.syncTokenScale(a,sender=boa.env.generate_address())
+    a.setDecimals(18)
+    assert s.getPriceAndHasFeed(a)==(0,True)
+    for method in ('getUsdValue','getAssetAmount'):
+        assert getattr(lab.g.desk,method)(a,10**18)==0
+    lab.g.desk.syncTokenScale(a,sender=lab.g.gov)
+    assert lab.g.desk.getUsdValue(a,3*10**18,True)==3*expected
+    assert lab.g.desk.getAssetAmount(a,3*expected,True)==3*10**18
+    s.disablePriceFeed(a,sender=lab.g.gov);advance_timelock_blocks(2)
+    assert s.confirmDisablePriceFeed(a,sender=lab.g.gov)
+    assert s.getBoundAssetDecimals(a)==(True,18) and not s.hasPriceFeed(a)
+    a.setDecimals(6)
+    with boa.reverts('asset decimals changed'):s.addNewPriceFeed(a,params(lab.pool),sender=lab.g.gov)
+    a.setDecimals(18)
+    assert admit(lab.g,s,a,params(lab.pool))==expected
+    assert s.getPricedAssets()==[a.address]
+    assert lab.g.desk.getUsdValue(a,3*10**18,True)==3*expected
+    assert lab.g.desk.getAssetAmount(a,3*expected,True)==3*10**18
+
+
+def test_actual_desk_coverage_and_snapshot_forward_fixed_stipends(active):
+    from .gas_tools import calls,cold
+    from .raw import selector
+    l=active
+    before=state(l.s,l.asset)
+    Raw({},address=l.pool.address);Raw({},address=l.anchor.address)
+    cold(l.g.desk)
+    assert l.g.desk.hasPriceFeed(l.asset)
+    coverage=calls(l.g.desk._computation,l.s)
+    assert len(coverage)==1
+    assert coverage[0].msg.gas==75000 and coverage[0].output==word(1)
+    assert coverage[0].children==[] and not coverage[0].is_error
+    cold(l.g.desk)
+    assert not l.g.desk.addPriceSnapshot(l.asset,sender=l.g.mc.address)
+    trace=l.g.desk._computation
+    children=calls(trace,l.s)
+    assert [(bytes(c.msg.data[:4]),c.msg.gas,c.output) for c in children]==[
+        (selector('hasPriceFeed(address)'),75000,word(1)),
+        (selector('addPriceSnapshot(address)'),150000,word(0))]
+    assert all(c.children==[] and not c.is_error for c in children)
+    assert trace.get_log_entries()==() and state(l.s,l.asset)==before
+
+
+def test_temporary_desk_restores_python_and_registry_on_failure(lab):
+    from .graph import temporary_desk
+    old=lab.g.desk
+    with pytest.raises(AssertionError,match='injected failure'):
+        with temporary_desk(lab.g) as replacement:
+            assert lab.g.desk is replacement
+            assert lab.g.hq.getAddr(7)==replacement.address
+            raise AssertionError('injected failure')
+    assert lab.g.desk is old and lab.g.hq.getAddr(7)==old.address
