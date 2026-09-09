@@ -1,7 +1,7 @@
 import boa
 import pytest
 
-from conf_utils import filter_logs
+from conf_utils import filter_logs, install_lootbox_user_checkpoint_trap
 from constants import EIGHTEEN_DECIMALS
 from tests.vaults.ripe_gov_exit_fee_model import (
     DECIMAL_OFFSET,
@@ -251,7 +251,7 @@ def test_sole_actual_holder_early_exit_reverts_atomically(
 
 
 @pytest.mark.parametrize("exit_fee", (10_00, 100_00))
-def test_paused_lootbox_rolls_back_complete_teller_release_atomically(
+def test_lootbox_checkpoint_failure_rolls_back_complete_teller_release_atomically(
     exit_fee,
     ripe_gov_vault,
     ripe_token,
@@ -265,6 +265,7 @@ def test_paused_lootbox_rolls_back_complete_teller_release_atomically(
     setAssetConfig,
     setRipeRewardsConfig,
     switchboard_alpha,
+    ripe_hq,
 ):
     _configure_asset(
         mission_control,
@@ -299,16 +300,16 @@ def test_paused_lootbox_rolls_back_complete_teller_release_atomically(
     )
     boa.env.time_travel(blocks=17)
 
-    lootbox.pause(True, sender=switchboard_alpha.address)
     before = _atomic_snapshot(ripe_gov_vault, ripe_token, bob, ledger)
 
-    with boa.reverts("contract paused"):
-        teller.releaseLock(ripe_token, sender=bob)
+    with boa.env.anchor():
+        install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+        with boa.reverts():
+            teller.releaseLock(ripe_token, sender=bob)
 
-    assert _atomic_snapshot(ripe_gov_vault, ripe_token, bob, ledger) == before
-    assert filter_logs(teller, "LockReleased") == []
+        assert _atomic_snapshot(ripe_gov_vault, ripe_token, bob, ledger) == before
+        assert filter_logs(teller, "LockReleased") == []
 
-    lootbox.pause(False, sender=switchboard_alpha.address)
     teller.releaseLock(ripe_token, sender=bob)
 
     # Decode the vault's nested event from the top-level Teller computation.

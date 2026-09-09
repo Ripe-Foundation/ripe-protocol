@@ -3,6 +3,7 @@ import boa
 
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
+from contracts.modules import Contributor
 
 
 @pytest.fixture(scope="module")
@@ -376,12 +377,14 @@ def test_hr_refund_after_cancel_paycheck_with_burn_no_position(
     setupRipeGovVaultConfig,
     deployedContributor
 ):
-    """Test refund with burn when contributor has no vault position"""
+    """A zero-claim contributor with no vault position receives a full refund."""
     
     setupRipeGovVaultConfig()
     contributor_addr = deployedContributor()
     
     refund_amount = 25000 * EIGHTEEN_DECIMALS
+    contributor = Contributor.at(contributor_addr)
+    assert contributor.totalClaimed() == 0
     
     # Get initial ledger balance
     initial_ripe_avail = ledger.ripeAvailForHr()

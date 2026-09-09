@@ -75,18 +75,16 @@ struct RepayConfig:
     canRepay: bool
     canAnyoneRepayDebt: bool
 
-struct RedeemCollateralConfig:
-    canRedeemCollateralGeneral: bool
-    canRedeemCollateralAsset: bool
-    isUserAllowed: bool
+struct EffectiveRedeemCollateralConfig:
+    canRedeemCollateral: bool
     ltvPaybackBuffer: uint256
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
-struct AuctionBuyConfig:
-    canBuyInAuctionGeneral: bool
-    canBuyInAuctionAsset: bool
-    isUserAllowed: bool
+struct EffectiveAuctionBuyConfig:
+    canBuyInAuction: bool
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct GenLiqConfig:
     canLiquidate: bool
@@ -145,6 +143,20 @@ struct RewardsConfig:
 struct DepositPointsConfig:
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
+    isNft: bool
+    shouldFundGenPoints: bool
+    accrualStartBlock: uint256
+
+struct AssetRetirementConfig:
+    isSupported: bool
+    hasPointsAlloc: bool
+    hasWhitelist: bool
+    ltv: uint256
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
+    shouldTransferToEndaoment: bool
     isNft: bool
 
 struct PriceConfig:
@@ -211,6 +223,8 @@ underscoreRegistry: public(address)
 trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
+rewardVaultId: public(HashMap[address, uint256]) # asset -> vaultId, 0 = no earner
+accrualStartBlock: public(HashMap[address, HashMap[uint256, uint256]]) # asset -> vaultId -> start; max = armed
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -249,6 +263,8 @@ def __init__(_ripeHq: address, _defaults: address):
         assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()
         for entry: cs.AssetConfigEntry in assetConfigs:
             self._setAssetConfig(entry.asset, entry.config)
+            if len(entry.config.vaultIds) != 1:
+                assert entry.config.stakersPointsAlloc == 0 and entry.config.voterPointsAlloc == 0 # dev: multi-vault defaults cannot have allocs
 
         # priority lists
         self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
@@ -316,6 +332,8 @@ def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     # register asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
         self._registerAsset(_asset)
+        if len(_config.vaultIds) == 1:
+            self.rewardVaultId[_asset] = _config.vaultIds[0]
 
 
 # asset registration
@@ -341,12 +359,20 @@ def deregisterAsset(_asset: address) -> bool:
     if targetIndex == 0:
         return False
 
-    assert self.assetConfig[_asset].stakersPointsAlloc == 0 and self.assetConfig[_asset].voterPointsAlloc == 0 # dev: active points alloc
+    self._updatePointsAllocs(_asset, 0, 0)
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    assetConfig.stakersPointsAlloc = 0
+    assetConfig.voterPointsAlloc = 0
+    self.assetConfig[_asset] = assetConfig
 
     # update data
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
     self.indexOfAsset[_asset] = 0
+    rewardVault: uint256 = self.rewardVaultId[_asset]
+    self.rewardVaultId[_asset] = 0
+    if rewardVault != 0:
+        self.accrualStartBlock[_asset][rewardVault] = 0
 
     # get last item, replace the removed item
     if targetIndex != lastIndex:
@@ -355,6 +381,28 @@ def deregisterAsset(_asset: address) -> bool:
         self.indexOfAsset[lastItem] = targetIndex
 
     return True
+
+
+@view
+@external
+def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    return AssetRetirementConfig(
+        isSupported=self.indexOfAsset[_asset] != 0,
+        hasPointsAlloc=(
+            self.rewardVaultId[_asset] != 0
+            or assetConfig.stakersPointsAlloc != 0
+            or assetConfig.voterPointsAlloc != 0
+        ),
+        hasWhitelist=assetConfig.whitelist != empty(address),
+        ltv=assetConfig.debtTerms.ltv,
+        canWithdraw=assetConfig.canWithdraw,
+        canRedeemCollateral=assetConfig.canRedeemCollateral,
+        canBuyInAuction=assetConfig.canBuyInAuction,
+        canClaimInStabPool=assetConfig.canClaimInStabPool,
+        shouldTransferToEndaoment=assetConfig.shouldTransferToEndaoment,
+        isNft=assetConfig.isNft,
+    )
 
 
 ###############
@@ -382,7 +430,37 @@ def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDele
 @external
 def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
     self.rewardsConfig = _config
+
+
+# reward vault
+
+
+@view
+@external
+def assetStakersPointsAlloc(_asset: address) -> uint256:
+    return self.assetConfig[_asset].stakersPointsAlloc
+
+
+@external
+def setRewardVaultId(_asset: address, _vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    if _vaultId == 0:
+        self._updatePointsAllocs(_asset, 0, 0)
+        assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+        assetConfig.stakersPointsAlloc = 0
+        assetConfig.voterPointsAlloc = 0
+        self.assetConfig[_asset] = assetConfig
+    self.rewardVaultId[_asset] = _vaultId
+
+
+@external
+def setAccrualStartBlock(_asset: address, _vaultId: uint256, _startBlock: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self == addys._getMissionControlAddr() # dev: not current mission control
+    self.accrualStartBlock[_asset][_vaultId] = _startBlock
 
 
 # points allocs
@@ -583,7 +661,7 @@ def isSupportedAsset(_asset: address) -> bool:
 @view
 @external
 def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
-    return _vaultId in self.assetConfig[_asset].vaultIds
+    return self.indexOfAsset[_asset] != 0 and _vaultId in self.assetConfig[_asset].vaultIds
 
 
 @view
@@ -642,10 +720,11 @@ def _getLockDuration(_minLockDuration: uint256, _maxLockDuration: uint256, _auto
 def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     genConfig: cs.GenConfig = self.genConfig
+    isSupported: bool = self.indexOfAsset[_asset] != 0
     return TellerDepositConfig(
         canDepositGeneral=genConfig.canDeposit,
-        canDepositAsset=assetConfig.canDeposit,
-        doesVaultSupportAsset=_vaultId in assetConfig.vaultIds,
+        canDepositAsset=isSupported and assetConfig.canDeposit,
+        doesVaultSupportAsset=isSupported and _vaultId in assetConfig.vaultIds,
         isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),
         perUserDepositLimit=assetConfig.perUserDepositLimit,
         globalDepositLimit=assetConfig.globalDepositLimit,
@@ -733,14 +812,20 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 @view
 @external
-def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
+def getEffectiveRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveRedeemCollateralConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    return RedeemCollateralConfig(
-        canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
-        canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+    shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
+
+    # canWithdraw gates voluntary teller withdrawals only. Redemptions use their dedicated general/asset flags and remain available for solvency.
+    return EffectiveRedeemCollateralConfig(
+        canRedeemCollateral=(
+            self.genConfig.canRedeemCollateral
+            and assetConfig.canRedeemCollateral
+            and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
+        ),
         ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+        shouldTransferBalance=shouldTransferBalance,
     )
 
 
@@ -755,13 +840,19 @@ def getLtvPaybackBuffer() -> uint256:
 
 @view
 @external
-def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
+def getEffectiveAuctionBuyConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> EffectiveAuctionBuyConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
-    return AuctionBuyConfig(
-        canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,
-        canBuyInAuctionAsset=assetConfig.canBuyInAuction,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+    shouldTransferBalance: bool = _shouldTransferBalance and self.indexOfAsset[_asset] != 0
+
+    # canWithdraw gates voluntary teller withdrawals only. Auctions use their dedicated general/asset flags and remain available for liquidation.
+    return EffectiveAuctionBuyConfig(
+        canBuyInAuction=(
+            self.genConfig.canBuyInAuction
+            and assetConfig.canBuyInAuction
+            and self._isUserAllowed(assetConfig.whitelist, _recipient, _asset)
+        ),
         canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
+        shouldTransferBalance=shouldTransferBalance,
     )
 
 
@@ -929,12 +1020,27 @@ def getRewardsConfig() -> RewardsConfig:
 
 @view
 @external
-def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
+def getDepositPointsConfig(_asset: address, _vaultId: uint256) -> DepositPointsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    startBlock: uint256 = self.accrualStartBlock[_asset][_vaultId]
+    if self.indexOfAsset[_asset] == 0:
+        return DepositPointsConfig(
+            stakersPointsAlloc=0,
+            voterPointsAlloc=0,
+            isNft=assetConfig.isNft,
+            shouldFundGenPoints=False,
+            accrualStartBlock=startBlock,
+        )
+    earner: uint256 = self.rewardVaultId[_asset]
+    isEarner: bool = earner != 0 and _vaultId == earner
+    stakers: uint256 = assetConfig.stakersPointsAlloc if isEarner else 0
+    voters: uint256 = assetConfig.voterPointsAlloc if isEarner else 0
     return DepositPointsConfig(
-        stakersPointsAlloc=assetConfig.stakersPointsAlloc,
-        voterPointsAlloc=assetConfig.voterPointsAlloc,
+        stakersPointsAlloc=stakers,
+        voterPointsAlloc=voters,
         isNft=assetConfig.isNft,
+        shouldFundGenPoints=isEarner and assetConfig.stakersPointsAlloc == 0 and assetConfig.voterPointsAlloc == 0 and startBlock == 0,
+        accrualStartBlock=startBlock,
     )
 
 

@@ -69,7 +69,17 @@ def ripeBondConfig() -> cs.RipeBondConfig:
 @view
 @external
 def rewardsConfig() -> cs.RipeRewardsConfig:
-    return empty(cs.RipeRewardsConfig)
+    return cs.RipeRewardsConfig(
+        arePointsEnabled=True,
+        ripePerBlock=0,
+        borrowersAlloc=0,
+        stakersAlloc=0,
+        votersAlloc=0,
+        genDepositorsAlloc=0,
+        autoStakeRatio=0,
+        autoStakeDurationRatio=0,
+        stabPoolRipePerDollarClaimed=0,
+    )
 
 
 # ripe gov vault configs

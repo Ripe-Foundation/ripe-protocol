@@ -122,6 +122,7 @@ MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
+FULL_EXIT_TOLERANCE_USD: constant(uint256) = 2 * 10 ** 16  # $0.02 in 18-decimal USD
 RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 # Live residual delisting is bounded to R <= P // 10**10. This caps omitted
 # membership to one ten-billionth of the prior per-cohort pair. A correctly
@@ -819,14 +820,17 @@ def _claimFromStabilityPool(
     isDepleted: bool = False
     claimShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_claimer, _stabAsset, claimShares, True)
 
-    # reduce claimable balances - compute remaining USD value using price ratio from claim calculation
+    # reduce claimable balances using the remaining asset's direct value
     remainingUsdValue: uint256 = 0
     if claimAmount < maxClaimableAsset:
-        numerator: uint256 = (maxClaimableAsset - claimAmount) * claimUsdValue
-        if numerator < claimAmount:
-            remainingUsdValue = 1 # very small dust, trigger removal
-        else:
-            remainingUsdValue = numerator // claimAmount
+        remainingUsdValue = self._getUsdValue(
+            _claimAsset,
+            maxClaimableAsset - claimAmount,
+            _a.greenToken,
+            _a.savingsGreen,
+            _a.priceDesk,
+            True,
+        )
     self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset, remainingUsdValue)
 
     # move tokens to recipient
@@ -869,17 +873,29 @@ def _calcClaimSharesAndAmount(
     if maxClaimAmount == 0:
         return 0, 0, 0 # not getting price for claim asset
 
-    # max amount available to withdraw
-    if _maxUsdValue >= maxClaimUsdValue and maxClaimAmount <= totalClaimAsset:
-        return maxUserShares, maxClaimAmount, maxClaimUsdValue
-
     # finalize withdrawal amount / shares
     claimAmount: uint256 = min(maxClaimAmount, totalClaimAsset)
-    if _maxUsdValue != max_value(uint256):
-        claimAmount = min(claimAmount, _maxUsdValue * maxClaimAmount // maxClaimUsdValue)
+
+    # a limit that already covers the full position needs no proration. this also keeps an arbitrarily large finite limit out of the multiplication.
+    if _maxUsdValue < maxClaimUsdValue:
+        claimAmount = min(claimAmount, self._getAssetAmount(_claimAsset, _maxUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk, True))
 
     # finalize values
-    claimUsdValue: uint256 = claimAmount * maxClaimUsdValue // maxClaimAmount
+    claimUsdValue: uint256 = min(
+        self._getUsdValue(_claimAsset, claimAmount, _a.greenToken, _a.savingsGreen, _a.priceDesk, True),
+        maxClaimUsdValue,
+    )
+    if _maxUsdValue != max_value(uint256):
+        claimUsdValue = min(claimUsdValue, _maxUsdValue)
+
+    # preserve the full-position exit when inverse/forward rounding leaves a sub-tolerance residual. larger coarse-asset gaps must leave the corresponding shares intact.
+    if (
+        _maxUsdValue >= maxClaimUsdValue
+        and maxClaimAmount <= totalClaimAsset
+        and maxClaimUsdValue - claimUsdValue < FULL_EXIT_TOLERANCE_USD
+    ):
+        return maxUserShares, claimAmount, claimUsdValue
+
     claimShares: uint256 = min(maxUserShares, self._valueToShares(claimUsdValue, totalShares, totalValue, True))
     return claimShares, claimAmount, claimUsdValue
 
@@ -1038,11 +1054,7 @@ def _redeemFromStabilityPool(
 
     # finalize amounts
     remainingRedeemValue: uint256 = maxRedeemValue
-    remainingClaimAmount: uint256 = maxClaimableAmount
-    if maxClaimableAmount > actualClaimableAmount:
-        # This branch guarantees the prorated value is below maxRedeemValue.
-        remainingRedeemValue = actualClaimableAmount * maxRedeemValue // maxClaimableAmount
-        remainingClaimAmount = actualClaimableAmount
+    remainingClaimAmount: uint256 = min(maxClaimableAmount, actualClaimableAmount)
 
     greenSpent: uint256 = 0
     numStabAssets: uint256 = vaultData.numAssets
@@ -1065,24 +1077,38 @@ def _redeemFromStabilityPool(
 
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
 
-        redeemNumerator: uint256 = claimAmount * maxRedeemValue
-        redeemAmount: uint256 = redeemNumerator // maxClaimableAmount
-        if redeemNumerator % maxClaimableAmount != 0:
+        # Value the amount actually delivered, then round its USD charge up.
+        # The inverse quote distinguishes an exact forward value from a floor,
+        # so splitting across cohorts or separate transactions cannot harvest
+        # the discarded remainder.
+        redeemAmount: uint256 = self._getUsdValue(
+            _asset,
+            claimAmount,
+            _a.greenToken,
+            _a.savingsGreen,
+            _a.priceDesk,
+            True,
+        )
+        if self._getAssetAmount(_asset, redeemAmount, _a.greenToken, _a.savingsGreen, _a.priceDesk, True) < claimAmount:
             redeemAmount += 1
         redeemAmount = min(redeemAmount, remainingRedeemValue)
+        if redeemAmount == 0:
+            continue
 
         if stabAsset == _a.savingsGreen:
             if staticcall IERC4626(_a.savingsGreen).previewDeposit(redeemAmount) == 0:
                 continue
 
-        # compute remaining USD value using price ratio: maxRedeemValue / maxClaimableAmount
         remainingUsdValue: uint256 = 0
         if claimAmount < claimableBalance:
-            numerator: uint256 = (claimableBalance - claimAmount) * maxRedeemValue
-            if numerator < maxClaimableAmount:
-                remainingUsdValue = 1 # very small dust, trigger removal
-            else:
-                remainingUsdValue = numerator // maxClaimableAmount
+            remainingUsdValue = self._getUsdValue(
+                _asset,
+                claimableBalance - claimAmount,
+                _a.greenToken,
+                _a.savingsGreen,
+                _a.priceDesk,
+                True,
+            )
         self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance, remainingUsdValue)
 
         # move tokens to recipient

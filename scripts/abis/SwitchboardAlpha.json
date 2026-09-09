@@ -585,23 +585,6 @@
     "type": "event"
   },
   {
-    "name": "RewardsPointsEnabledModified",
-    "inputs": [
-      {
-        "name": "arePointsEnabled",
-        "type": "bool",
-        "indexed": false
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "indexed": true
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "PendingPriorityLiqAssetVaultsChange",
     "inputs": [
       {
@@ -2909,44 +2892,6 @@
       {
         "name": "",
         "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "setRewardsPointsEnabled",
-    "inputs": [
-      {
-        "name": "_shouldEnable",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "setRewardsPointsEnabled",
-    "inputs": [
-      {
-        "name": "_shouldEnable",
-        "type": "bool"
-      },
-      {
-        "name": "_missionControl",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
       }
     ]
   },

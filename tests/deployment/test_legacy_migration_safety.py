@@ -718,7 +718,7 @@ def test_candidate_promotion_copies_complete_record_after_registry_readback(
     active = {
         "contracts": {
             "Service": old,
-            "ServiceCandidate": candidate,
+            "ServiceStaged2026082600": candidate,
             "OldCandidate2026082100": {
                 "address": "0x" + "9" * 40,
                 "file": "historical.vy",
@@ -736,7 +736,7 @@ def test_candidate_promotion_copies_complete_record_after_registry_readback(
     }
     promoted = migration.promote_candidate(
         "Service",
-        "ServiceCandidate",
+        "ServiceStaged2026082600",
         registry,
         7,
         expected_source_path="Service.vy",
@@ -747,7 +747,7 @@ def test_candidate_promotion_copies_complete_record_after_registry_readback(
     assert promoted == candidate["address"]
     pending = json.loads((tmp_path / "2-pending-manifest.json").read_text())
     assert pending["contracts"]["Service"] == candidate
-    assert "ServiceCandidate" not in pending["contracts"]
+    assert "ServiceStaged2026082600" not in pending["contracts"]
     assert "OldCandidate2026082100" not in pending["contracts"]
     assert "old_only" not in pending["contracts"]["Service"]
     assert json.loads((tmp_path / "current-manifest.json").read_text()) == active
@@ -756,7 +756,7 @@ def test_candidate_promotion_copies_complete_record_after_registry_readback(
     assert json.loads((tmp_path / "current-manifest.json").read_text()) == pending
     assert json.loads((tmp_path / "1-manifest.json").read_text()) == active
     # The step manifest attributes only what this migration promoted -
-    # "Service" (this step's canonical name) - not "ServiceCandidate", which
+    # "Service" (this step's canonical name) - not its temporary label, which
     # was already deployed and recorded in an earlier step. And per the
     # step-manifest schema, only address/file survive: not abi/args/
     # old_only/future_field.

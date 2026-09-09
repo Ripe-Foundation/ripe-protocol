@@ -964,7 +964,12 @@ def test_borrow_terms_exclude_current_and_retired_stability_pools(
     assert not mission_control.isStabVaultId(3)
 
     setGeneralConfig()
-    setAssetConfig(alpha_token, [1, 3, alternate_id])
+    setAssetConfig(
+        alpha_token,
+        [1, 3, alternate_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
     setGeneralDebtConfig()
     amount = 100 * EIGHTEEN_DECIMALS
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
@@ -1005,6 +1010,8 @@ def test_borrow_terms_exclude_retired_stab_vault_from_every_registry_source(
     setAssetConfig(
         alpha_token,
         [3, alternate_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
         _specialStabPoolId=special_id,
     )
     setGeneralDebtConfig()
@@ -1032,6 +1039,8 @@ def test_borrow_terms_exclude_retired_stab_vault_from_every_registry_source(
         setAssetConfig(
             alpha_token,
             [3, alternate_id],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
             _specialStabPoolId=0,
         )
 
@@ -1502,6 +1511,112 @@ def test_zero_balance_registered_asset_keeps_borrow_term_floor(
     assert terms.totalMaxDebt == amount // 2
     assert terms.lowestLtv == 10_00
     assert terms.debtTerms.liqThreshold == 79_99
+
+
+def test_deregistered_debt_asset_blocks_only_new_borrow_until_position_exits(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    createDebtTerms,
+    simple_erc20_vault,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+        _daowry=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _debtTerms=debt_terms,
+    )
+    setAssetConfig(bravo_token, _debtTerms=debt_terms)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, amount, bravo_token, bravo_token_whale)
+    assert teller.borrow(50 * EIGHTEEN_DECIMALS, bob, False, sender=bob) == (
+        50 * EIGHTEEN_DECIMALS
+    )
+
+    assert mission_control.deregisterAsset(
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token)
+
+    # Global deregistration must close the live Teller deposit path too, not
+    # merely prevent later configuration changes. A failed deposit must leave
+    # both custody and wallet balances unchanged.
+    fresh_amount = EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, fresh_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, fresh_amount, sender=bob)
+    wallet_before = alpha_token.balanceOf(bob)
+    vault_before = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    with boa.reverts("asset deposits disabled"):
+        teller.deposit(
+            alpha_token,
+            fresh_amount,
+            bob,
+            simple_erc20_vault,
+            sender=bob,
+        )
+    assert alpha_token.balanceOf(bob) == wallet_before
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == vault_before
+
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.highestLtv == 100_01
+    assert credit_engine.getMaxBorrowAmount(bob) == 0
+    with boa.reverts("unsupported asset"):
+        teller.borrow(EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    # Exit mechanics remain available while the unsupported position is real.
+    green_token.approve(teller.address, 10 * EIGHTEEN_DECIMALS, sender=bob)
+    assert teller.repay(
+        10 * EIGHTEEN_DECIMALS,
+        bob,
+        False,
+        False,
+        sender=bob,
+    )
+    assert teller.withdraw(
+        alpha_token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+
+    # BasicVault retains the zero-balance row, but it is no longer a position
+    # and therefore must not keep the account in exit-only mode.
+    assert simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
+        alpha_token.address,
+        0,
+    )
+    assert credit_engine.getMaxBorrowAmount(bob) > 0
+    assert teller.borrow(EIGHTEEN_DECIMALS, bob, False, sender=bob) == (
+        EIGHTEEN_DECIMALS
+    )
 
 
 def test_get_user_borrow_terms_asset_with_no_price(

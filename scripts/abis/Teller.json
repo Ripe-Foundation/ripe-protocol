@@ -200,6 +200,12 @@
     "type": "event"
   },
   {
+    "name": "CurveSnapshotFailed",
+    "inputs": [],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "DepartmentPauseModified",
     "inputs": [
       {

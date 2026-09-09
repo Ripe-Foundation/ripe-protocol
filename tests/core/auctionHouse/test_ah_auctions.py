@@ -23,10 +23,10 @@ def test_auction_house_source_abi_and_vault_interface_are_frozen():
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/AuctionHouse.vy": (
-            "e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e"
+            "2407eb962709fdc068dbe32d3738343fc4640cd51c788b2aae55bbf9d6ac4a9f"
         ),
         "scripts/abis/AuctionHouse.json": (
-            "5fd8e740cee561933a74fc64136ad2a3e42867b9754c38ae596a85b83460d9e7"
+            "292546cb0bfb6fd928b7a535647713f0a2d1575063649b56853b7b59d25851ce"
         ),
         "interfaces/Vault.vyi": (
             "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"
@@ -537,9 +537,9 @@ def test_ah_auction_buy_config_restrictions(
     """Test auction buy config restrictions
     
     This tests:
-    - canBuyInAuctionGeneral restrictions (via setGeneralConfig)
-    - canBuyInAuctionAsset restrictions (via setAssetConfig)
-    - isUserAllowed restrictions (via whitelist)
+    - general auction restrictions (via setGeneralConfig)
+    - asset auction restrictions (via setAssetConfig)
+    - recipient whitelist restrictions
     - Graceful failure when restrictions are violated
     """
     

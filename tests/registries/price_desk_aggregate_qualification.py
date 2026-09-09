@@ -52,7 +52,7 @@ ROBINHOOD_PRICE_STALE_TIME = STALE_WINDOW_GLOBAL
 LIQUIDATE_MANY_API_MAX = 50
 DELEVERAGE_MANY_API_MAX = 25
 QUALIFIED_SATURATED_LIQUIDATION_BATCH_SIZE = 2
-QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE = 3
+QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE = 2
 # Each value is proven by a successful N-user transaction and an OOG at N+1.
 # Raising either input without expanding the measured envelope fails loudly.
 

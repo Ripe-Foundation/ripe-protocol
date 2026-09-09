@@ -5,6 +5,8 @@ from conf_utils import filter_logs, redeem_collateral
 
 
 def _target_repay(debt_amount, collateral_value, target_ltv):
+    if target_ltv >= HUNDRED_PERCENT:
+        return debt_amount
     coll_adjusted = collateral_value * target_ltv // HUNDRED_PERCENT
     if debt_amount <= coll_adjusted:
         return debt_amount
@@ -12,6 +14,64 @@ def _target_repay(debt_amount, collateral_value, target_ltv):
         (debt_amount - coll_adjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - target_ltv),
         debt_amount,
     )
+
+
+def test_c11_max_pay_surfaces_return_full_debt_at_100_percent_ltv(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    credit_redeem,
+    deleverage,
+    auction_house,
+    teller,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=createDebtTerms(
+            _ltv=HUNDRED_PERCENT,
+            _redemptionThreshold=70_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+        _shouldTransferToEndaoment=False,
+        _shouldBurnAsPayment=False,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    # Enter the redemption/deleverage band without starting liquidation.
+    mock_price_source.setPrice(alpha_token, 60 * EIGHTEEN_DECIMALS // 100)
+    user_debt, terms, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    debt = user_debt.amount
+    assert not user_debt.inLiquidation
+    assert credit_engine.canRedeemUserCollateral(bob)
+    assert terms.lowestLtv >= HUNDRED_PERCENT
+
+    assert credit_redeem.getMaxRedeemValue(bob) == debt
+    assert deleverage.getMaxDeleverageAmount(bob) == debt
+    assert auction_house.calcTargetRepayAmount(
+        debt,
+        terms.collateralVal,
+        terms.lowestLtv,
+    ) == debt
 
 
 def _configure_mixed_ltv(
@@ -473,6 +533,93 @@ def test_sc26_share_rounding_dust_does_not_set_lowest_ltv(
     assert terms.lowestLtv != low_ltv
     assert terms.collateralVal == meaningful
     assert terms.totalMaxDebt == meaningful * high_ltv // HUNDRED_PERCENT
+
+
+def test_deregistered_share_rounding_dust_does_not_block_borrow(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    teller,
+    mission_control,
+    switchboard_alpha,
+    createDebtTerms,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+):
+    high_ltv = 50_00
+    low_ltv = 10_00
+    rebase_id = vault_book.getRegId(rebase_erc20_vault)
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0, _keeperFeeRatio=0, _minKeeperFee=0)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[simple_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _debtTerms=createDebtTerms(
+            _ltv=high_ltv,
+            _redemptionThreshold=70_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[rebase_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _debtTerms=createDebtTerms(
+            _ltv=low_ltv,
+            _redemptionThreshold=70_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    meaningful = 100 * EIGHTEEN_DECIMALS
+    performDeposit(alice, meaningful, bravo_token, bravo_token_whale, rebase_erc20_vault)
+    performDeposit(bob, meaningful, alpha_token, alpha_token_whale, simple_erc20_vault)
+    performDeposit(bob, 1, bravo_token, bravo_token_whale, rebase_erc20_vault)
+    drain = bravo_token.balanceOf(rebase_erc20_vault) - 1
+    bravo_token.transfer(bravo_token_whale, drain, sender=rebase_erc20_vault.address)
+
+    bravo_index = rebase_erc20_vault.indexOfUserAsset(bob, bravo_token)
+    assert rebase_erc20_vault.getUserAssetAndAmountAtIndex(
+        bob,
+        bravo_index,
+    ) == (bravo_token.address, 0)
+    assert rebase_erc20_vault.doesUserHaveBalance(bob, bravo_token)
+    assert mission_control.getDebtTerms(bravo_token).ltv == low_ltv
+    assert mission_control.deregisterAsset(
+        bravo_token,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.indexOfAsset(bravo_token) == 0
+
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.highestLtv == high_ltv
+    assert terms.highestLtv != HUNDRED_PERCENT + 1
+    assert terms.collateralVal == meaningful
+    assert terms.totalMaxDebt == meaningful * high_ltv // HUNDRED_PERCENT
+    assert credit_engine.getMaxBorrowAmount(bob) > 0
+    assert teller.borrow(EIGHTEEN_DECIMALS, bob, False, sender=bob) == (
+        EIGHTEEN_DECIMALS
+    )
 
 
 def test_sc26_consumers_follow_share_rounding_lowest_ltv(

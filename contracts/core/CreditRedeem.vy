@@ -41,7 +41,7 @@ interface CreditEngine:
     def getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256): view
 
 interface MissionControl:
-    def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
+    def getEffectiveRedeemCollateralConfig(_asset: address, _recipient: address, _shouldTransferBalance: bool) -> RedeemCollateralConfig: view
     def preferredStabVaultId() -> uint256: view
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
@@ -52,6 +52,7 @@ interface Teller:
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool) -> uint256: view
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
 
 interface Ledger:
     def getRepayDataBundle(_user: address) -> RepayDataBundle: view
@@ -85,11 +86,10 @@ struct RepayDataBundle:
     numUserVaults: uint256
 
 struct RedeemCollateralConfig:
-    canRedeemCollateralGeneral: bool
-    canRedeemCollateralAsset: bool
-    isUserAllowed: bool
+    canRedeemCollateral: bool
     ltvPaybackBuffer: uint256
     canAnyoneDeposit: bool
+    shouldTransferBalance: bool
 
 struct CollateralRedemption:
     user: address
@@ -197,8 +197,8 @@ def _redeemCollateral(
         return 0
 
     # redemptions not allowed on asset
-    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getRedeemCollateralConfig(_asset, _recipient)
-    if not config.canRedeemCollateralGeneral or not config.canRedeemCollateralAsset or not config.isUserAllowed:
+    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getEffectiveRedeemCollateralConfig(_asset, _recipient, _shouldTransferBalance)
+    if not config.canRedeemCollateral:
         return 0
 
     # make sure caller can deposit to recipient
@@ -241,23 +241,31 @@ def _redeemCollateral(
     # max asset amount to take from user
     maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, False)
 
-    # Skip expected zero-credit positions before vault mutation. A later
+    # skip expected zero-credit positions before vault mutation. a later
     # post-transfer zero repayment is an unexpected under-send and reverts.
-    previewAmount: uint256 = min(userAmount, maxAssetAmount)
-
     # Keep maxAssetAmount == 0 first: Vyper short-circuits before subtracting or dividing.
-    if maxAssetAmount == 0 or previewAmount <= (maxAssetAmount - 1) // maxRedeemValue:
+    if maxAssetAmount == 0 or userAmount <= unsafe_sub(maxAssetAmount, 1) // maxRedeemValue:
         return 0
 
     # withdraw or transfer balance to redeemer
-    amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(_shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)
+    amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(config.shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)
     assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
     if amountSent == 0:
         return 0
 
-    # Expected zero-credit positions are skipped before transfer.
-    # A post-transfer zero repayment means the vault sent less than previewed and must revert atomically.
-    repayValue: uint256 = min(amountSent * maxRedeemValue // maxAssetAmount, userDebt.amount)
+    # price desk floors nonzero dust to one USD wei; enforce the inverse quote's
+    # minimum creditable delivery so a vault under-send still reverts atomically.
+    assert amountSent > unsafe_sub(maxAssetAmount, 1) // maxRedeemValue # dev: zero repayment value (vault under-send)
+
+    deliveredValue: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_asset, amountSent, False)
+    assert deliveredValue != 0 # dev: zero repayment value (vault under-send)
+
+    # a one-wei inverse/forward loss is exact only when the complete quote was
+    # delivered. A genuinely short vault delivery keeps its actual value.
+    if amountSent == maxAssetAmount and deliveredValue == unsafe_sub(maxRedeemValue, 1):
+        deliveredValue = maxRedeemValue
+
+    repayValue: uint256 = min(min(deliveredValue, maxRedeemValue), userDebt.amount)
     assert repayValue != 0 # dev: zero repayment value (vault under-send)
     assert extcall GreenToken(_a.greenToken).burn(repayValue) # dev: could not burn green
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, repayValue, newInterest, d.numUserVaults, _a)
@@ -345,6 +353,10 @@ def getMaxRedeemValue(_user: address) -> uint256:
 @view
 @internal
 def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+    # 100% target is not a defined LTV gap; pay all rather than divide by zero.
+    if _targetLtv >= HUNDRED_PERCENT:
+        return _debtAmount
+
     # only reduce the debt necessary to get LTV back to a safe position — never perfectly precise depending on which assets are taken
     # to ensure maximum protocol solvency, we target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT

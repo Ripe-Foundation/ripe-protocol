@@ -3639,8 +3639,8 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    # RH-D031 pins the exact third-party-touch artifact; any growth reopens it.
-    assert len(runtime) <= 24_461
+    # RH-D031 pins the exact third-party-touch artifact; any drift reopens it.
+    assert len(runtime) == 24_424
 
 
 ############################################################################
