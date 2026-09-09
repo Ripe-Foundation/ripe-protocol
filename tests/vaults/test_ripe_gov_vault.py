@@ -4369,8 +4369,8 @@ def test_nonzero_asset_weight_boundaries_are_exact(ripe_gov_vault):
     )
     assert _weighted_points(ripe_gov_vault, 2 * HUNDRED_PERCENT) == base * 2
 
-    # 500_00 is the ceiling SwitchboardAlpha._isValidRipeVaultConfig permits
     assert _weighted_points(ripe_gov_vault, 500_00) == base * 5
+    assert _weighted_points(ripe_gov_vault, 1854_00) == base * 1854_00 // HUNDRED_PERCENT
 
 
 def test_zero_weight_deposit_accrues_no_points(

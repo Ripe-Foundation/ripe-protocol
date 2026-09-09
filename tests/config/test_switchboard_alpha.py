@@ -2451,20 +2451,6 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
             sender=governance.address
         )
     
-    # Test with asset weight > 500%
-    with boa.reverts("invalid ripe vault config"):
-        switchboard_alpha.setRipeGovVaultConfig(
-            alpha_token.address,  # supported asset
-            501_00,  # > 500% weight (invalid)
-            False,   # shouldFreezeWhenBadDebt
-            86400,
-            31536000,
-            200_00,
-            5_00,
-            True,
-            sender=governance.address
-        )
-    
     # Test with min lock > max lock duration
     with boa.reverts("invalid ripe vault config"):
         switchboard_alpha.setRipeGovVaultConfig(
@@ -2749,6 +2735,31 @@ def test_ripe_gov_vault_config_execution_keeps_existing_no_revalidation_behavior
 
     assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     assert new_mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 100_00
+
+
+def test_ripe_gov_vault_config_allows_weight_above_500(
+    switchboard_alpha, governance, alpha_token, setAssetConfig, mission_control,
+):
+    """Asset weight has no SwitchboardAlpha ceiling; 1854% is a valid config."""
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        1854_00,
+        True,
+        86400,
+        31536000,
+        200_00,
+        10_00,
+        True,
+        sender=governance.address,
+    )
+    assert action_id > 0
+    assert switchboard_alpha.pendingRipeGovVaultConfig(action_id).assetWeight == 1854_00
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 1854_00
 
 
 def test_ripe_gov_vault_config_success(switchboard_alpha, governance, alpha_token, setAssetConfig):
