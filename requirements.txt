@@ -238,10 +238,11 @@ pymdown-extensions==10.21.3
     # via
     #   -r requirements.in
     #   mkdocs-material
-pytest==8.4.2
+pytest==9.0.3
     # via
     #   -r requirements.in
     #   pytest-cov
+    #   pytest-xdist
     #   titanoboa
 pytest-cov==7.0.0
     # via titanoboa
