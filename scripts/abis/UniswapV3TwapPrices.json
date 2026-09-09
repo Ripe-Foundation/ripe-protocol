@@ -1061,7 +1061,7 @@
     "name": "getPrice",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1078,7 +1078,7 @@
     "name": "getPrice",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       },
       {
@@ -1099,7 +1099,7 @@
     "name": "getPrice",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       },
       {
@@ -1107,7 +1107,7 @@
         "type": "uint256"
       },
       {
-        "name": "_oracleRegistry",
+        "name": "_priceDesk",
         "type": "address"
       }
     ],
@@ -1124,7 +1124,7 @@
     "name": "getPriceAndHasFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1145,7 +1145,7 @@
     "name": "getPriceAndHasFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       },
       {
@@ -1170,7 +1170,7 @@
     "name": "getPriceAndHasFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       },
       {
@@ -1178,7 +1178,7 @@
         "type": "uint256"
       },
       {
-        "name": "_oracleRegistry",
+        "name": "_priceDesk",
         "type": "address"
       }
     ],
@@ -1199,7 +1199,7 @@
     "name": "hasPriceFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1216,7 +1216,24 @@
     "name": "hasPendingPriceFeedUpdate",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addPriceSnapshot",
+    "inputs": [
+      {
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1233,7 +1250,7 @@
     "name": "getFeedConfig",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1294,7 +1311,7 @@
     "name": "getPendingFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1369,7 +1386,7 @@
     "name": "getBoundAssetDecimals",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1381,23 +1398,6 @@
       {
         "name": "",
         "type": "uint8"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "addPriceSnapshot",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
       }
     ]
   },
@@ -1455,11 +1455,11 @@
     "name": "addNewPriceFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       },
       {
-        "name": "params",
+        "name": "_params",
         "type": "tuple",
         "components": [
           {
@@ -1487,70 +1487,6 @@
             "type": "uint256"
           }
         ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "updatePriceFeed",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address"
-      },
-      {
-        "name": "params",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "pool",
-            "type": "address"
-          },
-          {
-            "name": "twapWindowSeconds",
-            "type": "uint32"
-          },
-          {
-            "name": "minCurrentLiquidity",
-            "type": "uint128"
-          },
-          {
-            "name": "minHarmonicLiquidity",
-            "type": "uint128"
-          },
-          {
-            "name": "maxObservationAgeSeconds",
-            "type": "uint32"
-          },
-          {
-            "name": "quoteStaleTime",
-            "type": "uint256"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "disablePriceFeed",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address"
       }
     ],
     "outputs": [
@@ -1566,41 +1502,7 @@
     "name": "confirmNewPriceFeed",
     "inputs": [
       {
-        "name": "asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "confirmPriceFeedUpdate",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "confirmDisablePriceFeed",
-    "inputs": [
-      {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1617,7 +1519,71 @@
     "name": "cancelNewPendingPriceFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updatePriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_params",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "pool",
+            "type": "address"
+          },
+          {
+            "name": "twapWindowSeconds",
+            "type": "uint32"
+          },
+          {
+            "name": "minCurrentLiquidity",
+            "type": "uint128"
+          },
+          {
+            "name": "minHarmonicLiquidity",
+            "type": "uint128"
+          },
+          {
+            "name": "maxObservationAgeSeconds",
+            "type": "uint32"
+          },
+          {
+            "name": "quoteStaleTime",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "confirmPriceFeedUpdate",
+    "inputs": [
+      {
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1634,7 +1600,41 @@
     "name": "cancelPriceFeedUpdate",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "disablePriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "confirmDisablePriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1651,7 +1651,7 @@
     "name": "cancelDisablePriceFeed",
     "inputs": [
       {
-        "name": "asset",
+        "name": "_asset",
         "type": "address"
       }
     ],
@@ -1667,31 +1667,31 @@
     "type": "constructor",
     "inputs": [
       {
-        "name": "ripeHq",
+        "name": "_ripeHq",
         "type": "address"
       },
       {
-        "name": "tempGov",
+        "name": "_tempGov",
         "type": "address"
       },
       {
-        "name": "minActionTimeLock",
+        "name": "_minActionTimeLock",
         "type": "uint256"
       },
       {
-        "name": "maxActionTimeLock",
+        "name": "_maxActionTimeLock",
         "type": "uint256"
       },
       {
-        "name": "factory",
+        "name": "_factory",
         "type": "address"
       },
       {
-        "name": "weth",
+        "name": "_weth",
         "type": "address"
       },
       {
-        "name": "ethUsdFeed",
+        "name": "_ethUsdFeed",
         "type": "address"
       }
     ],

@@ -359,7 +359,7 @@ def test_defensive_confirmation_active_state_guards(lab,kind):
     start(lab,kind)
     # Synthetic storage fault: public lifecycle/pending collision rules prevent
     # these states. Exercise the confirm-time defense independently of proposal.
-    position=lab.s.compiler_data.storage_layout['storage_layout']['configs']['slot']
+    position=lab.s.compiler_data.storage_layout['storage_layout']['feedConfig']['slot']
     slot=int.from_bytes(keccak(words(position,lab.asset.address)),'big')
     pool=lab.pool.address if kind==1 else ZERO
     boa.env.evm.set_storage(lab.s.address,slot,int(pool,16))

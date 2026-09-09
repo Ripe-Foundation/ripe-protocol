@@ -58,7 +58,7 @@ failure has one such exception; hard stipend/EIP-170 limits always apply.
 The 27 gas tests took 11.66s on Python 3.12.13/arm64 with a warm compile cache,
 within the five-minute target; the combined 35-test gas selection took 57.59s
 with four workers, within the unchanged 30-minute CI job. Final source size
-is 20,635 bytes; canonical peak cold direct/forwarded source gas is 170,809/156,699.
+is 21,030 bytes; canonical peak cold direct/forwarded source gas is 171,597/157,428.
 
 Fork workers deploy the graph after selecting the pin. Laboratory liquidity
 minima are 1, observation age 3,600, local quote age 0 and global quote age 86,400.
