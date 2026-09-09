@@ -121,12 +121,16 @@ no local governance, timelock, configuration, or snapshot state.
 
 The standard PriceSource entrypoints remain callable but are permanently
 inert. They return no price or feed, even if the component is accidentally
-registered. Only explicitly named RIPE/WETH monitoring views expose the
-accepted spot-reserve manipulation and liquidity limitations documented in
-[`uniswap-v2-prices.md`](uniswap-v2-prices.md). Deployment does not authorize
-PriceDesk registration, collateral valuation, LP admission, or any other
-value-bearing consumer. Exact source and artifact identities are generated
-from the final integrated bytes, not copied from the superseded candidate row.
+registered. Constructor-bound RIPE/WETH views and the stateless
+`getPoolMonitoringPrice(asset, pool, partner)` view expose direct spot
+observations for offchain monitoring. Operators must qualify each generic
+tuple's factory provenance, liquidity, token behavior, and partner pricing and
+must handle typed dependency reverts. The manipulation and trust limitations
+are documented in [`uniswap-v2-prices.md`](uniswap-v2-prices.md). Source
+authorization does not authorize deployment, PriceDesk registration,
+collateral valuation, LP admission, or any other value-bearing consumer. Exact
+source and artifact identities are generated from the final integrated bytes,
+not copied from the superseded candidate row.
 
 ## Historical/shared-source rationale inventory
 
