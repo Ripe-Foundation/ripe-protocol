@@ -23,6 +23,16 @@
         "indexed": false
       },
       {
+        "name": "maxObservationAge",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
+        "indexed": false
+      },
+      {
         "name": "baseLiquidity",
         "type": "uint128",
         "indexed": false
@@ -62,6 +72,16 @@
       {
         "name": "twapWindow",
         "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "maxObservationAge",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
         "indexed": false
       }
     ],
@@ -114,6 +134,16 @@
         "indexed": false
       },
       {
+        "name": "maxObservationAge",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
+        "indexed": false
+      },
+      {
         "name": "baseLiquidity",
         "type": "uint128",
         "indexed": false
@@ -158,6 +188,16 @@
       {
         "name": "twapWindow",
         "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "maxObservationAge",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
         "indexed": false
       }
     ],
@@ -263,11 +303,6 @@
       {
         "name": "minLiquidityRatio",
         "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "minObservationCardinality",
-        "type": "uint16",
         "indexed": false
       }
     ],
@@ -1866,10 +1901,6 @@
       {
         "name": "_minLiquidityRatio",
         "type": "uint256"
-      },
-      {
-        "name": "_minObservationCardinality",
-        "type": "uint16"
       }
     ],
     "outputs": [
@@ -1895,10 +1926,6 @@
       {
         "name": "_minLiquidityRatio",
         "type": "uint256"
-      },
-      {
-        "name": "_minObservationCardinality",
-        "type": "uint16"
       }
     ],
     "outputs": [
@@ -1958,6 +1985,10 @@
           {
             "name": "maxObservationAge",
             "type": "uint32"
+          },
+          {
+            "name": "minLiquidity",
+            "type": "uint128"
           }
         ]
       }
@@ -1984,10 +2015,6 @@
           {
             "name": "minLiquidityRatio",
             "type": "uint256"
-          },
-          {
-            "name": "minObservationCardinality",
-            "type": "uint16"
           }
         ]
       }
@@ -2051,10 +2078,31 @@
               {
                 "name": "maxObservationAge",
                 "type": "uint32"
+              },
+              {
+                "name": "minLiquidity",
+                "type": "uint128"
               }
             ]
           }
         ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingQuoteCount",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ]
   },

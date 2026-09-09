@@ -12,6 +12,7 @@ struct Config:
     baseLiquidity: uint128
     twapWindow: uint32
     maxObservationAge: uint32
+    minLiquidity: uint128
 
 struct Pending:
     actionId: uint256

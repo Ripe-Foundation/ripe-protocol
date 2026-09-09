@@ -91,7 +91,7 @@ def test_cold_and_in_transaction_warm_paths(gas_lab,target):
         direct=l.g.desk._computation
     source_call=calls(direct,l.s)[0]
     # slot0, liquidity, observations, observe and the desk's WETH price; a direct call also resolves the desk
-    assert len(source_call.children)==(6 if target=='source' else 5)
+    assert len(source_call.children)==8
     assert_source_budget(source_call.get_gas_used())
     cold(probe)
     before=boa.env.evm.vm.state
@@ -183,7 +183,7 @@ def test_deep_ring_with_dense_tick_bits_and_both_quote_precision_branches(gas_la
         ref=deploy('v3','Reference')
         sqrt=ref.sqrt(tick)
         assert (sqrt>2**128-1)==(not reverse)
-        expected=ref.quote(tick,10**18,asset.address,weth.address)*2500
+        expected=ref.quote(tick,10**36,asset.address,weth.address)*2500//10**18
         assert admit(g,s,asset.address,params(l.p,window=14400))==expected>0
         g.desk.syncTokenScale(asset.address,sender=g.local)
         cold(s)

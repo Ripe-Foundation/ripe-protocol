@@ -89,13 +89,10 @@ def quote_price_source(g, token, price):
     return mock
 
 
-def source(g, factory, delay=2, min_cardinality=None):
+def source(g, factory, delay=2):
     s = boa.load(SOURCE, g.hq, g.local, 2, 100, factory)
     if delay:
         s.setActionTimeLockAfterSetup(delay, sender=g.gov)
-    if min_cardinality is not None:
-        d = s.feedDefaults()
-        s.setFeedDefaults(d.twapWindow, d.maxObservationAge, d.minLiquidityRatio, min_cardinality, sender=g.gov)
     return s
 
 

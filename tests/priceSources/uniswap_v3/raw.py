@@ -82,7 +82,7 @@ class Pool(Raw):
         super().__init__({'factory()': word(factory), 'token0()': word(a), 'token1()': word(q), 'fee()': word(10000)})
         self.set_history(tick, window, liquidity)
 
-    def set_history(self, tick=0, window=3600, liquidity=10**20, age=0, past=0, spl_past=0, cardinality=1000):
+    def set_history(self, tick=0, window=3600, liquidity=10**20, age=0, past=0, spl_past=0, cardinality=65535):
         # slot0 metadata is synthetic; historical accumulators may be frozen inputs.
         self.set('slot0()', words(2**96, 0, 0, cardinality, cardinality, 0, 1))
         self.set('liquidity()', word(liquidity))

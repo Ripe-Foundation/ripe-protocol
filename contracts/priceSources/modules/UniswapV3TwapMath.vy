@@ -32,11 +32,9 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-# uniswap v3 tick domain, and the sqrt ratios at its ends (Q64.96)
+# uniswap v3 tick domain
 MIN_TICK: constant(int256) = -887272
 MAX_TICK: constant(int256) = 887272
-MIN_SQRT_RATIO: constant(uint256) = 4295128739
-MAX_SQRT_RATIO: constant(uint256) = 1461446703485210103287273052203988822378723970342
 
 Q32: constant(uint256) = 2 ** 32
 Q64: constant(uint256) = 2 ** 64

@@ -2,6 +2,7 @@
 # Ripe Foundation (C) 2026
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: PriceSource
 
@@ -33,6 +34,7 @@ interface UniswapV3Pool:
     def fee() -> uint24: view
 
 interface PriceDesk:
+    def tokenScale(_asset: address) -> uint256: view
     def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint256, uint256): view
     def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
 
@@ -65,8 +67,9 @@ struct UniV3FeedConfig:
     assetDecimals: uint256
     quoteDecimals: uint256
     baseLiquidity: uint128 # harmonic liquidity over the window when proposed
-    twapWindow: uint32 # seconds, 0 inherits feedDefaults
-    maxObservationAge: uint32 # seconds, 0 inherits feedDefaults
+    twapWindow: uint32 # resolved seconds, bound at proposal
+    maxObservationAge: uint32 # resolved seconds, bound at proposal
+    minLiquidity: uint128 # absolute floor, rounded up at proposal
 
 struct PendingUniV3Feed:
     actionId: uint256
@@ -76,13 +79,14 @@ struct FeedDefaults:
     twapWindow: uint32 # seconds
     maxObservationAge: uint32 # seconds
     minLiquidityRatio: uint256 # basis points of baseLiquidity (100_00 = 100%)
-    minObservationCardinality: uint16
 
 event NewUniV3FeedPending:
     asset: indexed(address)
     pool: indexed(address)
     quoteAsset: address
     twapWindow: uint32
+    maxObservationAge: uint32
+    minLiquidity: uint128
     baseLiquidity: uint128
     confirmationBlock: uint256
     actionId: uint256
@@ -92,6 +96,8 @@ event NewUniV3FeedAdded:
     pool: indexed(address)
     quoteAsset: address
     twapWindow: uint32
+    maxObservationAge: uint32
+    minLiquidity: uint128
 
 event NewUniV3FeedCancelled:
     asset: indexed(address)
@@ -103,6 +109,8 @@ event UniV3FeedUpdatePending:
     prevPool: indexed(address)
     quoteAsset: address
     twapWindow: uint32
+    maxObservationAge: uint32
+    minLiquidity: uint128
     baseLiquidity: uint128
     confirmationBlock: uint256
     actionId: uint256
@@ -113,6 +121,8 @@ event UniV3FeedUpdated:
     prevPool: indexed(address)
     quoteAsset: address
     twapWindow: uint32
+    maxObservationAge: uint32
+    minLiquidity: uint128
 
 event UniV3FeedUpdateCancelled:
     asset: indexed(address)
@@ -137,7 +147,6 @@ event FeedDefaultsSet:
     twapWindow: uint32
     maxObservationAge: uint32
     minLiquidityRatio: uint256
-    minObservationCardinality: uint16
 
 # core config
 feedConfig: public(HashMap[address, UniV3FeedConfig]) # asset -> config
@@ -145,6 +154,7 @@ feedDefaults: public(FeedDefaults)
 
 # pending changes
 pendingUpdates: public(HashMap[address, PendingUniV3Feed]) # asset -> config
+pendingQuoteCount: public(HashMap[address, uint256]) # quote -> pending add/update count
 
 # uniswap v3
 FACTORY: public(immutable(address))
@@ -152,9 +162,9 @@ FACTORY: public(immutable(address))
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICED_ASSETS: constant(uint256) = 50
+MAX_WARM_QUALIFY_GAS: constant(uint256) = 170_000 # cold margin qualified in the gas lane
 MIN_TWAP_WINDOW: constant(uint32) = 30 * 60 # 30 minutes
 MAX_TWAP_WINDOW: constant(uint32) = 4 * 60 * 60 # 4 hours
-MAX_OBSERVATION_AGE: constant(uint32) = 24 * 60 * 60 # 1 day
 
 
 @deploy
@@ -168,12 +178,11 @@ def __init__(
     assert _factory != empty(address) # dev: invalid factory
     FACTORY = _factory
 
-    # feeds inherit these unless a proposal overrides window / age
+    # defaults apply only when proposals resolve zero window / age arguments
     self.feedDefaults = FeedDefaults(
         twapWindow=60 * 60, # 1 hour
-        maxObservationAge=60 * 60, # 1 hour
+        maxObservationAge=30 * 60, # 30 minutes
         minLiquidityRatio=50_00, # 50% of the liquidity seen at proposal
-        minObservationCardinality=500,
     )
 
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
@@ -187,7 +196,7 @@ def __init__(
 ###############
 
 
-# get price
+# get price (_staleTime is unused; pool age is bound at proposal and quote freshness belongs to its source)
 
 
 @view
@@ -196,7 +205,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: UniV3FeedConfig = self.feedConfig[_asset]
     if config.pool == empty(address):
         return 0
-    return self._getPrice(config, _priceDesk)
+    return self._getPrice(_asset, config, _priceDesk)
 
 
 @view
@@ -205,22 +214,28 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: UniV3FeedConfig = self.feedConfig[_asset]
     if config.pool == empty(address):
         return 0, False
-    return self._getPrice(config, _priceDesk), True
+    return self._getPrice(_asset, config, _priceDesk), True
 
 
 @view
 @internal
-def _getPrice(_config: UniV3FeedConfig, _priceDesk: address) -> uint256:
-    # raw quote-asset units received for one whole asset token, at the pool's
-    # time-weighted mean tick
-    quotePerAsset: uint256 = self._getPoolTwapQuote(_config)
-    if quotePerAsset == 0:
+def _getPrice(_asset: address, _config: UniV3FeedConfig, _priceDesk: address, _checkScale: bool = True) -> uint256:
+    # A supplied desk is an equality check only, never a routing authority.
+    priceDesk: address = addys._getPriceDeskAddr()
+    if _priceDesk != empty(address) and _priceDesk != priceDesk:
+        return 0
+
+    # Only the proposal probe skips this guard: governance may sync then confirm.
+    if _checkScale and not self._hasCompatibleScale(_asset, _config.assetDecimals):
+        return 0
+
+    # quote one whole asset token at 1e18 extra precision; scaling is removed
+    # only in the final USD conversion
+    quoteScaled: uint256 = self._getPoolTwapQuote(_config)
+    if quoteScaled == 0:
         return 0
 
     # quote asset -> usd via price desk (freshness is that feed's own policy)
-    priceDesk: address = _priceDesk
-    if priceDesk == empty(address):
-        priceDesk = addys._getPriceDeskAddr()
     quotePrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(_config.quoteAsset, False)
     if quotePrice == 0:
         return 0
@@ -228,8 +243,15 @@ def _getPrice(_config: UniV3FeedConfig, _priceDesk: address) -> uint256:
     # usd per whole asset token, 18 decimals
     isValid: bool = False
     price: uint256 = 0
-    isValid, price = twapMath._mulDiv(quotePerAsset, quotePrice, 10 ** _config.quoteDecimals)
+    isValid, price = twapMath._mulDiv(quoteScaled, quotePrice, 10 ** _config.quoteDecimals * 10 ** 18)
     return price if isValid else 0
+
+
+@view
+@internal
+def _hasCompatibleScale(_asset: address, _assetDecimals: uint256) -> bool:
+    scale: uint256 = staticcall PriceDesk(addys._getPriceDeskAddr()).tokenScale(_asset)
+    return scale == 0 or scale == 10 ** _assetDecimals
 
 
 # utilities
@@ -262,7 +284,10 @@ def _qualifyPriceSource(_asset: address):
     # config that cannot price through the desk is not admitted
     qualifiedPrice: uint256 = 0
     sourceStatus: uint256 = 0
-    qualifiedPrice, sourceStatus = staticcall PriceDesk(addys._getPriceDeskAddr()).qualifyCallerPriceSource(_asset)
+    priceDesk: address = addys._getPriceDeskAddr()
+    gasBefore: uint256 = msg.gas
+    qualifiedPrice, sourceStatus = staticcall PriceDesk(priceDesk).qualifyCallerPriceSource(_asset)
+    assert gasBefore - msg.gas <= MAX_WARM_QUALIFY_GAS # dev: route too expensive
     assert qualifiedPrice != 0 and sourceStatus == 1 # dev: price source not executable
 
 
@@ -275,18 +300,15 @@ def _qualifyPriceSource(_asset: address):
 @internal
 def _getPoolTwapQuote(_config: UniV3FeedConfig) -> uint256:
     pool: address = _config.pool
-    defaults: FeedDefaults = self.feedDefaults
-    window: uint32 = _config.twapWindow if _config.twapWindow != 0 else defaults.twapWindow
-    maxAge: uint32 = _config.maxObservationAge if _config.maxObservationAge != 0 else defaults.maxObservationAge
-    minLiquidity: uint256 = convert(_config.baseLiquidity, uint256) * defaults.minLiquidityRatio // HUNDRED_PERCENT
 
     # pool must not be mid-swap (a swap callback could otherwise read a half-updated state)
     slot0: Slot0 = staticcall UniswapV3Pool(pool).slot0()
     if not slot0.unlocked:
         return 0
 
-    # current in-range liquidity must hold the ratio of what was seen at proposal
-    if convert(staticcall UniswapV3Pool(pool).liquidity(), uint256) < minLiquidity:
+    # both current and window liquidity must hold the proposal's absolute floor
+    currentLiquidity: uint128 = staticcall UniswapV3Pool(pool).liquidity()
+    if currentLiquidity == 0 or currentLiquidity < _config.minLiquidity:
         return 0
 
     # the latest observation must be initialized and recent enough. This bounds
@@ -295,18 +317,18 @@ def _getPoolTwapQuote(_config: UniV3FeedConfig) -> uint256:
     if not latest.initialized:
         return 0
     now: uint32 = convert(block.timestamp % (2 ** 32), uint32)
-    if unsafe_sub(now, latest.blockTimestamp) > maxAge:
+    if unsafe_sub(now, latest.blockTimestamp) > _config.maxObservationAge:
         return 0
 
     # mean tick and harmonic liquidity over the window
     isValid: bool = False
     meanTick: int256 = 0
     harmonicLiquidity: uint256 = 0
-    isValid, meanTick, harmonicLiquidity = self._observe(pool, window)
-    if not isValid or harmonicLiquidity < minLiquidity:
+    isValid, meanTick, harmonicLiquidity = self._observe(pool, _config.twapWindow)
+    if not isValid or harmonicLiquidity < convert(_config.minLiquidity, uint256):
         return 0
 
-    return twapMath._getQuoteAtTick(meanTick, 10 ** _config.assetDecimals, _config.assetIsToken0)
+    return twapMath._getQuoteAtTick(meanTick, 10 ** _config.assetDecimals * 10 ** 18, _config.assetIsToken0)
 
 
 @view
@@ -352,14 +374,11 @@ def getFeedLiquidity(_asset: address) -> (uint256, uint256, uint256):
     config: UniV3FeedConfig = self.feedConfig[_asset]
     if config.pool == empty(address):
         return 0, 0, 0
-    defaults: FeedDefaults = self.feedDefaults
-    window: uint32 = config.twapWindow if config.twapWindow != 0 else defaults.twapWindow
     na: bool = False
     meanTick: int256 = 0
     harmonicLiquidity: uint256 = 0
-    na, meanTick, harmonicLiquidity = self._observe(config.pool, window)
-    minLiquidity: uint256 = convert(config.baseLiquidity, uint256) * defaults.minLiquidityRatio // HUNDRED_PERCENT
-    return convert(staticcall UniswapV3Pool(config.pool).liquidity(), uint256), harmonicLiquidity, minLiquidity
+    na, meanTick, harmonicLiquidity = self._observe(config.pool, config.twapWindow)
+    return convert(staticcall UniswapV3Pool(config.pool).liquidity(), uint256), harmonicLiquidity, convert(config.minLiquidity, uint256)
 
 
 ################
@@ -383,7 +402,8 @@ def addNewPriceFeed(
 
     # validation
     config: UniV3FeedConfig = self._getFeedConfig(_asset, _pool, _twapWindow, _maxObservationAge)
-    assert self._isValidNewFeed(_asset, config) # dev: invalid feed
+    assert self._isValidNewFeed(_asset, config) and self._isValidFeedConfig(_asset, config) # dev: invalid feed
+    self.pendingQuoteCount[config.quoteAsset] += 1
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -392,7 +412,7 @@ def addNewPriceFeed(
         config=config,
     )
 
-    log NewUniV3FeedPending(asset=_asset, pool=_pool, quoteAsset=config.quoteAsset, twapWindow=_twapWindow, baseLiquidity=config.baseLiquidity, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    log NewUniV3FeedPending(asset=_asset, pool=_pool, quoteAsset=config.quoteAsset, twapWindow=config.twapWindow, maxObservationAge=config.maxObservationAge, minLiquidity=config.minLiquidity, baseLiquidity=config.baseLiquidity, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
@@ -408,9 +428,11 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     d: PendingUniV3Feed = self.pendingUpdates[_asset]
     assert d.config.pool != empty(address) # dev: no pending new feed
     assert self.feedConfig[_asset].pool == empty(address) # dev: no pending new feed
-    if not self._isCurrentFeedIdentity(_asset, d.config) or not self._isValidNewFeed(_asset, d.config):
+    if not self._isCurrentFeedIdentity(_asset, d.config):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
+
+    assert self._isValidNewFeed(_asset, d.config) and self._hasCompatibleScale(_asset, d.config.assetDecimals) # dev: invalid feed
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
@@ -421,9 +443,10 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     self._qualifyPriceSource(_asset)
 
     self.pendingUpdates[_asset] = empty(PendingUniV3Feed)
+    self.pendingQuoteCount[d.config.quoteAsset] -= 1
     priceData._addPricedAsset(_asset)
 
-    log NewUniV3FeedAdded(asset=_asset, pool=d.config.pool, quoteAsset=d.config.quoteAsset, twapWindow=d.config.twapWindow)
+    log NewUniV3FeedAdded(asset=_asset, pool=d.config.pool, quoteAsset=d.config.quoteAsset, twapWindow=d.config.twapWindow, maxObservationAge=d.config.maxObservationAge, minLiquidity=d.config.minLiquidity)
     return True
 
 
@@ -440,14 +463,16 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
     assert d.config.pool != empty(address) # dev: no pending new feed
     assert self.feedConfig[_asset].pool == empty(address) # dev: no pending new feed
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
-    log NewUniV3FeedCancelled(asset=_asset, pool=d.config.pool)
     return True
 
 
 @internal
 def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
+    config: UniV3FeedConfig = self.pendingUpdates[_asset].config
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self.pendingQuoteCount[config.quoteAsset] -= 1
     self.pendingUpdates[_asset] = empty(PendingUniV3Feed)
+    log NewUniV3FeedCancelled(asset=_asset, pool=config.pool)
 
 
 # validation
@@ -457,7 +482,7 @@ def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
 @external
 def isValidNewFeed(_asset: address, _pool: address, _twapWindow: uint32 = 0, _maxObservationAge: uint32 = 0) -> bool:
     config: UniV3FeedConfig = self._getFeedConfig(_asset, _pool, _twapWindow, _maxObservationAge)
-    return self._isValidNewFeed(_asset, config)
+    return self._isValidNewFeed(_asset, config) and self._isValidFeedConfig(_asset, config)
 
 
 @view
@@ -465,7 +490,7 @@ def isValidNewFeed(_asset: address, _pool: address, _twapWindow: uint32 = 0, _ma
 def _isValidNewFeed(_asset: address, _config: UniV3FeedConfig) -> bool:
     if priceData.indexOfAsset[_asset] != 0 or self.feedConfig[_asset].pool != empty(address): # use the `updatePriceFeed` function instead
         return False
-    return self._isValidFeedConfig(_asset, _config)
+    return self._isValidFeedStructure(_asset, _config)
 
 
 ###############
@@ -490,7 +515,8 @@ def updatePriceFeed(
     # validation (an update always re-baselines liquidity, so the same settings are allowed)
     prevPool: address = self.feedConfig[_asset].pool
     config: UniV3FeedConfig = self._getFeedConfig(_asset, _pool, _twapWindow, _maxObservationAge)
-    assert self._isValidUpdateFeed(_asset, config) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, config) and self._isValidFeedConfig(_asset, config) # dev: invalid feed
+    self.pendingQuoteCount[config.quoteAsset] += 1
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -499,7 +525,7 @@ def updatePriceFeed(
         config=config,
     )
 
-    log UniV3FeedUpdatePending(asset=_asset, pool=_pool, prevPool=prevPool, quoteAsset=config.quoteAsset, twapWindow=_twapWindow, baseLiquidity=config.baseLiquidity, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    log UniV3FeedUpdatePending(asset=_asset, pool=_pool, prevPool=prevPool, quoteAsset=config.quoteAsset, twapWindow=config.twapWindow, maxObservationAge=config.maxObservationAge, minLiquidity=config.minLiquidity, baseLiquidity=config.baseLiquidity, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
@@ -516,9 +542,11 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert d.config.pool != empty(address) # dev: no pending update feed
     prevPool: address = self.feedConfig[_asset].pool
     assert prevPool != empty(address) # dev: no pending update feed
-    if not self._isCurrentFeedIdentity(_asset, d.config) or not self._isValidUpdateFeed(_asset, d.config):
+    if not self._isCurrentFeedIdentity(_asset, d.config):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
+
+    assert self._isValidUpdateFeed(_asset, d.config) and self._hasCompatibleScale(_asset, d.config.assetDecimals) # dev: invalid feed
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
@@ -529,7 +557,8 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 
     self.pendingUpdates[_asset] = empty(PendingUniV3Feed)
 
-    log UniV3FeedUpdated(asset=_asset, pool=d.config.pool, prevPool=prevPool, quoteAsset=d.config.quoteAsset, twapWindow=d.config.twapWindow)
+    self.pendingQuoteCount[d.config.quoteAsset] -= 1
+    log UniV3FeedUpdated(asset=_asset, pool=d.config.pool, prevPool=prevPool, quoteAsset=d.config.quoteAsset, twapWindow=d.config.twapWindow, maxObservationAge=d.config.maxObservationAge, minLiquidity=d.config.minLiquidity)
     return True
 
 
@@ -546,14 +575,16 @@ def cancelPriceFeedUpdate(_asset: address) -> bool:
     assert d.config.pool != empty(address) # dev: no pending update feed
     assert self.feedConfig[_asset].pool != empty(address) # dev: no pending update feed
     self._cancelPriceFeedUpdate(_asset, d.actionId)
-    log UniV3FeedUpdateCancelled(asset=_asset, pool=d.config.pool, prevPool=self.feedConfig[_asset].pool)
     return True
 
 
 @internal
 def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
+    config: UniV3FeedConfig = self.pendingUpdates[_asset].config
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self.pendingQuoteCount[config.quoteAsset] -= 1
     self.pendingUpdates[_asset] = empty(PendingUniV3Feed)
+    log UniV3FeedUpdateCancelled(asset=_asset, pool=config.pool, prevPool=self.feedConfig[_asset].pool)
 
 
 # validation
@@ -563,7 +594,7 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @external
 def isValidUpdateFeed(_asset: address, _pool: address, _twapWindow: uint32 = 0, _maxObservationAge: uint32 = 0) -> bool:
     config: UniV3FeedConfig = self._getFeedConfig(_asset, _pool, _twapWindow, _maxObservationAge)
-    return self._isValidUpdateFeed(_asset, config)
+    return self._isValidUpdateFeed(_asset, config) and self._isValidFeedConfig(_asset, config)
 
 
 @view
@@ -571,7 +602,7 @@ def isValidUpdateFeed(_asset: address, _pool: address, _twapWindow: uint32 = 0, 
 def _isValidUpdateFeed(_asset: address, _config: UniV3FeedConfig) -> bool:
     if priceData.indexOfAsset[_asset] == 0 or self.feedConfig[_asset].pool == empty(address): # use the `addNewPriceFeed` function instead
         return False
-    return self._isValidFeedConfig(_asset, _config)
+    return self._isValidFeedStructure(_asset, _config)
 
 
 # feed config
@@ -609,18 +640,18 @@ def _getFeedConfig(_asset: address, _pool: address, _twapWindow: uint32, _maxObs
     config: UniV3FeedConfig = self._getFeedIdentity(_asset, _pool)
     if config.pool == empty(address):
         return config
-    config.twapWindow = _twapWindow
-    config.maxObservationAge = _maxObservationAge
+    defaults: FeedDefaults = self.feedDefaults
+    config.twapWindow = _twapWindow if _twapWindow != 0 else defaults.twapWindow
+    config.maxObservationAge = _maxObservationAge if _maxObservationAge != 0 else defaults.maxObservationAge
 
-    # snapshot the pool's harmonic liquidity over the window; the read-time
-    # floors are a ratio of this value
-    window: uint32 = _twapWindow if _twapWindow != 0 else self.feedDefaults.twapWindow
+    # snapshot the harmonic baseline and lock its ceiling-rounded absolute floor
     isValid: bool = False
     meanTick: int256 = 0
     harmonicLiquidity: uint256 = 0
-    isValid, meanTick, harmonicLiquidity = self._observe(_pool, window)
+    isValid, meanTick, harmonicLiquidity = self._observe(_pool, config.twapWindow)
     if isValid:
         config.baseLiquidity = convert(harmonicLiquidity, uint128)
+        config.minLiquidity = convert((harmonicLiquidity * defaults.minLiquidityRatio + HUNDRED_PERCENT - 1) // HUNDRED_PERCENT, uint128)
     return config
 
 
@@ -634,43 +665,52 @@ def _isCurrentFeedIdentity(_asset: address, _config: UniV3FeedConfig) -> bool:
         return False
     if live.assetIsToken0 != _config.assetIsToken0:
         return False
-    return live.assetDecimals == _config.assetDecimals and live.quoteDecimals == _config.quoteDecimals
+    if live.assetDecimals != _config.assetDecimals or live.quoteDecimals != _config.quoteDecimals:
+        return False
+    return staticcall UniswapV3Factory(FACTORY).getPool(_asset, _config.quoteAsset, _config.fee) == _config.pool
 
 
 @view
 @internal
-def _isValidFeedConfig(_asset: address, _config: UniV3FeedConfig) -> bool:
+def _isValidFeedStructure(_asset: address, _config: UniV3FeedConfig) -> bool:
     if empty(address) in [_asset, _config.pool, _config.quoteAsset]:
         return False
     if _config.assetDecimals > NORMALIZED_DECIMALS or _config.quoteDecimals > NORMALIZED_DECIMALS:
         return False
-    if _config.baseLiquidity == 0:
+    if _config.baseLiquidity == 0 or _config.minLiquidity == 0:
         return False
 
-    # settings: zero inherits feedDefaults, otherwise inside the domain
-    if _config.twapWindow != 0 and (_config.twapWindow < MIN_TWAP_WINDOW or _config.twapWindow > MAX_TWAP_WINDOW):
+    # proposal-resolved settings are independent of later defaults changes
+    if _config.twapWindow < MIN_TWAP_WINDOW or _config.twapWindow > MAX_TWAP_WINDOW:
         return False
-    if _config.maxObservationAge > MAX_OBSERVATION_AGE:
-        return False
-
-    # the canonical factory must map (asset, quote, fee) to this exact pool
-    if staticcall UniswapV3Factory(FACTORY).getPool(_asset, _config.quoteAsset, _config.fee) != _config.pool:
-        return False
-
-    # the observation ring must be able to hold a real history for the window
-    slot0: Slot0 = staticcall UniswapV3Pool(_config.pool).slot0()
-    if slot0.observationCardinality < self.feedDefaults.minObservationCardinality:
+    if _config.maxObservationAge == 0 or _config.maxObservationAge > _config.twapWindow:
         return False
 
     # no v3 feed may depend on another v3 feed: the quote asset must be priced
     # elsewhere, and this asset must not be the quote of an existing feed
     if self.feedConfig[_config.quoteAsset].pool != empty(address) or self.pendingUpdates[_config.quoteAsset].actionId != 0:
         return False
-    if self._isQuoteOfActiveFeed(_asset):
+    if self.pendingQuoteCount[_asset] != 0 or self._isQuoteOfActiveFeed(_asset):
+        return False
+
+    return True
+
+
+@view
+@internal
+def _isValidFeedConfig(_asset: address, _config: UniV3FeedConfig) -> bool:
+    # Proposal-only checks. Confirmation never probes price before staging.
+    # the canonical factory must map (asset, quote, fee) to this exact pool
+    if staticcall UniswapV3Factory(FACTORY).getPool(_asset, _config.quoteAsset, _config.fee) != _config.pool:
+        return False
+
+    # the observation ring must be able to hold a real history for the window
+    slot0: Slot0 = staticcall UniswapV3Pool(_config.pool).slot0()
+    if convert(slot0.observationCardinality, uint256) < convert(_config.twapWindow, uint256) + 1:
         return False
 
     # must be priceable under the proposed settings
-    return self._getPrice(_config, empty(address)) != 0
+    return self._getPrice(_asset, _config, empty(address), False) != 0
 
 
 @view
@@ -757,7 +797,6 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
     assert d.config.pool == empty(address) # dev: no pending disable feed
     assert self.feedConfig[_asset].pool != empty(address) # dev: no pending disable feed
     self._cancelDisablePriceFeed(_asset, d.actionId)
-    log DisableUniV3FeedCancelled(asset=_asset, pool=self.feedConfig[_asset].pool)
     return True
 
 
@@ -765,6 +804,7 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
 def _cancelDisablePriceFeed(_asset: address, _aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.pendingUpdates[_asset] = empty(PendingUniV3Feed)
+    log DisableUniV3FeedCancelled(asset=_asset, pool=self.feedConfig[_asset].pool)
 
 
 # validation
@@ -794,18 +834,17 @@ def setFeedDefaults(
     _twapWindow: uint32,
     _maxObservationAge: uint32,
     _minLiquidityRatio: uint256,
-    _minObservationCardinality: uint16,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self._isValidFeedDefaults(_twapWindow, _maxObservationAge, _minLiquidityRatio, _minObservationCardinality) # dev: invalid defaults
+    assert not priceData.isPaused # dev: contract paused
+    assert self._isValidFeedDefaults(_twapWindow, _maxObservationAge, _minLiquidityRatio) # dev: invalid defaults
 
     self.feedDefaults = FeedDefaults(
         twapWindow=_twapWindow,
         maxObservationAge=_maxObservationAge,
         minLiquidityRatio=_minLiquidityRatio,
-        minObservationCardinality=_minObservationCardinality,
     )
-    log FeedDefaultsSet(twapWindow=_twapWindow, maxObservationAge=_maxObservationAge, minLiquidityRatio=_minLiquidityRatio, minObservationCardinality=_minObservationCardinality)
+    log FeedDefaultsSet(twapWindow=_twapWindow, maxObservationAge=_maxObservationAge, minLiquidityRatio=_minLiquidityRatio)
     return True
 
 
@@ -818,9 +857,8 @@ def isValidFeedDefaults(
     _twapWindow: uint32,
     _maxObservationAge: uint32,
     _minLiquidityRatio: uint256,
-    _minObservationCardinality: uint16,
 ) -> bool:
-    return self._isValidFeedDefaults(_twapWindow, _maxObservationAge, _minLiquidityRatio, _minObservationCardinality)
+    return self._isValidFeedDefaults(_twapWindow, _maxObservationAge, _minLiquidityRatio)
 
 
 @pure
@@ -829,12 +867,11 @@ def _isValidFeedDefaults(
     _twapWindow: uint32,
     _maxObservationAge: uint32,
     _minLiquidityRatio: uint256,
-    _minObservationCardinality: uint16,
 ) -> bool:
     if _twapWindow < MIN_TWAP_WINDOW or _twapWindow > MAX_TWAP_WINDOW:
         return False
-    if _maxObservationAge == 0 or _maxObservationAge > MAX_OBSERVATION_AGE:
+    if _maxObservationAge == 0 or _maxObservationAge > _twapWindow:
         return False
-    if _minLiquidityRatio > HUNDRED_PERCENT:
+    if _minLiquidityRatio == 0 or _minLiquidityRatio > HUNDRED_PERCENT:
         return False
-    return _minObservationCardinality != 0
+    return True
