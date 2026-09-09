@@ -1,106 +1,209 @@
-# Uniswap V3 TWAP tests
+# Uniswap V3 TWAP tests and operation
 
-`UniswapV3TwapPrices.vy` prices a governance-selected Uniswap V3 pool: geometric
-TWAP of the asset against the pool's other token (the quote asset), multiplied
-by the quote asset's PriceDesk price. Any quote asset the desk prices works
-(WETH, a stablecoin, ...); a quote asset may not itself be priced by this
-source. It follows the same shape as the other price sources (typed
-`staticcall` reads, Chainlink-style add/update/disable lifecycle, desk
-qualification at confirmation), so a malformed or reverting dependency reverts
-the read and PriceDesk isolates the source.
+Owner decisions D1–D20, 2026-09-09. The [current specification](../../../docs/priceSources/uniswap-v3-twap-spec.md)
+and [operator runbook](../../../docs/priceSources/uniswap-v3-twap-runbook.md)
+describe the shipped contract and both scale-recovery sequences.
 
-A proposal is `addNewPriceFeed(asset, pool, twapWindow=0, maxObservationAge=0)`.
-Zero inherits `feedDefaults` (1h window, 1h observation age, 50% liquidity
-ratio, 500 observation cardinality), which governance sets with
-`setFeedDefaults`. The proposal snapshots the pool's harmonic liquidity over the
-window as `baseLiquidity`; every read requires current and harmonic liquidity to
-stay above `minLiquidityRatio` of it, and an update re-baselines. Admission also
-requires the pool's observation ring to hold at least
-`minObservationCardinality` slots. `getPoolLiquidity` / `getFeedLiquidity` show
-the live numbers.
+A feed returns geometric historical asset/quote TWAP multiplied by the quote's
+current PriceDesk USD price. The quote may be either pool token other than the
+asset; this is not an arithmetic USD TWAP. Add/update arguments are
+`(asset, pool, twapWindow=0, maxObservationAge=0)`. Each zero resolves at proposal
+to the then-current default: window 3600, age 1800, ratio 5000 basis points.
+The proposal stores resolved window/age, harmonic baseline, and the absolute
+floor `ceil(baseline*ratio/10000)`. Defaults are three fields and never read by
+active pricing. Ratio, baseline and current liquidity cannot be zero. Both
+current and harmonic liquidity must reach the stored floor; every update
+re-baselines. A zero floor is impossible for an admitted positive baseline.
 
-Run from the repository root with Python 3.12, Vyper 0.4.3, Titanoboa 0.2.7
-and, for parallel runs, pytest-xdist 3.8.0. Set `RIPE_TWAP_PYTHON` to that
-interpreter. Without xdist, omit `-n 4 --dist loadfile` for the serial fallback.
+The extrapolated fraction is `<= min(age/window, 1)`; age must be positive and
+no greater than the window. The 50% bound applies only to defaults 1800/3600.
+At most one observation is written per second on any chain. A full ring of N
+slots spans at least N−1 seconds, so successful admission observe plus
+`cardinality >= window + 1` is sufficient; cardinalityNext is not admission
+cardinality. Typed preflights still revert when history is unavailable.
+
+Precision uses one whole asset token times 1e18 through tick math and removes
+that extra factor in the final full-width USD mulDiv. Independent Fraction
+bounds cover low-decimal quotes and sub-cent assets, alongside compiled V3/V4
+references, tick extremes, rounding branches, accumulator wraps and overflow.
+
+Confirmation order is governance/pause/state, identity and factory mapping,
+structural/loop/scale checks, timelock, staged config, measured desk callback,
+then pending clear/count decrement/enumeration/event. Identity drift cancels
+with one event and returns false. Every transient failure reverts and preserves
+the proposal. Disable has no identity or dependency check. Internal cancel
+helpers emit; public helpers do not duplicate logs. Pending inbound quote
+counts protect both pending and active quote use within one source instance.
+
+The canonical desk is always resolved through Addys. A nonzero supplied desk
+must match it; `_staleTime` is ignored even when zero. Quote freshness belongs
+to the quote source's policy. The priced asset's cached desk scale is checked
+on confirmation and every read, not at proposal. Zero/unset or the snapshot's
+exact scale is compatible; first sync and quote-scale hardening remain a
+separate PriceDesk follow-up.
+
+## Quote route and operator procedure
+
+A quote must be priced by sources that never call back into PriceDesk, such as
+Chainlink, Pyth or Stork. Order this V3 source after every quote source. D4 is
+operator procedure only; there is no contract allowlist or priority walk.
+Cross-instance and wrapper cycles, including wsuperOETHb-style routes, remain
+an accepted limitation. Tests admit them with independent fallback and show
+both prices becoming zero when that fallback is removed.
+
+The quote-source rule applies to every source that can become authoritative for a quote asset, including fallbacks, and must be re-checked after any registry or priority change.
+
+Before any feed proposal, review candidate token upgradeability and decimals
+mutability, pool identity/history, proposed resolved policy, and every quote
+route/fallback. Run the read-only helper:
+
+```sh
+"$RIPE_TWAP_PYTHON" scripts/twap_pool_depth.py "$RPC" "$POOL" "$ASSET" --source "$SOURCE"
+# Without a source: --window 3600 --age 1800 --ratio 5000 (also the defaults).
+# --block N pins explicitly; otherwise latest is pinned and printed.
+# --price-desk ADDRESS selects an explicit desk when there is no source.
+```
+
+With `--source`, defaults and canonical desk are read from that source's RipeHq
+at the pin. Without it, the helper resolves current-manifest RipeHq for RH/Base
+mainnet, then the live desk ID 7; other chains require `--price-desk`. Confirm
+the printed identity. All pool/quote calls use the same block and the final
+header is rechecked. It prints tokens/order, fee, current/harmonic liquidity,
+cardinality and its window+1 check, age, and the proposal's absolute floor.
+Each 1%/2% direction walks tickBitmap and ticks, applies every liquidityNet
+crossing and rounds inputs/outputs like V3 swap steps. USD input is fee-inclusive,
+marked at initial spot and the pinned live desk quote. It is labelled
+“market depth snapshot at block N; not a TWAP manipulation cost”. No current
+in-range liquidity is extrapolated through unexamined ranges. Operator tests
+compare both directions/orders against canonical multi-range swaps exactly.
+
+Do not propose a pool whose smaller-direction 2% depth is below the value
+governance sets in the runbook. That value is currently unset; this work sets
+no economic threshold. The runbook also requires confirmed event verification
+after scale-sync batches: Safe MultiSend does not treat returned false as
+failure, so an identity cancellation can leave earlier calls in place.
+
+## Tests and reproducible evidence
+
+Run from repository root: Python 3.12, Vyper 0.4.3, Titanoboa 0.2.7 and
+pytest-xdist 3.8.0. Set `RIPE_TWAP_PYTHON` to that interpreter. Omit xdist flags
+for serial operation; keep file ordering with `--dist loadfile` when parallel.
 
 ```sh
 export PYTHONDONTWRITEBYTECODE=1
 export RIPE_BOA_CACHE_DIR="$(mktemp -d)/compile"
-export RIPE_TWAP_FORK_CACHE="$(mktemp -d)/fork"
 "$RIPE_TWAP_PYTHON" -m pytest tests/priceSources/uniswap_v3 -n 4 --dist loadfile -q
 "$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/priceSources/uniswap_v3 -m fuzz -q -s
 "$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/registries/test_price_desk_gas.py tests/priceSources/uniswap_v3 -m gas -q -s
+"$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/priceSources/uniswap_v3/test_twap_fork_config.py tests/priceSources/uniswap_v3/test_twap_artifacts.py -q
 "$RIPE_TWAP_PYTHON" scripts/export_abis.py --check
 "$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/deployment/test_abi_export.py -q
 "$RIPE_TWAP_PYTHON" -m pytest tests/priceSources tests/registries tests/inventory tests/test_price_desk_aggregate_source_count_guard.py tests/test_lean_shard_coverage.py -n 4 --dist loadfile -q
 ```
 
-Rebuild the actual Solidity wrappers and compare checked artifact bytes:
+The two tooling/artifact files run in required CI job `twap-tooling`, excluded
+from lean shards and explicitly required by `rh-pr-gate`. Gas stays in
+`snapshot-gas`. The coverage guard proves each file has exactly one default
+shard or dedicated tooling job. Default CI is offline; fork RPC is opt-in.
+
+Cold gas tests reset access journals, metering and transient storage while
+preserving snapshot IDs; only sender/top-level recipient start warm. SLOAD
+controls prove cold/warm/cold behavior. Gas excludes intrinsic cost and chain
+data fees. Canonical pool bytecode is verified except compiler-listed
+immutables; synthetic 20000/65535 rings are calibrated against organic history.
+The historical ring proof also runs 3601 organic one-second overwrites.
+
+For contract phase `8a9b90ec` (codesize), all rows below passed the original
+20-case gas matrix. These are maxima over that named matrix, not universal
+worst-case bounds. Targets are 22500 runtime bytes / 210000 forwarded source
+gas; hard limits are 24576 bytes / 250000 stipend. “Burn” is a deliberate hostile
+source-isolation case, not supported route qualification.
+
+| Checkpoint | Runtime B | Successful forwarded max | Late failure max | Burn | Direct successful max |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| codesize baseline | 19544 | 167190 | 174283 | 248164 | 187829 |
+| §3.1 | 19527 | 160756 | 169991 | 248064 | 181395 |
+| §3.2 | 19587 | 161631 | 170820 | 248077 | 182270 |
+| §3.3 | 19867 | 165094 | 174290 | 248162 | 185733 |
+| §3.4 | 20185 | 165094 | 174290 | 248162 | 185733 |
+| §3.5 | 20202 | 165782 | 174984 | 248173 | 185738 |
+| §3.6 | 20614 | 165782 | 174984 | 248173 | 185738 |
+| §3.7 | 20650 | 165782 | 174984 | 248173 | 185738 |
+| §3.8 | 20650 | 165782 | 174984 | 248173 | 185738 |
+
+Phase 2 `cb69a688`: 95 new remediation cases and 44 gas cases passed. T11
+measures **9115 gas** cold-minus-warm for add and update, canonical and synthetic
+storage-heavy quote routes. `MAX_WARM_QUALIFY_GAS` remains **170000**, so ceiling
+plus delta = **179115 <= 210000**. The enumerated pre-callback/read touch set is:
+
+- Addresses: source itself (top-level recipient), pool, canonical desk, RipeHq.
+- Storage: all ten staged `feedConfig[asset]` fields (pool, fee, quoteAsset,
+  assetIsToken0, assetDecimals, quoteDecimals, baseLiquidity, twapWindow,
+  maxObservationAge, minLiquidity); `PriceDesk.tokenScale[asset]`;
+  `RipeHq.addrInfo[7].addr`.
+
+T11 prints the concrete addresses/slot indices and verifies the intersection
+with executed reads. Pool metadata immutables do not warm slot0/liquidity/
+observations. RipeHq ID 5 and MissionControl policy are first read during the
+callback. Canonical add/update samples: warm 153500 / cold 162615. Storage-heavy
+59-slot sample: warm 169893 / cold 179008; 60 slots exceed the ceiling and reject.
+An adversarial metadata path warms extra quote slots, passes the ceiling and
+fails cold: the quote alone costs 228350 (<250000), while the combined outer
+route exhausts its stipend (246724 measured before forwarding loss). The fat
+registry miss is tested separately in T22: source-first 248171/unavailable;
+source-last 183235/success. RH-shaped source-last sample is 162655.
+
+Successful confirmation does not replace cold qualification of a production route; the CI cold tests are the qualification.
+
+## Fresh fixed-WETH laboratory
+
+Fork qualification uses pinned live pools and ETH/USD anchor, with locally
+deployed RipeHq/PriceDesk/ChainlinkPrices/V3 contracts. It is a fixed-WETH
+laboratory, not production route qualification. Defaults use the new model;
+expected results derive independently from raw captured inputs and compiled
+reference tick math, never copied contract outputs. Each case and the complete
+run verify the pinned header. Missing header/state stays unverified; a second
+downgrade preserves the first observed status. `qualified`, `expected_rejected`
+and `unverified` are separate buckets; behavioral failures remain explicit.
+Engineering target overruns fail qualification. Rejections assert the expected
+`invalid feed` or `OLD` reason, not an arbitrary revert.
+
+```sh
+unset RIPE_TWAP_BLOCK RIPE_TWAP_BLOCK_HASH
+RIPE_TWAP_PIN_MODE=fresh RIPE_TWAP_RPC_URL="$RPC" RIPE_TWAP_FORK_OUTPUT=/tmp/twap-fresh.json "$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/priceSources/uniswap_v3/test_twap_fork_qual.py -m fork_qualification -q -s
+# Pinned replay: set mode=pinned and both RIPE_TWAP_BLOCK and RIPE_TWAP_BLOCK_HASH.
+# RIPE_TWAP_ARCHIVE_RPC_URL is preferred for pinned mode; there is no fallback pin.
+```
+
+Atomic checkpoints retain inputs, stages, discrepancies, dependency traces
+and sanitized failure reasons. A 600-second worker deadline retains evidence
+but fails incomplete execution. The fixture selected by `fork_inputs.py` is
+fresh block 58904245: 10 qualified, INDEX 3600/14400 expected rejected, zero
+unverified/failed. INDEX cardinality was 1801 at that pin; this is captured
+state, not a permanent expectation about that pool. Final-head fresh evidence
+is recorded separately after the evidence commit.
+
+## Provenance and ratified residuals
+
+Production math retains the pinned MIT V4 notice. Separate V3 references retain
+GPL-2.0-or-later notices, core LICENSE and SPDX license-list-data v3.25.0 text;
+the pool's license change date is no later than April 1, 2023. V4 notices/upstream
+hashes remain pinned. Compiler artifacts bind source, executable bytes,
+immutables and storage layout: V3 solc 0.7.6/Istanbul; V4 solc 0.8.26/Cancun;
+optimizer 800 runs. Rebuild/check commands:
 
 ```sh
 forge build --force --root tests/priceSources/uniswap_v3/reference/v3 --use 0.7.6
 forge build --force --root tests/priceSources/uniswap_v3/reference/v4 --use 0.8.26
 "$RIPE_TWAP_PYTHON" tests/priceSources/uniswap_v3/reference/artifacts.py --check
-"$RIPE_TWAP_PYTHON" -m pytest tests/priceSources/uniswap_v3/test_twap_math.py -q -s
-# Intentional reference regeneration: omit --check from artifacts.py.
 ```
 
-Ordinary CI uses offline artifacts without downloads or RPC. Artifact JSON pins
-sources, executable hashes, immutable offsets and storage layout: V3 solc
-0.7.6/Istanbul, V4 solc 0.8.26/Cancun, optimizer 800 runs. Compiled comparisons
-cover 303 ticks and 2,424 quotes; fuzz covers 2,048 signed-floor cases (all four
-sign/exactness strata) and 512 mulDiv cases each for valid intermediate
-overflow, quotient overflow, zero divisor, and ordinary non-overflow arithmetic.
+Ratified residuals — **2026-09-09, source: owner** (verbatim):
 
-Production math retains the pinned MIT V4 notice in its Vyper module. Separate
-V3 references/fixtures retain GPL-2.0-or-later notices, core LICENSE and the GPL
-text from SPDX license-list-data v3.25.0; the pool's license change date is no
-later than April 1, 2023. V4 MIT notices and all upstream hashes remain pinned.
-The specification's later release legal review remains required.
-
-The local graph prices WETH through a real `ChainlinkPrices` source bound to a
-mock ETH/USD feed (`graph.weth_price_source`), so anchor freshness, round
-validation and the desk's global stale policy are exercised through the same
-path production uses. `StagingWethSource.vy` is a test WETH source that
-witnesses the V3 source's staged config while the unchanged desk runs the
-confirmation callback; `graph.quote_price_source` prices any other quote token
-through a mock source. Mock pool histories are built for the 1h default window;
-the graph's global stale time is 86,400. Delay/expiry are
-2/100 block counts, with the delay set through `setActionTimeLockAfterSetup`
-exactly as FinishSetup does for every source; block-only advances preserve the
-timestamp.
-
-Stress tests verify canonical compiled pool runtime except compiler-listed
-immutables, calibrate storage against organic history, and reuse synthetic
-20,000/65,535-slot rings. The independent search model predicts a subset of
-measured observation slots, not the live read order. Cold tests reset metering,
-transient storage and access journals, preserving snapshot IDs in an empty
-journal. Only sender/top-level recipient are warmed; SLOAD controls prove
-cold/warm/cold. Gas excludes intrinsic cost and chain data fees. Local stress
-tests enforce 210,000 source gas and 22,500 deployed bytes; hard stipend/EIP-170
-limits always apply. A pool that lacks history for the window reverts with
-`OLD`; the source propagates that and the desk isolates it, which the gas suite
-checks separately from an exhausted `observe`.
-Deployed runtime is 20,986 bytes (EIP-170 headroom 3,590). Canonical peak cold
-direct/forwarded source gas is 187,303/166,710, of which the desk's quote-asset
-read is roughly 33k forwarded; the 20 gas tests took 18.9s on Python 3.12.13/arm64.
-
-Fork workers deploy the graph after selecting the pin.
-
-```sh
-unset RIPE_TWAP_BLOCK RIPE_TWAP_BLOCK_HASH
-RIPE_TWAP_PIN_MODE=fresh RIPE_TWAP_RPC_URL=https://rpc.mainnet.chain.robinhood.com "$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/priceSources/uniswap_v3/test_twap_fork_qual.py -m fork_qualification -q -s
-RIPE_TWAP_PIN_MODE=pinned RIPE_TWAP_RPC_URL=https://rpc.mainnet.chain.robinhood.com RIPE_TWAP_BLOCK=57037442 RIPE_TWAP_BLOCK_HASH=0x2488e1b687eaa880ee85ddbe92b903039500f7e03ef6ead1bdb1374a4659fc27 "$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/priceSources/uniswap_v3/test_twap_fork_qual.py -m fork_qualification -q -s
-```
-
-Pinned mode prefers explicit `RIPE_TWAP_ARCHIVE_RPC_URL`; missing state remains
-unverified with no fresh fallback. RPC retries/timeouts are finite. Atomic
-checkpoints retain raw replies, stages, measured mismatches and sanitized reasons.
-Dependency traces include forwarded/used gas, headroom and nested proxy calls.
-Each completed case and the final run recheck the pinned header. A 600s worker
-timeout retains evidence but fails qualification as incomplete. Direct worker
-invocation requires `RIPE_TWAP_FORK_OUTPUT`; pytest supplies it automatically.
-Live target overruns are disclosed in `target_overrun` while correct results
-remain passed; hard limits and safety assertions still fail qualification.
-Expected rejection is `unavailable`; a behavior mismatch is `failed`. Passing
-laboratory tests does not qualify production routes or approve borrowing.
+zero-delay setup with FinishSetup as a migration item; preflights revert on missing history; same-pool
+update always re-baselines; one-second age minimum; `hasPendingPriceFeedUpdate` is false during the
+callback; quote freshness is the quote source's policy (no V3-specific quote age); desk fallback is
+availability, not corroboration; a one-second liquidity hole pins the harmonic floor for the rest of the
+window under the tested settings; `setFeedDefaults` is untimelocked because it is proposal-scoped; a later
+MissionControl priority reorder can revive the expensive nested quote route; there is no in-transaction
+cold proof of the stipend (see §3.6).

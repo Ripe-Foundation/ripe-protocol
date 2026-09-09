@@ -20,7 +20,7 @@ def ripe_hq():
 def fork_results(tmp_path_factory):
     env=os.environ.copy()
     env['PYTHONDONTWRITEBYTECODE']='1'
-    env['RIPE_TWAP_FORK_OUTPUT']=str(tmp_path_factory.mktemp('twap-fork')/'inputs.json')
+    env.setdefault('RIPE_TWAP_FORK_OUTPUT',str(tmp_path_factory.mktemp('twap-fork')/'inputs.json'))
     data=run_worker([sys.executable,str(BASE/'fork_worker.py')],cwd=BASE.parents[2],env=env,
                     initial=initial_results(env.get('RIPE_TWAP_PIN_MODE'),[a['label'] for a in VECTORS['assets']],LAB))
     assert len(data['cases'])==3*len(VECTORS['assets'])

@@ -1,3 +1,214 @@
+# Uniswap V3 TWAP price source
+
+Revision 7 · 2026-09-09 · owner-ratified PR #229 remediation (D1–D20).
+The current specification is this body. The superseded Revision 5 packet is
+preserved in Appendix A. This revision covers the two new V3 contracts, tests,
+documentation and tooling; it does not authorize deployment or feed admission.
+
+## Price and interfaces
+
+`UniswapV3TwapPrices.vy` is a Vyper 0.4.3 `PriceSource`, optimized for codesize.
+A feed selects one canonical Uniswap V3 pool containing the priced asset. The
+other token is its quote asset. It returns USD18 per whole asset token:
+
+```
+geometric historical asset/quote TWAP × current quote USD price
+```
+
+This is not an arithmetic USD TWAP. The quote is obtained through the current
+canonical PriceDesk resolved by Addys (`RipeHq.getAddr(7)`). A nonzero supplied
+`_priceDesk` must equal that desk or the source returns zero. `_staleTime` is
+ignored, including zero: pool observation age is per feed and quote freshness
+belongs to the authoritative quote source and desk policy.
+
+The constructor binds RipeHq, initial governance, a
+nonempty factory and minimum/maximum action timelocks. Governance, Addys,
+PriceSourceData and TimeLock interfaces are exported without modifying those
+modules. Initial action delay is zero; the existing after-setup setter works,
+and FinishSetup inclusion is a separate migration obligation.
+
+| Interface | Behavior |
+| --- | --- |
+| `getPrice(asset, staleTime=0, priceDesk=0)` | Price, or zero for an unavailable route |
+| `getPriceAndHasFeed(...)` | Price and configured-feed existence |
+| `hasPriceFeed(asset)` | Active config exists; does not certify availability |
+| `hasPendingPriceFeedUpdate(asset)` | Timelock action is pending; false during the qualification callback |
+| `addPriceSnapshot(asset)` | Standard unsupported snapshot operation |
+| `addNewPriceFeed`, `updatePriceFeed` | `(asset, pool, twapWindow=0, maxObservationAge=0)` |
+| `confirmNewPriceFeed`, `confirmPriceFeedUpdate` | Confirm proposed add/update; identity drift cancels and returns false |
+| `cancelNewPendingPriceFeed`, `cancelPriceFeedUpdate` | Explicit cancellation, one cancel event |
+| `disablePriceFeed`, `confirmDisablePriceFeed`, `cancelDisablePriceFeed` | Separate disable lifecycle, independent of market/metadata dependencies |
+| `isValidNewFeed`, `isValidUpdateFeed`, `isValidDisablePriceFeed` | Preflights; typed dependency calls can revert, including missing history |
+| `setFeedDefaults(window, age, ratio)` / `isValidFeedDefaults(...)` | Three-field proposal defaults; setter governance-only and pause-gated |
+| `getPoolLiquidity(pool, window=0)` | Current and harmonic liquidity; zero window uses current defaults |
+| `getFeedLiquidity(asset)` | Current, harmonic over stored window, and stored absolute minimum |
+| `pendingQuoteCount(quote)` | Count of pending add/update proposals using the quote |
+
+## Proposal-bound policy and admission
+
+`FeedDefaults` is `(twapWindow:uint32, maxObservationAge:uint32,
+minLiquidityRatio:uint256)`, initialized to `(3600,1800,5000)`. Valid windows
+are 1800–14400 seconds; `0 < age <= window`; `0 < ratio <= 10000`. The defaults
+setter is untimelocked because it only affects future proposals.
+
+`UniV3FeedConfig` stores, in order: `pool:address`, `fee:uint24`,
+`quoteAsset:address`, `assetIsToken0:bool`, `assetDecimals:uint256`,
+`quoteDecimals:uint256`, `baseLiquidity:uint128`, `twapWindow:uint32`,
+`maxObservationAge:uint32`, `minLiquidity:uint128`.
+
+At proposal, each zero window/age argument independently resolves to the
+current default. The source snapshots token identity/decimals and harmonic
+liquidity over the resolved window, then stores:
+
+```
+minLiquidity = ceil(baseLiquidity * minLiquidityRatio / 10000)
+```
+
+Baseline and minimum must be positive. Both token decimals must be at most 18.
+The pool factory, ordered token pair, fee and canonical factory `getPool` entry
+must match. Admission requires actual `observationCardinality >= window + 1`,
+compared in uint256, and a successful price probe. CardinalityNext alone is
+insufficient. The probe skips the priced-asset scale guard so a proposal can
+start while the desk has an incompatible cached scale (D19).
+
+Same-instance quote cycles are rejected: the quote cannot have an active feed
+or pending action here, and the asset cannot be a quote of an active feed or
+have nonzero `pendingQuoteCount`. Successful proposals increment the quote
+count. Successful confirmation or explicit/identity cancellation decrements
+exactly once. Reverts preserve the count. Disable proposals carry no quote.
+An update protects the active feed's old quote until replacement confirms.
+
+Every update re-baselines, including a same-pool update. Defaults changes do
+not rewrite active feeds or in-flight proposals. The read path never reads
+`feedDefaults`; it uses the stored window, age and absolute minimum. It
+requires positive current liquidity and both current and harmonic liquidity
+at least the stored minimum, a valid unlocked slot0, initialized latest
+observation, and latest observation age at most the stored age.
+
+At most one observation is written per second, on any chain. A full ring of
+N slots spans at least N−1 seconds; successful admission `observe` plus
+`cardinality >= window + 1` protects the lookback under subsequent one-second
+writes. The extrapolated fraction is at most `min(age/window,1)`. The default
+1800/3600 configuration bounds it to 50%; this is not a universal feed bound.
+
+## Precision and arithmetic
+
+Mean tick is the mathematical floor of signed cumulative delta/window;
+accumulators wrap at int56/uint160 before widening. Harmonic liquidity is
+`floor(window * (2**160-1) / (secondsPerLiquidityDelta << 32))`, with zero or
+out-of-uint128 results unavailable.
+
+Tick math quotes `10**assetDecimals * 10**18` raw units, then the USD step is
+`mulDiv(quoteScaled, quotePrice18, 10**quoteDecimals * 10**18)`. Tick range is
+−887272 through +887272. The square uses Q192 when the sqrt ratio fits uint128,
+and the full-width Q128 branch above that boundary. Multiplication uses a
+512-bit intermediate; unrepresentable final uint256 results and zero quotes
+are unavailable, not arithmetic panics. Both orders at the extreme ticks,
+amount 1e36, low-decimal sub-cent assets and independent Fraction bounds are
+tested. Existing typed dependency call failures propagate; PriceDesk isolates
+those reverts under its unchanged source stipend.
+
+## Confirmation, scale recovery and cancellation
+
+Add and update confirmations retain distinct active-state predicates. Their
+order is fixed:
+
+1. Governance, pause, pending action and correct active-state checks.
+2. Re-read identity and canonical factory mapping. Drift cancels, emits once,
+   and returns false, even before the timelock is ready.
+3. Structural and loop checks, plus priced-asset scale compatibility; failures
+   revert with `invalid feed`. There is no confirmation-time price probe.
+4. Confirm the action timelock; failure reverts with `time lock not reached`.
+5. Stage the new config in active storage.
+6. Qualify through the current PriceDesk, measuring the warm callback. Reject
+   excess cost with `route too expensive`, then reject an unsuccessful/zero
+   route with `price source not executable`.
+7. Clear pending state, decrement the quote count, enumerate a newly added
+   asset, and emit the confirmed event.
+
+Transient price, liquidity, OLD, locked pool, zero quote, callback and scale
+failures revert the transaction, preserving the proposal and undoing staged
+config and timelock consumption. Identity drift alone auto-cancels. The
+internal cancellation helpers emit, so explicit cancels do not emit twice.
+Disable confirmation has no identity check or dependency reads.
+
+At confirmation and each price read, `PriceDesk.tokenScale(asset)` must be zero
+or exactly `10**snapshotAssetDecimals`. Only the priced asset is guarded;
+permissionless first scale sync and quote-scale hardening are a separate desk
+follow-up. See the [V3 operator runbook](uniswap-v3-twap-runbook.md) for both
+`[syncTokenScale, confirm]` recovery sequences and the returned-false batch case.
+
+## Quote route, economics and gas qualification
+
+D4 is operator policy only. Every potentially authoritative quote source,
+including fallback, must never call back into PriceDesk (for example Chainlink,
+Pyth or Stork). V3 must be after every quote source; recheck after registry or
+priority changes. There is no on-chain source allowlist or priority walk.
+Cross-instance and wrapper cycles, including wsuperOETHb-style routes, remain
+possible; independent fallback removal can make both reads return zero.
+Desk fallback provides availability, not independent corroboration.
+
+Relative floors do not prove economic depth. Before proposal, check token
+upgradeability/decimals mutability and run the pinned, read-only
+`scripts/twap_pool_depth.py`. It walks tickBitmap/ticks, applies liquidityNet
+crossings, and reports fee-inclusive 1%/2% spot depth separately by direction,
+marked using the pinned live PriceDesk quote. Governance must record the
+minimum acceptable smaller-direction 2% depth in the runbook before proposal.
+
+`MAX_WARM_QUALIFY_GAS = 170000`. The measured warm-to-cold delta is 9115, so
+ceiling + delta = 179115 <= 210000. The pre-callback/read intersection is:
+source, pool, desk and RipeHq addresses; all ten staged feedConfig[asset]
+slots; PriceDesk.tokenScale[asset]; RipeHq.addrInfo[7].addr. Pool observation,
+slot0 and liquidity storage are cold; metadata immutables do not warm those
+slots. HQ entry 5 and MissionControl pricing policy are first touched during
+the callback. T11 prints concrete addresses and slot indices and checks the
+intersection against execution reads for both add and update.
+
+This is a scoped guarantee for that touch set. An adversarial metadata path
+can warm additional quote storage and pass confirmation while failing the
+cold outer route; T11 preserves that demonstration and separately checks the
+quote's own stipend. T22 covers RH-shaped and fat registries. Successful
+confirmation does not replace cold qualification of a production route; the
+CI cold tests are the qualification.
+
+## Events, constants and revision-bound measurements
+
+Pending add/update events log resolved window and maxObservationAge, absolute
+minLiquidity, baseline, confirmationBlock and actionId; confirmed add/update
+events log resolved window, maxObservationAge and minLiquidity. All include
+asset/pool and quote; updates also identify prevPool. Cancel events identify
+asset/pool, plus prevPool for updates. Disable pending includes confirmationBlock
+and actionId; disabled/cancelled identify asset/pool. FeedDefaultsSet has exactly
+window, age and ratio. Exported ABI is `scripts/abis/UniswapV3TwapPrices.json`;
+the internal math module has no standalone ABI.
+
+Constants: HUNDRED_PERCENT=10000, NORMALIZED_DECIMALS=18,
+MAX_PRICED_ASSETS=50, MIN_TWAP_WINDOW=1800, MAX_TWAP_WINDOW=14400,
+MAX_WARM_QUALIFY_GAS=170000; math uses canonical Q32/Q64/Q128/Q192 and tick bounds.
+Unused sqrt-ratio constants were removed.
+
+Contract implementation `8a9b90ec`, measurement comment/tests `cb69a688`:
+Vyper 0.4.3 codesize, Python 3.12, Titanoboa 0.2.7. Runtime is 20650 bytes
+(target <=22500, EIP-170 <=24576). The original 20-case matrix's maximum
+successful forwarded source cost is 165782; its bounded late-failure maximum
+is 174984. Intentional hostile stipend burn reaches 248173 and is a
+fault-isolation case. Expanded T11 has admitted cold samples up to 179008;
+T22's fat-source-last sample is 183235. These are measured maxima over named
+fixtures, not a universal worst-case proof. Hard per-source stipend is 250000;
+engineering forwarded target remains <=210000. The complete per-item table
+and final-head evidence are maintained in the test README/evidence record.
+
+Provenance facts: production math derives from pinned MIT V4 TickMath/FullMath;
+V3 behavior references are separately licensed, compiled and hash-bound. The
+upstream lock and notices are retained. Owner decision D16 closes legal review
+as an implementation gate.
+
+## Appendix A: historical specification (superseded 2026-09-09)
+
+The following original packet, including its intermediate Revision 6 note, is
+retained as history. Its old decisions, interfaces and gates are superseded by
+the current body above and owner decisions D1–D20 dated 2026-09-09.
+
 # Reusable Uniswap V3 TWAP price source — implementation specification
 
 Revision 5 · September 7, 2026 · RIPE Protocol · contracts and tests handoff

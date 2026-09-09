@@ -1,4 +1,6 @@
 """Opt-in, bounded-RPC worker. All EVM mutations are local to this process."""
+import hashlib
+import subprocess
 import json
 import os
 from pathlib import Path
@@ -19,7 +21,7 @@ from conf_utils import advance_timelock_blocks
 from priceSources.uniswap_v3.graph import make_graph,source,params,register,weth_price_source,SOURCE,CHAINLINK
 from priceSources.uniswap_v3.compiled import deploy,artifact
 from priceSources.uniswap_v3.gas_tools import cold,calls,dependency_trace,assert_source_hard_limit,assert_size_hard_limit,target_overruns
-from priceSources.uniswap_v3.fork_results import atomic_save,initial_results,failure,sanitized,exception_reason,rpc_endpoints
+from priceSources.uniswap_v3.fork_results import atomic_save,initial_results,failure,sanitized,exception_reason,rpc_endpoints,downgrade,buckets
 
 from priceSources.uniswap_v3.fork_inputs import VECTORS,LAB
 
@@ -83,6 +85,17 @@ class Rpc:
         return self.call('eth_call',[{'to':address,'data':'0x'+data.hex()},hex(block)])
 
 
+def header_fields(header):
+    try:
+        number=int(header['number'],16)
+        block_hash=header['hash']
+        timestamp=int(header['timestamp'],16)
+        if not re.fullmatch('0x[0-9a-fA-F]{64}',block_hash):raise ValueError('invalid hash')
+        return number,block_hash,timestamp
+    except (KeyError,TypeError,ValueError):
+        raise InfrastructureError('missing or malformed block header field') from None
+
+
 def pin(rpc,mode,block,block_hash):
     if int(rpc.call('eth_chainId',[]),16)!=4663:
         raise ValueError('expected Robinhood chain 4663')
@@ -91,10 +104,10 @@ def pin(rpc,mode,block,block_hash):
         if head<32:raise ValueError('head below fresh offset')
         block=head-32
     header=rpc.call('eth_getBlockByNumber',[hex(block),False])
-    if not header:raise InfrastructureError('pinned header unavailable')
-    if int(header['number'],16)!=block or (block_hash and header['hash'].lower()!=block_hash.lower()):
+    number,selected_hash,timestamp=header_fields(header)
+    if number!=block or (block_hash and selected_hash.lower()!=block_hash.lower()):
         raise ValueError('pinned header/hash mismatch')
-    return {'block':block,'hash':header['hash'],'timestamp':int(header['timestamp'],16)}
+    return {'block':block,'hash':selected_hash,'timestamp':timestamp}
 
 
 def collect(rpc,a,window,pin,raw=None,checkpoint=lambda:None,stage=lambda name:None):
@@ -143,21 +156,23 @@ def reference_price(raw,a,window,timestamp,ref):
     spl=(sc[1]-sc[0])%2**160
     mean=delta//window
     harmonic=window*(2**160-1)//(spl*2**32) if spl else 0
-    valid=(4295128739<=sqrt<1461446703485210103287273052203988822378723970342 and -887272<=tick<=887272 and 0<=index<card<=card_next<=65535 and unlocked and initialized and card>=LAB['minObservationCardinality'] and (timestamp%2**32-ot)%2**32<=LAB['maxObservationAge'] and decoded('liquidity',['uint128'])[0]>=harmonic*LAB['minLiquidityRatio']//100_00 and 1<=harmonic<=2**128-1 and -887272<=mean<=887272 and round_id>0 and answer>0 and answered>=round_id and 0<updated<=timestamp and timestamp-updated<=86400)
+    floor=(harmonic*LAB['minLiquidityRatio']+9999)//10000
+    valid=(4295128739<=sqrt<1461446703485210103287273052203988822378723970342 and -887272<=tick<=887272 and 0<=index<card<=card_next<=65535 and unlocked and initialized and card>=window+1 and 0<LAB['maxObservationAge']<=window and (timestamp%2**32-ot)%2**32<=LAB['maxObservationAge'] and decoded('liquidity',['uint128'])[0]>=floor>0 and 1<=harmonic<=2**128-1 and -887272<=mean<=887272 and round_id>0 and answer>0 and answered>=round_id and 0<updated<=timestamp and timestamp-updated<=86400)
     assert decoded('factory',['address'])[0].lower()==VECTORS['factory'].lower()
     assert decoded('canonicalPool',['address'])[0].lower()==a['pool'].lower()
     tokens=[decoded(k,['address'])[0].lower() for k in ('token0','token1')]
     assert tokens==sorted([a['asset'].lower(),VECTORS['weth'].lower()],key=lambda x:int(x,16))
     if not valid:return 0
-    quote=ref.quote(mean,10**d,a['asset'],VECTORS['weth'])
+    quote=ref.quote(mean,10**d*10**18,a['asset'],VECTORS['weth'])
     usd=answer*10**(18-ad)
-    result=quote*usd//10**18
+    result=quote*usd//10**36
     return result if usd<2**256 and result<2**256 else 0
 
 
 def check_header(rpc,selected):
     last=rpc.call('eth_getBlockByNumber',[hex(selected['block']),False])
-    return 'matched' if last and int(last['number'],16)==selected['block'] and last['hash'].lower()==selected['hash'].lower() and int(last['timestamp'],16)==selected['timestamp'] else 'mismatch'
+    number,block_hash,timestamp=header_fields(last)
+    return 'matched' if number==selected['block'] and block_hash.lower()==selected['hash'].lower() and timestamp==selected['timestamp'] else 'mismatch'
 
 
 def deployed_size(contract):
@@ -183,11 +198,15 @@ def qualify_case(g,ref,a,case,checkpoint):
         assert_size_hard_limit(case['deployed_bytes'])
         stage('proposal')
         if expected==0:
-            # unusable routes are rejected as `invalid feed`, or revert inside the pool (`OLD`)
-            with boa.reverts():
+            reason='invalid feed'
+            if 'observe_revert' in case['raw']:
+                assert re.search(r'\bOLD\b',case['raw']['observe_revert']), 'unexpected observe revert'
+                reason='OLD'
+            case['expected_revert']=reason
+            with boa.reverts(reason):
                 s.addNewPriceFeed(a['asset'],*params(a['pool'],window=window),sender=g.gov)
-            case.update(status='unavailable',behavior_passed=True,
-                        reason='route unavailable under laboratory guards; admission rejected as expected')
+            case.update(status='expected_rejected',behavior_passed=True,
+                        reason='fixed-WETH laboratory admission rejected as expected: '+reason)
             checkpoint()
             return
         assert s.addNewPriceFeed(a['asset'],*params(a['pool'],window=window),sender=g.gov)
@@ -218,6 +237,7 @@ def qualify_case(g,ref,a,case,checkpoint):
         assert case['actual']==expected, 'price mismatch against compiled reference'
         assert len(children)==1 and children[0].msg.gas==250000, 'unexpected source call stipend/count'
         assert_source_hard_limit(case['source_gas'])
+        assert not any(case['target_overrun'].values()), 'engineering target exceeded'
         stage('usd_conversion')
         case['usd_value']=g.desk.getUsdValue(a['asset'],scale,True)
         checkpoint()
@@ -226,7 +246,7 @@ def qualify_case(g,ref,a,case,checkpoint):
         case['asset_amount']=g.desk.getAssetAmount(a['asset'],expected,True)
         checkpoint()
         assert case['asset_amount']==scale, 'asset conversion mismatch'
-        case.update(status='passed',behavior_passed=True,
+        case.update(status='qualified',behavior_passed=True,
                     reason='local source and actual desk matched compiled reference at fixed pin')
         checkpoint()
 
@@ -236,6 +256,9 @@ def run():
     urls=rpc_endpoints(os.environ)
     path=os.environ['RIPE_TWAP_FORK_OUTPUT']
     output=initial_results(mode,[a['label'] for a in VECTORS['assets']],LAB)
+    output['code_revision']=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    output['code_sha256']={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [ROOT/SOURCE,ROOT/'contracts/priceSources/modules/UniswapV3TwapMath.vy',Path(__file__),ROOT/'tests/priceSources/uniswap_v3/fork_inputs.py']}
+    output['model']='fixed-WETH laboratory; local RipeHq/PriceDesk/ChainlinkPrices; pinned live pool and ETH/USD anchor'
     def save():atomic_save(path,output)
     def stage(name):
         output['stage']=name
@@ -291,9 +314,7 @@ def run():
                     case['header_consistency']='unverified'
                     case['header_reason']=exception_reason(exc,urls)
                 if case['header_consistency']!='matched':
-                    case['observed_status']=case['status']
-                    case.update(status='unverified',behavior_passed=False,
-                                reason='case header consistency '+case['header_consistency']+'; '+case['reason'])
+                    downgrade(case,'case header consistency '+case['header_consistency'])
                 save()
                 print('TWAP_FORK_CASE '+json.dumps({k:v for k,v in case.items() if k!='raw'},sort_keys=True),flush=True)
     except infrastructure as exc:
@@ -308,9 +329,8 @@ def run():
         except infrastructure as exc:output['header_reason']=exception_reason(exc,urls)
     if output['header_consistency']!='matched':
         for case in output['cases']:
-            case['observed_status']=case['status']
-            case.update(status='unverified',behavior_passed=False,
-                        reason='end-header consistency '+output['header_consistency']+'; '+case.get('reason',''))
+            downgrade(case,'end-header consistency '+output['header_consistency'])
+    output['buckets']=buckets(output)
     stage('complete')
     print('TWAP_FORK_RESULT '+json.dumps(output,sort_keys=True),flush=True)
     return 0

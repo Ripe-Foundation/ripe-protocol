@@ -39,7 +39,10 @@ def exception_reason(exc,rpc_urls=()):
     trace=getattr(exc,'stack_trace',None)
     try:reason=getattr(trace,'dev_reason',None) if trace is not None else None
     except (AttributeError,IndexError):reason=None
-    return sanitized(f'{type(exc).__name__}: {reason or str(exc)}',rpc_urls)
+    if not reason:
+        try:reason=str(exc)
+        except Exception:reason='exception trace could not be formatted'
+    return sanitized(f'{type(exc).__name__}: {reason}',rpc_urls)
 
 
 def atomic_save(path,data):
@@ -85,10 +88,10 @@ def run_worker(command,*,cwd,env,timeout=600,initial):
         data=json.loads(path.read_text())
         data.update(stage='timeout',reason=f'worker deadline exceeded ({timeout}s)')
         for case in data['cases']:
-            if case.get('header_consistency')=='matched' and case['status'] in ('passed','unavailable','failed'):
+            if case.get('header_consistency')=='matched' and case['status'] in ('qualified','expected_rejected','failed'):
                 continue
-            case['observed_status']=case['status']
-            case['observed_reason']=case.get('reason','')
+            case.setdefault('observed_status',case['status'])
+            case.setdefault('observed_reason',case.get('reason',''))
             case.update(status='unverified',behavior_passed=False,
                         reason=f'worker deadline exceeded ({timeout}s) during '+case['stage'])
         atomic_save(path,data)
@@ -102,3 +105,16 @@ def run_worker(command,*,cwd,env,timeout=600,initial):
         raise RuntimeError(f'fork worker exited {result.returncode}; stderr: {stderr}; stdout: {stdout}')
     data=json.loads(path.read_text())
     return require_complete(data)
+
+
+def downgrade(case,reason):
+    """Retain the original outcome across both case and end-header downgrades."""
+    case.setdefault('observed_status',case['status'])
+    case.setdefault('observed_reason',case.get('reason',''))
+    case.update(status='unverified',behavior_passed=False,reason=reason+'; '+case.get('reason',''))
+
+
+def buckets(data):
+    # A behavioral failure is never silently counted as an expected rejection.
+    return {status:[f"{c['asset']}/{c['window']}" for c in data['cases'] if c['status']==status]
+            for status in ('qualified','expected_rejected','unverified','failed')}

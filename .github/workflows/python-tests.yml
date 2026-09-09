@@ -218,6 +218,8 @@ jobs:
                 tests/priceSources
                 --ignore=tests/priceSources/curve
                 --ignore=tests/priceSources/blueChip
+                --ignore=tests/priceSources/uniswap_v3/test_twap_fork_config.py
+                --ignore=tests/priceSources/uniswap_v3/test_twap_artifacts.py
               )
               ;;
             supporting)
@@ -408,6 +410,54 @@ jobs:
             tests/priceSources/uniswap_v3/test_twap_gas.py \
             'tests/registries/test_price_desk_aggregate_protocol_gas.py::test_aggregate_protocol_gas[valuation-intended_prompt]'
 
+  twap-tooling:
+    name: Python 3.12.0 / twap-tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ETHERSCAN_API_KEY: local-placeholder
+      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
+      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
+      PYTHONHASHSEED: "0"
+      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
+      TMPDIR: ${{ github.workspace }}/.ci/tmp
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use Python 3.12.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.0"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Create private runtime directories
+        run: |
+          mkdir -p \
+            "$HYPOTHESIS_STORAGE_DIRECTORY" \
+            "$PYTHONPYCACHEPREFIX" \
+            "$RIPE_BOA_CACHE_DIR" \
+            "$TMPDIR" \
+            "$XDG_CACHE_HOME" \
+            "$RUNNER_TEMP/pytest-cache" \
+            "$RUNNER_TEMP/pytest-basetemp"
+
+      - name: Install pinned requirements
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip check
+
+      - name: Run TWAP tooling and artifact tests
+        run: |
+          unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
+          unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+          unset RIPE_TWAP_RPC_URL RIPE_TWAP_ARCHIVE_RPC_URL RIPE_TWAP_PIN_MODE
+          python -m pytest -o addopts='' \
+            tests/priceSources/uniswap_v3/test_twap_fork_config.py \
+            tests/priceSources/uniswap_v3/test_twap_artifacts.py
+
   rh-pr-gate:
     name: rh-pr-gate
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
@@ -416,6 +466,7 @@ jobs:
       - test
       - deployment-controls
       - snapshot-gas
+      - twap-tooling
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -452,5 +503,14 @@ jobs:
         run: |
           if [ "$GAS_RESULT" != "success" ]; then
             echo "Snapshot gas lane did not succeed: $GAS_RESULT"
+            exit 1
+          fi
+
+      - name: Require successful TWAP tooling
+        env:
+          TWAP_TOOLING_RESULT: ${{ needs.twap-tooling.result }}
+        run: |
+          if [ "$TWAP_TOOLING_RESULT" != "success" ]; then
+            echo "TWAP tooling did not succeed: $TWAP_TOOLING_RESULT"
             exit 1
           fi

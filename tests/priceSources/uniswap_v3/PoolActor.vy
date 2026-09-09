@@ -33,3 +33,7 @@ def uniswapV3SwapCallback(a: int256, b: int256, data: Bytes[1]):
         assert extcall IERC20(staticcall Pool(msg.sender).token0()).transfer(msg.sender, convert(a,uint256))
     if b > 0:
         assert extcall IERC20(staticcall Pool(msg.sender).token1()).transfer(msg.sender, convert(b,uint256))
+@external
+def add_range(pool: address, lower: int24, upper: int24, amount: uint128):
+    self.pool = pool
+    extcall Pool(pool).mint(self, lower, upper, amount, b"")

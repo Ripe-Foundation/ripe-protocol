@@ -78,7 +78,7 @@ from fork_results import atomic_save
 path=os.environ['RIPE_TWAP_FORK_OUTPUT']
 data=json.load(open(path))
 data['pin']={'block':7,'hash':'0x'+'ab'*32,'timestamp':100}
-data['cases'][0].update(status='passed',behavior_passed=True,header_consistency='matched',stage='asset_conversion',raw={'round':'0x1234'},actual=42,source_gas=12345)
+data['cases'][0].update(status='qualified',behavior_passed=True,header_consistency='matched',stage='asset_conversion',raw={'round':'0x1234'},actual=42,source_gas=12345)
 data['cases'][1].update(stage='rpc:round',raw={'assetDecimals':'0x12'})
 data['cases'][2].update(status='failed',stage='price',raw={'round':'0x56'},reason='price mismatch',actual=17,reference=18)
 atomic_save(path,data)
@@ -91,7 +91,7 @@ time.sleep(60)
                    initial=initial_results('pinned',['TEST','WAITING'],{}))
     data=json.loads(path.read_text())
     assert data['stage']=='timeout' and data['pin']['block']==7
-    assert data['cases'][0]['status']=='passed' and data['cases'][0]['source_gas']==12345
+    assert data['cases'][0]['status']=='qualified' and data['cases'][0]['source_gas']==12345
     assert data['cases'][0]['raw']=={'round':'0x1234'}
     assert data['cases'][1]['raw']=={'assetDecimals':'0x12'}
     assert data['cases'][1]['status']=='unverified' and 'rpc:round' in data['cases'][1]['reason']
@@ -124,9 +124,12 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
     from . import fork_worker as worker
     from .fork_results import atomic_save,failure
     from .compiled import deploy
-    from .raw import Raw
+    from .raw import Raw,Revert
+    from eth_abi import encode
+    from eth_utils import keccak
     from .graph import make_graph,weth_price_source
-    data=json.loads((Path(__file__).parent/'fixtures/fresh-57185814.json').read_text())
+    from .fork_inputs import FRESH_FIXTURE
+    data=json.loads(FRESH_FIXTURE.read_text())
     captured=data['cases'][0]
     case={'asset':captured['asset'],'window':captured['window'],'pin':data['pin'],
           'raw':dict(captured['raw']),'status':'unverified'}
@@ -142,6 +145,8 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
          'observations(uint256)':decoded('observation'),'observe(uint32[])':decoded('observe')},address=asset['pool'])
     weth_price_source(g,worker.VECTORS['weth'],worker.VECTORS['anchor']['address'])
     ref=deploy('v3','Reference')
+    expected=worker.reference_price(raw,asset,case['window'],data['pin']['timestamp'],ref)
+    assert expected>0
     if fault=='price':
         reference=worker.reference_price
         monkeypatch.setattr(worker,'reference_price',lambda *args:reference(*args)+1)
@@ -165,17 +170,13 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
         monkeypatch.setattr(worker,'source',rejected)
     else:
         case['raw']['observe_revert']='execution reverted: OLD'
-        del pool.responses['observe(uint32[])'];pool.install()
+        pool.responses['observe(uint32[])']=Revert(keccak(text='Error(string)')[:4]+encode(['string'],['OLD']));pool.install()
     path=tmp_path/'case.json'
     save=lambda:atomic_save(path,case)
-    if fault in ('unavailable','gas_target','size_target'):
+    if fault=='unavailable':
         worker.qualify_case(g,ref,asset,case,save)
-        assert case['status']==('unavailable' if fault=='unavailable' else 'passed')
-        assert case['behavior_passed']
-        if fault!='unavailable':
-            assert case['actual']==case['reference']==case['usd_value']==captured['actual']
-            assert case['asset_amount']==case['token_scale']
-            assert case['target_overrun']=={'source_gas':int(fault=='gas_target'),'deployed_bytes':int(fault=='size_target')}
+        assert case['status']=='expected_rejected' and case['behavior_passed']
+        assert case['expected_revert']=='OLD'
     else:
         with pytest.raises((AssertionError,RuntimeError)) as caught:
             worker.qualify_case(g,ref,asset,case,save)
@@ -185,11 +186,15 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
             assert case['stage']==('price' if fault=='hard_gas' else 'constructor')
             assert ('hard stipend' if fault=='hard_gas' else 'EIP-170') in case['reason']
             assert case['target_overrun']['source_gas' if fault=='hard_gas' else 'deployed_bytes']>0
+        elif fault in ('gas_target','size_target'):
+            assert case['stage']=='price' and 'engineering target exceeded' in case['reason']
+            assert case['actual']==case['reference']==expected
+            assert case['target_overrun']=={'source_gas':int(fault=='gas_target'),'deployed_bytes':int(fault=='size_target')}
         elif fault=='exception':
             assert case['stage']=='constructor' and 'descriptive injected constructor failure' in case['reason']
         else:
             assert case['stage']==fault
-            assert case['actual']==captured['actual'] and case['source_gas']>0 and case['desk_gas']>0
+            assert case['actual']==expected and case['source_gas']>0 and case['desk_gas']>0
             assert case['source_calls'][0]['gas_forwarded']==250000
             dependencies=case['source_calls'][0]['dependencies']
             assert dependencies and all(d['gas_forwarded']>=d['gas_used'] for d in dependencies)
@@ -293,3 +298,26 @@ def test_empty_timeout_is_incomplete_and_completed_missing_state_stays_unverifie
     assert data['stage']=='timeout' and all(c['status']=='unverified' for c in data['cases'])
     data['stage']='complete'
     assert require_complete(data) is data
+
+
+@pytest.mark.parametrize('missing',['number','hash','timestamp'])
+@pytest.mark.parametrize('operation',['pin','check'])
+def test_missing_header_fields_are_infrastructure_not_behavior_failure(missing,operation):
+    from .fork_worker import pin,check_header,InfrastructureError
+    header={'number':'0x7','hash':'0x'+'ab'*32,'timestamp':'0x64'}
+    del header[missing]
+    class Incomplete:
+        def call(self,method,args):return '0x1237' if method=='eth_chainId' else header
+    with pytest.raises(InfrastructureError,match='header field'):
+        if operation=='pin':pin(Incomplete(),'pinned',7,None)
+        else:check_header(Incomplete(),{'block':7,'hash':'0x'+'ab'*32,'timestamp':100})
+
+
+def test_end_header_downgrade_preserves_first_observed_status_and_reason():
+    from .fork_results import downgrade,buckets
+    case={'asset':'TEST','window':3600,'status':'expected_rejected','behavior_passed':True,'reason':'invalid feed'}
+    downgrade(case,'case header mismatch')
+    downgrade(case,'end header missing')
+    assert case['status']=='unverified' and not case['behavior_passed']
+    assert case['observed_status']=='expected_rejected' and case['observed_reason']=='invalid feed'
+    assert buckets({'cases':[case]})=={'qualified':[],'expected_rejected':[],'unverified':['TEST/3600'],'failed':[]}

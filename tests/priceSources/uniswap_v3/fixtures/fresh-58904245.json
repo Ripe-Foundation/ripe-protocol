@@ -1,0 +1,2170 @@
+{
+  "mode": "fresh",
+  "pin": {
+    "block": 58904245,
+    "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+    "timestamp": 1788992960
+  },
+  "stage": "complete",
+  "header_consistency": "matched",
+  "cases": [
+    {
+      "asset": "CASHCAT",
+      "window": 1800,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x000000000000000000000000020bfc650a365f8bb26819deaabf3e21291018b4",
+        "token1": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x00000000000000000000000000000000000000000000270a5e9bb67dc37911d3",
+        "slot0": "0x00000000000000000000000000000000000000000211769d9c962ddf3d63c0a8fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe87890000000000000000000000000000000000000000000000000000000000000c5a0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd9effffffffffffffffffffffffffffffffffffffffffffffffffffff48cd76a9cb0000000000000000000000000000000000000000000004573f5a3d4b008e856c0000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffffffff48d79f044bffffffffffffffffffffffffffffffffffffffffffffffffffffff48cd44a9fd0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000457114d426602b83a1c00000000000000000000000000000000000000000000045740392ff6811fe2cb",
+        "canonicalPool": "0x000000000000000000000000a70fc67c9f69da90b63a0e4c05d229954574e313",
+        "poolRuntimeSha256": "0cc1226092bf770d4b3749c1ded81e9b34807b656704c1b67e431271cd5a8881",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 157824344792992350,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 157824344792992350,
+      "desk_gas": 199331,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 161137,
+          "failed": false,
+          "output": "0x0000000000000000000000000000000000000000000000000230b467c84b8a5e0000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 80918,
+              "gas_headroom": 124999,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 120946,
+              "gas_used": 33356,
+              "gas_headroom": 87590,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 118319,
+                  "gas_used": 340,
+                  "gas_headroom": 117979,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 117724,
+                  "gas_used": 648,
+                  "gas_headroom": 117076,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 115739,
+                  "gas_used": 29393,
+                  "gas_headroom": 86346,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 102878,
+                      "gas_used": 340,
+                      "gas_headroom": 102538,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 98978,
+                      "gas_used": 13315,
+                      "gas_headroom": 85663,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 89993,
+                          "gas_used": 5082,
+                          "gas_headroom": 84911,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 161137,
+      "usd_value": 157824344792992350,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "CASHCAT",
+      "window": 3600,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x000000000000000000000000020bfc650a365f8bb26819deaabf3e21291018b4",
+        "token1": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x00000000000000000000000000000000000000000000270a5e9bb67dc37911d3",
+        "slot0": "0x00000000000000000000000000000000000000000211769d9c962ddf3d63c0a8fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe87890000000000000000000000000000000000000000000000000000000000000c5a0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd9effffffffffffffffffffffffffffffffffffffffffffffffffffff48cd76a9cb0000000000000000000000000000000000000000000004573f5a3d4b008e856c0000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffffffff48e1f8d977ffffffffffffffffffffffffffffffffffffffffffffffffffffff48cd44a9fd0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000456e04a81659ecf0df300000000000000000000000000000000000000000000045740392ff6811fe2cb",
+        "canonicalPool": "0x000000000000000000000000a70fc67c9f69da90b63a0e4c05d229954574e313",
+        "poolRuntimeSha256": "0cc1226092bf770d4b3749c1ded81e9b34807b656704c1b67e431271cd5a8881",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 157982240177682735,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 157982240177682735,
+      "desk_gas": 195585,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 157391,
+          "failed": false,
+          "output": "0x00000000000000000000000000000000000000000000000002314402aa9c792f0000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 77108,
+              "gas_headroom": 128809,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 124633,
+              "gas_used": 33356,
+              "gas_headroom": 91277,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 121949,
+                  "gas_used": 340,
+                  "gas_headroom": 121609,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 121353,
+                  "gas_used": 648,
+                  "gas_headroom": 120705,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 119369,
+                  "gas_used": 29393,
+                  "gas_headroom": 89976,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 106451,
+                      "gas_used": 340,
+                      "gas_headroom": 106111,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 102552,
+                      "gas_used": 13315,
+                      "gas_headroom": 89237,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 93511,
+                          "gas_used": 5082,
+                          "gas_headroom": 88429,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 157391,
+      "usd_value": 157982240177682735,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "CASHCAT",
+      "window": 14400,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x000000000000000000000000020bfc650a365f8bb26819deaabf3e21291018b4",
+        "token1": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x00000000000000000000000000000000000000000000270a5e9bb67dc37911d3",
+        "slot0": "0x00000000000000000000000000000000000000000211769d9c962ddf3d63c0a8fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe87890000000000000000000000000000000000000000000000000000000000000c5a0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd9effffffffffffffffffffffffffffffffffffffffffffffffffffff48cd76a9cb0000000000000000000000000000000000000000000004573f5a3d4b008e856c0000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffffffff491fcc93b2ffffffffffffffffffffffffffffffffffffffffffffffffffffff48cd44a9fd0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000455c6647104aace487a00000000000000000000000000000000000000000000045740392ff6811fe2cb",
+        "canonicalPool": "0x000000000000000000000000a70fc67c9f69da90b63a0e4c05d229954574e313",
+        "poolRuntimeSha256": "0cc1226092bf770d4b3749c1ded81e9b34807b656704c1b67e431271cd5a8881",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 163298688364049492,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 163298688364049492,
+      "desk_gas": 197640,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 159446,
+          "failed": false,
+          "output": "0x0000000000000000000000000000000000000000000000000244274ab839f4540000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 79108,
+              "gas_headroom": 126809,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 122610,
+              "gas_used": 33356,
+              "gas_headroom": 89254,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 119957,
+                  "gas_used": 340,
+                  "gas_headroom": 119617,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 119362,
+                  "gas_used": 648,
+                  "gas_headroom": 118714,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 117377,
+                  "gas_used": 29393,
+                  "gas_headroom": 87984,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 104490,
+                      "gas_used": 340,
+                      "gas_headroom": 104150,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 100591,
+                      "gas_used": 13315,
+                      "gas_headroom": 87276,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 91581,
+                          "gas_used": 5082,
+                          "gas_headroom": 86499,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 159446,
+      "usd_value": 163298688364049492,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "PONS",
+      "window": 1800,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x00000000000000000000000039dbed3a2bd333467115de45665cc57f813c4571",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x000000000000000000000000000000000000000000002625414729c906ef95d8",
+        "slot0": "0x000000000000000000000000000000000000003dc26c05fb01924412372b9c5d00000000000000000000000000000000000000000000000000000000000142250000000000000000000000000000000000000000000000000000000000004a2c0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd4c0000000000000000000000000000000000000000000000000000007b19ef4e9500000000000000000000000000000000000000000000026c353888b31d8e8e750000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000007b11a432360000000000000000000000000000000000000000000000000000007b1a814759000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000026c0bab8f2e8fb530dc00000000000000000000000000000000000000000000026c384306bbb422fd1e",
+        "canonicalPool": "0x00000000000000000000000010cc6bd38112cac182db90b6a71d8bb5939526ba",
+        "poolRuntimeSha256": "c4dcf4932bf4f7741091aea2dbae7ddc4cb898913b7558e97ad5acdc302fa9a5",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 632520899279196800,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 632520899279196800,
+      "desk_gas": 184063,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 145869,
+          "failed": false,
+          "output": "0x00000000000000000000000000000000000000000000000008c72a681a8c12800000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 65782,
+              "gas_headroom": 140135,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 135975,
+              "gas_used": 33356,
+              "gas_headroom": 102619,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 133114,
+                  "gas_used": 340,
+                  "gas_headroom": 132774,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 132518,
+                  "gas_used": 648,
+                  "gas_headroom": 131870,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 130534,
+                  "gas_used": 29393,
+                  "gas_headroom": 101141,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 117441,
+                      "gas_used": 340,
+                      "gas_headroom": 117101,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 113542,
+                      "gas_used": 13315,
+                      "gas_headroom": 100227,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 104329,
+                          "gas_used": 5082,
+                          "gas_headroom": 99247,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 145869,
+      "usd_value": 632520899279196800,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "PONS",
+      "window": 3600,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x00000000000000000000000039dbed3a2bd333467115de45665cc57f813c4571",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x000000000000000000000000000000000000000000002625414729c906ef95d8",
+        "slot0": "0x000000000000000000000000000000000000003dc26c05fb01924412372b9c5d00000000000000000000000000000000000000000000000000000000000142250000000000000000000000000000000000000000000000000000000000004a2c0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd4c0000000000000000000000000000000000000000000000000000007b19ef4e9500000000000000000000000000000000000000000000026c353888b31d8e8e750000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000007b08c381e80000000000000000000000000000000000000000000000000000007b1a814759000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000026bde78d3e481c0d7f200000000000000000000000000000000000000000000026c384306bbb422fd1e",
+        "canonicalPool": "0x00000000000000000000000010cc6bd38112cac182db90b6a71d8bb5939526ba",
+        "poolRuntimeSha256": "c4dcf4932bf4f7741091aea2dbae7ddc4cb898913b7558e97ad5acdc302fa9a5",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 628360214736224807,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 628360214736224807,
+      "desk_gas": 195564,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 157370,
+          "failed": false,
+          "output": "0x00000000000000000000000000000000000000000000000008b862493e5742270000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 77283,
+              "gas_headroom": 128634,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 124654,
+              "gas_used": 33356,
+              "gas_headroom": 91298,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 121969,
+                  "gas_used": 340,
+                  "gas_headroom": 121629,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 121374,
+                  "gas_used": 648,
+                  "gas_headroom": 120726,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 119389,
+                  "gas_used": 29393,
+                  "gas_headroom": 89996,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 106470,
+                      "gas_used": 340,
+                      "gas_headroom": 106130,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 102571,
+                      "gas_used": 13315,
+                      "gas_headroom": 89256,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 93530,
+                          "gas_used": 5082,
+                          "gas_headroom": 88448,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 157370,
+      "usd_value": 628360214736224807,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "PONS",
+      "window": 14400,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x00000000000000000000000039dbed3a2bd333467115de45665cc57f813c4571",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x000000000000000000000000000000000000000000002625414729c906ef95d8",
+        "slot0": "0x000000000000000000000000000000000000003dc26c05fb01924412372b9c5d00000000000000000000000000000000000000000000000000000000000142250000000000000000000000000000000000000000000000000000000000004a2c0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd4c0000000000000000000000000000000000000000000000000000007b19ef4e9500000000000000000000000000000000000000000000026c353888b31d8e8e750000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000007ad3a9e88a0000000000000000000000000000000000000000000000000000007b1a814759000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000026abf64579dbe5ed12000000000000000000000000000000000000000000000026c384306bbb422fd1e",
+        "canonicalPool": "0x00000000000000000000000010cc6bd38112cac182db90b6a71d8bb5939526ba",
+        "poolRuntimeSha256": "c4dcf4932bf4f7741091aea2dbae7ddc4cb898913b7558e97ad5acdc302fa9a5",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 637473605106197880,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 637473605106197880,
+      "desk_gas": 197436,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 159242,
+          "failed": false,
+          "output": "0x00000000000000000000000000000000000000000000000008d8c2ddca0ae5780000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 79283,
+              "gas_headroom": 126634,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 122811,
+              "gas_used": 33356,
+              "gas_headroom": 89455,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 120155,
+                  "gas_used": 340,
+                  "gas_headroom": 119815,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 119560,
+                  "gas_used": 648,
+                  "gas_headroom": 118912,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 117575,
+                  "gas_used": 29393,
+                  "gas_headroom": 88182,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 104685,
+                      "gas_used": 340,
+                      "gas_headroom": 104345,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 100786,
+                      "gas_used": 13315,
+                      "gas_headroom": 87471,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 91773,
+                          "gas_used": 5082,
+                          "gas_headroom": 86691,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 159242,
+      "usd_value": 637473605106197880,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "AI",
+      "window": 1800,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x0000000000000000000000002e8c31162b855a2ffa90f6f8634643ad6f111e18",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x000000000000000000000000000000000000000000003297f64ff638ca306096",
+        "slot0": "0x000000000000000000000000000000000000006d596cd613daf3337604d31bd70000000000000000000000000000000000000000000000000000000000016ec700000000000000000000000000000000000000000000000000000000000016ba0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1ddbc0000000000000000000000000000000000000000000000000000007497aa36dc0000000000000000000000000000039c0000000000000ab7d8c111566d968fc70000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000748d8eec9b0000000000000000000000000000000000000000000000000000007497aff1f800000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000039c0000000000000ab7b0dcda3423dc0be80000000000000000000000000000039c0000000000000ab7d8d54eb4467032bd",
+        "canonicalPool": "0x000000000000000000000000c4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+        "poolRuntimeSha256": "f47276e25720d218522d28508ecf1c9260d976655e8f852166c0339c52ebd2c1",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 194468896180965276,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 194468896180965276,
+      "desk_gas": 197509,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 159315,
+          "failed": false,
+          "output": "0x00000000000000000000000000000000000000000000000002b2e46e44ba8f9c0000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 79283,
+              "gas_headroom": 126634,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 122739,
+              "gas_used": 33356,
+              "gas_headroom": 89383,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 120084,
+                  "gas_used": 340,
+                  "gas_headroom": 119744,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 119489,
+                  "gas_used": 648,
+                  "gas_headroom": 118841,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 117504,
+                  "gas_used": 29393,
+                  "gas_headroom": 88111,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 104615,
+                      "gas_used": 340,
+                      "gas_headroom": 104275,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 100716,
+                      "gas_used": 13315,
+                      "gas_headroom": 87401,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 91704,
+                          "gas_used": 5082,
+                          "gas_headroom": 86622,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 159315,
+      "usd_value": 194468896180965276,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "AI",
+      "window": 3600,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x0000000000000000000000002e8c31162b855a2ffa90f6f8634643ad6f111e18",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x000000000000000000000000000000000000000000003297f64ff638ca306096",
+        "slot0": "0x000000000000000000000000000000000000006d596cd613daf3337604d31bd70000000000000000000000000000000000000000000000000000000000016ec700000000000000000000000000000000000000000000000000000000000016ba0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1ddbc0000000000000000000000000000000000000000000000000000007497aa36dc0000000000000000000000000000039c0000000000000ab7d8c111566d968fc70000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000074837a0c170000000000000000000000000000000000000000000000000000007497aff1f800000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000039c0000000000000ab78c4209e77e3a40e90000000000000000000000000000039c0000000000000ab7d8d54eb4467032bd",
+        "canonicalPool": "0x000000000000000000000000c4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+        "poolRuntimeSha256": "f47276e25720d218522d28508ecf1c9260d976655e8f852166c0339c52ebd2c1",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 198834162602724602,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 198834162602724602,
+      "desk_gas": 179044,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 140850,
+          "failed": false,
+          "output": "0x00000000000000000000000000000000000000000000000002c2669e0f25ccfa0000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 60498,
+              "gas_headroom": 145419,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 140916,
+              "gas_used": 33356,
+              "gas_headroom": 107560,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 137977,
+                  "gas_used": 340,
+                  "gas_headroom": 137637,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 137382,
+                  "gas_used": 648,
+                  "gas_headroom": 136734,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 135397,
+                  "gas_used": 29393,
+                  "gas_headroom": 106004,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 122228,
+                      "gas_used": 340,
+                      "gas_headroom": 121888,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 118329,
+                      "gas_used": 13315,
+                      "gas_headroom": 105014,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 109042,
+                          "gas_used": 5082,
+                          "gas_headroom": 103960,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 140850,
+      "usd_value": 198834162602724602,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "AI",
+      "window": 14400,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x0000000000000000000000002e8c31162b855a2ffa90f6f8634643ad6f111e18",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x000000000000000000000000000000000000000000003297f64ff638ca306096",
+        "slot0": "0x000000000000000000000000000000000000006d596cd613daf3337604d31bd70000000000000000000000000000000000000000000000000000000000016ec700000000000000000000000000000000000000000000000000000000000016ba0000000000000000000000000000000000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000004e2000000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1ddbc0000000000000000000000000000000000000000000000000000007497aa36dc0000000000000000000000000000039c0000000000000ab7d8c111566d968fc70000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000074471fbdb40000000000000000000000000000000000000000000000000000007497aff1f800000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000039c0000000000000ab6b76bdff2843854350000000000000000000000000000039c0000000000000ab7d8d54eb4467032bd",
+        "canonicalPool": "0x000000000000000000000000c4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+        "poolRuntimeSha256": "f47276e25720d218522d28508ecf1c9260d976655e8f852166c0339c52ebd2c1",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 205381557171371304,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 205381557171371304,
+      "desk_gas": 197526,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 159332,
+          "failed": false,
+          "output": "0x00000000000000000000000000000000000000000000000002d9a970269dbd280000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 79108,
+              "gas_headroom": 126809,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 122723,
+              "gas_used": 33356,
+              "gas_headroom": 89367,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 120069,
+                  "gas_used": 340,
+                  "gas_headroom": 119729,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 119473,
+                  "gas_used": 648,
+                  "gas_headroom": 118825,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 117489,
+                  "gas_used": 29393,
+                  "gas_headroom": 88096,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 104600,
+                      "gas_used": 340,
+                      "gas_headroom": 104260,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 100701,
+                      "gas_used": 13315,
+                      "gas_headroom": 87386,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 91689,
+                          "gas_used": 5082,
+                          "gas_headroom": 86607,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 159332,
+      "usd_value": 205381557171371304,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "INDEX",
+      "window": 1800,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x00000000000000000000000056910d4409f3a0c78c64dd8d0545ff0705389870",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x0000000000000000000000000000000000000000000036edd682048e662e5f5d",
+        "slot0": "0x00000000000000000000000000000000000000fe35e93e47bb2406e3c76d6519000000000000000000000000000000000000000000000000000000000001b0b000000000000000000000000000000000000000000000000000000000000005660000000000000000000000000000000000000000000000000000000000000709000000000000000000000000000000000000000000000000000000000000070900000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd4e00000000000000000000000000000000000000000000000000000093771745fb000000000000000000000000000000000000000000be06e1bf2fdb6bcfebadcb0000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000936bfdcf0d0000000000000000000000000000000000000000000000000000009377d7f45b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000be06e1a1e9123cb59c3054000000000000000000000000000000000000000000be06e1c143291f5e0a1b4b",
+        "canonicalPool": "0x000000000000000000000000d29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+        "poolRuntimeSha256": "7588c64bcbd6bc00ae35c44f6d13a1f08c54ee2e27afa77c03d530c19c97e765",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "asset_conversion",
+      "status": "qualified",
+      "reason": "local source and actual desk matched compiled reference at fixed pin",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 39030856597594241,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "source_gas": 0,
+        "deployed_bytes": 0
+      },
+      "token_scale": 1000000000000000000,
+      "actual": 39030856597594241,
+      "desk_gas": 180311,
+      "source_calls": [
+        {
+          "gas_forwarded": 250000,
+          "gas_used": 142117,
+          "failed": false,
+          "output": "0x000000000000000000000000000000000000000000000000008aaa5b76c760810000000000000000000000000000000000000000000000000000000000000001",
+          "dependencies": [
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 223854,
+              "gas_used": 2340,
+              "gas_headroom": 221514,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+              "selector": "0xd81f84b7",
+              "gas_forwarded": 221110,
+              "gas_used": 340,
+              "gas_headroom": 220770,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x033b7265",
+              "gas_forwarded": 220502,
+              "gas_used": 2356,
+              "gas_headroom": 218146,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xd29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+              "selector": "0x3850c7bd",
+              "gas_forwarded": 215297,
+              "gas_used": 2696,
+              "gas_headroom": 212601,
+              "failed": false,
+              "return_bytes": 224,
+              "children": []
+            },
+            {
+              "target": "0xd29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+              "selector": "0x1a686502",
+              "gas_forwarded": 212112,
+              "gas_used": 2428,
+              "gas_headroom": 209684,
+              "failed": false,
+              "return_bytes": 32,
+              "children": []
+            },
+            {
+              "target": "0xd29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+              "selector": "0x252c09d7",
+              "gas_forwarded": 209408,
+              "gas_used": 2635,
+              "gas_headroom": 206773,
+              "failed": false,
+              "return_bytes": 128,
+              "children": []
+            },
+            {
+              "target": "0xd29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+              "selector": "0x883bdbfd",
+              "gas_forwarded": 205917,
+              "gas_used": 61957,
+              "gas_headroom": 143960,
+              "failed": false,
+              "return_bytes": 256,
+              "children": []
+            },
+            {
+              "target": "0x0757b84433fc529cc4a4a9829b08ab4b68e9c49c",
+              "selector": "0x76d69760",
+              "gas_forwarded": 139669,
+              "gas_used": 33356,
+              "gas_headroom": 106313,
+              "failed": false,
+              "return_bytes": 32,
+              "children": [
+                {
+                  "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                  "selector": "0xd81f84b7",
+                  "gas_forwarded": 136750,
+                  "gas_used": 340,
+                  "gas_headroom": 136410,
+                  "failed": false,
+                  "return_bytes": 32,
+                  "children": []
+                },
+                {
+                  "target": "0xd10829c06f95d40004afc4379579bc05aa3982e5",
+                  "selector": "0x3ac3c636",
+                  "gas_forwarded": 136154,
+                  "gas_used": 648,
+                  "gas_headroom": 135506,
+                  "failed": false,
+                  "return_bytes": 128,
+                  "children": []
+                },
+                {
+                  "target": "0x064e88f9cd0ef0525f7a125d4396ee93468c7cdd",
+                  "selector": "0xabe4ffb4",
+                  "gas_forwarded": 134170,
+                  "gas_used": 29393,
+                  "gas_headroom": 104777,
+                  "failed": false,
+                  "return_bytes": 64,
+                  "children": [
+                    {
+                      "target": "0x88dd242155c50c2b91f288391b4d8d4c93e0552a",
+                      "selector": "0xd81f84b7",
+                      "gas_forwarded": 121021,
+                      "gas_used": 340,
+                      "gas_headroom": 120681,
+                      "failed": false,
+                      "return_bytes": 32,
+                      "children": []
+                    },
+                    {
+                      "target": "0x78f3556b67e17df817d51ef5a990cdaf09e8d3a9",
+                      "selector": "0xfeaf968c",
+                      "gas_forwarded": 117121,
+                      "gas_used": 13315,
+                      "gas_headroom": 103806,
+                      "failed": false,
+                      "return_bytes": 160,
+                      "children": [
+                        {
+                          "target": "0x6091e64eb7138eef066a80fd3a0d7427b91f2721",
+                          "selector": "0xfeaf968c",
+                          "gas_forwarded": 107853,
+                          "gas_used": 5082,
+                          "gas_headroom": 102771,
+                          "failed": false,
+                          "return_bytes": 160,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "source_gas": 142117,
+      "usd_value": 39030856597594241,
+      "asset_amount": 1000000000000000000,
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "INDEX",
+      "window": 3600,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x00000000000000000000000056910d4409f3a0c78c64dd8d0545ff0705389870",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x0000000000000000000000000000000000000000000036edd682048e662e5f5d",
+        "slot0": "0x00000000000000000000000000000000000000fe35e93e47bb2406e3c76d6519000000000000000000000000000000000000000000000000000000000001b0b000000000000000000000000000000000000000000000000000000000000005660000000000000000000000000000000000000000000000000000000000000709000000000000000000000000000000000000000000000000000000000000070900000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd4e00000000000000000000000000000000000000000000000000000093771745fb000000000000000000000000000000000000000000be06e1bf2fdb6bcfebadcb0000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000093602358ac0000000000000000000000000000000000000000000000000000009377d7f45b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000be06e182304e3dd00b9931000000000000000000000000000000000000000000be06e1c143291f5e0a1b4b",
+        "canonicalPool": "0x000000000000000000000000d29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+        "poolRuntimeSha256": "7588c64bcbd6bc00ae35c44f6d13a1f08c54ee2e27afa77c03d530c19c97e765",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "proposal",
+      "status": "expected_rejected",
+      "reason": "fixed-WETH laboratory admission rejected as expected: invalid feed",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 0,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "deployed_bytes": 0
+      },
+      "expected_revert": "invalid feed",
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    },
+    {
+      "asset": "INDEX",
+      "window": 14400,
+      "pin": {
+        "block": 58904245,
+        "hash": "0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d",
+        "timestamp": 1788992960
+      },
+      "laboratory": {
+        "twapWindow": 3600,
+        "maxObservationAge": 1800,
+        "minLiquidityRatio": 5000,
+        "localGraphGlobalStaleTime": 86400
+      },
+      "raw": {
+        "assetDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "wethDecimals": "0x0000000000000000000000000000000000000000000000000000000000000012",
+        "anchorDecimals": "0x0000000000000000000000000000000000000000000000000000000000000008",
+        "round": "0x000000000000000000000000000000000000000000000001000000000000081600000000000000000000000000000000000000000000000000000038fe066300000000000000000000000000000000000000000000000000000000006aa1d8ee000000000000000000000000000000000000000000000000000000006aa1d8fa0000000000000000000000000000000000000000000000010000000000000816",
+        "factory": "0x0000000000000000000000001f7d7550b1b028f7571e69a784071f0205fd2efa",
+        "token0": "0x0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token1": "0x00000000000000000000000056910d4409f3a0c78c64dd8d0545ff0705389870",
+        "fee": "0x0000000000000000000000000000000000000000000000000000000000002710",
+        "liquidity": "0x0000000000000000000000000000000000000000000036edd682048e662e5f5d",
+        "slot0": "0x00000000000000000000000000000000000000fe35e93e47bb2406e3c76d6519000000000000000000000000000000000000000000000000000000000001b0b000000000000000000000000000000000000000000000000000000000000005660000000000000000000000000000000000000000000000000000000000000709000000000000000000000000000000000000000000000000000000000000070900000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000001",
+        "observation": "0x000000000000000000000000000000000000000000000000000000006aa1dd4e00000000000000000000000000000000000000000000000000000093771745fb000000000000000000000000000000000000000000be06e1bf2fdb6bcfebadcb0000000000000000000000000000000000000000000000000000000000000001",
+        "observe": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000009319012f9e0000000000000000000000000000000000000000000000000000009377d7f45b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000be06e0bfbd28365f803c26000000000000000000000000000000000000000000be06e1c143291f5e0a1b4b",
+        "canonicalPool": "0x000000000000000000000000d29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+        "poolRuntimeSha256": "7588c64bcbd6bc00ae35c44f6d13a1f08c54ee2e27afa77c03d530c19c97e765",
+        "poolRuntimeBytes": 22142
+      },
+      "stage": "proposal",
+      "status": "expected_rejected",
+      "reason": "fixed-WETH laboratory admission rejected as expected: invalid feed",
+      "local_number_at_setup": 58904245,
+      "clock_note": "Boa emulates NUMBER from child header; no claim about live EVM NUMBER",
+      "reference": 0,
+      "deployed_bytes": 20650,
+      "target_overrun": {
+        "deployed_bytes": 0
+      },
+      "expected_revert": "invalid feed",
+      "behavior_passed": true,
+      "header_consistency": "matched"
+    }
+  ],
+  "code_revision": "cb69a688eba34438c7d4ac936c4988ced73ea378",
+  "code_sha256": {
+    "contracts/priceSources/UniswapV3TwapPrices.vy": "2332c92dfcaabeace3821ee50917d23b418016c3bb0dcb68f2f7ed059f8766b5",
+    "contracts/priceSources/modules/UniswapV3TwapMath.vy": "1428f02f6e12f2b7b2df93c9d66e30a5819af450ef9d4829e56f59b0358172f6",
+    "tests/priceSources/uniswap_v3/fork_worker.py": "fc0f08eede81ab461337dddec906fdda2e81131fda4e2da373dc61bd0f779b47",
+    "tests/priceSources/uniswap_v3/fork_inputs.py": "735b4c3b72d4a3215157a23280b22e0adcb65f19e87d9f0bd74aed033e6dacc7"
+  },
+  "model": "fixed-WETH laboratory; local RipeHq/PriceDesk/ChainlinkPrices; pinned live pool and ETH/USD anchor",
+  "buckets": {
+    "qualified": [
+      "CASHCAT/1800",
+      "CASHCAT/3600",
+      "CASHCAT/14400",
+      "PONS/1800",
+      "PONS/3600",
+      "PONS/14400",
+      "AI/1800",
+      "AI/3600",
+      "AI/14400",
+      "INDEX/1800"
+    ],
+    "expected_rejected": [
+      "INDEX/3600",
+      "INDEX/14400"
+    ],
+    "unverified": [],
+    "failed": []
+  }
+}

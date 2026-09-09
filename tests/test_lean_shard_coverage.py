@@ -15,6 +15,10 @@ PYTEST_INI_PATH = ROOT / "pytest.ini"
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
 }
+TWAP_TOOLING_FILES = {
+    "tests/priceSources/uniswap_v3/test_twap_fork_config.py",
+    "tests/priceSources/uniswap_v3/test_twap_artifacts.py",
+}
 BOA_CACHE_PREFIX = "boa-${{ runner.os }}-py312-${{ matrix.lane }}"
 BOA_INPUT_HASH = (
     "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
@@ -310,6 +314,11 @@ def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
         )
     }
 
+    tooling_command = _step(_workflow()["jobs"]["twap-tooling"], "Run TWAP tooling and artifact tests")["run"]
+    tooling_args = _pytest_args(tooling_command)
+    assert {arg for arg in tooling_args if arg.startswith("tests/")} == TWAP_TOOLING_FILES
+    assert _flag_values(tooling_args, "-o") == ["addopts="]
+    assert not _flag_values(tooling_args, "-m")
     shard_arguments = _workflow_lean_shard_arguments()
     unmatched = []
     multiply_matched = {}
@@ -319,6 +328,9 @@ def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
             for shard, arguments in shard_arguments.items()
             if _shard_selects_path(path, arguments)
         ]
+        if path in TWAP_TOOLING_FILES:
+            assert not matches, f"TWAP tooling also selected by lean shard: {path}"
+            matches.append("twap-tooling")
         if not matches:
             unmatched.append(path)
         elif len(matches) != 1:
@@ -419,6 +431,7 @@ def test_python_workflow_bounds_every_job_runtime():
         "test": "${{ matrix.lane == 'comprehensive' && 180 || 120 }}",
         "deployment-controls": "60",
         "snapshot-gas": "30",
+        "twap-tooling": "30",
         "rh-pr-gate": "5",
     }
     assert all("timeout-minutes" in job for job in jobs.values())
@@ -449,9 +462,11 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
         "test",
         "deployment-controls",
         "snapshot-gas",
+        "twap-tooling",
     ]
 
     expected_results = {
+        "Require successful TWAP tooling": ("TWAP_TOOLING_RESULT", "${{ needs.twap-tooling.result }}"),
         "Require successful Solidity lane": (
             "SOLIDITY_RESULT",
             "${{ needs.solidity.result }}",
