@@ -1,11 +1,18 @@
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
-from conf_utils import filter_logs, set_full_payoff_params
+from conf_utils import filter_logs, set_full_payoff_params, clear_transient_storage
 
 HUNDRED_PERCENT = 100_00
 SIX_DECIMALS = 10**6
 EIGHT_DECIMALS = 10**8
+
+
+def _deleverage_one(teller, user, target_repay_amount, *, sender):
+    return teller.deleverageManyUsers(
+        [(user, target_repay_amount)],
+        sender=sender,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -116,7 +123,7 @@ def test_untrusted_caller_can_deleverage_in_redemption_zone(
 
     # Alice (untrusted) attempts to deleverage
     # She should succeed but be capped to max_deleverage amount
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
 
     assert repaid_amount > 0, "Deleverage should succeed"
     assert repaid_amount <= max_deleverage, "Should be capped to max deleverage amount"
@@ -149,7 +156,7 @@ def test_untrusted_caller_cannot_deleverage_healthy_user(
 
     CORRECT BEHAVIOR (after security fix):
     - getMaxDeleverageAmount() returns 0 for healthy users
-    - deleverageUser() NOW properly checks redemption threshold for untrusted callers
+    - one-user deleverageManyUsers() checks the redemption threshold for untrusted callers
     - Untrusted callers can only deleverage users in the redemption zone
 
     This test validates that the redemption zone check prevents abuse.
@@ -184,9 +191,9 @@ def test_untrusted_caller_cannot_deleverage_healthy_user(
     assert max_deleverage == 0, "User should not be deleveragable when healthy"
 
     # Alice (untrusted) attempts to deleverage - should be blocked
-    # After the fix, this reverts with "cannot deleverage"
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 0, sender=alice)
+    # The one-user batch reports that no request was eligible.
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 0, sender=alice)
 
     # Verify debt unchanged (no deleverage occurred)
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -229,7 +236,7 @@ def test_trusted_caller_no_restrictions(
 
     # Teller (trusted) deleverages with large target amount
     # Should be able to deleverage ALL debt, not just capped amount
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # For trusted caller, should deleverage full debt
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -324,7 +331,7 @@ def test_exact_boundary_full_payoff_extras_require_trusted_caller(
     expected_extra = 10**15 if caller_is_trusted else 0
     expected_collateral = pre_debt.amount + expected_extra
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=caller)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=caller)
 
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     post_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -392,7 +399,7 @@ def test_user_self_deleverage_no_restrictions(
     assert initial_debt == 100 * EIGHTEEN_DECIMALS
 
     # Bob self-deleverages (user == caller, treated as trusted)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=bob)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=bob)
 
     # Verify some debt was repaid
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -441,7 +448,7 @@ def test_underscore_address_trusted(
 
     # Teller (Ripe protocol address) deleverages
     # Should succeed as trusted - no redemption zone check, no amount caps
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Should have repaid some debt (trusted callers can deleverage)
     assert repaid_amount > 0, "Teller should be able to deleverage as trusted address"
@@ -527,7 +534,7 @@ def test_user_exits_redemption_zone_after_partial(
     assert max_deleverage_before > 0
 
     # Alice deleverages (capped amount)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
     assert repaid_amount > 0
 
     # After deleverage, user should no longer be in redemption zone
@@ -797,7 +804,7 @@ def test_untrusted_capped_to_max_deleverage_amount(
     assert max_deleverage < 100 * EIGHTEEN_DECIMALS  # Should be less than full debt
 
     # Alice tries to deleverage with MAX target (effectively unlimited)
-    repaid_amount = teller.deleverageUser(bob, 2**256 - 1, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 2**256 - 1, sender=alice)
 
     # Should be capped
     assert repaid_amount <= max_deleverage, "Untrusted caller should be capped"
@@ -835,7 +842,7 @@ def test_trusted_exceeds_max_deleverage_amount(
     max_deleverage = deleverage.getMaxDeleverageAmount(bob)
 
     # Teller (trusted) deleverages
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Should exceed the cap and fully repay
     assert repaid_amount > max_deleverage, "Trusted should exceed cap"
@@ -889,7 +896,7 @@ def test_max_deleverage_with_ltv_buffer(
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
 
     # Deleverage with untrusted (uses buffer)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
 
     # Check final LTV
     post_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -947,7 +954,7 @@ def test_max_deleverage_without_ltv_buffer(
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
 
     # Check final LTV
     post_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -1026,7 +1033,7 @@ def test_calcAmountToPay_math_verification(
     _test(max_deleverage, expected_repay)
 
     # Execute deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
     _test(repaid_amount, expected_repay)
 
     # Verify final state
@@ -1072,7 +1079,7 @@ def test_partial_deleverage_under_cap(
     target_amount = max_deleverage // 2
 
     # Alice deleverages with specific target
-    repaid_amount = teller.deleverageUser(bob, target_amount, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, target_amount, sender=alice)
 
     # Should get approximately the requested amount
     assert abs(repaid_amount - target_amount) < EIGHTEEN_DECIMALS, "Should repay requested amount"
@@ -1111,7 +1118,7 @@ def test_target_exceeds_cap_gets_capped(
     # Alice requests MORE than cap
     excessive_target = max_deleverage * 2
 
-    repaid_amount = teller.deleverageUser(bob, excessive_target, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, excessive_target, sender=alice)
 
     # Should be capped
     assert repaid_amount <= max_deleverage, "Should be capped to max"
@@ -1194,7 +1201,7 @@ def test_delegation_canBorrow_grants_trusted_access(
     setUserDelegation(bob, alice, _canBorrow=True)
 
     # Alice should be able to deleverage as trusted (has borrow delegation)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
 
     # Should have deleveraged some amount (trusted caller, no caps)
     assert repaid_amount > 0, "Alice with borrow delegation should deleverage"
@@ -1242,7 +1249,7 @@ def test_delegation_without_canBorrow_fails(
     max_deleverage = deleverage.getMaxDeleverageAmount(bob)
     assert max_deleverage > 0, "User should be in redemption zone"
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
 
     # Should be capped (untrusted behavior)
     assert repaid_amount > 0, "Should deleverage some amount"
@@ -1282,7 +1289,7 @@ def test_self_delegation_not_needed(
     initial_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Bob self-deleverages (no delegation needed, user == caller)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=bob)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=bob)
 
     # Should succeed and reduce debt (may be partial based on Phase 2/3 mechanics)
     assert repaid_amount > 0, "Self-deleverage should work"
@@ -1319,7 +1326,7 @@ def test_ripe_protocol_address_trusted(
     mock_price_source.setPrice(alpha_token, new_price)
 
     # AuctionHouse (Ripe protocol address) deleverages
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Should succeed as trusted
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -1347,7 +1354,7 @@ def test_user_with_no_debt_returns_zero(
 ):
     """
     Test that user with no debt cannot be deleveraged.
-    Should revert with "cannot deleverage".
+    The one-user batch should revert because nobody was deleveraged.
     """
     setGeneralConfig()
 
@@ -1358,8 +1365,8 @@ def test_user_with_no_debt_returns_zero(
     performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, simple_erc20_vault)
 
     # Should fail
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 0, sender=alice)
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 0, sender=alice)
 
 
 def test_user_in_liquidation_can_be_deleveraged(
@@ -1378,10 +1385,8 @@ def test_user_in_liquidation_can_be_deleveraged(
     mock_price_source,
 ):
     """
-    Test that user in liquidation can still be deleveraged.
-
-    The contract allows deleveraging even for users marked as in liquidation,
-    as deleverage is a debt reduction mechanism that helps the protocol.
+    Untrusted many-users cannot unwind a book flagged inLiquidation.
+    Trusted specific-assets (self) and trusted many-users (Ripe) still can.
     """
     # Setup user in redemption zone
     initial_price, new_price = setup_redemption_zone(
@@ -1404,12 +1409,35 @@ def test_user_in_liquidation_can_be_deleveraged(
     )
     ledger.setUserDebt(bob, debt_tuple, 0, (0, 0), sender=credit_engine.address)
 
-    # Deleverage should work (helps reduce protocol risk)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
-    assert repaid_amount > 0, "Deleverage should work even for users in liquidation"
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 0, sender=alice)
+    assert ledger.userDebt(bob).inLiquidation is True
+
+    # Trusted specific-assets: ordinary self is trusted on this entry.
+    clear_transient_storage()
+    repaid_specific = teller.deleverageWithSpecificAssets(
+        [(3, alpha_token.address, 20 * EIGHTEEN_DECIMALS)],
+        bob,
+        sender=bob,
+    )
+    assert repaid_specific > 0, "trusted specific-assets should still sell a flagged book"
+
+    # Re-flag remaining debt so trusted many-users is still on a flagged book.
+    clear_transient_storage()
+    user_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0]
+    assert user_debt.amount > 0
+    ledger.setUserDebt(
+        bob,
+        (user_debt.amount, user_debt.principal, user_debt.debtTerms, user_debt.lastTimestamp, True),
+        0,
+        (0, 0),
+        sender=credit_engine.address,
+    )
+    repaid_trusted = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
+    assert repaid_trusted > 0, "trusted many-users (Ripe) should still sell a flagged book"
 
 
-def test_zero_collateral_value_returns_zero(
+def test_zero_collateral_value_reverts_without_price(
     switchboard_alpha,
     deleverage,
     credit_engine,
@@ -1444,8 +1472,8 @@ def test_zero_collateral_value_returns_zero(
     mock_price_source.setPrice(alpha_token, 0)
 
     # Should fail
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 0, sender=alice)
+    with boa.reverts("has price config, no price"):
+        _deleverage_one(teller, bob, 0, sender=alice)
 
 
 def test_no_deleveragable_assets_available(
@@ -1492,11 +1520,11 @@ def test_no_deleveragable_assets_available(
 
     # User is in redemption zone, but has no deleveragable assets
     # Should fail
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 0, sender=alice)
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 0, sender=alice)
 
 
-def test_price_oracle_returns_zero(
+def test_price_oracle_zero_reverts_without_price(
     switchboard_alpha,
     deleverage,
     credit_engine,
@@ -1531,8 +1559,8 @@ def test_price_oracle_returns_zero(
     mock_price_source.setPrice(alpha_token, 0)
 
     # Should fail gracefully
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 0, sender=alice)
+    with boa.reverts("has price config, no price"):
+        _deleverage_one(teller, bob, 0, sender=alice)
 
 
 def test_deleverage_with_different_decimal_tokens(
@@ -1594,7 +1622,7 @@ def test_deleverage_with_different_decimal_tokens(
     mock_price_source.setPrice(delta_token, 70 * EIGHTEEN_DECIMALS // 100)
 
     # Should be able to deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
     assert repaid_amount > 0, "Should succeed with different decimal tokens"
 
 
@@ -1637,7 +1665,7 @@ def test_extreme_leverage_underwater_position(
     # Extremely underwater
 
     # Should still be deleveragable
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
     assert repaid_amount > 0, "Should deleverage even when underwater"
 
 
@@ -1867,8 +1895,8 @@ def test_local_trust_checks_do_not_depend_on_underscore_registry_health(
     mock_undy_v2.setAllAddressesAreVaults(False)
     mock_undy_v2.setVaultCheckRevertAddress(teller.address)
 
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 1, sender=teller.address)
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 1, sender=teller.address)
 
     with boa.reverts("nobody deleveraged"):
         teller.deleverageManyUsers([(bob, 1)], sender=teller.address)
@@ -1935,11 +1963,20 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
 
     # The caller is locally trusted, but a full payoff still classifies the
     # position owner so earn-vault owners never pay full-payoff extras.
+    # This used to pop mock_undy_v2 out of boa.env.sstore_trace around the
+    # reverts below, to dodge a diagnostic-only bug in Boa 0.2.7's revert
+    # renderer when the trace holds public HashMap[address, bool] writes.
+    # tests/conftest.py now clears that trace globally, but only at test
+    # boundaries -- setEarnVault above writes _earnVaults and
+    # _basicEarnVaults mid-test, after that clear. The two mechanisms are
+    # therefore not equivalent: if the renderer regresses here, the global
+    # fixture will not prevent it and the local pop has to come back.
     with boa.reverts("mock underscore vault check"):
-        teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+        _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
-    # CreditEngine independently classifies Underscore owners on its read path,
-    # widening the configured registry's failure surface beyond Deleverage.
+    # CreditEngine independently classifies Underscore owners on its read
+    # path, widening the configured registry's failure surface beyond
+    # Deleverage.
     with boa.reverts("mock underscore vault check"):
         credit_engine.getLatestUserDebtAndTerms(bob, False)
 
@@ -1955,17 +1992,16 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
         ZERO_ADDRESS,
         sender=switchboard_alpha.address,
     )
-    assert teller.deleverageUser(bob, 0, sender=switchboard_alpha.address) > 0
+    assert _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address) > 0
     deleverage_log = filter_logs(teller, "DeleverageUser")[0]
     assert deleverage_log.targetRepayAmountWithBuffer == pre_debt + full_payoff_buffer
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
 
 
-def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
+def test_leveraged_underscore_vault_self_call_passes_deleverageForWithdrawal_permission(
     switchboard_alpha,
     deleverage,
     alpha_token,
-    bob,
     alice,
     mission_control,
     mock_undy_v2,
@@ -1999,10 +2035,10 @@ def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
     mock_undy_v2.setEarnVault(alice, True)
     mock_undy_v2.setBasicEarnVault(alice, False)
 
-    # alice calls deleverageForWithdrawal — should NOT revert with "no perms"
-    # Returns False because bob has no debt, but the earn vault permission check passed
+    # alice calls for its own leveraged vault — should NOT revert with "no perms"
+    # Returns False because alice has no debt, but the earn-vault entry check passed.
     result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+        alice, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
     )
     assert result == False  # No debt to deleverage, but permission was granted
 
@@ -2010,11 +2046,10 @@ def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
     mock_undy_v2.setAllAddressesAreVaults(True)
 
 
-def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
+def test_basic_underscore_vault_self_call_passes_deleverageForWithdrawal_permission(
     switchboard_alpha,
     deleverage,
     alpha_token,
-    bob,
     alice,
     mission_control,
     mock_undy_v2,
@@ -2043,23 +2078,23 @@ def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
     # setEarnVault already sets basicEarnVault=True as backwards-compatible default
 
     result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+        alice, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
     )
     assert result == False  # No debt, but permission passed
 
     mock_undy_v2.setAllAddressesAreVaults(True)
 
 
-def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
+def test_production_shaped_leveraged_underscore_vault_self_call_stays_trusted(
     switchboard_alpha,
     deleverage,
     credit_engine,
     simple_erc20_vault,
+    endaoment_funds,
     alpha_token,
     alpha_token_whale,
     charlie_token,
     charlie_token_whale,
-    bob,
     alice,
     teller,
     performDeposit,
@@ -2071,17 +2106,17 @@ def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
     setAssetConfig,
     createDebtTerms,
     mock_price_source,
+    ripe_hq,
 ):
     """
-    End-to-end regression test: a leveraged underscore earn vault
-    (isEarnVault=True, isBasicEarnVault=False) can call
-    deleverageForWithdrawal() and actually execute a deleverage.
+    Pin the production call shape: msg.sender == _user == leverage vault.
 
-    Before the fix, this would revert with "no perms" because the
-    isBasicEarnVault() check returned False for leveraged vaults.
+    Production VaultRegistry.isEarnVault classifies a configured leveraged
+    vault through hasConfig even if it is not otherwise registry-valid. The
+    mock's explicit earn-vault bit represents that resolved classification.
     """
     setGeneralConfig()
-    setGeneralDebtConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
 
     # Configure alpha_token as main collateral (not deleveragable)
     alpha_terms = createDebtTerms(
@@ -2118,10 +2153,20 @@ def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(charlie_token, 1 * EIGHTEEN_DECIMALS)
 
-    # Set up bob's position: $1000 alpha + $700 USDC collateral, $500 debt
-    performDeposit(bob, 1000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, simple_erc20_vault)
-    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
-    teller.borrow(500 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    deleverage.setDeleverageBuffer(2_00, sender=switchboard_alpha.address)
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+
+    # The leverage vault owns its own Ripe position, exactly as in production.
+    performDeposit(alice, 1000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, simple_erc20_vault)
+    performDeposit(alice, 710 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    teller.borrow(700 * EIGHTEEN_DECIMALS, alice, False, sender=alice)
 
     # Configure USDC as priority liquidation asset for Phase 2
     setup_priority_configs(
@@ -2129,25 +2174,53 @@ def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
         priority_liq_assets=[(simple_erc20_vault, charlie_token)],
     )
 
-    # Set up underscore registry with alice as a leveraged vault
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_undy_v2.setAllAddressesAreVaults(False)
     mock_undy_v2.setEarnVault(alice, True)
     mock_undy_v2.setBasicEarnVault(alice, False)
 
-    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    assert pre_debt == 500 * EIGHTEEN_DECIMALS
-
-    # alice (leveraged vault) calls deleverageForWithdrawal
-    withdraw_amount = 200 * EIGHTEEN_DECIMALS
-    result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, withdraw_amount, sender=alice
+    pre_debt, terms, _ = credit_engine.getLatestUserDebtAndTerms(alice, True)
+    max_deleveragable, effective_ltv = deleverage.getDeleverageInfo(alice)
+    lost_capacity = 1000 * EIGHTEEN_DECIMALS * 70_00 // HUNDRED_PERCENT
+    denominator = (
+        terms.totalMaxDebt
+        - pre_debt.amount * effective_ltv // HUNDRED_PERCENT
     )
-    assert result == True, "Leveraged vault should trigger deleverage"
+    expected_target = pre_debt.amount * lost_capacity // denominator
+    expected_target = (
+        expected_target
+        * (HUNDRED_PERCENT + deleverage.deleverageBuffer())
+        // HUNDRED_PERCENT
+    )
+    expected_target = min(expected_target, max_deleveragable, pre_debt.amount)
+    pre_collateral = simple_erc20_vault.getTotalAmountForUser(alice, charlie_token)
+    pre_endaoment = charlie_token.balanceOf(endaoment_funds)
 
-    # Verify debt was reduced
-    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    assert post_debt < pre_debt, "Debt should be reduced after deleverage"
+    assert ripe_hq.isValidAddr(alice) is False
+    assert mock_undy_v2.isEarnVault(alice) is True
+    assert mock_undy_v2.isBasicEarnVault(alice) is False
+    assert deleverage.getMaxDeleverageAmount(alice) == 0
+    assert pre_debt.amount == 700 * EIGHTEEN_DECIMALS
+    assert expected_target == pre_debt.amount
+
+    withdraw_amount = 1000 * EIGHTEEN_DECIMALS
+    result = deleverage.deleverageForWithdrawal(
+        alice, 3, alpha_token, withdraw_amount, sender=alice
+    )
+    event = filter_logs(deleverage, "DeleverageUser")[-1]
+    post_debt = credit_engine.getLatestUserDebtAndTerms(alice, True)[0].amount
+    post_collateral = simple_erc20_vault.getTotalAmountForUser(alice, charlie_token)
+    post_endaoment = charlie_token.balanceOf(endaoment_funds)
+
+    assert result is True
+    assert event.user == event.caller == alice
+    assert event.targetRepayAmount == expected_target
+    # The nonzero payoff buffer remains disabled for an earn-vault owner.
+    assert event.targetRepayAmountWithBuffer == event.targetRepayAmount
+    assert event.collateralValueRepaid == event.debtToClear == pre_debt.amount
+    assert pre_collateral - post_collateral == 700 * SIX_DECIMALS
+    assert post_endaoment - pre_endaoment == 700 * SIX_DECIMALS
+    assert post_debt == 0
 
     # Restore default mock behavior
     mock_undy_v2.setAllAddressesAreVaults(True)

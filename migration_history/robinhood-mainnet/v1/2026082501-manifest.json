@@ -1,0 +1,20 @@
+{
+  "contracts": {
+    "VaultMigrator": {
+      "address": "0x383a9B1a2c41F28576a3Fd3df6834aa908399004",
+      "file": "contracts/core/VaultMigrator.vy"
+    },
+    "RipeReserveEngine": {
+      "address": "0xc60af65F0bF8a1456aD822e98c45769552B13190",
+      "file": "contracts/core/RipeReserveEngine.vy"
+    },
+    "RipeReserveVesting": {
+      "address": "0x92ea6b99F1a0Cf95863DBf5CD83B0a09449ad396",
+      "file": "contracts/core/RipeReserveVesting.vy"
+    },
+    "SwitchboardFoxtrot": {
+      "address": "0xD11B23b6391e294DF49961E64231bddDE5bB5E89",
+      "file": "contracts/config/SwitchboardFoxtrot.vy"
+    }
+  }
+}

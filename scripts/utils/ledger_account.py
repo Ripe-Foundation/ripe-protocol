@@ -74,7 +74,13 @@ class LedgerAccount:
             try:
                 chain_id = self.w3.eth.chain_id
                 print(f"🌐 Connected to network with Chain ID: {chain_id}")
-                print(f"🔗 RPC URL: {self.w3.provider.endpoint_uri}")
+                # Never print the endpoint: provider URLs carry an API key in
+                # the path or query, and this runs in shared terminals and CI
+                # logs. The chain id above already identifies the network.
+                endpoint = str(self.w3.provider.endpoint_uri)
+                scheme, _, rest = endpoint.partition("://")
+                host = rest.split("/", 1)[0].split("?", 1)[0]
+                print(f"🔗 RPC host: {scheme}://{host}/<redacted>")
 
                 # Check balance
                 balance = self.w3.eth.get_balance(self.address)

@@ -1804,84 +1804,6 @@
       {
         "name": "_asset",
         "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "addPartnerLiquidity",
-    "inputs": [
-      {
-        "name": "_legoId",
-        "type": "uint256"
-      },
-      {
-        "name": "_pool",
-        "type": "address"
-      },
-      {
-        "name": "_partner",
-        "type": "address"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "addPartnerLiquidity",
-    "inputs": [
-      {
-        "name": "_legoId",
-        "type": "uint256"
-      },
-      {
-        "name": "_pool",
-        "type": "address"
-      },
-      {
-        "name": "_partner",
-        "type": "address"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
       },
       {
         "name": "_amount",
@@ -1890,6 +1812,10 @@
       {
         "name": "_minLpAmount",
         "type": "uint256"
+      },
+      {
+        "name": "_expectedLpToken",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -1984,6 +1910,10 @@
       {
         "name": "_eth",
         "type": "address"
+      },
+      {
+        "name": "_curvePricesId",
+        "type": "uint256"
       }
     ],
     "outputs": []

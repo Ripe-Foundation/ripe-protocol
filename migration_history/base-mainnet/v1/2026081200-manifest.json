@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "VaultBook": {
+      "address": "0x09f45F56b218756ab092f7470F8199db56849867",
+      "file": "contracts/registries/VaultBook.vy"
+    }
+  }
+}

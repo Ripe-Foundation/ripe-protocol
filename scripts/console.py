@@ -1,28 +1,38 @@
 """
-Interactive IPython console for debugging with forked mainnet.
+Interactive IPython console for an explicitly selected, verified fork.
 
 Usage:
     python -m scripts.console [OPTIONS]
 
 Examples:
-    python -m scripts.console                    # Default: base-mainnet fork
+    python -m scripts.console --profile base-mainnet
     python -m scripts.console --chain base-sepolia
     python -m scripts.console --account 0x1234...  # Impersonate specific address
 """
 
 import os
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
+
 import click
 import boa
-import dotenv
+from boa.rpc import EthereumRPC
 
+from config.network_profiles import (
+    NETWORK_PROFILE_IDS,
+    NetworkProfileError,
+    Operation,
+    get_profile,
+    repository_paths,
+    require_operation,
+    resolve_rpc_reference,
+    validate_fork_request,
+    verify_chain_identity,
+)
 from scripts.utils import json_file, log
 from scripts.utils.migration_helpers import load_vyper_files
-from scripts.utils.deploy_args import DeployArgs
-from scripts.utils.mock_account import MockAccount
 
-dotenv.load_dotenv()
-
-MIGRATION_HISTORY_DIR = "./migration_history"
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ContractNameCompleter:
@@ -96,11 +106,17 @@ class Console:
         boa: The boa module for direct access
     """
 
-    def __init__(self, chain: str, environment: str, blueprint: str, rpc: str):
-        self._chain = chain
-        self._environment = environment
-        self._blueprint = blueprint
-        self._rpc = rpc
+    def __init__(
+        self,
+        profile_id: str,
+        operation: Operation,
+        mode: str,
+        manifest_path: Path | None,
+    ):
+        self._profile_id = profile_id
+        self._operation = operation
+        self._mode = mode
+        self._manifest_path = manifest_path
         self._manifest = {}
         self._contracts = {}
         self._files = load_vyper_files()
@@ -109,18 +125,22 @@ class Console:
 
     def _load_manifest(self):
         """Load the current manifest file."""
-        manifest_path = os.path.join(
-            MIGRATION_HISTORY_DIR,
-            self._chain,
-            self._environment,
-            "current-manifest.json"
-        )
-        try:
-            self._manifest = json_file.load(manifest_path)
-            log.h3(f"Loaded manifest from {manifest_path}")
-        except Exception as e:
-            log.error(f"Failed to load manifest: {e}")
+        if self._manifest_path is None:
             self._manifest = {"contracts": {}}
+            log.h3("No repository manifest is available for this profile.")
+            return
+        try:
+            self._manifest = json_file.load(str(self._manifest_path))
+            log.h3(
+                "Loaded profile-owned manifest "
+                f"{self._manifest_path.relative_to(ROOT)}"
+            )
+        except Exception:
+            raise NetworkProfileError(
+                "H02_REPOSITORY_UNAVAILABLE",
+                profile_id=self._profile_id,
+                operation=self._operation,
+            ) from None
 
     def get_address(self, name: str) -> str:
         """Get the address of a deployed contract by name."""
@@ -208,7 +228,10 @@ class Console:
             print(f"  {name}: {addr}")
 
     def __repr__(self):
-        return f"<Console chain={self._chain} contracts={len(self._manifest.get('contracts', {}))}>"
+        return (
+            f"<Console profile={self._profile_id} mode={self._mode} "
+            f"contracts={len(self._manifest.get('contracts', {}))}>"
+        )
 
 
 def create_console_banner(console: Console) -> str:
@@ -217,8 +240,8 @@ def create_console_banner(console: Console) -> str:
 ╔══════════════════════════════════════════════════════════════╗
 ║                    Ripe Protocol Console                     ║
 ╠══════════════════════════════════════════════════════════════╣
-║  Chain: {console._chain:<52} ║
-║  Environment: {console._environment:<46} ║
+║  Profile: {console._profile_id:<50} ║
+║  Mode: {console._mode:<53} ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Available objects:                                          ║
 ║    c          - Contract accessor with autocomplete          ║
@@ -236,113 +259,242 @@ def create_console_banner(console: Console) -> str:
 """
 
 
+def read_chain_id(rpc_url: str) -> int | str:
+    return EthereumRPC(rpc_url).fetch("eth_chainId", [])
+
+
+@contextmanager
+def _fork_environment(profile, operation, redacted_rpc, **kwargs):
+    fork_stack = ExitStack()
+    body_error = None
+    try:
+        try:
+            env = fork_stack.enter_context(
+                boa.fork(redacted_rpc.value, **kwargs)
+            )
+        except Exception:
+            raise click.ClickException(
+                "H02_RPC_CONNECT_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value} env={redacted_rpc.reference}"
+            ) from None
+        yield env
+    except BaseException as error:
+        body_error = error
+        raise
+    finally:
+        try:
+            fork_stack.close()
+        except Exception:
+            if body_error is None:
+                raise click.ClickException(
+                    "H02_FORK_TEARDOWN_FAILED "
+                    f"profile={profile.identity.profile_id} "
+                    f"operation={operation.value} "
+                    f"env={redacted_rpc.reference}"
+                ) from None
+            try:
+                log.error(
+                    "H02_FORK_TEARDOWN_FAILED "
+                    f"profile={profile.identity.profile_id} "
+                    f"operation={operation.value} "
+                    f"env={redacted_rpc.reference}"
+                )
+            except Exception:
+                pass
+
+
+def _validate_static_assertions(profile, operation, environment, blueprint):
+    repository = profile.repository
+    if environment is not None:
+        if (
+            repository.history_dir is None
+            or environment != repository.history_dir.name
+        ):
+            raise NetworkProfileError(
+                "H02_HISTORY_ALIAS",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+    if blueprint is not None and blueprint != repository.blueprint_id:
+        raise NetworkProfileError(
+            "H02_PROFILE_INVALID",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+
+
 @click.command()
 @click.option(
-    "--chain", "-c",
-    default="base-mainnet",
-    help="Chain to fork (default: base-mainnet)",
-    type=click.Choice(["base-mainnet", "base-sepolia", "eth-mainnet", "eth-sepolia"], case_sensitive=False),
+    "--profile",
+    "--chain",
+    "profile_id",
+    required=True,
+    type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
+    help=(
+        "Required canonical network profile. `--chain` is a deprecated "
+        "equivalent spelling. `local` is recognized but unsupported by this "
+        "command; it is reserved for a future embedded-runtime path."
+    ),
 )
 @click.option(
-    "--environment", "-e",
-    default="v1",
-    help="Environment/manifest directory (default: v1)",
+    "--environment",
+    "-e",
+    default=None,
+    help=(
+        "Optional compatibility assertion; it must match the profile-owned "
+        "history namespace."
+    ),
 )
 @click.option(
-    "--blueprint", "-b",
-    default="base",
-    help="Blueprint configuration (default: base)",
+    "--blueprint",
+    "-b",
+    default=None,
+    help=(
+        "Optional compatibility assertion; it must match the profile-owned "
+        "blueprint."
+    ),
 )
 @click.option(
     "--rpc",
-    default="",
-    help="Custom RPC URL (default: uses Alchemy)",
+    default=None,
+    help=(
+        "Sensitive full RPC URL override. If omitted, the selected profile's "
+        "named RPC_URL environment variable is used. The value is never logged."
+    ),
 )
 @click.option(
-    "--account", "-a",
+    "--account",
+    "-a",
     default="",
-    help="Address to impersonate as the default sender",
+    help="Address to impersonate only after fork identity is verified.",
 )
 @click.option(
     "--block",
-    default="0",
-    help="Block to fork from (default: 0)",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Exact source block. Required for evidence mode.",
 )
-def main(chain, environment, blueprint, rpc, account, block):
-    """
-    Start an interactive IPython console with forked mainnet.
+@click.option(
+    "--evidence",
+    is_flag=True,
+    default=False,
+    help="Require a pinned, clean fork suitable for reproducible evidence.",
+)
+def main(
+    profile_id,
+    environment,
+    blueprint,
+    rpc,
+    account,
+    block,
+    evidence,
+):
+    """Start an explicit exploration or reproducible-evidence fork console."""
+    operation = (
+        Operation.CONSOLE_EVIDENCE
+        if evidence
+        else Operation.CONSOLE_EXPLORATION
+    )
+    try:
+        profile = get_profile(profile_id)
+        policy = require_operation(profile, operation)
+        _validate_static_assertions(
+            profile, operation, environment, blueprint
+        )
+        validate_fork_request(
+            profile,
+            operation,
+            evidence_mode=evidence,
+            block_number=block,
+            allow_dirty=not evidence,
+        )
+        redacted_rpc = resolve_rpc_reference(
+            profile, operation, os.environ, rpc
+        )
+        identity = verify_chain_identity(
+            profile, operation, redacted_rpc, read_chain_id
+        )
 
-    The console provides access to all deployed contracts from the manifest
-    and allows impersonating any address for testing.
-    """
-    # Determine RPC URL
-    final_rpc = rpc if rpc else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}"
+        manifest = None
+        if policy.requires_repository:
+            paths = repository_paths(
+                profile, operation, root=ROOT, identity=identity
+            )
+            manifest = paths.history_dir / "current-manifest.json"
+    except NetworkProfileError as error:
+        raise click.ClickException(str(error)) from None
 
+    mode = "reproducible pinned evidence" if evidence else "local exploration"
     log.h1("Starting Ripe Protocol Console")
-    log.info(f"Forking {chain} via {final_rpc[:50]}...")
+    log.info(
+        "RPC configured: "
+        f"profile={profile.identity.profile_id} "
+        f"reference={redacted_rpc.reference} value=<redacted>."
+    )
+    log.info(f"Mode: {mode}. Source-RPC submission is disabled.")
 
-    # Create console instance
-    console = Console(chain, environment, blueprint, final_rpc)
-    kwargs = {
-        "allow_dirty": True,
-    }
-    if block != '0':
-        kwargs["block_identifier"] = int(block)
+    try:
+        console = Console(
+            profile.identity.profile_id, operation, mode, manifest
+        )
+    except NetworkProfileError as error:
+        raise click.ClickException(str(error)) from None
+    kwargs = {"allow_dirty": not evidence}
+    if block is not None:
+        kwargs["block_identifier"] = block
 
-    # Start fork environment
-    with boa.fork(final_rpc, **kwargs) as env:
-
-        # Set up impersonation if specified
+    with _fork_environment(
+        profile, operation, redacted_rpc, **kwargs
+    ) as env:
         if account:
             env.eoa = account
             try:
                 env.set_balance(account, 10 * 10**18)
-                log.info(f"Impersonating {account} (funded with 10 ETH)")
-            except:
-                log.info(f"Impersonating {account}")
+                log.info(
+                    "Configured explicit fork-only impersonation account."
+                )
+            except Exception:
+                log.info(
+                    "Configured explicit fork-only impersonation account "
+                    "without funding."
+                )
 
-        # Try to import IPython
         try:
             from IPython import embed
             from traitlets.config import Config
 
-            # Configure IPython
             config = Config()
             config.InteractiveShellEmbed.colors = "Linux"
             config.InteractiveShell.autocall = 0
-
-            # Create namespace with useful objects
             namespace = {
                 "c": console.c,
                 "console": console,
                 "boa": boa,
                 "env": env,
             }
-
-            banner = create_console_banner(console)
-
-            # Start IPython
             embed(
                 config=config,
-                banner1=banner,
+                banner1=create_console_banner(console),
                 user_ns=namespace,
                 colors="Linux",
             )
-
         except ImportError:
-            log.error("IPython is not installed. Install it with: pip install ipython")
-            log.info("Falling back to standard Python REPL...")
-
+            log.error(
+                "IPython is not installed. Falling back to the standard "
+                "Python REPL."
+            )
             import code
+
             namespace = {
                 "c": console.c,
                 "console": console,
                 "boa": boa,
                 "env": env,
             }
-
-            banner = create_console_banner(console)
-            code.interact(banner=banner, local=namespace)
+            code.interact(
+                banner=create_console_banner(console), local=namespace
+            )
 
 
 if __name__ == "__main__":

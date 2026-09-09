@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -10,6 +10,7 @@ from interfaces import Vault
 from ethereum.ercs import IERC20
 
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
+MAX_TRANSFER_DELTA: constant(uint256) = 2
 
 
 @deploy
@@ -39,6 +40,7 @@ def _depositTokensInVault(
     # calc shares
     prevTotalBalance: uint256 = totalAssetBalance - depositAmount # remove the deposited amount to calc shares accurately
     newShares: uint256 = self._amountToShares(depositAmount, vaultData.totalBalances[_asset], prevTotalBalance, False)
+    assert newShares != 0 # dev: cannot receive 0 shares
 
     # add balance on deposit
     vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)
@@ -55,19 +57,65 @@ def _withdrawTokensFromVault(
 ) -> (uint256, uint256, bool):
     assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
+    assert _recipient != self # dev: invalid recipient
 
-    # calc shares + amount to withdraw
-    withdrawalShares: uint256 = 0
-    withdrawalAmount: uint256 = 0
-    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount)
+    requestedShares: uint256 = 0
+    requestedAmount: uint256 = 0
+    requestedShares, requestedAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount, True)
 
-    # reduce balance on withdrawal
+    totalSharesBefore: uint256 = vaultData.totalBalances[_asset]
+    userSharesBefore: uint256 = vaultData.userBalances[_user][_asset]
+    vaultBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+
+    assert extcall IERC20(_asset).transfer(_recipient, requestedAmount, default_return_value=True) # dev: token transfer failed
+
+    vaultAfter: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    recipientAfter: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+    assert vaultAfter <= vaultBefore # dev: invalid vault outflow
+    assert recipientAfter >= recipientBefore # dev: invalid recipient delivery
+
+    actualOutflow: uint256 = vaultBefore - vaultAfter
+    actualDelivery: uint256 = recipientAfter - recipientBefore
+    assert self._isWithinTransferDelta(actualOutflow, requestedAmount) # dev: invalid vault outflow
+    assert self._isWithinTransferDelta(actualDelivery, requestedAmount) # dev: invalid recipient delivery
+
+    creditedAmount: uint256 = min(requestedAmount, min(actualOutflow, actualDelivery))
+    assert creditedAmount != 0 # dev: no credited withdrawal amount
+
+    withdrawalShares: uint256 = requestedShares
+    if actualOutflow != requestedAmount:
+        withdrawalShares = self._amountToShares(
+            actualOutflow,
+            totalSharesBefore,
+            vaultBefore,
+            True,
+        )
+        if withdrawalShares > userSharesBefore:
+            assert userSharesBefore == totalSharesBefore # dev: remaining holder loss
+            withdrawalShares = userSharesBefore
+    assert withdrawalShares != 0 # dev: cannot withdraw 0 shares
+
     isDepleted: bool = False
-    withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
+    withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(
+        _user,
+        _asset,
+        withdrawalShares,
+        True,
+    )
 
-    # move tokens to recipient
-    assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
-    return withdrawalAmount, withdrawalShares, isDepleted
+    return creditedAmount, withdrawalShares, isDepleted
+
+
+@pure
+@internal
+def _isWithinTransferDelta(
+    _actual: uint256,
+    _requested: uint256,
+) -> bool:
+    if _actual >= _requested:
+        return _actual - _requested <= MAX_TRANSFER_DELTA
+    return _requested - _actual <= MAX_TRANSFER_DELTA
 
 
 @internal
@@ -83,7 +131,10 @@ def _transferBalanceWithinVault(
     # calc shares + amount to transfer
     transferShares: uint256 = 0
     transferAmount: uint256 = 0
-    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount)
+    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount, False)
+
+    if transferAmount == 0:
+        return 0, 0, False
 
     # transfer shares
     isFromUserDepleted: bool = False
@@ -176,7 +227,10 @@ def _calcWithdrawalSharesAndAmount(
     _user: address,
     _asset: address,
     _amount: uint256,
+    _shouldRoundUpShares: bool = True,
 ) -> (uint256, uint256):
+    assert _amount != 0 # dev: no withdrawal amount
+
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     assert totalBalance != 0 # dev: no asset to withdraw
 
@@ -189,8 +243,15 @@ def _calcWithdrawalSharesAndAmount(
     # calc amount + shares to withdraw
     withdrawalAmount: uint256 = min(totalBalance, self._sharesToAmount(withdrawalShares, totalShares, totalBalance, False))
     if _amount < withdrawalAmount:
-        withdrawalShares = min(withdrawalShares, self._amountToShares(_amount, totalShares, totalBalance, True))
-        withdrawalAmount = _amount
+        withdrawalShares = min(withdrawalShares, self._amountToShares(_amount, totalShares, totalBalance, _shouldRoundUpShares))
+        if not _shouldRoundUpShares:
+            if withdrawalShares == 0:
+                return 0, 0
+            withdrawalAmount = self._sharesToAmount(withdrawalShares, totalShares, totalBalance, False)
+            if withdrawalAmount == 0:
+                return 0, 0
+        else:
+            withdrawalAmount = _amount
 
     assert withdrawalAmount != 0 # dev: no withdrawal amount
     return withdrawalShares, withdrawalAmount
@@ -221,12 +282,8 @@ def _amountToShares(
     totalBalance += 1
     totalShares: uint256 = _totalShares + DECIMAL_OFFSET
 
-    # calc shares
-    numerator: uint256 = _amount * totalShares
-    shares: uint256 = numerator // totalBalance
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalBalance != 0):
+    shares: uint256 = self._mulDiv(_amount, totalShares, totalBalance)
+    if _shouldRoundUp and (uint256_mulmod(_amount, totalShares, totalBalance) != 0):
         shares += 1
 
     return shares
@@ -257,12 +314,53 @@ def _sharesToAmount(
     totalBalance += 1
     totalShares: uint256 = _totalShares + DECIMAL_OFFSET
 
-    # calc amount
-    numerator: uint256 = _shares * totalBalance
-    amount: uint256 = numerator // totalShares
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalShares != 0):
+    amount: uint256 = self._mulDiv(_shares, totalBalance, totalShares)
+    if _shouldRoundUp and (uint256_mulmod(_shares, totalBalance, totalShares) != 0):
         amount += 1
 
     return amount
+
+
+# safe math
+
+
+@view
+@internal
+def _mulDiv(_x: uint256, _y: uint256, _d: uint256) -> uint256:
+    assert _d != 0 # dev: zero denominator
+
+    lo: uint256 = unsafe_mul(_x, _y)
+    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))
+    hi: uint256 = unsafe_sub(
+        unsafe_sub(mm, lo),
+        convert(mm < lo, uint256),
+    )
+
+    if hi == 0:
+        return lo // _d
+
+    assert _d > hi # dev: result overflows
+
+    rem: uint256 = uint256_mulmod(_x, _y, _d)
+    hi = unsafe_sub(hi, convert(rem > lo, uint256))
+    lo = unsafe_sub(lo, rem)
+
+    tz: uint256 = unsafe_sub(0, _d) & _d
+    d2: uint256 = _d // tz
+    lo = lo // tz
+    lo |= unsafe_mul(
+        hi,
+        unsafe_add(
+            unsafe_div(unsafe_sub(0, tz), tz),
+            1,
+        ),
+    )
+
+    inv: uint256 = unsafe_mul(3, d2) ^ 2
+    for i: uint256 in range(6):
+        inv = unsafe_mul(
+            inv,
+            unsafe_sub(2, unsafe_mul(d2, inv)),
+        )
+
+    return unsafe_mul(lo, inv)

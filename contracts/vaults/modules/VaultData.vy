@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -175,6 +175,11 @@ def _registerVaultAsset(_asset: address):
 @external
 def deregisterVaultAsset(_asset: address) -> bool:
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    return self._deregisterVaultAsset(_asset)
+
+
+@internal
+def _deregisterVaultAsset(_asset: address) -> bool:
 
     if self.totalBalances[_asset] != 0:
         return False

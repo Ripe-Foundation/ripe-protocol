@@ -2460,7 +2460,7 @@ def test_failed_redeem_does_not_burn_tokens(endaoment_psm, charlie_token, green_
     user_balance_before = green_token.balanceOf(user)
 
     # Attempt to redeem should fail
-    with boa.reverts():
+    with boa.reverts("zero amount"):
         endaoment_psm.redeemGreen(green_amount, user, False, sender=user)
 
     # Verify no tokens were burned

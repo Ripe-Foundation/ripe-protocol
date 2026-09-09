@@ -1,0 +1,56 @@
+{
+  "abi": {
+    "canonical_sha256": "0a10ba343608af86094ef62417285e32e3abe6a976bdf63590706310e9771f34",
+    "committed_file_sha256": "14e30767739ef4da4de16215eed4a000045128e779cd2096e7c98481567f8bdd",
+    "committed_path": "scripts/abis/Ledger.json"
+  },
+  "artifacts": {
+    "creation_bytecode": {
+      "sha256": "4d0f2f90b2ee563f70a303b76742ac36047f908b78ffe45c5020130e5665b0e3",
+      "size": 13683
+    },
+    "immutable_bound_runtime": {
+      "action_block_source_readback": "0x0000000000000000000000000000000000000064",
+      "sha256": "50b12de6b392ba90de1655d22f58396b7817f77b2ed4c84349a2f5bf985795d4",
+      "size": 13392
+    },
+    "runtime_template": {
+      "deployed_runtime_identity": false,
+      "sha256": "fe65aaa826003b14518824bf6219b33cde311db63687a9b9c23baf7fb4708380",
+      "size": 13264
+    }
+  },
+  "baseline": "a86650b187c523f27c92f05bfe959d06840025a6",
+  "builder_head": "9124cf0c7531e12d2c314a65020c3e67a93e4977",
+  "compiler": {
+    "command": "vyper -p . -f bytecode,bytecode_runtime contracts/data/Ledger.vy",
+    "effective_optimization": "gas",
+    "experimental_codegen": false,
+    "transitive_compiler_input_integrity": "b381be6ad58a12908a6d494b25b5cf764c3a8dbcef658a4f0757624e595a093d",
+    "version": "0.4.3+commit.bff19ea2"
+  },
+  "constructor": {
+    "encoded_arguments": "0x0000000000000000000000003acb9bbdfc7adff0dc5228a0b4c0e42c6446d8be000000000000000000000000b64b55c2a531f6afc55d90f424ca7cf465d6091e0000000000000000000000000000000000000000000000000000000000000064",
+    "ordered_arguments": [
+      "0x3AcB9bBdfC7ADfF0DC5228a0b4c0e42C6446d8Be",
+      "0xB64b55C2A531F6AFC55d90f424Ca7Cf465D6091E",
+      "0x0000000000000000000000000000000000000064"
+    ]
+  },
+  "identity": {
+    "profile_manifest_sha256": "9d0324a2c202ed17e46f87cfe98e94ea04c6020cbb19eb305f0807570e9ad50c",
+    "profile_name": "robinhood",
+    "registry_input": {
+      "address": "0x3AcB9bBdfC7ADfF0DC5228a0b4c0e42C6446d8Be",
+      "approval_status": "unapproved_placeholder",
+      "label": "rh-ledger-profile:ripe-hq"
+    }
+  },
+  "label": "local reproduction evidence, not deployment evidence",
+  "schema_version": 1,
+  "source": {
+    "path": "contracts/data/Ledger.vy",
+    "sha256": "7da1e310bad222d6cacc14aa3683ec67be6ddc76fc148efe3b174e198d645f3f"
+  },
+  "status": "DRAFT \u2014 owner approval required before integration or use"
+}

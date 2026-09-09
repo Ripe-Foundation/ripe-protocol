@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -1262,7 +1262,7 @@ def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
 @view
 @external
 def priorityPriceSourceIds() -> DynArray[uint256, 10]:
-    return [1, 8, 2, 9, 4, 5]
+    return [1, 8, 2, 4, 5]
 
 # lite signers
 

@@ -4,6 +4,10 @@ import boa
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
 
 
+def _with_vault_ids(asset_config, vault_ids):
+    return (vault_ids, *asset_config[1:])
+
+
 ############
 # Fixtures #
 ############
@@ -106,6 +110,16 @@ def sample_ripe_rewards_config():
     )
 
 
+@pytest.fixture
+def fresh_mission_control(ripe_hq, defaults):
+    return boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        defaults,
+        name="fresh_mission_control",
+    )
+
+
 ####################
 # Initial State    #
 ####################
@@ -120,6 +134,199 @@ def test_mission_control_initial_state(mission_control):
     assert not mission_control.isPaused()
     assert not mission_control.canMintGreen()
     assert not mission_control.canMintRipe()
+
+
+def test_vault_id_pointers_initialize_to_robinhood_and_base_invariants(
+    fresh_mission_control,
+):
+    assert fresh_mission_control.coreRipeGovVaultId() == 2
+    assert fresh_mission_control.isRipeGovVaultId(2)
+    assert not fresh_mission_control.isRipeGovVaultId(0)
+    assert fresh_mission_control.preferredStabVaultId() == 1
+    assert fresh_mission_control.isStabVaultId(1)
+
+
+def test_default_priority_stab_vaults_initialize_registry(ripe_hq):
+    base_defaults = boa.load(
+        "contracts/config/DefaultsBase.vy",
+        name="base_defaults_for_stab_registry",
+    )
+    initialized_mission_control = boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        base_defaults,
+        name="mission_control_with_base_defaults",
+    )
+
+    configured_stab_vaults = base_defaults.priorityStabVaults()
+    assert len(configured_stab_vaults) != 0
+    for vault in configured_stab_vaults:
+        assert initialized_mission_control.isStabVaultId(vault.vaultId)
+
+    assert not initialized_mission_control.isStabVaultId(0)
+    assert not initialized_mission_control.isStabVaultId(2)
+
+
+def test_every_registered_switchboard_can_set_exact_nonzero_vault_ids(
+    fresh_mission_control,
+    switchboard_alpha,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_delta,
+    switchboard_echo,
+):
+    switchboards = [
+        switchboard_alpha,
+        switchboard_bravo,
+        switchboard_charlie,
+        switchboard_delta,
+        switchboard_echo,
+    ]
+
+    for offset, switchboard in enumerate(switchboards, start=1):
+        core_id = 100 + offset
+        preferred_id = 200 + offset
+        fresh_mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard.address)
+        assert fresh_mission_control.coreRipeGovVaultId() == core_id
+        assert fresh_mission_control.get_logs() == []
+
+        fresh_mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard.address)
+        assert fresh_mission_control.preferredStabVaultId() == preferred_id
+        assert fresh_mission_control.isStabVaultId(preferred_id)
+        assert fresh_mission_control.get_logs() == []
+
+
+def test_preferred_stab_vault_registry_is_monotonic(
+    fresh_mission_control,
+    switchboard_charlie,
+):
+    first_id = 41
+    second_id = 42
+
+    assert not fresh_mission_control.isStabVaultId(first_id)
+    assert not fresh_mission_control.isStabVaultId(second_id)
+
+    fresh_mission_control.setPreferredStabVaultId(
+        first_id,
+        sender=switchboard_charlie.address,
+    )
+    fresh_mission_control.setPreferredStabVaultId(
+        second_id,
+        sender=switchboard_charlie.address,
+    )
+
+    assert fresh_mission_control.preferredStabVaultId() == second_id
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+
+
+def test_ripe_gov_vault_registry_is_monotonic(
+    fresh_mission_control,
+    switchboard_charlie,
+):
+    first_id = 41
+    second_id = 42
+
+    assert fresh_mission_control.isRipeGovVaultId(2)
+    assert not fresh_mission_control.isRipeGovVaultId(first_id)
+    assert not fresh_mission_control.isRipeGovVaultId(second_id)
+
+    fresh_mission_control.setCoreRipeGovVaultId(
+        first_id,
+        sender=switchboard_charlie.address,
+    )
+    fresh_mission_control.setCoreRipeGovVaultId(
+        second_id,
+        sender=switchboard_charlie.address,
+    )
+
+    assert fresh_mission_control.coreRipeGovVaultId() == second_id
+    assert fresh_mission_control.isRipeGovVaultId(2)
+    assert fresh_mission_control.isRipeGovVaultId(first_id)
+    assert fresh_mission_control.isRipeGovVaultId(second_id)
+
+
+def test_priority_stab_vault_registry_tracks_multiple_assets_and_ignores_zero(
+    fresh_mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+):
+    first_id = 41
+    second_id = 42
+
+    fresh_mission_control.setPriorityStabVaults(
+        [
+            (first_id, alpha_token.address),
+            (first_id, bravo_token.address),
+            (second_id, alpha_token.address),
+            (0, bravo_token.address),
+        ],
+        sender=switchboard_alpha.address,
+    )
+
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+    assert not fresh_mission_control.isStabVaultId(0)
+
+    fresh_mission_control.setPriorityStabVaults([], sender=switchboard_alpha.address)
+    assert fresh_mission_control.getPriorityStabVaults() == []
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+
+
+def test_special_stab_vault_registry_is_monotonic(
+    fresh_mission_control,
+    switchboard_bravo,
+    alpha_token,
+    sample_asset_config,
+):
+    first_id = 41
+    second_id = 42
+    asset_config = list(sample_asset_config)
+    asset_config[17] = first_id
+    fresh_mission_control.setAssetConfig(
+        alpha_token,
+        tuple(asset_config),
+        sender=switchboard_bravo.address,
+    )
+    asset_config[17] = second_id
+    fresh_mission_control.setAssetConfig(
+        alpha_token,
+        tuple(asset_config),
+        sender=switchboard_bravo.address,
+    )
+
+    asset_config[17] = 0
+    fresh_mission_control.setAssetConfig(
+        alpha_token,
+        tuple(asset_config),
+        sender=switchboard_bravo.address,
+    )
+
+    assert fresh_mission_control.assetConfig(alpha_token).specialStabPoolId == 0
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+
+
+@pytest.mark.parametrize("setter_name", ["setCoreRipeGovVaultId", "setPreferredStabVaultId"])
+def test_vault_id_pointer_setters_reject_zero(
+    fresh_mission_control,
+    switchboard_charlie,
+    setter_name,
+):
+    with boa.reverts("invalid vault id"):
+        getattr(fresh_mission_control, setter_name)(0, sender=switchboard_charlie.address)
+
+
+@pytest.mark.parametrize("setter_name", ["setCoreRipeGovVaultId", "setPreferredStabVaultId"])
+def test_vault_id_pointer_setters_reject_non_switchboards(
+    fresh_mission_control,
+    alice,
+    setter_name,
+):
+    with boa.reverts("no perms"):
+        getattr(fresh_mission_control, setter_name)(1, sender=alice)
 
 
 #######################
@@ -238,6 +445,61 @@ def test_mission_control_set_asset_config(mission_control, switchboard_alpha, al
     assert mission_control.isSupportedAsset(alpha_token.address)
     assert mission_control.getNumAssets() == 1
 
+
+def test_first_register_seeds_singleton_earner_without_overwriting_and_reseeds_after_readd(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    sample_asset_config,
+):
+    singleton_config = list(sample_asset_config)
+    singleton_config[0] = [1]
+    singleton_config[1] = 0
+    singleton_config[2] = 0
+    mission_control.setAssetConfig(
+        alpha_token,
+        singleton_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 1
+
+    mission_control.setRewardVaultId(
+        alpha_token,
+        2,
+        sender=switchboard_alpha.address,
+    )
+    updated_config = list(singleton_config)
+    updated_config[3] += 1
+    mission_control.setAssetConfig(
+        alpha_token,
+        updated_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 2
+
+    multi_vault_config = list(singleton_config)
+    multi_vault_config[0] = [1, 2]
+    mission_control.setAssetConfig(
+        bravo_token,
+        multi_vault_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(bravo_token) == 0
+
+    assert mission_control.deregisterAsset(
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 0
+    mission_control.setAssetConfig(
+        alpha_token,
+        singleton_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.rewardVaultId(alpha_token) == 1
+
+
 def test_mission_control_set_asset_config_unauthorized(mission_control, alice, alpha_token, sample_asset_config):
     """Test that only Switchboard can set asset config."""
     with boa.reverts("no perms"):
@@ -265,12 +527,19 @@ def test_mission_control_asset_registration(mission_control, switchboard_alpha, 
 
 def test_mission_control_deregister_asset(mission_control, switchboard_alpha, alpha_token, bravo_token, charlie_token, sample_asset_config):
     """Test asset deregistration functionality."""
+    zero_alloc_config = list(sample_asset_config)
+    zero_alloc_config[1] = 0
+    zero_alloc_config[2] = 0
+    zero_alloc_config = tuple(zero_alloc_config)
+
     # Add multiple assets
-    mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
-    mission_control.setAssetConfig(bravo_token.address, sample_asset_config, sender=switchboard_alpha.address)
-    mission_control.setAssetConfig(charlie_token.address, sample_asset_config, sender=switchboard_alpha.address)
+    mission_control.setAssetConfig(alpha_token.address, zero_alloc_config, sender=switchboard_alpha.address)
+    mission_control.setAssetConfig(bravo_token.address, zero_alloc_config, sender=switchboard_alpha.address)
+    mission_control.setAssetConfig(charlie_token.address, zero_alloc_config, sender=switchboard_alpha.address)
     
     assert mission_control.getNumAssets() == 3
+    totals_before = mission_control.totalPointsAllocs()
+    config_before = mission_control.assetConfig(bravo_token.address)
     
     # Deregister middle asset
     success = mission_control.deregisterAsset(bravo_token.address, sender=switchboard_alpha.address)
@@ -282,11 +551,168 @@ def test_mission_control_deregister_asset(mission_control, switchboard_alpha, al
     # Check that charlie moved to bravo's position
     assert mission_control.assets(2) == charlie_token.address
     assert mission_control.indexOfAsset(charlie_token.address) == 2
+    assert mission_control.totalPointsAllocs() == totals_before
+    assert mission_control.assetConfig(bravo_token.address) == config_before
 
-def test_mission_control_deregister_asset_nonexistent(mission_control, switchboard_alpha, alpha_token):
+
+@pytest.mark.parametrize(
+    "stakers_points_alloc,voter_points_alloc",
+    [(77, 0), (0, 91)],
+)
+def test_mission_control_deregister_asset_zeros_stored_allocs_and_removes_live_totals(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+    stakers_points_alloc,
+    voter_points_alloc,
+):
+    config = list(sample_asset_config)
+    config[1] = stakers_points_alloc
+    config[2] = voter_points_alloc
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+
+    num_assets_before = mission_control.numAssets()
+    config_before = mission_control.assetConfig(alpha_token.address)
+    totals_before = mission_control.totalPointsAllocs()
+
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
+
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.indexOfAsset(alpha_token.address) == 0
+    assert mission_control.numAssets() == num_assets_before - 1
+    stored = mission_control.assetConfig(alpha_token.address)
+    assert stored.stakersPointsAlloc == 0
+    assert stored.voterPointsAlloc == 0
+    expected = list(config_before)
+    expected[1] = 0
+    expected[2] = 0
+    assert list(stored) == expected
+    assert mission_control.rewardVaultId(alpha_token.address) == 0
+    assert not mission_control.getAssetRetirementConfig(alpha_token.address).hasPointsAlloc
+    totals_after = mission_control.totalPointsAllocs()
+    assert totals_after.stakersPointsAllocTotal == (
+        totals_before.stakersPointsAllocTotal - stakers_points_alloc
+    )
+    assert totals_after.voterPointsAllocTotal == (
+        totals_before.voterPointsAllocTotal - voter_points_alloc
+    )
+
+
+def test_asset_retirement_config_reports_whitelist_posture(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    mock_whitelist,
+    sample_asset_config,
+):
+    config = list(sample_asset_config)
+    config[19] = mock_whitelist.address
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.getAssetRetirementConfig(alpha_token).hasWhitelist
+
+    config[19] = ZERO_ADDRESS
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.getAssetRetirementConfig(alpha_token).hasWhitelist
+
+
+def test_asset_retirement_config_reports_stability_claim_posture(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+):
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        sample_asset_config,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.getAssetRetirementConfig(alpha_token).canClaimInStabPool
+
+    config = list(sample_asset_config)
+    config[16] = False
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(config),
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.getAssetRetirementConfig(alpha_token).canClaimInStabPool
+
+
+def test_mission_control_deregister_asset_nonexistent(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    sample_asset_config,
+):
     """Test deregistering non-existent asset."""
     success = mission_control.deregisterAsset(alpha_token.address, sender=switchboard_alpha.address)
     assert not success
+
+    zero_alloc_config = list(sample_asset_config)
+    zero_alloc_config[1] = 0
+    zero_alloc_config[2] = 0
+    mission_control.setAssetConfig(
+        bravo_token.address,
+        tuple(zero_alloc_config),
+        sender=switchboard_alpha.address,
+    )
+    success = mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
+    assert not success
+
+
+def test_mission_control_deregister_asset_nonexistent_with_stale_retained_config(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+):
+    """Keep nonexistent-asset behavior with a stale retained allocation."""
+    zero_alloc_config = list(sample_asset_config)
+    zero_alloc_config[1] = 0
+    zero_alloc_config[2] = 0
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(zero_alloc_config),
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    # Model a legacy retained config that cannot be reached through the guarded
+    # lifecycle. The registry check must still return False before reading it.
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].stakersPointsAlloc = 77"
+    )
+    assert mission_control.assetConfig(alpha_token.address).stakersPointsAlloc == 77
+    success = mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
+    assert not success
+
 
 def test_mission_control_deregister_asset_unauthorized(mission_control, alice, alpha_token):
     """Test that only Switchboard can deregister assets."""
@@ -361,6 +787,40 @@ def test_mission_control_set_ripe_rewards_config_unauthorized(mission_control, a
     with boa.reverts("no perms"):
         mission_control.setRipeRewardsConfig(sample_ripe_rewards_config, sender=alice)
 
+
+def test_mission_control_clear_reward_vault_zeroes_asset_allocs_and_totals(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+):
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        sample_asset_config,
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setRewardVaultId(
+        alpha_token.address,
+        1,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.assetStakersPointsAlloc(alpha_token.address) == 100
+
+    mission_control.setRewardVaultId(
+        alpha_token.address,
+        0,
+        sender=switchboard_alpha.address,
+    )
+
+    assert mission_control.rewardVaultId(alpha_token.address) == 0
+    config = mission_control.assetConfig(alpha_token.address)
+    assert config.stakersPointsAlloc == 0
+    assert config.voterPointsAlloc == 0
+    totals = mission_control.totalPointsAllocs()
+    assert totals.stakersPointsAllocTotal == 0
+    assert totals.voterPointsAllocTotal == 0
+
+
 def test_mission_control_points_allocs_tracking(mission_control, switchboard_alpha, alpha_token, bravo_token, sample_asset_config):
     """Test that points allocations are tracked correctly."""
     # Initially no allocations
@@ -399,6 +859,128 @@ def test_mission_control_points_allocs_tracking(mission_control, switchboard_alp
     total_allocs = mission_control.totalPointsAllocs()
     assert total_allocs.stakersPointsAllocTotal == 200  # 50 + 150
     assert total_allocs.voterPointsAllocTotal == 350    # 100 + 250
+
+
+def test_mission_control_deregister_asset_points_allocs_conservation(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    sample_asset_config,
+):
+    retired_config = list(sample_asset_config)
+    retired_config[1] = 77
+    retired_config[2] = 31
+    retired_config[3] = 1_234 * EIGHTEEN_DECIMALS
+    retired_config[4] = 12_345 * EIGHTEEN_DECIMALS
+    retired_config[5] = 7 * EIGHTEEN_DECIMALS
+    active_config = list(sample_asset_config)
+    active_config[1] = 23
+    active_config[2] = 19
+
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(retired_config),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setAssetConfig(
+        bravo_token.address,
+        tuple(active_config),
+        sender=switchboard_alpha.address,
+    )
+
+    active_before = mission_control.assetConfig(bravo_token.address)
+    totals_before = mission_control.totalPointsAllocs()
+    retired_before = mission_control.assetConfig(alpha_token.address)
+
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
+    totals_after_deregister = mission_control.totalPointsAllocs()
+    stored = mission_control.assetConfig(alpha_token.address)
+    assert stored.stakersPointsAlloc == 0
+    assert stored.voterPointsAlloc == 0
+    expected = list(retired_before)
+    expected[1] = 0
+    expected[2] = 0
+    assert list(stored) == expected
+    assert mission_control.rewardVaultId(alpha_token.address) == 0
+    assert not mission_control.getAssetRetirementConfig(alpha_token.address).hasPointsAlloc
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.isSupportedAsset(bravo_token.address)
+    assert mission_control.assetConfig(bravo_token.address) == active_before
+    assert totals_after_deregister.stakersPointsAllocTotal == (
+        active_before.stakersPointsAlloc
+    )
+    assert totals_after_deregister.voterPointsAllocTotal == (
+        active_before.voterPointsAlloc
+    )
+    assert totals_after_deregister.stakersPointsAllocTotal == (
+        totals_before.stakersPointsAllocTotal - retired_before.stakersPointsAlloc
+    )
+    assert totals_after_deregister.voterPointsAllocTotal == (
+        totals_before.voterPointsAllocTotal - retired_before.voterPointsAlloc
+    )
+
+
+def test_mission_control_readd_after_deregister_does_not_underflow_totals(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    sample_asset_config,
+):
+    retired_config = list(sample_asset_config)
+    retired_config[1] = 77
+    retired_config[2] = 31
+    retired_config[3] = 1_234 * EIGHTEEN_DECIMALS
+    retired_config[4] = 12_345 * EIGHTEEN_DECIMALS
+    active_config = list(sample_asset_config)
+    active_config[1] = 23
+    active_config[2] = 19
+
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(retired_config),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setAssetConfig(
+        bravo_token.address,
+        tuple(active_config),
+        sender=switchboard_alpha.address,
+    )
+    retired_before = mission_control.assetConfig(alpha_token.address)
+
+    assert mission_control.deregisterAsset(
+        alpha_token.address,
+        sender=switchboard_alpha.address,
+    )
+    totals_after_deregister = mission_control.totalPointsAllocs()
+    assert totals_after_deregister.stakersPointsAllocTotal == 23
+    assert totals_after_deregister.voterPointsAllocTotal == 19
+    retired_stored = mission_control.assetConfig(alpha_token.address)
+    assert retired_stored.stakersPointsAlloc == 0
+    assert retired_stored.voterPointsAlloc == 0
+    assert retired_stored.perUserDepositLimit == retired_before.perUserDepositLimit
+    assert retired_stored.globalDepositLimit == retired_before.globalDepositLimit
+
+    readd_config = list(sample_asset_config)
+    readd_config[1] = 40
+    readd_config[2] = 10
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(readd_config),
+        sender=switchboard_alpha.address,
+    )
+
+    assert mission_control.isSupportedAsset(alpha_token.address)
+    totals_after_readd = mission_control.totalPointsAllocs()
+    assert totals_after_readd.stakersPointsAllocTotal == 23 + 40
+    assert totals_after_readd.voterPointsAllocTotal == 19 + 10
+    readded_stored = mission_control.assetConfig(alpha_token.address)
+    assert readded_stored.stakersPointsAlloc == 40
+    assert readded_stored.voterPointsAlloc == 10
 
 
 ######################
@@ -444,6 +1026,113 @@ def test_mission_control_get_teller_withdraw_config(mission_control, switchboard
     mission_control.setUserDelegation(alice, bob, sample_action_delegation, sender=switchboard_alpha.address)
     config = mission_control.getTellerWithdrawConfig(alpha_token.address, alice, bob)
     assert config.canWithdrawForUser
+
+
+def test_mission_control_effective_external_delivery_policy(
+    mission_control,
+    setGeneralConfig,
+    setAssetConfig,
+    switchboard_alpha,
+    alpha_token,
+    alice,
+):
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+
+    # Supported collateral honors the caller's requested delivery mode.
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True)
+    assert redeem.canRedeemCollateral and redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and auction.shouldTransferBalance
+
+    # External delivery is governed by the dedicated redemption/auction flags,
+    # not the user-withdrawal flag.
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, False)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, False)
+    assert redeem.canRedeemCollateral and not redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and not auction.shouldTransferBalance
+
+    # Disabling voluntary Teller withdrawals does not disable either solvency
+    # path, regardless of requested delivery mode.
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _canWithdraw=False,
+    )
+    assert mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, False).canRedeemCollateral
+    assert mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, False).canBuyInAuction
+    assert mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True).canRedeemCollateral
+    assert mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True).canBuyInAuction
+
+    # The new lifecycle guard prevents retiring the asset while an exit path is
+    # disabled. Restore the flag, retire it, then model a legacy retained config
+    # to pin the decoupled canWithdraw policy for already-retired assets.
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    assert mission_control.deregisterAsset(alpha_token, sender=switchboard_alpha.address)
+    mission_control.eval(
+        f"self.assetConfig[{alpha_token.address}].canWithdraw = False"
+    )
+    redeem = mission_control.getEffectiveRedeemCollateralConfig(alpha_token, alice, True)
+    auction = mission_control.getEffectiveAuctionBuyConfig(alpha_token, alice, True)
+    assert redeem.canRedeemCollateral and not redeem.shouldTransferBalance
+    assert auction.canBuyInAuction and not auction.shouldTransferBalance
+
+
+@pytest.mark.parametrize(
+    "scope,path",
+    [
+        ("general", "redeem"),
+        ("asset", "redeem"),
+        ("general", "auction"),
+        ("asset", "auction"),
+    ],
+)
+def test_mission_control_effective_delivery_uses_dedicated_path_flags(
+    scope,
+    path,
+    mission_control,
+    setGeneralConfig,
+    setAssetConfig,
+    alpha_token,
+    alice,
+):
+    gen_kwargs = {}
+    asset_kwargs = {
+        "_stakersPointsAlloc": 0,
+        "_voterPointsAlloc": 0,
+    }
+    if path == "redeem":
+        if scope == "general":
+            gen_kwargs["_canRedeemCollateral"] = False
+        else:
+            asset_kwargs["_canRedeemCollateral"] = False
+    else:
+        if scope == "general":
+            gen_kwargs["_canBuyInAuction"] = False
+        else:
+            asset_kwargs["_canBuyInAuction"] = False
+
+    setGeneralConfig(**gen_kwargs)
+    setAssetConfig(alpha_token, **asset_kwargs)
+    if path == "redeem":
+        config = mission_control.getEffectiveRedeemCollateralConfig(
+            alpha_token, alice, False
+        )
+        assert not config.canRedeemCollateral
+    else:
+        config = mission_control.getEffectiveAuctionBuyConfig(
+            alpha_token, alice, False
+        )
+        assert not config.canBuyInAuction
 
 def test_mission_control_get_borrow_config(mission_control, switchboard_alpha, alice, bob, sample_gen_config, sample_gen_debt_config, sample_action_delegation):
     """Test getting borrow configuration."""
@@ -545,8 +1234,12 @@ def test_mission_control_set_stab_claim_rewards_config_unauthorized(mission_cont
     with boa.reverts("no perms"):
         mission_control.setRipeRewardsConfig((True, 10, 25_00, 25_00, 25_00, 25_00, 0, 0, 100 * EIGHTEEN_DECIMALS), sender=alice)
 
-def test_mission_control_set_priority_liq_asset_vaults(mission_control, switchboard_alpha, alpha_token):
-    """Test setting priority liquidation asset vaults."""
+def test_mission_control_set_priority_liq_asset_vaults(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+):
+    """The authorized setter stores data without applying policy."""
     priority_vaults = [
         (1, alpha_token.address),  # (vaultId, asset)
         (2, alpha_token.address),
@@ -558,6 +1251,7 @@ def test_mission_control_set_priority_liq_asset_vaults(mission_control, switchbo
     assert len(stored_vaults) == 2
     assert stored_vaults[0].vaultId == 1
     assert stored_vaults[0].asset == alpha_token.address
+
 
 def test_mission_control_set_priority_liq_asset_vaults_unauthorized(mission_control, alice, alpha_token):
     """Test that only Switchboard can set priority liq asset vaults."""
@@ -801,14 +1495,19 @@ def test_mission_control_set_priority_price_source_ids_unauthorized(mission_cont
 # Complex View Functions #
 ###########################
 
-def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, sample_gen_config, sample_gen_debt_config, alpha_token):
+def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, sample_gen_config, sample_gen_debt_config, alpha_token, sample_asset_config):
     """Test getting general liquidation configuration."""
     # Set up configs
     mission_control.setGeneralConfig(sample_gen_config, sender=switchboard_alpha.address)
     mission_control.setGeneralDebtConfig(sample_gen_debt_config, sender=switchboard_alpha.address)
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        _with_vault_ids(sample_asset_config, [3]),
+        sender=switchboard_alpha.address,
+    )
     
     # Set priority vaults
-    priority_liq_vaults = [(1, alpha_token.address)]
+    priority_liq_vaults = [(3, alpha_token.address)]
     priority_stab_vaults = [(2, alpha_token.address)]
     mission_control.setPriorityLiqAssetVaults(priority_liq_vaults, sender=switchboard_alpha.address)
     mission_control.setPriorityStabVaults(priority_stab_vaults, sender=switchboard_alpha.address)
@@ -820,6 +1519,96 @@ def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, 
     assert config.maxKeeperFee == sample_gen_debt_config[13]
     assert len(config.priorityLiqAssetVaults) == 1
     assert len(config.priorityStabVaults) == 1
+
+
+def test_get_gen_liq_config_skips_retired_priority_liq_vault(
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    governance,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    alpha_token,
+    bravo_token,
+):
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    rebase_id = vault_book.getRegId(rebase_erc20_vault)
+    mission_control.setPriorityLiqAssetVaults(
+        [(simple_id, alpha_token.address), (rebase_id, bravo_token.address)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert vault_book.startAddressDisableInRegistry(
+        rebase_id, sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        rebase_id, sender=governance.address
+    )
+
+    stored = mission_control.getPriorityLiqAssetVaults()
+    assert [(row.vaultId, row.asset) for row in stored] == [
+        (simple_id, alpha_token.address),
+        (rebase_id, bravo_token.address),
+    ]
+    assert vault_book.isValidRegId(rebase_id)
+    assert vault_book.getAddr(rebase_id) == ZERO_ADDRESS
+
+    resolved = mission_control.getGenLiqConfig().priorityLiqAssetVaults
+    assert [(row.vaultId, row.vaultAddr, row.asset) for row in resolved] == [
+        (simple_id, simple_erc20_vault.address, alpha_token.address),
+    ]
+    assert all(row.vaultAddr != ZERO_ADDRESS for row in resolved)
+
+
+def test_get_gen_liq_config_skips_retired_priority_stab_vault(
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    governance,
+    stability_pool,
+    alternate_stability_pool,
+    savings_green,
+):
+    live_id = vault_book.getRegId(stability_pool)
+    assert vault_book.startAddNewAddressToRegistry(
+        alternate_stability_pool,
+        "Second Stability Pool",
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    retired_id = vault_book.confirmNewAddressToRegistry(
+        alternate_stability_pool, sender=governance.address
+    )
+    assert retired_id != live_id
+    assert vault_book.getAddr(retired_id) == alternate_stability_pool.address
+
+    mission_control.setPriorityStabVaults(
+        [(live_id, savings_green.address), (retired_id, savings_green.address)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert vault_book.startAddressDisableInRegistry(
+        retired_id, sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        retired_id, sender=governance.address
+    )
+
+    stored = mission_control.getPriorityStabVaults()
+    assert [(row.vaultId, row.asset) for row in stored] == [
+        (live_id, savings_green.address),
+        (retired_id, savings_green.address),
+    ]
+    assert vault_book.isValidRegId(retired_id)
+    assert vault_book.getAddr(retired_id) == ZERO_ADDRESS
+
+    resolved = mission_control.getGenLiqConfig().priorityStabVaults
+    assert [(row.vaultId, row.vaultAddr, row.asset) for row in resolved] == [
+        (live_id, stability_pool.address, savings_green.address),
+    ]
+    assert all(row.vaultAddr != ZERO_ADDRESS for row in resolved)
 
 def test_mission_control_get_asset_liq_config(mission_control, switchboard_alpha, alpha_token, sample_asset_config):
     """Test getting asset liquidation configuration."""
@@ -906,13 +1695,48 @@ def test_mission_control_get_rewards_config(mission_control, switchboard_alpha, 
     assert config.voterPointsAllocTotal == 400
 
 def test_mission_control_get_deposit_points_config(mission_control, switchboard_alpha, alpha_token, sample_asset_config):
-    """Test getting deposit points configuration."""
+    """Only the selected reward vault receives allocs or gen funding."""
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
-    
-    config = mission_control.getDepositPointsConfig(alpha_token.address)
-    assert config.stakersPointsAlloc == sample_asset_config[1]
-    assert config.voterPointsAlloc == sample_asset_config[2]
-    assert config.isNft == sample_asset_config[20]
+    mission_control.setRewardVaultId(alpha_token.address, 1, sender=switchboard_alpha.address)
+
+    member = mission_control.getDepositPointsConfig(alpha_token.address, 1)
+    assert member.stakersPointsAlloc == sample_asset_config[1]
+    assert member.voterPointsAlloc == sample_asset_config[2]
+    assert member.isNft == sample_asset_config[20]
+    assert not member.shouldFundGenPoints
+
+    non_member = mission_control.getDepositPointsConfig(alpha_token.address, 3)
+    assert non_member.stakersPointsAlloc == 0
+    assert non_member.voterPointsAlloc == 0
+    assert non_member.isNft == sample_asset_config[20]
+    # Membership must not turn a real nonzero staker allocation into a signal
+    # that this historical row should fund general-depositor USD.
+    assert not non_member.shouldFundGenPoints
+
+    zero_staker_config = list(sample_asset_config)
+    zero_staker_config[1] = 0
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(zero_staker_config),
+        sender=switchboard_alpha.address,
+    )
+    non_member = mission_control.getDepositPointsConfig(alpha_token.address, 3)
+    assert non_member.stakersPointsAlloc == 0
+    assert non_member.voterPointsAlloc == 0
+    assert not non_member.shouldFundGenPoints
+    member = mission_control.getDepositPointsConfig(alpha_token.address, 1)
+    assert not member.shouldFundGenPoints
+
+    zero_alloc_config = list(zero_staker_config)
+    zero_alloc_config[2] = 0
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(zero_alloc_config),
+        sender=switchboard_alpha.address,
+    )
+    member = mission_control.getDepositPointsConfig(alpha_token.address, 1)
+    assert member.shouldFundGenPoints
+    assert member.accrualStartBlock == 0
 
 def test_mission_control_get_price_config(mission_control, switchboard_alpha, sample_gen_config):
     """Test getting price configuration."""
@@ -1069,10 +1893,14 @@ def test_mission_control_max_priority_price_sources(mission_control, switchboard
     stored_ids = mission_control.getPriorityPriceSourceIds()
     assert len(stored_ids) == 10
 
-def test_mission_control_max_priority_vaults(mission_control, switchboard_alpha, alpha_token):
+def test_mission_control_max_priority_vaults(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+):
     """Test maximum priority vaults limit."""
     # Create max allowed priority vaults (20)
-    max_vaults = [(i, alpha_token.address) for i in range(1, 21)]
+    max_vaults = [(vault_id, alpha_token.address) for vault_id in range(3, 23)]
     mission_control.setPriorityLiqAssetVaults(max_vaults, sender=switchboard_alpha.address)
     
     stored_vaults = mission_control.getPriorityLiqAssetVaults()
@@ -1115,17 +1943,30 @@ def test_mission_control_comprehensive_config_flow(mission_control, switchboard_
     assert deposit_config.canAnyoneDeposit
     
     # 5. Deregister asset
+    zero_alloc_config = list(mission_control.assetConfig(alpha_token.address))
+    zero_alloc_config[1] = 0
+    zero_alloc_config[2] = 0
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        tuple(zero_alloc_config),
+        sender=switchboard_alpha.address,
+    )
     success = mission_control.deregisterAsset(alpha_token.address, sender=switchboard_alpha.address)
     assert success
     assert not mission_control.isSupportedAsset(alpha_token.address)
     
     # 6. Test that asset-specific configs now reflect deregistration
     deposit_config = mission_control.getTellerDepositConfig(1, alpha_token.address, alice)
-    # Note: Asset config remains but asset is no longer in registry
-    # The doesVaultSupportAsset still works because assetConfig is not cleared
-    # But isSupportedAsset should return False
-    assert deposit_config.doesVaultSupportAsset  # config still exists
-    assert not mission_control.isSupportedAsset(alpha_token.address)  # but not in registry
+    assert not deposit_config.canDepositAsset
+    assert not deposit_config.doesVaultSupportAsset
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    # Retained configuration remains available for existing positions to unwind.
+    withdraw_config = mission_control.getTellerWithdrawConfig(
+        alpha_token.address, alice, alice
+    )
+    assert withdraw_config.canWithdrawAsset
+    assert withdraw_config.canWithdrawForUser
 
 
 ####################
@@ -1154,6 +1995,13 @@ def test_mission_control_multiple_asset_management(mission_control, switchboard_
     assert bravo_config.perUserDepositLimit == 2000 * EIGHTEEN_DECIMALS
     
     # Remove middle asset and verify integrity
+    modified_config[1] = 0
+    modified_config[2] = 0
+    mission_control.setAssetConfig(
+        bravo_token.address,
+        tuple(modified_config),
+        sender=switchboard_alpha.address,
+    )
     mission_control.deregisterAsset(bravo_token.address, sender=switchboard_alpha.address)
     assert mission_control.getNumAssets() == 2
     assert not mission_control.isSupportedAsset(bravo_token.address)

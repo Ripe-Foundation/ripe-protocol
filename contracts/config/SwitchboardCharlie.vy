@@ -8,9 +8,10 @@
 #                                                    ┗┛┛┗┗┻┛ ┗┗┗ 
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025 
+#      Ripe Foundation (C) 2026 
 
 # @version 0.4.3
+# pragma optimize codesize
 
 exports: gov.__interface__
 exports: timeLock.__interface__
@@ -22,6 +23,18 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import contracts.modules.Addys as addys
 import interfaces.ConfigStructs as cs
+
+struct AssetRetirementConfig:
+    isSupported: bool
+    hasPointsAlloc: bool
+    hasWhitelist: bool
+    ltv: uint256
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
+    shouldTransferToEndaoment: bool
+    isNft: bool
 
 interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -38,31 +51,50 @@ interface Lootbox:
 interface MissionControl:
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
+    def setRewardVaultId(_asset: address, _vaultId: uint256): nonpayable
+    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
+    def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def setTrainingWheels(_trainingWheels: address): nonpayable
+    def setPreferredStabVaultId(_vaultId: uint256): nonpayable
+    def setCoreRipeGovVaultId(_vaultId: uint256): nonpayable
     def deregisterAsset(_asset: address) -> bool: nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
+    def assetStakersPointsAlloc(_asset: address) -> uint256: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def rewardVaultId(_asset: address) -> uint256: view
+    def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
 
-interface AuctionHouse:
-    def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def pauseAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-    def startAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-    def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
+interface StabilityPool:
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def vaultAssets(_index: uint256) -> address: view
+    def isPaused() -> bool: view
 
 interface RipeEcoContract:
     def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]): nonpayable
     def recoverFunds(_recipient: address, _asset: address): nonpayable
     def pause(_shouldPause: bool): nonpayable
 
-interface CreditEngine:
-    def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-    def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_vaultId: uint256) -> address: view
+
+interface RipeGovVault:
+    def totalGovPoints() -> uint256: view
+    def isPaused() -> bool: view
 
 interface Switchboard:
     def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
+
+interface CreditEngine:
+    def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface Ledger:
     def setLockedAccount(_wallet: address, _shouldLock: bool): nonpayable
@@ -73,19 +105,12 @@ interface TrainingWheels:
 interface VaultData:
     def deregisterVaultAsset(_asset: address) -> bool: nonpayable
 
-interface VaultBook:
-    def getAddr(_vaultId: uint256) -> address: view
-
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
     RECOVER_FUNDS
     RECOVER_FUNDS_MANY
-    START_AUCTION
-    START_MANY_AUCTIONS
-    PAUSE_AUCTION
-    PAUSE_MANY_AUCTIONS
     TRAINING_WHEELS
     SET_UNDERSCORE_SEND_INTERVAL
     SET_UNDY_DEPOSIT_REWARDS_AMOUNT
@@ -94,6 +119,9 @@ flag ActionType:
     DEREGISTER_VAULT_ASSET
     SET_USER_CONFIG
     SET_USER_DELEGATION
+    CORE_RIPE_GOV_VAULT
+    PREFERRED_STAB_VAULT
+    REWARD_VAULT_ID
 
 flag AssetFlag:
     CAN_DEPOSIT
@@ -113,11 +141,6 @@ struct RecoverFundsManyAction:
     recipient: address
     assets: DynArray[address, MAX_RECOVER_ASSETS]
 
-struct FungAuctionConfig:
-    liqUser: address
-    vaultId: uint256
-    asset: address
-
 struct TrainingWheelAccess:
     user: address
     isAllowed: bool
@@ -135,6 +158,11 @@ struct UserDelegationAction:
     delegate: address
     config: cs.ActionDelegation
 
+struct RewardVaultUpdate:
+    asset: address
+    oldVaultId: uint256
+    newVaultId: uint256
+
 event PendingRecoverFundsAction:
     contractAddr: indexed(address)
     recipient: indexed(address)
@@ -146,30 +174,6 @@ event PendingRecoverFundsManyAction:
     contractAddr: indexed(address)
     recipient: indexed(address)
     numAssets: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PendingStartAuctionAction:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PendingStartManyAuctionsAction:
-    numAuctions: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PendingPauseAuctionAction:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PendingPauseManyAuctionsAction:
-    numAuctions: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -191,24 +195,6 @@ event RecoverFundsManyExecuted:
     contractAddr: indexed(address)
     recipient: indexed(address)
     numAssets: uint256
-
-event StartAuctionExecuted:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    success: bool
-
-event StartManyAuctionsExecuted:
-    numAuctionsStarted: uint256
-
-event PauseAuctionExecuted:
-    liqUser: indexed(address)
-    vaultId: uint256
-    asset: indexed(address)
-    success: bool
-
-event PauseManyAuctionsExecuted:
-    numAuctionsPaused: uint256
 
 event BlacklistSet:
     tokenAddr: indexed(address)
@@ -263,6 +249,12 @@ event DepositPointsUpdatedMany:
     numUsers: uint256
     vaultId: uint256
     asset: indexed(address)
+    caller: indexed(address)
+
+event AssetDepositPointsCheckpointedAt:
+    asset: indexed(address)
+    vaultId: uint256
+    vaultAddr: indexed(address)
     caller: indexed(address)
 
 event TrainingWheelsSet:
@@ -376,14 +368,40 @@ event UserDelegationSet:
     delegate: indexed(address)
     caller: indexed(address)
 
+event PendingCoreRipeGovVaultIdChange:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+    confirmationBlock: uint256
+    actionId: uint256
+
+event CoreRipeGovVaultIdSet:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+
+event PendingPreferredStabVaultIdChange:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PreferredStabVaultIdSet:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+
+event RewardVaultIdSet:
+    asset: indexed(address)
+    oldVaultId: uint256
+    newVaultId: uint256
+    caller: indexed(address)
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingRecoverFundsActions: public(HashMap[uint256, RecoverFundsAction])
 pendingRecoverFundsManyActions: public(HashMap[uint256, RecoverFundsManyAction])
-pendingStartAuctionActions: public(HashMap[uint256, FungAuctionConfig])
-pendingStartManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
-pendingPauseAuctionActions: public(HashMap[uint256, FungAuctionConfig])
-pendingPauseManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
 pendingTrainingWheels: public(HashMap[uint256, address])
 pendingUnderscoreSendInterval: public(HashMap[uint256, uint256])
 pendingUndyDepositRewardsAmount: public(HashMap[uint256, uint256])
@@ -393,18 +411,21 @@ pendingDeregisterAsset: public(HashMap[uint256, address])
 pendingDeregisterVaultAsset: public(HashMap[uint256, DeregisterVaultAssetAction])
 pendingUserConfig: public(HashMap[uint256, UserConfigAction])
 pendingUserDelegation: public(HashMap[uint256, UserDelegationAction])
+pendingCoreRipeGovVaultId: public(HashMap[uint256, uint256])
+pendingPreferredStabVaultId: public(HashMap[uint256, uint256])
+pendingRewardVault: public(HashMap[uint256, RewardVaultUpdate])
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
-MAX_AUCTIONS: constant(uint256) = 20
 MAX_TRAINING_WHEEL_ACCESS: constant(uint256) = 25
 MAX_DEBT_UPDATES: constant(uint256) = 50
 MAX_CLAIM_USERS: constant(uint256) = 50
 
+SAVINGS_GREEN_ID: constant(uint256) = 2
+RIPE_TOKEN_ID: constant(uint256) = 3
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 SWITCHBOARD_ID: constant(uint256) = 6
 VAULT_BOOK_ID: constant(uint256) = 8
-AUCTION_HOUSE_ID: constant(uint256) = 9
 CREDIT_ENGINE_ID: constant(uint256) = 13
 LOOTBOX_ID: constant(uint256) = 16
 
@@ -434,12 +455,6 @@ def _hasPermsForLiteAction(_caller: address, _hasLiteAccess: bool) -> bool:
 
 
 # addys lite
-
-
-@view
-@internal
-def _getAuctionHouseAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(AUCTION_HOUSE_ID)
 
 
 @view
@@ -480,6 +495,148 @@ def _getVaultBookAddr() -> address:
 @internal
 def _getLedgerAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+
+
+###################
+# Reward Vault Id #
+###################
+
+
+@view
+@internal
+def _assertValidRewardVaultId(_asset: address, _vaultId: uint256, _oldVaultId: uint256, _missionControl: address):
+    if _oldVaultId != 0 and _vaultId != _oldVaultId:
+        # A live promotional clock and its points history share this row identity.
+        # Retargeting requires an explicit checkpointed points/clock migration.
+        assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, _oldVaultId) == 0 # dev: promotional reward row migration required
+    checkVaultId: uint256 = _oldVaultId if _vaultId == 0 else _vaultId
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(checkVaultId, _asset) # dev: unsupported reward vault
+    if _vaultId != 0:
+        if staticcall MissionControl(_missionControl).assetStakersPointsAlloc(_asset) != 0:
+            assert staticcall MissionControl(_missionControl).isRipeGovVaultId(_vaultId) or staticcall MissionControl(_missionControl).isStabVaultId(_vaultId) # dev: staker vault class
+
+
+# Operator retirement / migration:
+# 1. setRewardVaultId(asset, 0) — checkpoints, clears, and zeros allocs on the MC write.
+# 2. Move balances / change vaultIds.
+# 3. setRewardVaultId(asset, newVault); new vault must already be in vaultIds.
+# 4. Bravo sets allocs if needed, or leave both 0 for gen only.
+# Execute fences the new row's lastUpdate under the old/zero policy before the write,
+# so a stale Ledger row cannot eat the old earner's interval.
+# Clear and zero are atomic in MissionControl, so there is no orphan-allocation gap.
+@external
+def setRewardVaultId(_asset: address, _vaultId: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    mc: address = self._getMissionControlAddr()
+    oldVaultId: uint256 = staticcall MissionControl(mc).rewardVaultId(_asset)
+    self._assertValidRewardVaultId(_asset, _vaultId, oldVaultId, mc)
+    assert _vaultId != oldVaultId # dev: reward vault unchanged
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.REWARD_VAULT_ID
+    self.pendingMissionControl[aid] = mc
+    self.pendingRewardVault[aid] = RewardVaultUpdate(asset=_asset, oldVaultId=oldVaultId, newVaultId=_vaultId)
+    return aid
+
+
+##########################
+# Core Vault ID Pointers #
+##########################
+
+
+# core ripe gov vault id
+
+
+@external
+def setCoreRipeGovVaultId(_newVaultId: uint256, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    mc: address = self._resolveMissionControl(_missionControl)
+    newVaultAddr: address = empty(address)
+    previousVaultId: uint256 = 0
+    newVaultAddr, previousVaultId = self._validateCoreRipeGovVaultId(_newVaultId, mc)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.CORE_RIPE_GOV_VAULT
+    self.pendingCoreRipeGovVaultId[aid] = _newVaultId
+    self.pendingMissionControl[aid] = mc
+    log PendingCoreRipeGovVaultIdChange(
+        previousVaultId=previousVaultId,
+        newVaultId=_newVaultId,
+        newVaultAddr=newVaultAddr,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
+
+
+@view
+@internal
+def _validateCoreRipeGovVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
+    assert _vaultId != 0 # dev: invalid vault id
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
+    previousVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert _vaultId != previousVaultId # dev: already set
+
+    ripeToken: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_TOKEN_ID)
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, ripeToken) # dev: unsupported asset
+    na: uint256 = staticcall RipeGovVault(vaultAddr).totalGovPoints()
+    assert not staticcall RipeGovVault(vaultAddr).isPaused() # dev: vault paused
+    return vaultAddr, previousVaultId
+
+
+# preferred stab vault id
+
+
+@external
+def setPreferredStabVaultId(_newVaultId: uint256, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    mc: address = self._resolveMissionControl(_missionControl)
+    newVaultAddr: address = empty(address)
+    previousVaultId: uint256 = 0
+    newVaultAddr, previousVaultId = self._validatePreferredStabVaultId(_newVaultId, mc)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.PREFERRED_STAB_VAULT
+    self.pendingPreferredStabVaultId[aid] = _newVaultId
+    self.pendingMissionControl[aid] = mc
+    log PendingPreferredStabVaultIdChange(
+        previousVaultId=previousVaultId,
+        newVaultId=_newVaultId,
+        newVaultAddr=newVaultAddr,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
+
+
+@view
+@internal
+def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
+    assert _vaultId != 0 # dev: invalid vault id
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
+    previousVaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
+    assert _vaultId != previousVaultId # dev: already set
+
+    savingsGreen: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SAVINGS_GREEN_ID)
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, savingsGreen) # dev: unsupported asset
+
+    # verify has correct interface
+    naStabAsset: address = staticcall StabilityPool(vaultAddr).vaultAssets(1)
+    naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(savingsGreen, savingsGreen)
+    naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(savingsGreen, savingsGreen)
+    assert staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen) == 0 # dev: asset reserved for claims
+    assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
+
+    return vaultAddr, previousVaultId
 
 
 #################
@@ -720,7 +877,6 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
     assert empty(address) not in [_user, _asset] # dev: invalid parameters
 
-    # Get vault address from vault book
     vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
     assert vaultAddr != empty(address) # dev: invalid vault
 
@@ -730,10 +886,30 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
 
 
 @external
+def checkpointAssetDepositPointsAt(_asset: address, _vaultId: uint256, _vaultAddr: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert empty(address) not in [_asset, _vaultAddr] # dev: invalid parameters
+    assert _vaultAddr.is_contract # dev: invalid vault
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    bookAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert bookAddr == _vaultAddr # dev: vault addr mismatch
+
+    mc: address = self._getMissionControlAddr()
+    if staticcall MissionControl(mc).rewardVaultId(_asset) == _vaultId:
+        assert staticcall MissionControl(mc).accrualStartBlock(_asset, _vaultId) != max_value(uint256) # dev: cannot checkpoint armed promotional row
+
+    extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
+    log AssetDepositPointsCheckpointedAt(asset=_asset, vaultId=_vaultId, vaultAddr=_vaultAddr, caller=msg.sender)
+    return True
+
+
+@external
 def updateManyDepositPoints(_users: DynArray[address, MAX_CLAIM_USERS], _vaultId: uint256, _asset: address) -> bool:
     assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
 
-    # Get vault address from vault book
+    assert empty(address) not in _users # dev: invalid user
     vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
     assert vaultAddr != empty(address) # dev: invalid vault
 
@@ -742,110 +918,6 @@ def updateManyDepositPoints(_users: DynArray[address, MAX_CLAIM_USERS], _vaultId
 
     log DepositPointsUpdatedMany(numUsers=len(_users), vaultId=_vaultId, asset=_asset, caller=msg.sender)
     return True
-
-
-###################
-# Auction Actions #
-###################
-
-
-# start auctions
-
-
-@external
-def startAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert empty(address) not in [_liqUser, _asset] # dev: invalid parameters
-    
-    # validate auction can be started
-    auctionHouseAddr: address = self._getAuctionHouseAddr()
-    assert staticcall AuctionHouse(auctionHouseAddr).canStartAuction(_liqUser, _vaultId, _asset) # dev: cannot start auction
-    
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.START_AUCTION
-    self.pendingStartAuctionActions[aid] = FungAuctionConfig(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset
-    )
-    
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingStartAuctionAction(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset,
-        confirmationBlock=confirmationBlock,
-        actionId=aid
-    )
-    return aid
-
-
-@external
-def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_auctions) != 0 # dev: no auctions provided
-    
-    # validate all auctions can be started
-    auctionHouseAddr: address = self._getAuctionHouseAddr()
-    for auction: FungAuctionConfig in _auctions:
-        assert staticcall AuctionHouse(auctionHouseAddr).canStartAuction(auction.liqUser, auction.vaultId, auction.asset) # dev: cannot start auction
-    
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.START_MANY_AUCTIONS
-    self.pendingStartManyAuctionsActions[aid] = _auctions
-    
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingStartManyAuctionsAction(
-        numAuctions=len(_auctions),
-        confirmationBlock=confirmationBlock,
-        actionId=aid
-    )
-    return aid
-
-
-# pause auctions
-
-
-@external
-def pauseAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert empty(address) not in [_liqUser, _asset] # dev: invalid parameters
-    
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.PAUSE_AUCTION
-    self.pendingPauseAuctionActions[aid] = FungAuctionConfig(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset
-    )
-    
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingPauseAuctionAction(
-        liqUser=_liqUser,
-        vaultId=_vaultId,
-        asset=_asset,
-        confirmationBlock=confirmationBlock,
-        actionId=aid
-    )
-    return aid
-
-
-@external
-def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_auctions) != 0 # dev: no auctions provided
-    
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.PAUSE_MANY_AUCTIONS
-    self.pendingPauseManyAuctionsActions[aid] = _auctions
-    
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingPauseManyAuctionsAction(
-        numAuctions=len(_auctions),
-        confirmationBlock=confirmationBlock,
-        actionId=aid
-    )
-    return aid
 
 
 ###################
@@ -911,6 +983,36 @@ def deregisterAsset(_asset: address, _missionControl: address = empty(address)) 
         actionId=aid,
     )
     return aid
+
+
+# validate
+
+
+@view
+@internal
+def _validateAssetDeregistration(_asset: address, _missionControl: address):
+    rewardVault: uint256 = staticcall MissionControl(_missionControl).rewardVaultId(_asset)
+    if rewardVault != 0:
+        assert staticcall MissionControl(_missionControl).accrualStartBlock(_asset, rewardVault) == 0 # dev: promotional campaign cannot deregister
+    config: AssetRetirementConfig = staticcall MissionControl(_missionControl).getAssetRetirementConfig(_asset)
+    assert config.isSupported # dev: invalid asset
+    assert (
+        not config.hasPointsAlloc
+        and not config.hasWhitelist
+        and config.canWithdraw
+        and config.canClaimInStabPool
+        and (
+            config.ltv == 0
+            or (
+                not config.isNft
+                and config.canBuyInAuction
+                and (
+                    config.shouldTransferToEndaoment
+                    or config.canRedeemCollateral
+                )
+            )
+        )
+    ) # dev: invalid retirement config
 
 
 # deregister vault asset
@@ -983,6 +1085,42 @@ def setUserDelegation(
     return aid
 
 
+@view
+@internal
+def _getRequiredVaultAddr(_vaultBook: address, _vaultId: uint256) -> address:
+    if _vaultId == 0:
+        return empty(address)
+    vaultAddr: address = staticcall VaultBook(_vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address) # dev: missing reward vault
+    return vaultAddr
+
+
+@internal
+def _checkpointRewardVault(_lootbox: address, _asset: address, _vaultId: uint256, _vaultAddr: address):
+    extcall Lootbox(_lootbox).updateDepositPoints(empty(address), _vaultId, _vaultAddr, _asset)
+
+
+@internal
+def _executeRewardVaultId(_missionControl: address, _update: RewardVaultUpdate):
+    assert _missionControl == self._getMissionControlAddr() # dev: not current mission control
+    self._assertValidRewardVaultId(_update.asset, _update.newVaultId, _update.oldVaultId, _missionControl)
+    assert staticcall MissionControl(_missionControl).rewardVaultId(_update.asset) == _update.oldVaultId # dev: reward vault changed
+
+    vaultBook: address = self._getVaultBookAddr()
+    oldVaultAddr: address = self._getRequiredVaultAddr(vaultBook, _update.oldVaultId)
+    newVaultAddr: address = self._getRequiredVaultAddr(vaultBook, _update.newVaultId)
+
+    lootbox: address = self._getLootboxAddr()
+    for i: uint256 in range(2):
+        if _update.oldVaultId != 0:
+            self._checkpointRewardVault(lootbox, _update.asset, _update.oldVaultId, oldVaultAddr)
+        if _update.newVaultId != 0:
+            self._checkpointRewardVault(lootbox, _update.asset, _update.newVaultId, newVaultAddr)
+        if i == 0:
+            extcall MissionControl(_missionControl).setRewardVaultId(_update.asset, _update.newVaultId)
+    log RewardVaultIdSet(asset=_update.asset, oldVaultId=_update.oldVaultId, newVaultId=_update.newVaultId, caller=msg.sender)
+
+
 #############
 # Execution #
 #############
@@ -1010,26 +1148,6 @@ def executePendingAction(_aid: uint256) -> bool:
         extcall RipeEcoContract(p.contractAddr).recoverFundsMany(p.recipient, p.assets)
         log RecoverFundsManyExecuted(contractAddr=p.contractAddr, recipient=p.recipient, numAssets=len(p.assets))
 
-    elif actionType == ActionType.START_AUCTION:
-        p: FungAuctionConfig = self.pendingStartAuctionActions[_aid]
-        success: bool = extcall AuctionHouse(self._getAuctionHouseAddr()).startAuction(p.liqUser, p.vaultId, p.asset)
-        log StartAuctionExecuted(liqUser=p.liqUser, vaultId=p.vaultId, asset=p.asset, success=success)
-
-    elif actionType == ActionType.START_MANY_AUCTIONS:
-        auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS] = self.pendingStartManyAuctionsActions[_aid]
-        numStarted: uint256 = extcall AuctionHouse(self._getAuctionHouseAddr()).startManyAuctions(auctions)
-        log StartManyAuctionsExecuted(numAuctionsStarted=numStarted)
-
-    elif actionType == ActionType.PAUSE_AUCTION:
-        p: FungAuctionConfig = self.pendingPauseAuctionActions[_aid]
-        success: bool = extcall AuctionHouse(self._getAuctionHouseAddr()).pauseAuction(p.liqUser, p.vaultId, p.asset)
-        log PauseAuctionExecuted(liqUser=p.liqUser, vaultId=p.vaultId, asset=p.asset, success=success)
-
-    elif actionType == ActionType.PAUSE_MANY_AUCTIONS:
-        auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS] = self.pendingPauseManyAuctionsActions[_aid]
-        numPaused: uint256 = extcall AuctionHouse(self._getAuctionHouseAddr()).pauseManyAuctions(auctions)
-        log PauseManyAuctionsExecuted(numAuctionsPaused=numPaused)
-
     elif actionType == ActionType.TRAINING_WHEELS:
         p: address = self.pendingTrainingWheels[_aid]
         mc: address = self.pendingMissionControl[_aid]
@@ -1038,17 +1156,46 @@ def executePendingAction(_aid: uint256) -> bool:
         extcall MissionControl(mc).setTrainingWheels(p)
         log TrainingWheelsSet(trainingWheels=p)
 
+    elif actionType == ActionType.CORE_RIPE_GOV_VAULT:
+        newVaultId: uint256 = self.pendingCoreRipeGovVaultId[_aid]
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        newVaultAddr: address = empty(address)
+        previousVaultId: uint256 = 0
+        newVaultAddr, previousVaultId = self._validateCoreRipeGovVaultId(newVaultId, mc)
+        extcall MissionControl(mc).setCoreRipeGovVaultId(newVaultId)
+        log CoreRipeGovVaultIdSet(previousVaultId=previousVaultId, newVaultId=newVaultId, newVaultAddr=newVaultAddr)
+
+    elif actionType == ActionType.PREFERRED_STAB_VAULT:
+        newVaultId: uint256 = self.pendingPreferredStabVaultId[_aid]
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        newVaultAddr: address = empty(address)
+        previousVaultId: uint256 = 0
+        newVaultAddr, previousVaultId = self._validatePreferredStabVaultId(newVaultId, mc)
+        extcall MissionControl(mc).setPreferredStabVaultId(newVaultId)
+        log PreferredStabVaultIdSet(previousVaultId=previousVaultId, newVaultId=newVaultId, newVaultAddr=newVaultAddr)
+
+    elif actionType == ActionType.REWARD_VAULT_ID:
+        self._executeRewardVaultId(self.pendingMissionControl[_aid], self.pendingRewardVault[_aid])
+
     elif actionType == ActionType.DEREGISTER_ASSET:
         asset: address = self.pendingDeregisterAsset[_aid]
         mc: address = self.pendingMissionControl[_aid]
         if mc == empty(address):
             mc = self._getMissionControlAddr()
-        extcall MissionControl(mc).deregisterAsset(asset)
+        assert mc == self._getMissionControlAddr() # dev: not current mission control
+        self._validateAssetDeregistration(asset, mc)
+        success: bool = extcall MissionControl(mc).deregisterAsset(asset)
+        assert success # dev: invalid asset
         log AssetDeregistered(asset=asset)
 
     elif actionType == ActionType.DEREGISTER_VAULT_ASSET:
         p: DeregisterVaultAssetAction = self.pendingDeregisterVaultAsset[_aid]
-        extcall VaultData(p.vaultAddr).deregisterVaultAsset(p.asset)
+        success: bool = extcall VaultData(p.vaultAddr).deregisterVaultAsset(p.asset)
+        assert success # dev: invalid vault asset
         log VaultAssetDeregistered(vaultAddr=p.vaultAddr, asset=p.asset)
 
     elif actionType == ActionType.SET_UNDERSCORE_SEND_INTERVAL:

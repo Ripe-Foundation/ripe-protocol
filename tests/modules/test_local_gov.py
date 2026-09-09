@@ -161,7 +161,7 @@ def test_ripe_hq_gov_finish_setup(
     assert hq_gov.govChangeTimeLock() == 150
 
 
-def test_ripe_hq_gov_fail_finish_setup(
+def test_ripe_hq_gov_requires_finish_setup(
     createMockLocalGov,
     deploy3r,
     mock_rando_contract,
@@ -175,14 +175,13 @@ def test_ripe_hq_gov_fail_finish_setup(
         _initialTimeLock = 0
     )
 
-    # change gov in standard way
-    time_lock = hq_gov.govChangeTimeLock()
-    hq_gov.startGovernanceChange(mock_rando_contract, sender=deploy3r)
-    boa.env.time_travel(blocks=time_lock)
-    hq_gov.confirmGovernanceChange(sender=mock_rando_contract.address)
+    # Top-level governance must use the dedicated one-time setup path.
+    with boa.reverts("ripe hq setup required"):
+        hq_gov.startGovernanceChange(mock_rando_contract, sender=deploy3r)
 
-    with boa.reverts("already changed gov"):
-        hq_gov.finishRipeHqSetup(governance, sender=mock_rando_contract.address)
+    assert not hq_gov.hasPendingGovChange()
+    assert hq_gov.numGovChanges() == 0
+    assert hq_gov.finishRipeHqSetup(governance, 150, sender=deploy3r)
 
 
 def test_local_gov_change_basic(
@@ -355,12 +354,21 @@ def test_local_gov_ripe_hq_integration(
 def test_local_gov_zero_address_handling(
     createMockLocalGov,
     deploy3r,
+    mock_rando_contract,
 ):
     hq_gov = createMockLocalGov(_ripeHq=ZERO_ADDRESS)
 
+    with boa.reverts("ripe hq setup required"):
+        hq_gov.startGovernanceChange(ZERO_ADDRESS, sender=deploy3r)
+
+    hq_gov.finishRipeHqSetup(mock_rando_contract, sender=deploy3r)
+
     # Test zero address in governance change
     with boa.reverts("ripe hq cannot set 0x0"):
-        hq_gov.startGovernanceChange(ZERO_ADDRESS, sender=deploy3r)
+        hq_gov.startGovernanceChange(
+            ZERO_ADDRESS,
+            sender=mock_rando_contract.address,
+        )
 
 
 def test_local_gov_set_back_to_zero_address(

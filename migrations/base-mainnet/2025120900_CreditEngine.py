@@ -7,4 +7,5 @@ def migrate(migration: Migration):
     migration.deploy(
         "CreditEngine",
         hq,
+        migration.blueprint().PARAMS["CURVE_PRICES_ID"],
     )

@@ -2,7 +2,7 @@ import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import clear_transient_storage, filter_logs
 
 
 # green lp token
@@ -83,6 +83,416 @@ def setupStabAssetConfig(
 ###############
 # Liquidation #
 ###############
+
+
+def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    mock_price_source,
+    performDeposit,
+    simple_erc20_vault,
+    stability_pool,
+    teller,
+    credit_engine,
+    ledger,
+    vault_book,
+    bob,
+    sally,
+):
+    """Stability Pool positions remain non-collateral but phase-2 liquidatable."""
+
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    stab_terms = createDebtTerms(
+        _ltv=10_00,
+        _liqThreshold=70_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[simple_id],
+        _debtTerms=alpha_terms,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[stab_id],
+        _debtTerms=stab_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    alpha_amount = 200 * EIGHTEEN_DECIMALS
+    stab_amount = 50 * EIGHTEEN_DECIMALS
+    performDeposit(bob, alpha_amount, alpha_token, alpha_token_whale)
+    bravo_token.transfer(bob, stab_amount, sender=bravo_token_whale)
+    bravo_token.approve(teller, stab_amount, sender=bob)
+    assert teller.deposit(
+        bravo_token,
+        stab_amount,
+        bob,
+        stability_pool,
+        sender=bob,
+    ) == stab_amount
+
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        bravo_token.address,
+        stab_amount,
+    )
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == alpha_amount
+    assert terms.totalMaxDebt == alpha_amount // 2
+    assert terms.lowestLtv == 50_00
+
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS // 2)
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    assert ledger.hasFungibleAuction(bob, stab_id, bravo_token)
+
+
+def test_basic_vault_quarantine_suppresses_phase_two_stability_pool_assets(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    mock_price_source,
+    performDeposit,
+    simple_erc20_vault,
+    stability_pool,
+    teller,
+    credit_engine,
+    ledger,
+    vault_book,
+    bob,
+    sally,
+):
+    """A quarantined collateral account cannot enter phase-2 liquidation."""
+
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    stab_terms = createDebtTerms(
+        _ltv=10_00,
+        _liqThreshold=70_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=alpha_terms,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[1],
+        _debtTerms=stab_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    alpha_amount = 200 * EIGHTEEN_DECIMALS
+    stab_amount = 50 * EIGHTEEN_DECIMALS
+    performDeposit(bob, alpha_amount, alpha_token, alpha_token_whale)
+    bravo_token.transfer(bob, stab_amount, sender=bravo_token_whale)
+    bravo_token.approve(teller, stab_amount, sender=bob)
+    assert teller.deposit(
+        bravo_token,
+        stab_amount,
+        bob,
+        stability_pool,
+        sender=bob,
+    ) == stab_amount
+
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        bravo_token.address,
+        stab_amount,
+    )
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == alpha_amount
+    assert terms.totalMaxDebt == alpha_amount // 2
+    assert terms.lowestLtv == 50_00
+
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    alpha_token.burn(alpha_amount, sender=simple_erc20_vault.address)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS // 2)
+    assert credit_engine.getCollateralValue(bob) == 0
+    assert credit_engine.getUserBorrowTerms(bob, False).hasQuarantinedAsset
+    assert not credit_engine.canLiquidateUser(bob)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
+
+    stab_id = vault_book.getRegId(stability_pool)
+    assert stab_id == 1
+    assert not ledger.hasFungibleAuction(bob, stab_id, bravo_token)
+    assert not ledger.userDebt(bob).inLiquidation
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+
+
+def test_quarantine_suppresses_direct_settlement_until_custody_recovers(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    savings_green,
+    whale,
+    mock_price_source,
+    simple_erc20_vault,
+    teller,
+    credit_engine,
+    stability_pool,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    bob,
+    sally,
+):
+    """Direct settlement resumes automatically after custody is repaired."""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[simple_id],
+        _debtTerms=terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[simple_id],
+        _debtTerms=terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    setAssetConfig(
+        savings_green,
+        _vaultIds=[stab_id],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldBurnAsPayment=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityStabVaults(
+        [(stab_id, savings_green)], sender=switchboard_alpha.address
+    )
+
+    alpha_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, alpha_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, alpha_amount, sender=bob)
+    teller.deposit(
+        alpha_token, alpha_amount, bob, simple_erc20_vault, sender=bob
+    )
+
+    bravo_amount = 200 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(bob, bravo_amount, sender=bravo_token_whale)
+    bravo_token.approve(teller, bravo_amount, sender=bob)
+    teller.deposit(
+        bravo_token, bravo_amount, bob, simple_erc20_vault, sender=bob
+    )
+
+    pool_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, pool_amount, sender=whale)
+    green_token.approve(savings_green, pool_amount, sender=sally)
+    pool_shares = savings_green.deposit(pool_amount, sally, sender=sally)
+    savings_green.approve(teller, pool_shares, sender=sally)
+    teller.deposit(
+        savings_green, pool_shares, sally, stability_pool, sender=sally
+    )
+
+    max_debt = credit_engine.getUserBorrowTerms(bob, True).totalMaxDebt
+    teller.borrow(max_debt, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 40 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 25 * EIGHTEEN_DECIMALS // 100)
+
+    # A one-unit aggregate deficit quarantines the account, so even the healthy
+    # alpha position remains untouched by forced settlement.
+    bravo_token.burn(1, sender=simple_erc20_vault.address)
+    debt_before_quarantine = credit_engine.getUserDebtAmount(bob)
+    assert not credit_engine.canLiquidateUser(bob)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
+
+    assert stability_pool.claimableBalances(savings_green, alpha_token) == 0
+    assert not ledger.hasFungibleAuction(bob, simple_id, bravo_token)
+    assert not ledger.hasFungibleAuctions(bob)
+    assert not ledger.userDebt(bob).inLiquidation
+    assert credit_engine.getUserDebtAmount(bob) == debt_before_quarantine
+
+    # Repairing bravo custody restores the same position. A second liquidation
+    # must now run and create its auction instead of treating the account-wide
+    # freeze as proof that an auction is already handling the user.
+    bravo_token.transfer(simple_erc20_vault, 1, sender=bravo_token_whale)
+    assert credit_engine.canLiquidateUser(bob)
+    # Titanoboa retains EIP-1153 values between simulated top-level calls;
+    # production EVMs clear the liquidation caches before this transaction.
+    clear_transient_storage()
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+    # Boa exposes logs from the latest top-level computation, not cumulative
+    # transaction history. This is the repaired position's liquidation event.
+    liquidation_logs = filter_logs(teller, "LiquidateUser")
+    assert len(liquidation_logs) == 1
+    assert liquidation_logs[0].user == bob
+    assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
+    assert (
+        credit_engine.getUserDebtAmount(bob) < debt_before
+        or ledger.hasFungibleAuction(bob, simple_id, bravo_token)
+    )
+
+
+def test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    governance,
+    alpha_token,
+    green_token,
+    savings_green,
+    whale,
+    mock_price_source,
+    rebase_erc20_vault,
+    stability_pool,
+    teller,
+    credit_engine,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    bob,
+    sally,
+):
+    """Prior pool surplus cannot subsidize a short current liquidation leg."""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance,
+        0,
+        name="short_liquidation_receipt_token",
+    )
+    rebase_id = vault_book.getRegId(rebase_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        fee_token,
+        _vaultIds=[rebase_id],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
+    )
+    setAssetConfig(
+        savings_green,
+        _vaultIds=[stab_id],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldBurnAsPayment=True,
+    )
+    mock_price_source.setPrice(fee_token, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityStabVaults(
+        [(stab_id, savings_green)], sender=switchboard_alpha.address
+    )
+
+    pool_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, pool_amount, sender=whale)
+    green_token.approve(savings_green, pool_amount, sender=sally)
+    pool_shares = savings_green.deposit(pool_amount, sally, sender=sally)
+    savings_green.approve(teller, pool_shares, sender=sally)
+    teller.deposit(
+        savings_green, pool_shares, sally, stability_pool, sender=sally
+    )
+
+    collateral = 100 * EIGHTEEN_DECIMALS
+    fee_token.transfer(bob, collateral, sender=governance.address)
+    fee_token.approve(teller, collateral, sender=bob)
+    teller.deposit(
+        fee_token, collateral, bob, rebase_erc20_vault, sender=bob
+    )
+    teller.borrow(40 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(fee_token, 40 * EIGHTEEN_DECIMALS // 100)
+
+    donation = 5 * EIGHTEEN_DECIMALS
+    fee_token.transfer(stability_pool, donation, sender=governance.address)
+    fee_token.setTransferFee(5_00, sender=governance.address)
+    before = (
+        fee_token.balanceOf(rebase_erc20_vault),
+        fee_token.balanceOf(stability_pool),
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        stability_pool.totalClaimableBalances(fee_token),
+        credit_engine.getUserDebtAmount(bob),
+        ledger.userDebt(bob).inLiquidation,
+    )
+
+    with boa.reverts("invalid recipient delivery"):
+        teller.liquidateUser(bob, False, sender=sally)
+
+    assert (
+        fee_token.balanceOf(rebase_erc20_vault),
+        fee_token.balanceOf(stability_pool),
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        stability_pool.totalClaimableBalances(fee_token),
+        credit_engine.getUserDebtAmount(bob),
+        ledger.userDebt(bob).inLiquidation,
+    ) == before
 
 
 def test_ah_liquidation_with_stab_pool_both_assets_debug(
@@ -1153,6 +1563,7 @@ def test_ah_liquidation_multiple_collateral_types(
 def test_ah_liquidation_multiple_collateral_different_configs(
     setupStabAssetConfig,
     setAssetConfig,
+    setGeneralDebtConfig,
     green_lp_token,
     green_lp_token_whale,
     alpha_token,
@@ -1169,8 +1580,9 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     performDeposit,
     endaoment_funds,
 ):
-    """Test liquidation with multiple collateral types having different liquidation configs"""
+    """Endaoment-reserved collateral is excluded from keeper accounting."""
     setupStabAssetConfig()
+    setGeneralDebtConfig(_keeperFeeRatio=1_00)
     
     # Setup alpha for stability pool swap
     alpha_debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
@@ -1184,20 +1596,21 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     
-    # Setup bravo for endaoment transfer (no stab pool swap)
+    # Endaoment takes precedence even when every later AuctionHouse route is
+    # enabled. Without that early return, bravo could swap or enter auction.
     bravo_debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=5_00, _borrowRate=0)  # Lower liq fee
     setAssetConfig(
         bravo_token,
         _debtTerms=bravo_debt_terms,
         _shouldBurnAsPayment=False,
-        _shouldTransferToEndaoment=True,  # Direct to endaoment
-        _shouldSwapInStabPools=False,     # No stab pool
-        _shouldAuctionInstantly=False,
+        _shouldTransferToEndaoment=True,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
     )
     mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
     
     # Deposit stab assets
-    glp_deposit = 100 * EIGHTEEN_DECIMALS
+    glp_deposit = 300 * EIGHTEEN_DECIMALS
     green_lp_token.transfer(sally, glp_deposit, sender=green_lp_token_whale)
     green_lp_token.approve(teller, glp_deposit, sender=sally)
     teller.deposit(green_lp_token, glp_deposit, sally, stability_pool, 0, sender=sally)
@@ -1225,6 +1638,7 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     
     # Track initial state
     initial_bravo_in_endaoment_funds = bravo_token.balanceOf(endaoment_funds)
+    debt_before = credit_engine.getUserDebtAmount(bob)
     
     # Liquidate
     teller.liquidateUser(bob, False, sender=sally)
@@ -1232,6 +1646,8 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     # Check different handling for each collateral type
     swap_logs = filter_logs(teller, "CollateralSwappedWithStabPool")
     endaoment_logs = filter_logs(teller, "CollateralSentToEndaoment")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
     
     # Alpha should go through stab pool
     alpha_swapped = False
@@ -1241,10 +1657,33 @@ def test_ah_liquidation_multiple_collateral_different_configs(
             assert log.stabAsset == green_lp_token.address, "Should use green LP for alpha"
     
     assert alpha_swapped, "Alpha must be swapped through stab pool"
+    assert all(log.liqAsset != bravo_token.address for log in swap_logs)
     
-    # Bravo should go directly to endaoment -- so it's skipped
+    # Bravo is reserved for Endaoment handling, so AuctionHouse skips it.
     assert len(endaoment_logs) == 0, "Bravo should NOT go to endaoment"
+    assert all(log.asset != bravo_token.address for log in auction_logs)
     assert bravo_token.balanceOf(endaoment_funds) == initial_bravo_in_endaoment_funds
+
+    # Direct Endaoment collateral is skipped before AuctionHouse updates
+    # collateralValueOut. Only Stability swaps can cover the base fee; the
+    # skipped bravo value cannot reduce liqFeesUnpaid.
+    assert liq_log.collateralValueOut == sum(
+        log.collateralValueOut for log in swap_logs
+    )
+    assert liq_log.repayAmount == sum(log.valueSwapped for log in swap_logs)
+    assert liq_log.repayAmount < liq_log.targetRepayAmount
+    base_fee = liq_log.totalLiqFees - liq_log.keeperFee
+    assert liq_log.keeperFee > 0
+    paid_base_fee = min(
+        liq_log.collateralValueOut - liq_log.repayAmount,
+        base_fee,
+    )
+    assert liq_log.liqFeesUnpaid == (
+        base_fee - paid_base_fee + liq_log.keeperFee
+    )
+    assert credit_engine.getUserDebtAmount(bob) == (
+        debt_before + liq_log.liqFeesUnpaid - liq_log.repayAmount
+    )
     
     # Verify alpha is in stability pool
     assert alpha_token.balanceOf(stability_pool) > 0, "Alpha must be in stability pool"
@@ -1377,6 +1816,7 @@ def test_ah_liquidation_multiple_collateral_partial_liquidation(
 def test_ah_liquidation_user_with_stab_pool_position(
     setupStabAssetConfig,
     setAssetConfig,
+    setGeneralDebtConfig,
     green_lp_token,
     green_lp_token_whale,
     savings_green,
@@ -1389,12 +1829,27 @@ def test_ah_liquidation_user_with_stab_pool_position(
     createDebtTerms,
     credit_engine,
     stability_pool,
+    simple_erc20_vault,
+    vault_book,
     performDeposit,
     green_token,
     endaoment_funds,
 ):
-    """Test Phase 1: Liquidating user who also has stability pool positions"""
+    """Burn and Endaoment assets are excluded from keeper accounting."""
     setupStabAssetConfig()
+    setGeneralDebtConfig(_keeperFeeRatio=1_00)
+
+    simple_vault_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(
+        green_token,
+        _vaultIds=[simple_vault_id],
+        _debtTerms=createDebtTerms(),
+        _shouldBurnAsPayment=True,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
     
     # Setup alpha token as collateral
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
@@ -1404,13 +1859,25 @@ def test_ah_liquidation_user_with_stab_pool_position(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     
-    # Bob deposits into stability pool (PHASE 1 assets)
+    # Bob deposits GREEN collateral plus Stability Pool positions.
+    bob_green_deposit = 20 * EIGHTEEN_DECIMALS
     bob_sgreen_deposit = 50 * EIGHTEEN_DECIMALS
     bob_glp_deposit = 30 * EIGHTEEN_DECIMALS
+
+    green_token.mint(bob, bob_green_deposit, sender=credit_engine.address)
+    green_token.approve(teller, bob_green_deposit, sender=bob)
+    teller.deposit(
+        green_token,
+        bob_green_deposit,
+        bob,
+        simple_erc20_vault,
+        0,
+        sender=bob,
+    )
     
     # Get GREEN tokens for Bob to deposit into savings_green
     green_for_bob = bob_sgreen_deposit  # 1:1 for simplicity
@@ -1456,11 +1923,18 @@ def test_ah_liquidation_user_with_stab_pool_position(
     initial_green_supply = green_token.totalSupply()
     initial_glp_supply = green_lp_token.totalSupply()
     endaoment_funds_initial_glp_balance = green_lp_token.balanceOf(endaoment_funds)
+    bob_initial_green_amount = simple_erc20_vault.getTotalAmountForUser(
+        bob,
+        green_token,
+    )
     bob_initial_sgreen_value = stability_pool.getTotalUserValue(bob, savings_green)
     bob_initial_glp_value = stability_pool.getTotalUserValue(bob, green_lp_token)
+    debt_before = credit_engine.getUserDebtAmount(bob)
     
     # Trigger liquidation
-    new_price = 125 * EIGHTEEN_DECIMALS // 200
+    # Keep total collateral just below the $125 liquidation threshold after
+    # adding the $20 GREEN position: $104 alpha + $20 GREEN = $124.
+    new_price = 104 * EIGHTEEN_DECIMALS // 200
     mock_price_source.setPrice(alpha_token, new_price)
     assert credit_engine.canLiquidateUser(bob)
     
@@ -1469,11 +1943,41 @@ def test_ah_liquidation_user_with_stab_pool_position(
     
     # Get logs
     logs = filter_logs(teller, "CollateralSwappedWithStabPool")
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
+
+    # Bob's GREEN collateral and sGREEN/GLP positions are respectively
+    # shouldBurnAsPayment and shouldTransferToEndaoment assets. AuctionHouse
+    # must skip all three, so only alpha swaps may contribute to
+    # collateralValueOut and paidBaseFee.
+    assert logs
+    assert all(log.liqAsset == alpha_token.address for log in logs)
+    assert liq_log.collateralValueOut == sum(
+        log.collateralValueOut for log in logs
+    )
+    assert liq_log.repayAmount == sum(log.valueSwapped for log in logs)
+    assert liq_log.repayAmount < liq_log.targetRepayAmount
+    base_fee = liq_log.totalLiqFees - liq_log.keeperFee
+    assert liq_log.keeperFee > 0
+    paid_base_fee = min(
+        liq_log.collateralValueOut - liq_log.repayAmount,
+        base_fee,
+    )
+    assert liq_log.liqFeesUnpaid == (
+        base_fee - paid_base_fee + liq_log.keeperFee
+    )
+    assert credit_engine.getUserDebtAmount(bob) == (
+        debt_before + liq_log.liqFeesUnpaid - liq_log.repayAmount
+    )
     
     # stability pool should be same as before
+    bob_final_green_amount = simple_erc20_vault.getTotalAmountForUser(
+        bob,
+        green_token,
+    )
     bob_final_sgreen_value = stability_pool.getTotalUserValue(bob, savings_green)
     bob_final_glp_value = stability_pool.getTotalUserValue(bob, green_lp_token)
     
+    assert bob_final_green_amount == bob_initial_green_amount, "Bob's GREEN collateral must be the same"
     assert bob_final_sgreen_value == bob_initial_sgreen_value, "Bob's savings_green position must be the same"
     assert bob_final_glp_value > bob_initial_glp_value, "Bob's green_lp position must be greater"
     
@@ -1481,7 +1985,7 @@ def test_ah_liquidation_user_with_stab_pool_position(
     final_green_supply = green_token.totalSupply()
     final_glp_supply = green_lp_token.totalSupply()
     endaoment_funds_final_glp_balance = green_lp_token.balanceOf(endaoment_funds)
-    assert final_green_supply == initial_green_supply, "Green must be the same"
+    assert final_green_supply - initial_green_supply == liq_log.keeperFee
     assert final_glp_supply == initial_glp_supply, "Green LP is less than initial"
     assert endaoment_funds_final_glp_balance > endaoment_funds_initial_glp_balance, "Green LP must go to endaoment"
 
@@ -1683,7 +2187,7 @@ def test_ah_liquidation_with_stab_pool_both_assets(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,  # Will swap with stab pool
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     
@@ -1737,3 +2241,91 @@ def test_ah_liquidation_with_stab_pool_both_assets(
     assert glp_swapped > 0, "Green LP must be swapped"
     assert sgreen_swapped > 0, "Savings green must be swapped"
 
+
+@pytest.mark.parametrize(
+    ("user_count", "regression_ceiling"),
+    [
+        (1, 540_000),
+        (2, 840_000),
+        (5, 1_735_000),
+    ],
+    ids=["one-user", "two-users", "five-users"],
+)
+def test_stab_liq_batch_gas_bounds(
+    user_count,
+    regression_ceiling,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    savings_green,
+    whale,
+    stability_pool,
+    teller,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    sally,
+):
+    """Bound the stab-pool liquidation path this PR newly checkpoints."""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    stab_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=createDebtTerms(
+            _ltv=50_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=False,
+    )
+    setAssetConfig(
+        savings_green,
+        _vaultIds=[stab_id],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldBurnAsPayment=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityStabVaults(
+        [(stab_id, savings_green)], sender=switchboard_alpha.address
+    )
+
+    pool_amount = 80 * EIGHTEEN_DECIMALS * user_count
+    green_token.transfer(sally, pool_amount, sender=whale)
+    green_token.approve(savings_green, pool_amount, sender=sally)
+    pool_shares = savings_green.deposit(pool_amount, sally, sender=sally)
+    savings_green.approve(teller, pool_shares, sender=sally)
+    teller.deposit(savings_green, pool_shares, sally, stability_pool, sender=sally)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    debt_amount = 50 * EIGHTEEN_DECIMALS
+    users = [boa.env.generate_address(f"stab-liq-{i}") for i in range(user_count)]
+    for user in users:
+        performDeposit(user, deposit_amount, alpha_token, alpha_token_whale)
+        teller.borrow(debt_amount, user, False, sender=user)
+
+    mock_price_source.setPrice(alpha_token, 40 * EIGHTEEN_DECIMALS // 100)
+    for user in users:
+        assert credit_engine.canLiquidateUser(user)
+
+    gas_before = boa.env.get_gas_used()
+    teller.liquidateManyUsers(users, False, sender=sally)
+    gas_used = boa.env.get_gas_used() - gas_before
+    print("STAB_LIQ_BATCH_GAS", f"users={user_count}", f"gas={gas_used}")
+
+    for user in users:
+        assert credit_engine.getUserDebtAmount(user) < debt_amount
+    # About 20% above the pinned 448,433 / 697,721 / 1,445,585 measurements.
+    assert gas_used <= regression_ceiling
+    assert gas_used < 15_000_000

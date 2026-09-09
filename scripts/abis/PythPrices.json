@@ -222,7 +222,7 @@
     "inputs": [
       {
         "name": "payload",
-        "type": "bytes",
+        "type": "bytes[]",
         "indexed": false
       },
       {
@@ -1512,6 +1512,27 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "updateStaleTime",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "confirmPriceFeedUpdate",
     "inputs": [
       {
@@ -1555,6 +1576,27 @@
       {
         "name": "_feedId",
         "type": "bytes32"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidStaleTimeUpdate",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
       },
       {
         "name": "_staleTime",
@@ -1643,7 +1685,7 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "bytes[]"
       }
     ],
     "outputs": [
@@ -1660,7 +1702,7 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "bytes[]"
       }
     ],
     "outputs": [

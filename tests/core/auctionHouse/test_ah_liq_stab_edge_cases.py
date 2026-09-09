@@ -2,7 +2,33 @@ import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
-from conf_utils import filter_logs
+from conf_utils import filter_logs, sync_deployed_token
+
+
+ACTIVATION_THRESHOLD = 25 * 10**16
+MAX_ACTIVE_CLAIM_ASSETS = 20
+
+
+def test_auction_house_deployed_runtime_fits_eip170(auction_house):
+    assert len(boa.env.get_code(auction_house.address)) <= 24_576
+
+
+def test_payment_close_enough_accepts_exact_one_percent_boundary(auction_house):
+    target = 100 * EIGHTEEN_DECIMALS
+    one_percent = target // 100
+
+    assert auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target - one_percent})"
+    )
+    assert auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target + one_percent})"
+    )
+    assert not auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target - one_percent - 1})"
+    )
+    assert not auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target + one_percent + 1})"
+    )
 
 
 # green lp token fixture
@@ -148,6 +174,7 @@ def test_ah_liquidation_high_fees(
 
 def test_ah_liquidation_multiple_stab_pools(
     setupStabAssetConfig,
+    setGeneralDebtConfig,
     setAssetConfig,
     green_lp_token,
     green_lp_token_whale,
@@ -164,12 +191,24 @@ def test_ah_liquidation_multiple_stab_pools(
     performDeposit,
     green_token,
     whale,
+    auction_house,
+    ledger,
 ):
-    """Test liquidation uses both configured stab assets in priority order"""
+    """A binding repayment ceiling is conserved across two Stability pools."""
     setupStabAssetConfig()
+    setGeneralDebtConfig(
+        _keeperFeeRatio=1_00,
+        _minKeeperFee=EIGHTEEN_DECIMALS,
+        _ltvPaybackBuffer=0,
+    )
     
     # Setup alpha token for liquidation
-    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
     setAssetConfig(
         alpha_token,
         _debtTerms=debt_terms,
@@ -178,7 +217,7 @@ def test_ah_liquidation_multiple_stab_pools(
         _shouldSwapInStabPools=True,
         _shouldAuctionInstantly=True,
     )
-    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, 2 * EIGHTEEN_DECIMALS)
     
     # Deposit small amounts in stability pool to force use of both assets
     # First deposit green_lp_token (priority 1)
@@ -195,9 +234,10 @@ def test_ah_liquidation_multiple_stab_pools(
     savings_green.approve(teller, sally_sgreen_shares, sender=sally)
     teller.deposit(savings_green, sally_sgreen_shares, sally, stability_pool, 0, sender=sally)
     
-    # Setup large borrower position that needs both assets
-    collateral_amount = 200 * EIGHTEEN_DECIMALS
-    debt_amount = 100 * EIGHTEEN_DECIMALS
+    # This is the depleted-collateral shape: the risk target is 95 GREEN, but
+    # CreditEngine can credit only the 90 debt plus the 1 GREEN keeper fee.
+    collateral_amount = 105 * EIGHTEEN_DECIMALS
+    debt_amount = 90 * EIGHTEEN_DECIMALS
     performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
     teller.borrow(debt_amount, bob, False, sender=bob)
     
@@ -207,8 +247,12 @@ def test_ah_liquidation_multiple_stab_pools(
     green_token.transfer(whale, bob_green, sender=bob)
     
     # Trigger liquidation
-    mock_price_source.setPrice(alpha_token, 125 * EIGHTEEN_DECIMALS // 200)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     assert credit_engine.canLiquidateUser(bob)
+    assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == (
+        95 * EIGHTEEN_DECIMALS
+    )
+    debt_before = ledger.userDebt(bob).amount
     
     # Liquidate - should use both pools in priority order
     teller.liquidateUser(bob, False, sender=sally)
@@ -220,6 +264,258 @@ def test_ah_liquidation_multiple_stab_pools(
     assert logs[0].stabAsset == green_lp_token.address
     # Second should be savings_green (priority 2)
     assert logs[1].stabAsset == savings_green.address
+
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
+    creditable_repayment = debt_before + liq_log.keeperFee
+    assert liq_log.keeperFee == EIGHTEEN_DECIMALS
+    assert liq_log.repayAmount == creditable_repayment
+    assert sum(log.valueSwapped for log in logs) == creditable_repayment
+    assert ledger.userDebt(bob).amount == 0
+
+
+def test_ah_liquidation_skips_full_pair_and_uses_next_stab_asset(
+    setupStabAssetConfig,
+    setAssetConfig,
+    green_lp_token,
+    green_lp_token_whale,
+    savings_green,
+    alpha_token,
+    alpha_token_whale,
+    governance,
+    bob,
+    alice,
+    sally,
+    teller,
+    auction_house,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    stability_pool,
+    performDeposit,
+    green_token,
+    whale,
+):
+    """A full first pair is skipped before the next configured pair is used."""
+    setupStabAssetConfig()
+
+    debt_terms = createDebtTerms(
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    # Seed both configured stability assets. The first pair needs a small
+    # balance for the direct receipts that fill its active claim registry.
+    glp_deposit = EIGHTEEN_DECIMALS
+    green_lp_token.transfer(sally, glp_deposit, sender=green_lp_token_whale)
+    green_lp_token.approve(teller, glp_deposit, sender=sally)
+    teller.deposit(
+        green_lp_token,
+        glp_deposit,
+        sally,
+        stability_pool,
+        0,
+        sender=sally,
+    )
+
+    sgreen_deposit = 200 * EIGHTEEN_DECIMALS
+    green_token.mint(sally, sgreen_deposit, sender=credit_engine.address)
+    green_token.approve(savings_green, sgreen_deposit, sender=sally)
+    sgreen_shares = savings_green.deposit(sgreen_deposit, sally, sender=sally)
+    savings_green.approve(teller, sgreen_shares, sender=sally)
+    teller.deposit(
+        savings_green,
+        sgreen_shares,
+        sally,
+        stability_pool,
+        0,
+        sender=sally,
+    )
+
+    for index in range(MAX_ACTIVE_CLAIM_ASSETS):
+        claim_asset = boa.load(
+            "contracts/mock/MockErc20.vy",
+            governance,
+            f"Capacity Claim {index}",
+            f"CC{index}",
+            18,
+            0,
+            name=f"capacity_claim_{index}",
+        )
+        claim_asset.mint(alice, ACTIVATION_THRESHOLD, sender=governance.address)
+        mock_price_source.setPrice(claim_asset, EIGHTEEN_DECIMALS)
+        sync_deployed_token(claim_asset)
+        claim_asset.transfer(
+            stability_pool,
+            ACTIVATION_THRESHOLD,
+            sender=alice,
+        )
+        stability_pool.swapForLiquidatedCollateral(
+            green_lp_token,
+            1,
+            claim_asset,
+            ACTIVATION_THRESHOLD,
+            bob,
+            green_token,
+            savings_green,
+            sender=auction_house.address,
+        )
+
+    assert stability_pool.getNumActiveClaimAssets(green_lp_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
+    assert not stability_pool.canAcceptLiquidationAsset(
+        green_lp_token,
+        alpha_token,
+    )
+    assert not stability_pool.canAcceptLiquidationAsset(
+        green_lp_token,
+        savings_green,
+    )
+    assert stability_pool.canAcceptLiquidationAsset(savings_green, alpha_token)
+
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    bob_green = green_token.balanceOf(bob)
+    green_token.transfer(whale, bob_green, sender=bob)
+
+    mock_price_source.setPrice(
+        alpha_token,
+        125 * EIGHTEEN_DECIMALS // 200,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    logs = filter_logs(teller, "CollateralSwappedWithStabPool")
+    assert len(logs) == 1
+    assert logs[0].stabAsset == savings_green.address
+    assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+    assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
+
+
+def test_stability_routing_prices_or_falls_back_before_collateral_transfer(
+    setupStabAssetConfig,
+    setAssetConfig,
+    green_lp_token,
+    green_lp_token_whale,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    whale,
+    teller,
+    green_token,
+    ledger,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    stability_pool,
+    simple_erc20_vault,
+    performDeposit,
+    mission_control,
+    vault_book,
+    switchboard_alpha,
+):
+    setupStabAssetConfig()
+    stab_id = vault_book.getRegId(stability_pool)
+    mission_control.setPriorityStabVaults(
+        [(stab_id, green_lp_token)],
+        sender=switchboard_alpha.address,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=createDebtTerms(
+            _liqThreshold=80_00,
+            _liqFee=10_00,
+            _borrowRate=0,
+        ),
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    liquidity = 200 * EIGHTEEN_DECIMALS
+    green_lp_token.transfer(sally, liquidity, sender=green_lp_token_whale)
+    green_lp_token.approve(teller, liquidity, sender=sally)
+    teller.deposit(
+        green_lp_token,
+        liquidity,
+        sally,
+        stability_pool,
+        0,
+        sender=sally,
+    )
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    bob_green = green_token.balanceOf(bob)
+    assert bob_green > 0
+    green_token.transfer(whale, bob_green, sender=bob)
+    mock_price_source.setPrice(
+        alpha_token,
+        125 * EIGHTEEN_DECIMALS // 200,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+
+    borrower_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    assert borrower_collateral == 200 * EIGHTEEN_DECIMALS
+    pool_liquidity = green_lp_token.balanceOf(stability_pool)
+    assert stability_pool.canAcceptLiquidationAsset(green_lp_token, alpha_token)
+    assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+    assert stability_pool.totalClaimableBalances(alpha_token) == 0
+    assert alpha_token.balanceOf(stability_pool) == 0
+
+    # A configured-but-zero feed makes this Stability Pool cohort unavailable.
+    # Liquidation must continue through the configured ordinary-auction path.
+    with boa.env.anchor():
+        mock_price_source.setPrice(green_lp_token, 0)
+        teller.liquidateUser(bob, False, sender=sally)
+        assert filter_logs(teller, "CollateralSwappedWithStabPool") == []
+        liquidation = filter_logs(teller, "LiquidateUser")
+        assert len(liquidation) == 1
+        assert liquidation[0].numAuctionsStarted == 1
+        assert ledger.isUserInLiquidation(bob)
+        assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == borrower_collateral
+        assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+        assert stability_pool.totalClaimableBalances(alpha_token) == 0
+        assert alpha_token.balanceOf(stability_pool) == 0
+        assert green_lp_token.balanceOf(stability_pool) == pool_liquidity
+
+    # Removing the feed entirely follows the same non-raising no-price path.
+    mock_price_source.disablePriceFeed(green_lp_token)
+    assert not stability_pool.canAcceptLiquidationAsset(green_lp_token, alpha_token)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    assert filter_logs(teller, "CollateralSwappedWithStabPool") == []
+    liquidation = filter_logs(teller, "LiquidateUser")
+    assert len(liquidation) == 1
+    assert liquidation[0].numAuctionsStarted == 1
+    assert ledger.isUserInLiquidation(bob)
+    assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+    assert stability_pool.totalClaimableBalances(alpha_token) == 0
+    assert alpha_token.balanceOf(stability_pool) == 0
+    assert green_lp_token.balanceOf(stability_pool) == pool_liquidity
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == borrower_collateral
 
 
 def test_ah_liquidation_zero_price(
@@ -284,7 +580,8 @@ def test_ah_liquidation_zero_price(
     # With near-zero collateral value, liquidation can't repay much
     # The key is that collateral is now worthless
     assert log.collateralValueOut == 200  # 200 wei - essentially worthless
-    assert log.repayAmount == 180  # Can only repay 180 wei
+    assert log.repayAmount == 200
+    assert log.collateralValueOut == log.repayAmount
     assert log.didRestoreDebtHealth == False  # Can't restore with worthless collateral
     
     # The liquidation couldn't recover meaningful value
@@ -553,32 +850,25 @@ def test_ah_liquidation_zero_ltv_buffer(
     # 1. Liquidation must restore debt health
     assert log.didRestoreDebtHealth, "Liquidation must restore debt health"
 
-    # 2. Partial liquidation - exact expected amounts
-    # Debt calculation: 100 + 0.38 unpaid fees - 88 repaid = 12.38 remaining
-    expected_remaining_debt = int(12.38 * EIGHTEEN_DECIMALS)
-    # Use a small absolute tolerance for rounding differences
-    assert abs(user_debt.amount - expected_remaining_debt) < 1e16, f"Expected ~12.38 GREEN debt, got {user_debt.amount/EIGHTEEN_DECIMALS}"
+    # 2. Only the final base fee can be covered by the Stability spread. The
+    # keeper fee and any unpaid base fee are booked before repayment.
+    base_fee = pre_user_debt.amount * 5_00 // HUNDRED_PERCENT
+    keeper_fee = pre_user_debt.amount * 1_00 // HUNDRED_PERCENT
+    paid_base = min(log.collateralValueOut - log.repayAmount, base_fee)
+    expected_unpaid_fees = base_fee - paid_base + keeper_fee
+    assert log.liqFeesUnpaid == expected_unpaid_fees
+    assert user_debt.amount == (
+        pre_user_debt.amount + expected_unpaid_fees - log.repayAmount
+    )
+    assert bt.collateralVal == pre_bt.collateralVal - log.collateralValueOut
 
-    # Collateral: 124 - 93.62 = ~30.38 remaining
-    expected_remaining_collateral = 30.38 * EIGHTEEN_DECIMALS
-    _test(expected_remaining_collateral, bt.collateralVal, 1)  # 1% tolerance
-
-    # 3. Final LTV is ~40.75%, not exactly 50% because:
-    # - Formula conservatively ensures health even if not all fees can be paid
-    # - Only 5.62 of 6 GREEN fees paid from spread, 0.38 becomes debt
-    # - Final state: 12.38 debt / 30.38 collateral = 40.75% LTV
-    # This is expected behavior - formula is conservative to ensure safety
+    # 3. The conservative target restores the account below its target LTV.
     final_ltv = user_debt.amount * HUNDRED_PERCENT // bt.collateralVal
-    expected_ltv = 40_75  # 40.75%
-    assert abs(final_ltv - expected_ltv) < 50, f"LTV should be ~40.75%, got {final_ltv/100:.2f}%"
+    assert final_ltv < 50_00
 
     # 4. Verify liquidation fees (5% liq fee + 1% keeper fee = 6% total)
     expected_total_fees = pre_user_debt.amount * 6_00 // HUNDRED_PERCENT
     _test(expected_total_fees, log.totalLiqFees)
-
-    # Verify unpaid fees (~0.38 GREEN becomes debt)
-    expected_unpaid_fees = int(0.38 * EIGHTEEN_DECIMALS)
-    assert abs(log.liqFeesUnpaid - expected_unpaid_fees) < 1e16, f"Expected ~0.38 GREEN unpaid fees, got {log.liqFeesUnpaid/EIGHTEEN_DECIMALS}"
 
     # 5. Repay amount is ~88 GREEN (with rounding)
     expected_repay = 88 * EIGHTEEN_DECIMALS
@@ -587,14 +877,15 @@ def test_ah_liquidation_zero_ltv_buffer(
     # 6. No auctions should be started when debt health is restored
     assert log.numAuctionsStarted == 0, "No auctions should be started when debt health is restored"
 
-    # 7. Collateral taken = 88 / 0.94 = ~93.62 GREEN
-    expected_collateral = 93.62 * EIGHTEEN_DECIMALS
-    _test(expected_collateral, log.collateralValueOut, 1)  # 1% tolerance for rounding
+    # 7. Collateral taken uses the 5% base fee ratio, not the combined 6%.
+    expected_collateral = (
+        log.repayAmount * HUNDRED_PERCENT // (HUNDRED_PERCENT - 5_00)
+    )
+    _test(expected_collateral, log.collateralValueOut, 1)
 
-    # 8. Debt reduction should be ~87.62 GREEN (100 - 12.38)
+    # 8. Debt reduction equals repayment net of fees booked to debt.
     debt_reduction = pre_user_debt.amount - user_debt.amount
-    expected_debt_reduction = int(87.62 * EIGHTEEN_DECIMALS)
-    assert abs(debt_reduction - expected_debt_reduction) < 1e16, f"Debt reduction should be ~87.62 GREEN, got {debt_reduction/EIGHTEEN_DECIMALS}"
+    assert debt_reduction == log.repayAmount - log.liqFeesUnpaid
 
     # 9. Collateral reduction equals collateral taken
     collateral_reduction = pre_bt.collateralVal - bt.collateralVal

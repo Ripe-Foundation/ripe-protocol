@@ -32,8 +32,14 @@ def test_basic_vault_deposit_validation(
     large_amount = 1000000 * EIGHTEEN_DECIMALS
     small_amount = 100 * EIGHTEEN_DECIMALS
     alpha_token.transfer(simple_erc20_vault, small_amount, sender=alpha_token_whale)
-    deposited = simple_erc20_vault.depositTokensInVault(bob, alpha_token, large_amount, sender=teller.address)
-    assert deposited == small_amount  # Should only deposit what's available
+    with boa.reverts("insufficient vault backing"):
+        simple_erc20_vault.depositTokensInVault(
+            bob,
+            alpha_token,
+            large_amount,
+            sender=teller.address,
+        )
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
 
 
 def test_basic_vault_withdrawal_validation(
@@ -157,4 +163,75 @@ def test_basic_vault_utility_functions(
     # Test getUserAssetAtIndexAndHasBalance
     asset, has_balance = simple_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, 1)
     assert asset == alpha_token.address
-    assert has_balance 
+    assert has_balance
+
+
+def test_basic_vault_lootbox_share_tracks_custody_without_mutating_nominal_state(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    surplus = 5 * EIGHTEEN_DECIMALS
+
+    # A zero nominal balance returns before attempting an external token call.
+    assert simple_erc20_vault.getUserLootBoxShare(bob, ZERO_ADDRESS) == 0
+
+    alpha_token.transfer(simple_erc20_vault, deposit_amount, sender=alpha_token_whale)
+    simple_erc20_vault.depositTokensInVault(
+        bob,
+        alpha_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+
+    def assert_nominal_position(expected_share):
+        custody_before = alpha_token.balanceOf(simple_erc20_vault)
+        assert simple_erc20_vault.getUserLootBoxShare(bob, alpha_token) == expected_share
+        assert alpha_token.balanceOf(simple_erc20_vault) == custody_before
+        assert simple_erc20_vault.userBalances(bob, alpha_token) == deposit_amount
+        assert simple_erc20_vault.totalBalances(alpha_token) == deposit_amount
+        assert simple_erc20_vault.userAssets(bob, 1) == alpha_token.address
+        assert simple_erc20_vault.indexOfUserAsset(bob, alpha_token) == 1
+        assert simple_erc20_vault.numUserAssets(bob) == 2
+        assert simple_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, 1) == (
+            alpha_token.address,
+            True,
+        )
+
+    # Exact backing and surplus custody both expose the nominal reward share.
+    assert_nominal_position(deposit_amount)
+    alpha_token.transfer(simple_erc20_vault, surplus, sender=alpha_token_whale)
+    assert_nominal_position(deposit_amount)
+
+    # Strictly deficient custody suppresses the share at every severity.
+    alpha_token.transfer(
+        alpha_token_whale,
+        surplus + 1,
+        sender=simple_erc20_vault.address,
+    )
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount - 1
+    assert_nominal_position(0)
+
+    partial_shortfall = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(
+        alpha_token_whale,
+        partial_shortfall - 1,
+        sender=simple_erc20_vault.address,
+    )
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount - partial_shortfall
+    assert_nominal_position(0)
+
+    alpha_token.transfer(
+        alpha_token_whale,
+        deposit_amount - partial_shortfall,
+        sender=simple_erc20_vault.address,
+    )
+    assert alpha_token.balanceOf(simple_erc20_vault) == 0
+    assert_nominal_position(0)
+
+    # Restoring exactly the missing custody automatically restores the share.
+    alpha_token.transfer(simple_erc20_vault, deposit_amount, sender=alpha_token_whale)
+    assert_nominal_position(deposit_amount)

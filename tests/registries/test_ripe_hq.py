@@ -27,7 +27,8 @@ def test_ripe_hq_and_tokens_setup(
 
     # registry
     assert ripe_hq.registryChangeTimeLock() != 0
-    assert ripe_hq.getNumAddrs() == 22
+    # IDs 23 and 24 are reserved for the two CCIP pools; VaultMigrator is 25.
+    assert ripe_hq.getNumAddrs() == 25
 
     # governance
     assert ripe_hq.governance() == governance.address
@@ -41,7 +42,8 @@ def test_ripe_hq_and_tokens_setup(
 
     # switchboard
     assert switchboard.registryChangeTimeLock() != 0
-    assert switchboard.getNumAddrs() == 5
+    # Alpha through Golf are registered in the shared fixture.
+    assert switchboard.getNumAddrs() == 7
     assert switchboard.governance() == ZERO_ADDRESS
 
     # vault book
@@ -561,6 +563,3 @@ def test_circuit_breaker_blocks_all_minters(ripe_hq, auction_house, endaoment, g
     
     # Even if a contract has permission in hqConfig, circuit breaker overrides
     assert ripe_hq.canMintGreen(ZERO_ADDRESS) == False
-
-
-

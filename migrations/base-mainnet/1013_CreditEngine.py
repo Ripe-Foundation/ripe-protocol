@@ -10,6 +10,7 @@ def migrate(migration: Migration):
     credit_engine = migration.deploy(
         "CreditEngine",
         hq,
+        migration.blueprint().PARAMS["CURVE_PRICES_ID"],
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, credit_engine, "Credit Engine")

@@ -1,0 +1,271 @@
+"""Launch values for Robinhood, in one place.
+
+Every number and address the Robinhood migrations need, with the reason it has
+that value. Approved values are read from `config/BluePrint.py` so there is one
+source of truth; the rest are decisions recorded here with their rationale.
+
+Lives in config/ because migration directories have hyphens in their names and
+are therefore not importable packages -- the same reason Base's migrations
+import their values from config/ and scripts/.
+"""
+
+from config.BluePrint import (
+    ROBINHOOD_ADDRESSES,
+    ROBINHOOD_ADDRESS_STATUS,
+    ROBINHOOD_GOVERNANCE,
+    SymbolicBinding,
+)
+
+ZERO_ADDRESS = "0x" + "0" * 40
+
+
+def unresolved_external_address_keys():
+    return tuple(
+        sorted(
+            key
+            for key, status in ROBINHOOD_ADDRESS_STATUS.items()
+            if "unverified" in status
+        )
+    )
+
+
+def validate_deployment_external_facts():
+    """Fail before signer construction while any selected fact is unverified."""
+    unresolved = unresolved_external_address_keys()
+    if unresolved:
+        raise ValueError(
+            "RH_EXTERNAL_FACTS_UNVERIFIED:" + ",".join(unresolved)
+        )
+
+
+def address(key):
+    """Read a deployment input only after its authority marks it resolved."""
+    value = ROBINHOOD_ADDRESSES[key]
+    status = ROBINHOOD_ADDRESS_STATUS[key]
+    if isinstance(value, SymbolicBinding) or (
+        "unverified" in status or "unresolved" in status
+    ):
+        raise ValueError(f"RH_EXTERNAL_FACT_UNVERIFIED:{key}:{status}")
+    return value
+
+
+# --- block units ------------------------------------------------------------
+# Same constants as contracts/config/DefaultsRobinhood.vy. BLOCKS_PER_MINUTE is
+# 5 because on this Arbitrum L2 `block.number` is the L1 ancestor estimate,
+# advancing about every 12 seconds -- not the child block height.
+BLOCKS_PER_MINUTE = 5
+HOUR_IN_BLOCKS = 60 * BLOCKS_PER_MINUTE
+DAY_IN_BLOCKS = 24 * HOUR_IN_BLOCKS
+WEEK_IN_BLOCKS = 7 * DAY_IN_BLOCKS
+
+# --- timelocks (blocks) -----------------------------------------------------
+TOKEN_HQ_MIN_TIMELOCK = DAY_IN_BLOCKS
+TOKEN_HQ_MAX_TIMELOCK = WEEK_IN_BLOCKS
+LOCAL_GOV_MIN_TIMELOCK = DAY_IN_BLOCKS
+LOCAL_GOV_MAX_TIMELOCK = WEEK_IN_BLOCKS
+RIPE_HQ_MIN_TIMELOCK = HOUR_IN_BLOCKS * 12
+RIPE_HQ_MAX_TIMELOCK = WEEK_IN_BLOCKS
+REGISTRY_MIN_DELAY = HOUR_IN_BLOCKS * 12
+REGISTRY_MAX_DELAY = WEEK_IN_BLOCKS
+PRICE_MIN_TIMELOCK = HOUR_IN_BLOCKS * 2
+PRICE_MAX_TIMELOCK = WEEK_IN_BLOCKS
+
+# PriceDesk source IDs are chain-local. Curve is active at Robinhood ID 2;
+# BlueChipYield and Pyth are not deployed or assigned IDs for this launch.
+CURVE_PRICES_ID = 2
+BLUECHIP_PRICES_ID = 0
+PYTH_PRICES_ID = 0
+
+# All five switchboards share one band.
+SWITCHBOARD_MIN_TIMELOCK = HOUR_IN_BLOCKS * 2
+SWITCHBOARD_MAX_TIMELOCK = WEEK_IN_BLOCKS
+HR_MIN_TIMELOCK = DAY_IN_BLOCKS
+HR_MAX_TIMELOCK = WEEK_IN_BLOCKS
+
+# --- stale windows (SECONDS, not blocks) ------------------------------------
+# Deliberately plain integers: these are wall-clock seconds passed to price
+# feeds. Writing DAY_IN_BLOCKS here would make every staleness check 12x tighter.
+STALE_WINDOW_MIN = 300  # 5 minutes
+STALE_WINDOW_MAX = 604_800  # 7 days
+STALE_WINDOW_GLOBAL = 86_400  # 1 day, stored in MissionControl
+STALE_WINDOW_INHERIT = 0  # feed-level sentinel: inherit MissionControl
+STALE_WINDOW_EQUITY = 345_600  # 4 days, fixed feed-level override
+
+# Historical migration 0003 imported these names and deployed one-day fixed
+# feed policies. Keep its inputs stable; forward migrations must use the exact
+# address classifier below instead of either legacy name.
+STALE_WINDOW_DEFAULT = 86_400
+STALE_WINDOW_USDG = 86_400
+
+# Post-PR206/PR208 target policy consumed by the 2026082405 replacement and its
+# 2026082406 promotion check. These are normalized addresses, not symbolic
+# route names. Keeping the table independent from BluePrint bindings is
+# deliberate: rebinding a symbol cannot silently reclassify an asset's future
+# oracle policy.
+ROBINHOOD_STALE_TIME_INHERIT_ASSETS = frozenset(
+    (
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",  # native ETH
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73",  # WETH
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",  # BTC sentinel
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168",  # USDG
+    )
+)
+ROBINHOOD_STALE_TIME_EQUITY_ASSETS = frozenset(
+    (
+        "0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea",  # SPCX
+        "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",  # NVDA
+        "0x322f0929c4625ed5bad873c95208d54e1c003b2d",  # TSLA
+        "0xaf3d76f1834a1d425780943c99ea8a608f8a93f9",  # AAPL
+        "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",  # GOOGL
+        "0x1b0e319c6a659f002271b69db8a7df2f911c153e",  # GME
+    )
+)
+
+
+def _normalize_stale_time_policy_address(asset):
+    if (
+        not isinstance(asset, str)
+        or len(asset) != 42
+        or asset[:2].lower() != "0x"
+        or any(char not in "0123456789abcdefABCDEF" for char in asset[2:])
+    ):
+        raise ValueError(f"RH_ORACLE_STALE_POLICY_INVALID_ADDRESS:{asset!r}")
+    return asset.lower()
+
+
+def stale_time_override_for_asset(asset):
+    """Return the post-PR206/PR208 RH target; reject unclassified assets."""
+    normalized = _normalize_stale_time_policy_address(asset)
+    if normalized in ROBINHOOD_STALE_TIME_INHERIT_ASSETS:
+        return STALE_WINDOW_INHERIT
+    if normalized in ROBINHOOD_STALE_TIME_EQUITY_ASSETS:
+        return STALE_WINDOW_EQUITY
+    raise ValueError(f"RH_ORACLE_STALE_POLICY_UNKNOWN_ASSET:{normalized}")
+
+# --- initial supply ---------------------------------------------------------
+GREEN_INITIAL_SUPPLY = 100 * 10**18  # to the deployer, which seeds the pool
+RIPE_INITIAL_SUPPLY = 10_000 * 10**18  # to the governance Safe
+SGREEN_INITIAL_SUPPLY = 0
+
+# --- misc -------------------------------------------------------------------
+TELLER_SHOULD_PAUSE = True  # Teller launches paused
+# The governance-only SwitchboardEcho route is the authorization boundary for
+# migration calls. VaultMigrator must be available during the controlled
+# window while Teller remains paused, so its initial department state is
+# deliberately unpaused.
+VAULT_MIGRATOR_SHOULD_PAUSE = False
+BOND_BOOSTER_MAX_BOOST_RATIO = 200_00  # 200%
+BOND_BOOSTER_MAX_UNITS = 25_000  # a count, not a ratio
+BOND_BOOSTER_MIN_LOCK_DURATION = DAY_IN_BLOCKS * 180
+
+
+# --- governance -------------------------------------------------------------
+# The multi-chain Safe, same address as Base. It receives governance at the end
+# of the final migration; it never signs a deployment transaction.
+GOVERNANCE = ROBINHOOD_GOVERNANCE
+SAFE = ROBINHOOD_GOVERNANCE
+
+# Evidentiary roles. No Robinhood contract reads a "guardian", and the Safe
+# holds every power the role describes -- including the unpause that lite
+# signers deliberately cannot perform.
+GUARDIAN = ROBINHOOD_GOVERNANCE
+
+# --- token supply -----------------------------------------------------------
+# Base minted its RIPE supply to GOVERNANCE; Robinhood mints the approved
+# 100,000 to the same Safe. GREEN goes to the deployer, which seeds the pool.
+# sGREEN has a zero supply, and Erc20Token skips the credit entirely when the
+# supply is zero, so a zero recipient makes the mint impossible rather than
+# merely unused -- which is exactly what Base passed.
+SGREEN_SUPPLY_RECIPIENT = ZERO_ADDRESS
+
+# --- training wheels --------------------------------------------------------
+# Empty at launch by owner decision. Base seeded four addresses here; Robinhood
+# starts with none and adds them afterwards through the normal governed path.
+TRAINING_WHEELS_ALLOWLIST = []
+
+# --- Ledger action-block source ---------------------------------------------
+# ArbSys is the production answer: Robinhood is an Arbitrum L2 where
+# `block.number` is the L1 ancestor estimate and REPEATS across child blocks, so
+# native mode lets the Ledger's one-action-per-block guard treat several child
+# blocks as one. `arbBlockNumber()` is the true child height.
+#
+# It CANNOT be exercised on a titanoboa fork. ArbSys is a node-implemented
+# precompile, not bytecode: `boa.env.get_code(0x64)` returns 1 byte and the call
+# reverts. The live migration therefore performs both Ledger readbacks through
+# the configured Robinhood RPC node before registering the contract.
+#
+# A local simulation that substitutes native block mode is a different profile
+# and is never selectable through the production configuration.
+LEDGER_ACTION_BLOCK_SOURCE = ROBINHOOD_ADDRESSES["ARB_SYS"]
+
+# --- blue chip yield --------------------------------------------------------
+# Only Morpho V2 exists on Robinhood. The other six registries are zero, which
+# fails CLOSED: Vyper checks extcodesize, so registering an asset against a zero
+# registry reverts rather than silently mispricing it.
+BLUECHIP_MORPHO_FACTORIES = [ZERO_ADDRESS, ZERO_ADDRESS]
+BLUECHIP_EULER_FACTORIES = [ZERO_ADDRESS, ZERO_ADDRESS]
+BLUECHIP_FLUID_RESOLVER = ZERO_ADDRESS
+BLUECHIP_COMPOUND_CONFIGURATOR = ZERO_ADDRESS
+BLUECHIP_MOONWELL_COMPTROLLER = ZERO_ADDRESS
+BLUECHIP_AAVE_PROVIDER = ZERO_ADDRESS
+
+# --- lootbox ----------------------------------------------------------------
+# Every Lootbox parameter is an Underscore reward, and Underscore is
+# intentionally absent on Robinhood. The floor must still be nonzero: the
+# constructor asserts it is neither 0 nor max_value.
+LOOTBOX_MIN_SEND_INTERVAL = 1
+LOOTBOX_SEND_INTERVAL = 0
+LOOTBOX_DEPOSIT_REWARD = 0
+LOOTBOX_YIELD_BONUS = 0
+
+# --- deleverage -------------------------------------------------------------
+# Fresh-deployment values from docs/chains/rh/deleverage-cooldown-security-
+# decision.md, plus the literals Base passed in 2026072800.
+DELEVERAGE_MIN_BPS = 0
+DELEVERAGE_BUFFER = 0
+DELEVERAGE_COOLDOWN = 0
+DELEVERAGE_UNDERSCORE_SPREAD = 1_00  # 1%
+DELEVERAGE_FULL_PAYOFF_BUFFER = 10**15
+DELEVERAGE_OVERAGE_BPS = 1_00  # 1%
+DELEVERAGE_DUST_THRESHOLD = 0  # disabled pending governance policy approval
+DELEVERAGE_DUST_BPS = 0  # disabled pending governance policy approval
+
+# --- endaoment PSM ----------------------------------------------------------
+# Deployed DISABLED: the constructor hard-sets canMint and canRedeem to False,
+# and activation is a separate governed step. These fees and caps are
+# scaffolding, not approved policy -- they are nonzero only because the
+# constructor rejects a zero interval and a zero or max cap, and they are inert
+# while mint and redeem are false. Values from the rh-deploy branch.
+PSM_NUM_BLOCKS_PER_INTERVAL = 7_200  # 1 day on Robinhood
+PSM_MINT_FEE = 0
+PSM_MAX_INTERVAL_MINT = 100_000 * 10**18
+PSM_REDEEM_FEE = 0
+PSM_MAX_INTERVAL_REDEEM = 100_000 * 10**18
+# Yield position disabled: lego id 0 and a zero vault token leave it unset.
+PSM_YIELD_LEGO_ID = 0
+PSM_YIELD_VAULT_TOKEN = ZERO_ADDRESS
+
+# --- price sources ----------------------------------------------------------
+# CurvePrices takes a price-change timelock band. Robinhood has no separate
+# PRICE_DESK_*_REG_TIMELOCK, so all three price sources share the approved
+# Chainlink band.
+PRICE_CHANGE_MIN_TIMELOCK = PRICE_MIN_TIMELOCK
+PRICE_CHANGE_MAX_TIMELOCK = PRICE_MAX_TIMELOCK
+
+# --- RIPE price (Uniswap V2) ------------------------------------------------
+# The RIPE/WETH v2 pool is observed by a separately deployed monitoring
+# component. It implements PriceSource only as an inert compatibility shell:
+# every protocol-pricing entrypoint reports no feed, while explicitly named
+# RIPE monitoring views expose the manipulable spot observation. It is never
+# registered in PriceDesk and is forbidden as collateral or any other
+# protocol-valuation authority.
+RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
+
+# --- curve pool -------------------------------------------------------------
+# 100 USDG (6dp) + 100 GREEN (18dp), matching Base's GREEN pool seed.
+POOL_SEED_USDG = 100 * 10**6
+POOL_SEED_GREEN = 100 * 10**18
+# Seeding an empty StableSwap-NG pool mints LP equal to the invariant D, so
+# ~200e18 at a 1:1 peg. Base passed 0; this is a ~0.5% floor -- tight enough to
+# abort if the pool is not what we think it is, loose enough for rounding.
+POOL_MIN_MINTED_LP = 199 * 10**18

@@ -16,7 +16,7 @@
 #     ╚════════════════════════════════════════════════════╝
 #
 #     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#     Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -35,6 +35,7 @@ from interfaces import Department
 from interfaces import UndyLego
 
 from ethereum.ercs import IERC20
+from ethereum.ercs import IERC20Detailed
 from ethereum.ercs import IERC4626
 
 interface PriceDesk:
@@ -46,7 +47,6 @@ interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
 
 interface Registry:
-    def isValidAddr(_addr: address) -> bool: view
     def getAddr(_id: uint256) -> address: view
 
 interface VaultRegistry:
@@ -159,6 +159,9 @@ UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_USDC: constant(uint256) = 10 ** 6
 ONE_GREEN: constant(uint256) = 10 ** 18
+# At the minimum nonzero price, PriceDesk can scale the GREEN cap by ONE_USDC, then the fee gross-up by HUNDRED_PERCENT when its divisor is 1.
+# The constructor's 6-decimal payment-token check makes this bound exact.
+MAX_SAFE_INTERVAL_MINT: constant(uint256) = max_value(uint256) // (ONE_USDC * HUNDRED_PERCENT)
 
 USDC: public(immutable(address))
 
@@ -178,7 +181,7 @@ def __init__(
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, True, False) # (isPaused, canMintGreen, canMintRipe)
 
-    assert _numBlocksPerInterval != 0 # dev: invalid interval
+    assert _numBlocksPerInterval != 0 and _numBlocksPerInterval != max_value(uint256) # dev: invalid interval
     self.numBlocksPerInterval = _numBlocksPerInterval
     self.shouldAutoDeposit = True
 
@@ -186,7 +189,7 @@ def __init__(
     self.canMint = False
     assert _mintFee <= HUNDRED_PERCENT # dev: invalid fee
     self.mintFee = _mintFee
-    assert _maxIntervalMint != 0 and _maxIntervalMint != max_value(uint256) # dev: invalid max
+    assert _maxIntervalMint != 0 and _maxIntervalMint <= MAX_SAFE_INTERVAL_MINT # dev: invalid max
     self.maxIntervalMint = _maxIntervalMint
     self.shouldEnforceMintAllowlist = False
 
@@ -199,6 +202,7 @@ def __init__(
     self.shouldEnforceRedeemAllowlist = False
 
     assert _usdc != empty(address) # dev: invalid USDC address
+    assert staticcall IERC20Detailed(_usdc).decimals() == 6 # dev: usdc must be 6 decimals
     USDC = _usdc
 
     # yield config
@@ -334,10 +338,20 @@ def getAvailIntervalMint() -> uint256:
 
 @view
 @internal
+def _isInActiveInterval(_start: uint256) -> bool:
+    if _start == 0:
+        return False
+    if block.number < _start:
+        return True
+    return block.number - _start < self.numBlocksPerInterval
+
+
+@view
+@internal
 def _getAvailIntervalMint() -> uint256:
     data: PsmInterval = self.globalMintInterval
     maxIntervalMint: uint256 = self.maxIntervalMint
-    if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
+    if self._isInActiveInterval(data.start):
         maxIntervalMint -= min(data.amount, maxIntervalMint)
     return maxIntervalMint
 
@@ -350,7 +364,7 @@ def _updateMintInterval(_amount: uint256):
     data: PsmInterval = self.globalMintInterval
 
     # existing interval - accumulate amount
-    if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
+    if self._isInActiveInterval(data.start):
         data.amount += _amount
 
     # new interval - reset with current block and amount
@@ -453,6 +467,9 @@ def _calculateMaxRedeemableGreen(_isUnderscoreVault: bool, _legoId: uint256, _va
 
     # convert usdc to max green
     usdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_usdc, usdcAvailable, False)
+    # ONE_GREEN // ONE_USDC == 10**12  (GREEN wei per one USDC base unit at 1:1)
+    if usdValue < ONE_GREEN // ONE_USDC:
+        usdValue = 0
     usdcInGreenDecimals: uint256 = usdcAvailable * ONE_GREEN // ONE_USDC
     maxGreenFromUsdc: uint256 = min(usdValue, usdcInGreenDecimals)
 
@@ -509,7 +526,7 @@ def getAvailIntervalRedemptions() -> uint256:
 def _getAvailIntervalRedemptions() -> uint256:
     data: PsmInterval = self.globalRedeemInterval
     maxIntervalRedeem: uint256 = self.maxIntervalRedeem
-    if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
+    if self._isInActiveInterval(data.start):
         maxIntervalRedeem -= min(data.amount, maxIntervalRedeem)
     return maxIntervalRedeem
 
@@ -522,7 +539,7 @@ def _updateRedeemInterval(_amount: uint256):
     data: PsmInterval = self.globalRedeemInterval
 
     # existing interval - accumulate amount
-    if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
+    if self._isInActiveInterval(data.start):
         data.amount += _amount
 
     # new interval - reset with current block and amount
@@ -787,7 +804,7 @@ def setMaxIntervalMint(_maxGreenAmount: uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _maxGreenAmount != self.maxIntervalMint # dev: no change
-    assert _maxGreenAmount != 0 and _maxGreenAmount != max_value(uint256) # dev: invalid max
+    assert _maxGreenAmount != 0 and _maxGreenAmount <= MAX_SAFE_INTERVAL_MINT # dev: invalid max
     self.maxIntervalMint = _maxGreenAmount
     log MaxIntervalMintUpdated(maxAmount=_maxGreenAmount)
 

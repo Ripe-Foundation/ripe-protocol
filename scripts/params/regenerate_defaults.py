@@ -633,7 +633,7 @@ def generate_defaults_vyper(
     )
 
     vyper_code = f'''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 

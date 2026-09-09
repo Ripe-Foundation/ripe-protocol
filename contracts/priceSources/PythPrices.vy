@@ -1,5 +1,5 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -23,14 +23,14 @@ import contracts.modules.TimeLock as timeLock
 import interfaces.PriceSource as PriceSource
 
 interface PythNetwork:
+    def getUpdateFee(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256: view
+    def updatePriceFeeds(_payLoad: DynArray[Bytes[2048], MAX_PRICE_UPDATES]): payable
     def getPriceUnsafe(_priceFeedId: bytes32) -> PythPrice: view
     def priceFeedExists(_priceFeedId: bytes32) -> bool: view
-    def getUpdateFee(_payLoad: Bytes[2048]) -> uint256: view
-    def updatePriceFeeds(_payLoad: Bytes[2048]): payable
 
 interface MissionControl:
-    def getPriceStaleTime() -> uint256: view
     def canPerformLiteAction(_user: address) -> bool: view
+    def getPriceStaleTime() -> uint256: view
 
 struct PythPrice:
     price: int64
@@ -96,7 +96,7 @@ event DisablePythFeedCancelled:
     feedId: bytes32
 
 event PythPriceUpdated:
-    payload: Bytes[2048]
+    payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES]
     feeAmount: uint256
     caller: indexed(address)
 
@@ -117,6 +117,8 @@ PYTH: public(immutable(address))
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICE_UPDATES: constant(uint256) = 20
+MIN_LOCAL_STALE_TIME: constant(uint256) = 5 * 60
+MAX_EFFECTIVE_STALE_TIME: constant(uint256) = 60 * 60 * 24 * 7 # 7 days
 
 
 @deploy
@@ -151,7 +153,13 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
+    if not isValid:
+        return 0
     return self._getPrice(config.feedId, staleTime)
 
 
@@ -161,7 +169,13 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: PythFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    if not self._isCanonicalPriceDeskForward(_staleTime, _priceDesk):
+        return 0, True
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(_staleTime, config.staleTime)
+    if not isValid:
+        return 0, True
     return self._getPrice(config.feedId, staleTime), True
 
 
@@ -194,6 +208,8 @@ def _getLastPriceAndLastUpdate(_feedId: bytes32, _staleTime: uint256) -> (uint25
 
     # price is too stale
     publishTime: uint256 = convert(data.publishTime, uint256)
+    if publishTime > block.timestamp:
+        return 0, 0
     if _staleTime != 0 and block.timestamp - publishTime > _staleTime:
         return 0, 0
 
@@ -232,6 +248,17 @@ def _getLastPriceAndLastUpdate(_feedId: bytes32, _staleTime: uint256) -> (uint25
 
 
 @view
+@internal
+def _isCanonicalPriceDeskForward(_staleTime: uint256, _priceDesk: address) -> bool:
+    # zero is the direct-call sentinel. A nonzero value is accepted only as the
+    # global policy forwarded by the canonical PriceDesk.
+    if _staleTime == 0:
+        return True
+    priceDesk: address = addys._getPriceDeskAddr()
+    return msg.sender == priceDesk and _priceDesk == priceDesk
+
+
+@view
 @external
 def hasPriceFeed(_asset: address) -> bool:
     return self.feedConfig[_asset].feedId != empty(bytes32)
@@ -248,6 +275,38 @@ def addPriceSnapshot(_asset: address) -> bool:
     return False
 
 
+@view
+@internal
+def _resolveStaleTime(_globalStaleTime: uint256, _feedStaleTime: uint256) -> (uint256, bool):
+    if _feedStaleTime != 0:
+        if _feedStaleTime < MIN_LOCAL_STALE_TIME or _feedStaleTime > MAX_EFFECTIVE_STALE_TIME:
+            return 0, False
+        return _feedStaleTime, True
+
+    globalStaleTime: uint256 = _globalStaleTime
+    if globalStaleTime == 0:
+        isValid: bool = False
+        globalStaleTime, isValid = self._getGlobalStaleTime()
+        if not isValid:
+            return 0, False
+    elif globalStaleTime > MAX_EFFECTIVE_STALE_TIME:
+        return 0, False
+    return globalStaleTime, True
+
+
+@view
+@internal
+def _getGlobalStaleTime() -> (uint256, bool):
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl == empty(address):
+        return 0, False
+
+    staleTime: uint256 = staticcall MissionControl(missionControl).getPriceStaleTime()
+    if staleTime == 0 or staleTime > MAX_EFFECTIVE_STALE_TIME:
+        return 0, False
+    return staleTime, True
+
+
 ################
 # Add New Feed #
 ################
@@ -257,9 +316,10 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 
 @external
-def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
+def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     assert self._isValidNewFeed(_asset, _feedId, _staleTime) # dev: invalid feed
@@ -286,6 +346,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingPythFeed = self.pendingUpdates[_asset]
     assert d.config.feedId != empty(bytes32) # dev: no pending new feed
+    assert self.feedConfig[_asset].feedId == empty(bytes32) # dev: no pending new feed
     if not self._isValidNewFeed(_asset, d.config.feedId, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
@@ -311,6 +372,9 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingPythFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending new feed
+    assert d.config.feedId != empty(bytes32) # dev: no pending new feed
+    assert self.feedConfig[_asset].feedId == empty(bytes32) # dev: no pending new feed
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
     log NewPythFeedCancelled(asset=_asset, feedId=d.config.feedId)
     return True
@@ -348,13 +412,35 @@ def _isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> b
 
 
 @external
-def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
+def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+    assert _feedId != self.feedConfig[_asset].feedId # dev: invalid feed
+
+    # zero on a feed rotation preserves the active policy. Governance uses the
+    # dedicated updateStaleTime entry point to explicitly reset to inheritance.
+    staleTime: uint256 = _staleTime
+    if staleTime == 0:
+        staleTime = self.feedConfig[_asset].staleTime
+    return self._initiatePriceFeedUpdate(_asset, _feedId, staleTime)
+
+
+@external
+def updateStaleTime(_asset: address, _staleTime: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
+    config: PythFeedConfig = self.feedConfig[_asset]
+    return self._initiatePriceFeedUpdate(_asset, config.feedId, _staleTime)
+
+
+@internal
+def _initiatePriceFeedUpdate(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
+
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
-    assert self._isValidUpdateFeed(_asset, _feedId, oldFeedId, _staleTime) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, _feedId, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -379,8 +465,14 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingPythFeed = self.pendingUpdates[_asset]
     assert d.config.feedId != empty(bytes32) # dev: no pending update feed
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
-    if not self._isValidUpdateFeed(_asset, d.config.feedId, oldFeedId, d.config.staleTime):
-        self._cancelPriceFeedUpdate(_asset, d.actionId)
+    assert oldFeedId != empty(bytes32) # dev: no pending update feed
+    isStaleTimeOnly: bool = d.config.feedId == oldFeedId
+    if not self._isValidUpdateFeed(_asset, d.config.feedId, d.config.staleTime):
+        # a stale-only candidate can fail transiently when its unchanged oracle
+        # is unavailable or stale. Keep it pending so governance may retry or
+        # explicitly cancel it. Feed replacements retain fail-and-cancel.
+        if not isStaleTimeOnly:
+            self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
     # check time lock
@@ -403,6 +495,9 @@ def cancelPriceFeedUpdate(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     d: PendingPythFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending update feed
+    assert d.config.feedId != empty(bytes32) # dev: no pending update feed
+    assert self.feedConfig[_asset].feedId != empty(bytes32) # dev: no pending update feed
     self._cancelPriceFeedUpdate(_asset, d.actionId)
     log PythFeedUpdateCancelled(asset=_asset, feedId=d.config.feedId, oldFeedId=self.feedConfig[_asset].feedId)
     return True
@@ -420,16 +515,34 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
-    return self._isValidUpdateFeed(_asset, _feedId, self.feedConfig[_asset].feedId, _staleTime)
+    # feed-changing preflight mirrors updatePriceFeed: zero preserves the
+    # active stale policy. same-feed updates belong to isValidStaleTimeUpdate
+    currentConfig: PythFeedConfig = self.feedConfig[_asset]
+    if _feedId == currentConfig.feedId:
+        return False
+    staleTime: uint256 = _staleTime
+    if staleTime == 0:
+        staleTime = currentConfig.staleTime
+    return self._isValidUpdateFeed(_asset, _feedId, staleTime)
+
+
+@view
+@external
+def isValidStaleTimeUpdate(_asset: address, _staleTime: uint256) -> bool:
+    # stale-only preflight validates against the complete active feed config
+    config: PythFeedConfig = self.feedConfig[_asset]
+    return self._isValidUpdateFeed(_asset, config.feedId, _staleTime)
 
 
 @view
 @internal
-def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _oldFeedId: bytes32, _staleTime: uint256) -> bool:
-    if _feedId == _oldFeedId:
+def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    oldConfig: PythFeedConfig = self.feedConfig[_asset]
+    if priceData.indexOfAsset[_asset] == 0 or oldConfig.feedId == empty(bytes32): # use the `addNewPriceFeed` function instead
         return False
-    if priceData.indexOfAsset[_asset] == 0 or _oldFeedId == empty(bytes32): # use the `addNewPriceFeed` function instead
+    if _feedId == oldConfig.feedId and _staleTime == oldConfig.staleTime:
         return False
+
     return self._isValidFeedConfig(_asset, _feedId, _staleTime)
 
 
@@ -442,11 +555,11 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
     if not staticcall PythNetwork(PYTH).priceFeedExists(_feedId):
         return False
 
-    staleTime: uint256 = _staleTime
-    missionControl: address = addys._getMissionControlAddr()
-    if missionControl != empty(address):
-        staleTime = max(staleTime, staticcall MissionControl(missionControl).getPriceStaleTime())
-
+    staleTime: uint256 = 0
+    isValid: bool = False
+    staleTime, isValid = self._resolveStaleTime(0, _staleTime)
+    if not isValid:
+        return False
     return self._getPrice(_feedId, staleTime) != 0
 
 
@@ -462,6 +575,7 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -
 def disablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
+    assert self.pendingUpdates[_asset].actionId == 0 # dev: pending feed action
 
     # validation
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
@@ -490,6 +604,8 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     d: PendingPythFeed = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feedId == empty(bytes32) # dev: no pending disable feed
+    assert oldFeedId != empty(bytes32) # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeedId):
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False
@@ -514,7 +630,11 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    self._cancelDisablePriceFeed(_asset, self.pendingUpdates[_asset].actionId)
+    d: PendingPythFeed = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending disable feed
+    assert d.config.feedId == empty(bytes32) # dev: no pending disable feed
+    assert self.feedConfig[_asset].feedId != empty(bytes32) # dev: no pending disable feed
+    self._cancelDisablePriceFeed(_asset, d.actionId)
     log DisablePythFeedCancelled(asset=_asset, feedId=self.feedConfig[_asset].feedId)
     return True
 
@@ -549,20 +669,20 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 
 @payable
 @external
-def updatePythPrice(_payload: Bytes[2048]) -> bool:
+def updatePythPrice(_payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     assert msg.value != 0 # dev: payment required
     return self._updatePythPrice(_payload, PYTH, msg.value, True)
 
 
 @external
-def updatePythPriceNoPay(_payload: Bytes[2048]) -> bool:
+def updatePythPriceNoPay(_payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     return self._updatePythPrice(_payload, PYTH, self.balance, False)
 
 
 @internal
-def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address, _payment: uint256, _shouldRefund: bool) -> bool:
+def _updatePythPrice(_payload: DynArray[Bytes[2048], MAX_PRICE_UPDATES], _pythNetwork: address, _payment: uint256, _shouldRefund: bool) -> bool:
     feeAmount: uint256 = staticcall PythNetwork(_pythNetwork).getUpdateFee(_payload)
     assert _payment >= feeAmount # dev: insufficient payment
 

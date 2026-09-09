@@ -222,7 +222,47 @@
     "inputs": [
       {
         "name": "payload",
-        "type": "bytes",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "temporalNumericValue",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "timestampNs",
+                "type": "uint64"
+              },
+              {
+                "name": "quantizedValue",
+                "type": "int192"
+              }
+            ]
+          },
+          {
+            "name": "id",
+            "type": "bytes32"
+          },
+          {
+            "name": "publisherMerkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "name": "valueComputeAlgHash",
+            "type": "bytes32"
+          },
+          {
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32"
+          },
+          {
+            "name": "v",
+            "type": "uint8"
+          }
+        ],
         "indexed": false
       },
       {
@@ -1479,6 +1519,27 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "updateStaleTime",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "confirmPriceFeedUpdate",
     "inputs": [
       {
@@ -1522,6 +1583,27 @@
       {
         "name": "_feedId",
         "type": "bytes32"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidStaleTimeUpdate",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
       },
       {
         "name": "_staleTime",
@@ -1610,7 +1692,47 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "temporalNumericValue",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "timestampNs",
+                "type": "uint64"
+              },
+              {
+                "name": "quantizedValue",
+                "type": "int192"
+              }
+            ]
+          },
+          {
+            "name": "id",
+            "type": "bytes32"
+          },
+          {
+            "name": "publisherMerkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "name": "valueComputeAlgHash",
+            "type": "bytes32"
+          },
+          {
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32"
+          },
+          {
+            "name": "v",
+            "type": "uint8"
+          }
+        ]
       }
     ],
     "outputs": [
@@ -1627,7 +1749,47 @@
     "inputs": [
       {
         "name": "_payload",
-        "type": "bytes"
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "temporalNumericValue",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "timestampNs",
+                "type": "uint64"
+              },
+              {
+                "name": "quantizedValue",
+                "type": "int192"
+              }
+            ]
+          },
+          {
+            "name": "id",
+            "type": "bytes32"
+          },
+          {
+            "name": "publisherMerkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "name": "valueComputeAlgHash",
+            "type": "bytes32"
+          },
+          {
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32"
+          },
+          {
+            "name": "v",
+            "type": "uint8"
+          }
+        ]
       }
     ],
     "outputs": [

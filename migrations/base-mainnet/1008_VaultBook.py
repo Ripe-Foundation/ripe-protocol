@@ -2,6 +2,10 @@ from scripts.utils import log
 from scripts.utils.migration import Migration
 
 
+STABILITY_POOL_VAULT_ID = 1
+RIPE_GOV_VAULT_ID = 2
+
+
 def migrate(migration: Migration):
     blueprint = migration.blueprint()
     hq = migration.get_contract("RipeHq")
@@ -36,10 +40,10 @@ def migrate(migration: Migration):
     )
 
     migration.execute(vault_book.startAddNewAddressToRegistry, stability_pool, "Stability Pool")
-    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, stability_pool)) == 1
+    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, stability_pool)) == STABILITY_POOL_VAULT_ID
 
     migration.execute(vault_book.startAddNewAddressToRegistry, ripe_gov_vault, "Ripe Gov Vault")
-    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, ripe_gov_vault)) == 2
+    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, ripe_gov_vault)) == RIPE_GOV_VAULT_ID
 
     migration.execute(vault_book.startAddNewAddressToRegistry, simple_erc20_vault, "Simple ERC20 Vault")
     assert int(migration.execute(vault_book.confirmNewAddressToRegistry, simple_erc20_vault)) == 3

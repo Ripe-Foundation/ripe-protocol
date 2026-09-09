@@ -1,0 +1,136 @@
+{
+  "contracts": {
+    "Contributor": {
+      "address": "0x3f973774FaAeF307d1bA94f1c2C7eC947586f437",
+      "file": "contracts/modules/Contributor.vy"
+    },
+    "DefaultsRobinhoodLiveCandidate2026082100": {
+      "address": "0xbdcBb61a44f18254fD530a067ba885317568aEe2",
+      "file": "contracts/config/DefaultsRobinhoodLive.vy"
+    },
+    "LedgerCandidate2026082100": {
+      "address": "0xF1CD5BE4288b744913d33F55370793ca833D08d7",
+      "file": "contracts/data/Ledger.vy"
+    },
+    "MissionControlCandidate2026082100": {
+      "address": "0xD335373E59cA2F07FC3B779F2B456972C7EfDb29",
+      "file": "contracts/data/MissionControl.vy"
+    },
+    "SwitchboardCandidate2026082100": {
+      "address": "0xA1872467AC4fb442aeA341163A65263915ce178a",
+      "file": "contracts/registries/Switchboard.vy"
+    },
+    "SwitchboardAlphaCandidate2026082100": {
+      "address": "0xe2E1a03b95B8E8EFEB6eFbAD52172488FF8C84A6",
+      "file": "contracts/config/SwitchboardAlpha.vy"
+    },
+    "SwitchboardBravoCandidate2026082100": {
+      "address": "0x5b8660324655E543Cb3b13d675460C30da2f4087",
+      "file": "contracts/config/SwitchboardBravo.vy"
+    },
+    "SwitchboardCharlieCandidate2026082100": {
+      "address": "0x5ce2BbD5eBe9f7d9322a8F56740F95b9576eE0A2",
+      "file": "contracts/config/SwitchboardCharlie.vy"
+    },
+    "SwitchboardDeltaCandidate2026082100": {
+      "address": "0x2606Ce36b62a77562DF664E7a0009805BB254F3f",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    },
+    "SwitchboardEchoCandidate2026082100": {
+      "address": "0x0C757f8aAf16Dd30aBCD0861A5e0Ce41B8Ac6391",
+      "file": "contracts/config/SwitchboardEcho.vy"
+    },
+    "PriceDeskCandidate2026082100": {
+      "address": "0x4EEc14F2905ec6bCfE9f399b90c1b92128B0AF8B",
+      "file": "contracts/registries/PriceDesk.vy"
+    },
+    "ChainlinkPricesCandidate2026082100": {
+      "address": "0x599180f6cFCDa61FcFDC924c637b97d41c007E0F",
+      "file": "contracts/priceSources/ChainlinkPrices.vy"
+    },
+    "CurvePricesCandidate2026082100": {
+      "address": "0xC98e6c6CD0DDF20aA71413Ee12A1d169f58C418E",
+      "file": "contracts/priceSources/CurvePrices.vy"
+    },
+    "UniswapV2PricesCandidate2026082100": {
+      "address": "0x65D6e4b6406eFe2D56f87FBA2adCE6eDB5AC0d83",
+      "file": "contracts/priceSources/UniswapV2Prices.vy"
+    },
+    "VaultBookCandidate2026082100": {
+      "address": "0x1f90ef42Da9B41502d2311300E13FAcf70c64be7",
+      "file": "contracts/registries/VaultBook.vy"
+    },
+    "StabilityPoolCandidate2026082100": {
+      "address": "0x89b6E13E4aD4036EAA586219DD73Ebb2b36d5968",
+      "file": "contracts/vaults/StabilityPool.vy"
+    },
+    "RipeGovCandidate2026082100": {
+      "address": "0x7Eb9E83c4F475B650Ad25E359532286E130DED7f",
+      "file": "contracts/vaults/RipeGov.vy"
+    },
+    "SimpleErc20Candidate2026082100": {
+      "address": "0x4F89C94636995eF20d40d5592bA2585348bE6D53",
+      "file": "contracts/vaults/SimpleErc20.vy"
+    },
+    "AuctionHouseCandidate2026082100": {
+      "address": "0xA5801c426590F44Bc7d33551Caf7354488C8516C",
+      "file": "contracts/core/AuctionHouse.vy"
+    },
+    "AuctionHouseNFTCandidate2026082100": {
+      "address": "0xc5C49A69D6A8C777EeCE9212c892ba0a6f72CB3e",
+      "file": "contracts/core/AuctionHouseNFT.vy"
+    },
+    "BoardroomCandidate2026082100": {
+      "address": "0xd379595D192DddcDcdCeb3fCA5022A0e994c9988",
+      "file": "contracts/core/Boardroom.vy"
+    },
+    "BondBoosterCandidate2026082100": {
+      "address": "0xD6005557259d00EBBDf63AeD348c063B446b7a1B",
+      "file": "contracts/config/BondBooster.vy"
+    },
+    "BondRoomCandidate2026082100": {
+      "address": "0xdCB0Fb2527454C1072Fb40bEA11Bc0db7c7c4E4f",
+      "file": "contracts/core/BondRoom.vy"
+    },
+    "CreditEngineCandidate2026082100": {
+      "address": "0x127bEd3D1816ab194D19120C676dA89e13827F69",
+      "file": "contracts/core/CreditEngine.vy"
+    },
+    "EndaomentCandidate2026082100": {
+      "address": "0x5399362Ed32b24c036F15A73807113C02f9fFFfB",
+      "file": "contracts/core/Endaoment.vy"
+    },
+    "HumanResourcesCandidate2026082100": {
+      "address": "0xCd9F242a2B82387a3ED02cC4a8a0fF9a7EE8d8F5",
+      "file": "contracts/core/HumanResources.vy"
+    },
+    "LootboxCandidate2026082100": {
+      "address": "0x64CC9916d6222baC56f9DA770F78A3d71b0cFc80",
+      "file": "contracts/core/Lootbox.vy"
+    },
+    "TellerCandidate2026082100": {
+      "address": "0x955DB47578b17904108A3a01fEbb88A6c2189a8e",
+      "file": "contracts/core/Teller.vy"
+    },
+    "DeleverageCandidate2026082100": {
+      "address": "0x781a37a5999760c73c52fcdE1a6A34668D8eA311",
+      "file": "contracts/core/Deleverage.vy"
+    },
+    "CreditRedeemCandidate2026082100": {
+      "address": "0x7aAB69c238EA051Fa9e8370559FD917a72dBe074",
+      "file": "contracts/core/CreditRedeem.vy"
+    },
+    "TellerUtilsCandidate2026082100": {
+      "address": "0xa558f7f50362ea973CB64bAC3F8052fdabd48bEC",
+      "file": "contracts/core/TellerUtils.vy"
+    },
+    "EndaomentFundsCandidate2026082100": {
+      "address": "0x84d022C46739dBEA862439f137eA3fF9752d4dfc",
+      "file": "contracts/core/EndaomentFunds.vy"
+    },
+    "EndaomentPSMCandidate2026082100": {
+      "address": "0xbd8eE850965473a2E90c2C7096850f207D8Df986",
+      "file": "contracts/core/EndaomentPSM.vy"
+    }
+  }
+}

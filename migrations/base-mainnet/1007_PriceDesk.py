@@ -1,6 +1,6 @@
 from scripts.utils import log
 from scripts.utils.migration import Migration
-from tests.constants import EIGHTEEN_DECIMALS
+from tests.constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 def migrate(migration: Migration):
@@ -58,6 +58,7 @@ def migrate(migration: Migration):
     bluechip_yield_prices = migration.deploy(
         "BlueChipYieldPrices",
         hq,
+        ZERO_ADDRESS,
         blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
         [blueprint.ADDYS["MORPHO_FACTORY"], blueprint.ADDYS["MORPHO_FACTORY_LEGACY"]],
@@ -66,6 +67,7 @@ def migrate(migration: Migration):
         blueprint.ADDYS["COMPOUND_V3_CONFIGURATOR"],
         blueprint.ADDYS["MOONWELL_COMPTROLLER"],
         blueprint.ADDYS["AAVE_V3_ADDRESS_PROVIDER"],
+        ZERO_ADDRESS,
     )
     migration.execute(price_desk.startAddNewAddressToRegistry, bluechip_yield_prices, "BlueChip Yield Prices")
     migration.execute(price_desk.confirmNewAddressToRegistry, bluechip_yield_prices)

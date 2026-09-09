@@ -4,6 +4,8 @@
 .pytest_cache
 __pycache__
 .hypothesis/
+.coverage
+.coverage.*
 
 # dev environment
 .vscode
@@ -13,8 +15,22 @@ __pycache__
 
 out/
 
+# foundry (solidity/)
+cache/
+broadcast/
+
 migration_history/dev
 
 .hypothesis/
 
 migration_history/*/dev
+
+/migration_history/robinhood-mainnet/v1/.attempt-*
+/migration_history/robinhood-mainnet/v1/.manifest-v2.lock
+/migration_history/robinhood-mainnet/v1/.*.tmp.*
+/migration_history/robinhood-testnet/v1/.attempt-*
+/migration_history/robinhood-testnet/v1/.manifest-v2.lock
+/migration_history/robinhood-testnet/v1/.*.tmp.*
+
+# Local working notes; never commit (see PR #126 review).
+scratchpad/

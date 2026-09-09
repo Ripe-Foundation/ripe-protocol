@@ -637,6 +637,65 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAssetRetirementConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "isSupported",
+            "type": "bool"
+          },
+          {
+            "name": "hasPointsAlloc",
+            "type": "bool"
+          },
+          {
+            "name": "hasWhitelist",
+            "type": "bool"
+          },
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemCollateral",
+            "type": "bool"
+          },
+          {
+            "name": "canBuyInAuction",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimInStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferToEndaoment",
+            "type": "bool"
+          },
+          {
+            "name": "isNft",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "setUserConfig",
@@ -750,6 +809,83 @@
             "type": "uint256"
           }
         ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "assetStakersPointsAlloc",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRewardVaultId",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAccrualStartBlock",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_startBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCoreRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPreferredStabVaultId",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
       }
     ],
     "outputs": []
@@ -1250,7 +1386,7 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getRedeemCollateralConfig",
+    "name": "getEffectiveRedeemCollateralConfig",
     "inputs": [
       {
         "name": "_asset",
@@ -1259,6 +1395,10 @@
       {
         "name": "_recipient",
         "type": "address"
+      },
+      {
+        "name": "_shouldTransferBalance",
+        "type": "bool"
       }
     ],
     "outputs": [
@@ -1267,15 +1407,7 @@
         "type": "tuple",
         "components": [
           {
-            "name": "canRedeemCollateralGeneral",
-            "type": "bool"
-          },
-          {
-            "name": "canRedeemCollateralAsset",
-            "type": "bool"
-          },
-          {
-            "name": "isUserAllowed",
+            "name": "canRedeemCollateral",
             "type": "bool"
           },
           {
@@ -1284,6 +1416,10 @@
           },
           {
             "name": "canAnyoneDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferBalance",
             "type": "bool"
           }
         ]
@@ -1305,7 +1441,7 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getAuctionBuyConfig",
+    "name": "getEffectiveAuctionBuyConfig",
     "inputs": [
       {
         "name": "_asset",
@@ -1314,6 +1450,10 @@
       {
         "name": "_recipient",
         "type": "address"
+      },
+      {
+        "name": "_shouldTransferBalance",
+        "type": "bool"
       }
     ],
     "outputs": [
@@ -1322,19 +1462,15 @@
         "type": "tuple",
         "components": [
           {
-            "name": "canBuyInAuctionGeneral",
-            "type": "bool"
-          },
-          {
-            "name": "canBuyInAuctionAsset",
-            "type": "bool"
-          },
-          {
-            "name": "isUserAllowed",
+            "name": "canBuyInAuction",
             "type": "bool"
           },
           {
             "name": "canAnyoneDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferBalance",
             "type": "bool"
           }
         ]
@@ -1745,6 +1881,10 @@
       {
         "name": "_asset",
         "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
       }
     ],
     "outputs": [
@@ -1763,6 +1903,14 @@
           {
             "name": "isNft",
             "type": "bool"
+          },
+          {
+            "name": "shouldFundGenPoints",
+            "type": "bool"
+          },
+          {
+            "name": "accrualStartBlock",
+            "type": "uint256"
           }
         ]
       }
@@ -2580,6 +2728,47 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "coreRipeGovVaultId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "preferredStabVaultId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isStabVaultId",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "ripeGovVaultConfig",
     "inputs": [
       {
@@ -2780,6 +2969,61 @@
       {
         "name": "",
         "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "rewardVaultId",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "accrualStartBlock",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ]
   },

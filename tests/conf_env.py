@@ -112,8 +112,7 @@ def set_etherscan(fork):
     boa.set_etherscan(api_key=api_key or "local-placeholder", uri=uri)
 
 
-@pytest.fixture(scope="session")
-def free_port():
+def _find_free_port():
     """Find a free port to use for anvil"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', 0))
@@ -123,9 +122,10 @@ def free_port():
 
 
 @pytest.fixture(scope="session")
-def anvil(free_port):
+def anvil():
     @contextlib.contextmanager
     def anvil(fork_url=None, block_number=None):
+        free_port = _find_free_port()
         anvil_args = [
             "anvil",
             "--port", str(free_port),

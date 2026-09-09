@@ -614,6 +614,18 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "getCCIPAdmin",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "ripeHq",
     "inputs": [],
     "outputs": [

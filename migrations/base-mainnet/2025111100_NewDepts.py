@@ -16,6 +16,7 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MAX_STALE_TIME"],
         3_600,  # 2 hours
         blueprint.PARAMS["MAX_SWITCHBOARD_CHANGE_TIMELOCK"],
+        blueprint.PARAMS["PYTH_PRICES_ID"],
     )
     migration.execute(switchboard_alpha.setActionTimeLockAfterSetup)
     migration.execute(switchboard_alpha.relinquishGov)
@@ -37,6 +38,7 @@ def migrate(migration: Migration):
     credit_engine = migration.deploy(
         "CreditEngine",
         hq,
+        blueprint.PARAMS["CURVE_PRICES_ID"],
     )
     credit_redeem = migration.deploy(
         "CreditRedeem",
@@ -50,6 +52,7 @@ def migrate(migration: Migration):
         "Teller",
         hq,
         True,
+        blueprint.PARAMS["CURVE_PRICES_ID"],
     )
     teller_utils = migration.deploy(
         "TellerUtils",

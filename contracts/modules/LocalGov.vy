@@ -1,8 +1,7 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
-
 interface RipeHq:
     def minGovChangeTimeLock() -> uint256: view
     def maxGovChangeTimeLock() -> uint256: view
@@ -182,6 +181,7 @@ def _isRipeHqGov() -> bool:
 def startGovernanceChange(_newGov: address):
     governors: DynArray[address, 2] = self._getGovernors()
     assert msg.sender in governors # dev: no perms
+    assert not (self._isRipeHqGov() and self.numGovChanges == 0) # dev: ripe hq setup required
 
     # validation
     if _newGov != empty(address):

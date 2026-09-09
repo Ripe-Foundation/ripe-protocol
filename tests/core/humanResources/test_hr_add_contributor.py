@@ -336,7 +336,8 @@ def test_hr_confirm_new_contributor_timelock_not_reached(
 
 
 def test_hr_cancel_new_contributor_success(
-    human_resources, 
+    human_resources,
+    ledger,
     setupHrConfig,
     setupLedgerBalance,
     valid_terms,
@@ -360,7 +361,21 @@ def test_hr_cancel_new_contributor_success(
         valid_terms["depositLockDuration"],
         sender=governance.address
     )
-    
+
+    expected_confirmation_block = human_resources.getActionConfirmationBlock(action_id)
+    pending = human_resources.pendingContributor(action_id)
+    initial_num_contributors = ledger.numContributors()
+    assert expected_confirmation_block != 0
+    assert pending.owner == valid_terms["owner"]
+    assert pending.manager == valid_terms["manager"]
+    assert pending.compensation == valid_terms["compensation"]
+    assert pending.startDelay == valid_terms["startDelay"]
+    assert pending.vestingLength == valid_terms["vestingLength"]
+    assert pending.cliffLength == valid_terms["cliffLength"]
+    assert pending.unlockLength == valid_terms["unlockLength"]
+    assert pending.depositLockDuration == valid_terms["depositLockDuration"]
+    assert human_resources.hasPendingAction(action_id)
+
     # Cancel the contributor
     result = human_resources.cancelNewContributor(action_id, sender=governance.address)
     
@@ -368,15 +383,27 @@ def test_hr_cancel_new_contributor_success(
     events = filter_logs(human_resources, "NewContributorCancelled")
     assert len(events) == 1
     event = events[0]
-    assert event.owner == valid_terms["owner"]
+    assert event.owner == pending.owner
+    assert event.manager == pending.manager
+    assert event.compensation == pending.compensation
+    assert event.startDelay == pending.startDelay
+    assert event.vestingLength == pending.vestingLength
+    assert event.cliffLength == pending.cliffLength
+    assert event.unlockLength == pending.unlockLength
+    assert event.depositLockDuration == pending.depositLockDuration
+    assert event.confirmationBlock == expected_confirmation_block
+    assert event.confirmationBlock != 0
     assert event.actionId == action_id
     
     # Check return value
-    assert result
+    assert result is True
     
     # Check pending contributor was cleared
     pending = human_resources.pendingContributor(action_id)
     assert pending.owner == ZERO_ADDRESS  # Should be empty
+    assert not human_resources.hasPendingAction(action_id)
+    assert human_resources.getActionConfirmationBlock(action_id) == 0
+    assert ledger.numContributors() == initial_num_contributors
 
 
 def test_hr_cancel_new_contributor_invalid_perms(
@@ -959,3 +986,164 @@ def test_hr_are_valid_contributor_terms_vesting_above_maximum(
     )
     
     assert not result
+
+
+def _are_valid_terms(human_resources, terms, deposit_lock_duration=None):
+    return human_resources.areValidContributorTerms(
+        terms["owner"],
+        terms["manager"],
+        terms["compensation"],
+        terms["startDelay"],
+        terms["vestingLength"],
+        terms["cliffLength"],
+        terms["unlockLength"],
+        terms["depositLockDuration"] if deposit_lock_duration is None else deposit_lock_duration,
+    )
+
+
+def test_hr_are_valid_contributor_terms_no_ripe_gov_lock_terms(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=0, _maxLockDuration=0)
+
+    assert not _are_valid_terms(human_resources, valid_terms)
+
+
+def test_hr_are_valid_contributor_terms_zero_deposit_lock_duration(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+
+    assert not _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=0)
+
+
+def test_hr_initiate_new_contributor_zero_deposit_lock_duration_reverts(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    valid_terms,
+    governance,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+
+    with boa.reverts("invalid terms"):
+        human_resources.initiateNewContributor(
+            valid_terms["owner"],
+            valid_terms["manager"],
+            valid_terms["compensation"],
+            valid_terms["startDelay"],
+            valid_terms["vestingLength"],
+            valid_terms["cliffLength"],
+            valid_terms["unlockLength"],
+            0,
+            sender=governance.address,
+        )
+
+
+def test_hr_are_valid_contributor_terms_duration_above_live_max_is_invalid(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+    governance,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    assert not _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=1001)
+    with boa.reverts("invalid terms"):
+        human_resources.initiateNewContributor(
+            valid_terms["owner"],
+            valid_terms["manager"],
+            valid_terms["compensation"],
+            valid_terms["startDelay"],
+            valid_terms["vestingLength"],
+            valid_terms["cliffLength"],
+            valid_terms["unlockLength"],
+            1001,
+            sender=governance.address,
+        )
+
+
+def test_hr_are_valid_contributor_terms_duration_equal_to_live_max_is_valid(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    assert _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=1000)
+
+
+def test_hr_are_valid_contributor_terms_duration_below_live_min_is_valid(
+    human_resources,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    assert _are_valid_terms(human_resources, valid_terms, deposit_lock_duration=1)
+
+
+def test_hr_confirm_new_contributor_cancels_when_live_max_falls_below_duration(
+    human_resources,
+    ledger,
+    setupHrConfig,
+    setupLedgerBalance,
+    setupRipeGovVaultConfig,
+    valid_terms,
+    governance,
+):
+    setupHrConfig()
+    setupLedgerBalance(valid_terms["compensation"])
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=1000)
+
+    action_id = human_resources.initiateNewContributor(
+        valid_terms["owner"],
+        valid_terms["manager"],
+        valid_terms["compensation"],
+        valid_terms["startDelay"],
+        valid_terms["vestingLength"],
+        valid_terms["cliffLength"],
+        valid_terms["unlockLength"],
+        500,
+        sender=governance.address,
+    )
+    assert human_resources.pendingContributor(action_id).owner == valid_terms["owner"]
+    num_contributors_before = ledger.numContributors()
+    ripe_avail_before = ledger.ripeAvailForHr()
+
+    setupRipeGovVaultConfig(_minLockDuration=100, _maxLockDuration=400)
+    boa.env.time_travel(blocks=human_resources.actionTimeLock())
+
+    result = human_resources.confirmNewContributor(action_id, sender=governance.address)
+    assert result is False
+    pending = human_resources.pendingContributor(action_id)
+    assert pending.owner == ZERO_ADDRESS
+    assert pending.depositLockDuration == 0
+    assert filter_logs(human_resources, "NewContributorConfirmed") == []
+    assert ledger.numContributors() == num_contributors_before
+    assert ledger.ripeAvailForHr() == ripe_avail_before
+    with boa.reverts("no pending contributor"):
+        human_resources.confirmNewContributor(action_id, sender=governance.address)

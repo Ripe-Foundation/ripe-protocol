@@ -8,7 +8,7 @@
 #                                                    ┗━┛┗┗┛┗┗┛
 #
 #      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#      Ripe Foundation (C) 2025
+#      Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
@@ -27,8 +27,8 @@ interface Endaoment:
     def removeLiquidity(_legoId: uint256, _pool: address, _tokenA: address, _tokenB: address, _lpToken: address, _lpAmount: uint256 = max_value(uint256), _minAmountA: uint256 = 0, _minAmountB: uint256 = 0, _extraData: bytes32 = empty(bytes32)) -> (uint256, uint256, uint256, uint256): nonpayable
     def depositForYield(_legoId: uint256, _asset: address, _vaultAddr: address = empty(address), _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def claimIncentives(_user: address, _legoId: uint256, _rewardToken: address = empty(address), _rewardAmount: uint256 = max_value(uint256), _proofs: DynArray[bytes32, MAX_PROOFS] = []) -> (uint256, uint256): nonpayable
+    def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256, _expectedLpToken: address) -> (uint256, uint256, uint256): nonpayable
     def withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
-    def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256) -> (uint256, uint256, uint256): nonpayable
     def swapTokens(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (address, uint256, address, uint256, uint256): nonpayable
     def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256): nonpayable
@@ -57,6 +57,23 @@ interface EndaomentPSM:
     def setCanMint(_canMint: bool): nonpayable
     def setMintFee(_fee: uint256): nonpayable
 
+interface VaultMigrator:
+    def migrateVaultPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositionsForUserByAssets(_user: address, _assets: DynArray[address, MAX_MIGRATION_ASSETS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
+
+interface RipeGovVault:
+    def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
+    def disableGovPointAccrualForUser(_user: address): nonpayable
+    def govPointAccrualDisabledBlock() -> uint256: view
+    def disableGovPointAccrualGlobally(): nonpayable
+
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
 
@@ -84,6 +101,8 @@ flag ActionType:
     PSM_SET_USDC_YIELD_POSITION
     PSM_SET_NUM_BLOCKS_PER_INTERVAL
     PSM_SET_SHOULD_AUTO_DEPOSIT
+    DISABLE_RIPE_GOV_POINT_ACCRUAL_GLOBAL
+    DISABLE_RIPE_GOV_POINT_ACCRUAL_USER
 
 struct EndaoLiquidityAction:
     legoId: uint256
@@ -111,6 +130,7 @@ struct EndaoPartnerPoolAction:
     asset: address
     amount: uint256
     minLpAmount: uint256
+    expectedLpToken: address
 
 struct EndaoRepayAction:
     pool: address
@@ -161,6 +181,11 @@ struct PsmSetNumBlocksPerIntervalAction:
 
 struct PsmSetShouldAutoDepositAction:
     shouldAutoDeposit: bool
+
+struct RipeGovPointAccrualDisableAction:
+    vaultId: uint256
+    vaultAddr: address
+    user: address
 
 event EndaomentDepositPerformed:
     legoId: uint256
@@ -333,6 +358,19 @@ event PendingPsmSetShouldAutoDepositAction:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingRipeGovPointAccrualGlobalDisable:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeGovPointAccrualUserDisable:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+    user: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
 event EndaoTransferExecuted:
     asset: indexed(address)
     amount: uint256
@@ -409,6 +447,15 @@ event PsmSetNumBlocksPerIntervalExecuted:
 event PsmSetShouldAutoDepositExecuted:
     shouldAutoDeposit: bool
 
+event RipeGovPointAccrualGlobalDisableExecuted:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+
+event RipeGovPointAccrualUserDisableExecuted:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+    user: indexed(address)
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingEndaoSwapActions: public(HashMap[uint256, DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]])
@@ -431,14 +478,19 @@ pendingPsmUpdateRedeemAllowlistActions: public(HashMap[uint256, PsmUpdateRedeemA
 pendingPsmSetUsdcYieldPositionActions: public(HashMap[uint256, PsmSetUsdcYieldPositionAction])
 pendingPsmSetNumBlocksPerIntervalActions: public(HashMap[uint256, PsmSetNumBlocksPerIntervalAction])
 pendingPsmSetShouldAutoDepositActions: public(HashMap[uint256, PsmSetShouldAutoDepositAction])
+pendingRipeGovPointAccrualDisableActions: public(HashMap[uint256, RipeGovPointAccrualDisableAction])
 
 MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
+MAX_MIGRATION_USERS: constant(uint256) = 25
+MAX_MIGRATION_ASSETS: constant(uint256) = 20
 
 MISSION_CONTROL_ID: constant(uint256) = 5
+VAULT_BOOK_ID: constant(uint256) = 8
 ENDAOMENT_ID: constant(uint256) = 14
 ENDAOMENT_PSM_ID: constant(uint256) = 22
+VAULT_MIGRATOR_ID: constant(uint256) = 25
 
 
 @deploy
@@ -477,6 +529,18 @@ def _getMissionControlAddr() -> address:
 
 @view
 @internal
+def _getVaultBookAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
+
+
+@view
+@internal
+def _getVaultMigratorAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_MIGRATOR_ID)
+
+
+@view
+@internal
 def _getEndaomentAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(ENDAOMENT_ID)
 
@@ -487,9 +551,164 @@ def _getEndaomentPsmAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(ENDAOMENT_PSM_ID)
 
 
-######################
-# Endaoment Functions
-######################
+####################
+# Vault Migrations #
+####################
+
+
+# ripe gov migrations
+
+
+@external
+def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_users) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 # dev: invalid source vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositions(_users, _sourceVaultId)
+
+
+@external
+def migrateRipeGovPositionsForUserByAssets(
+    _user: address,
+    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
+    _sourceVaultId: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert len(_assets) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 # dev: invalid source vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositionsForUserByAssets(_user, _assets, _sourceVaultId)
+
+
+# basic vault migrations
+
+
+@external
+def migrateVaultPositions(
+    _users: DynArray[address, MAX_MIGRATION_USERS],
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_users) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositions(_users, _sourceVaultId, _targetVaultId)
+
+
+@external
+def migrateVaultPositionsForUserByAssets(
+    _user: address,
+    _assets: DynArray[address, MAX_MIGRATION_ASSETS],
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert len(_assets) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositionsForUserByAssets(_user, _assets, _sourceVaultId, _targetVaultId)
+
+
+# legacy ripe gov migrations (Base chain only)
+
+
+@external
+def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_users) != 0 # dev: no migrations
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users)
+
+
+##################################
+# RipeGov Point-Accrual Disables #
+##################################
+
+
+@view
+@external
+def isValidRipeGovPointAccrualDisable(_vaultId: uint256, _user: address) -> bool:
+    return self._isValidRipeGovPointAccrualDisable(_vaultId, _user)
+
+
+@view
+@internal
+def _isValidRipeGovPointAccrualDisable(_vaultId: uint256, _user: address) -> bool:
+    if _vaultId == 0:
+        return False
+
+    vaultBookAddr: address = self._getVaultBookAddr()
+    if vaultBookAddr == empty(address) or not vaultBookAddr.is_contract:
+        return False
+
+    vaultBook: VaultBook = VaultBook(vaultBookAddr)
+    if not staticcall vaultBook.isValidRegId(_vaultId):
+        return False
+
+    vaultAddr: address = staticcall vaultBook.getAddr(_vaultId)
+    if vaultAddr == empty(address) or not vaultAddr.is_contract:
+        return False
+    if staticcall RipeGovVault(vaultAddr).govPointAccrualDisabledBlock() != 0:
+        return False
+    if _user != empty(address) and staticcall RipeGovVault(vaultAddr).userGovPointAccrualDisabledBlock(_user) != 0:
+        return False
+    return True
+
+
+@external
+def disableRipeGovPointAccrualGlobally(_vaultId: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._isValidRipeGovPointAccrualDisable(_vaultId, empty(address)) # dev: invalid disable
+
+    vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_GLOBAL
+    self.pendingRipeGovPointAccrualDisableActions[aid] = RipeGovPointAccrualDisableAction(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        user=empty(address),
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeGovPointAccrualGlobalDisable(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def disableRipeGovPointAccrualForUser(_vaultId: uint256, _user: address) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert self._isValidRipeGovPointAccrualDisable(_vaultId, _user) # dev: invalid disable
+
+    vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_USER
+    self.pendingRipeGovPointAccrualDisableActions[aid] = RipeGovPointAccrualDisableAction(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        user=_user,
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeGovPointAccrualUserDisable(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        user=_user,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+#######################
+# Endaoment Functions #
+#######################
 
 
 @external
@@ -755,10 +974,11 @@ def mintPartnerLiquidityInEndaoment(_partner: address, _asset: address, _amount:
 
 
 @external
-def addPartnerLiquidityInEndaoment(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256) -> uint256:
+def addPartnerLiquidityInEndaoment(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256, _expectedLpToken: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _legoId != 0 # dev: invalid lego id
     assert _partner != empty(address) # dev: invalid partner
+    assert _expectedLpToken != empty(address) # dev: invalid lp token
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.ENDAO_PARTNER_POOL
@@ -768,7 +988,8 @@ def addPartnerLiquidityInEndaoment(_legoId: uint256, _pool: address, _partner: a
         partner=_partner,
         asset=_asset,
         amount=_amount,
-        minLpAmount=_minLpAmount
+        minLpAmount=_minLpAmount,
+        expectedLpToken=_expectedLpToken
     )
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
@@ -1091,7 +1312,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.ENDAO_PARTNER_POOL:
         p: EndaoPartnerPoolAction = self.pendingEndaoPartnerPoolActions[_aid]
-        extcall Endaoment(self._getEndaomentAddr()).addPartnerLiquidity(p.legoId, p.pool, p.partner, p.asset, p.amount, p.minLpAmount)
+        extcall Endaoment(self._getEndaomentAddr()).addPartnerLiquidity(p.legoId, p.pool, p.partner, p.asset, p.amount, p.minLpAmount, p.expectedLpToken)
         log EndaoPartnerPoolExecuted(legoId=p.legoId, pool=p.pool, partner=p.partner, asset=p.asset)
 
     elif actionType == ActionType.ENDAO_REPAY:
@@ -1163,6 +1384,24 @@ def executePendingAction(_aid: uint256) -> bool:
         p: PsmSetShouldAutoDepositAction = self.pendingPsmSetShouldAutoDepositActions[_aid]
         extcall EndaomentPSM(self._getEndaomentPsmAddr()).setShouldAutoDeposit(p.shouldAutoDeposit)
         log PsmSetShouldAutoDepositExecuted(shouldAutoDeposit=p.shouldAutoDeposit)
+
+    elif actionType == ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_GLOBAL:
+        p: RipeGovPointAccrualDisableAction = self.pendingRipeGovPointAccrualDisableActions[_aid]
+        assert p.user == empty(address) # dev: invalid global action
+        assert self._isValidRipeGovPointAccrualDisable(p.vaultId, empty(address)) # dev: invalid disable
+        vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
+        assert vaultAddr == p.vaultAddr # dev: vault binding changed
+        extcall RipeGovVault(vaultAddr).disableGovPointAccrualGlobally()
+        log RipeGovPointAccrualGlobalDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr)
+
+    elif actionType == ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_USER:
+        p: RipeGovPointAccrualDisableAction = self.pendingRipeGovPointAccrualDisableActions[_aid]
+        assert p.user != empty(address) # dev: invalid user action
+        assert self._isValidRipeGovPointAccrualDisable(p.vaultId, p.user) # dev: invalid disable
+        vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
+        assert vaultAddr == p.vaultAddr # dev: vault binding changed
+        extcall RipeGovVault(vaultAddr).disableGovPointAccrualForUser(p.user)
+        log RipeGovPointAccrualUserDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr, user=p.user)
 
     self.actionType[_aid] = empty(ActionType)
     return True

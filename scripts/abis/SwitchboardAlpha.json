@@ -585,23 +585,6 @@
     "type": "event"
   },
   {
-    "name": "RewardsPointsEnabledModified",
-    "inputs": [
-      {
-        "name": "arePointsEnabled",
-        "type": "bool",
-        "indexed": false
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "indexed": true
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "PendingPriorityLiqAssetVaultsChange",
     "inputs": [
       {
@@ -1137,6 +1120,33 @@
       {
         "name": "exitFee",
         "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PriceSnapshotAdded",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "priceSourceId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "priceSourceAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "didUpdate",
+        "type": "bool",
         "indexed": false
       }
     ],
@@ -2888,44 +2898,6 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "setRewardsPointsEnabled",
-    "inputs": [
-      {
-        "name": "_shouldEnable",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "setRewardsPointsEnabled",
-    "inputs": [
-      {
-        "name": "_shouldEnable",
-        "type": "bool"
-      },
-      {
-        "name": "_missionControl",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
     "name": "setPriorityLiqAssetVaults",
     "inputs": [
       {
@@ -3074,6 +3046,27 @@
       {
         "name": "",
         "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addPriceSnapshot",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_priceSourceId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
       }
     ]
   },
@@ -3748,6 +3741,10 @@
       },
       {
         "name": "_maxConfigTimeLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_pythPricesId",
         "type": "uint256"
       }
     ],

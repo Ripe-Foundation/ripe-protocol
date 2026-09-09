@@ -28,8 +28,6 @@ WRAPPED_SUPER_OETH: public(immutable(address))
 MCBETH: public(immutable(address))
 VVV: public(immutable(address))
 
-vvvPrice: public(uint256)
-
 
 @deploy
 def __init__(
@@ -52,15 +50,9 @@ def __init__(
     WRAPPED_SUPER_OETH = _wrappedSuperOETH
     priceData._addPricedAsset(_wrappedSuperOETH)
 
+    # MCBETH / VVV are not priceable from this source.
     MCBETH = _mcbeth
-    if _mcbeth != empty(address):
-        priceData._addPricedAsset(_mcbeth)
-
     VVV = _vvv
-    if _vvv != empty(address):
-        priceData._addPricedAsset(_vvv)
-
-    self.vvvPrice = 240 * 10 ** 16 # $2.40
 
 
 ########
@@ -71,10 +63,6 @@ def __init__(
 @view
 @external
 def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
-    if MCBETH != empty(address) and _asset == MCBETH:
-        return 1
-    if VVV != empty(address) and _asset == VVV:
-        return self.vvvPrice
     if _asset != WRAPPED_SUPER_OETH:
         return 0
     return self._getPrice(_asset, _priceDesk)
@@ -83,10 +71,6 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
 @view
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
-    if MCBETH != empty(address) and _asset == MCBETH:
-        return 1, True
-    if VVV != empty(address) and _asset == VVV:
-        return self.vvvPrice, True    
     if _asset != WRAPPED_SUPER_OETH:
         return 0, False
     return self._getPrice(_asset, _priceDesk), True
@@ -95,10 +79,6 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
-    if MCBETH != empty(address) and _asset == MCBETH:
-        return True
-    if VVV != empty(address) and _asset == VVV:
-        return True   
     return _asset == WRAPPED_SUPER_OETH
 
 
@@ -166,12 +146,3 @@ def addPriceSnapshot(_asset: address) -> bool:
 @external
 def disablePriceFeed(_asset: address) -> bool:
     return False
-
-
-# reset VVV price (for stability pool)
-
-
-@external
-def resetVvvPrice():
-    assert gov._canGovern(msg.sender) # dev: no perms
-    self.vvvPrice = 1
