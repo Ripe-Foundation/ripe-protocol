@@ -90,7 +90,7 @@ def test_cold_and_in_transaction_warm_paths(gas_lab,target):
         assert l.g.desk.getPrice(l.a.address,True)==2500*10**18
         direct=l.g.desk._computation
     source_call=calls(direct,l.s)[0]
-    # slot0, liquidity, observations, observe and the desk's WETH price; a direct call also resolves the desk
+    # Canonical desk resolution, scale guard (HQ + desk), four pool reads, quote desk.
     assert len(source_call.children)==8
     assert_source_budget(source_call.get_gas_used())
     cold(probe)
@@ -167,7 +167,7 @@ def test_final_deployed_size_coverage_and_noop_snapshot(gas_lab):
     assert not l.s.addPriceSnapshot(l.a.address,gas=150000)
     snapshot=l.s._computation.get_gas_used()
     assert l.s._computation.children==[]
-    print(f'TWAP_SIZE deployed={deployed} eip170_headroom={24576-deployed} target_overrun={max(0,deployed-22500)} coverage={coverage} snapshot={snapshot} compiler=Vyper-0.4.3 optimize=gas evm=prague action_delay=2 expiration_duration=100')
+    print(f'TWAP_SIZE deployed={deployed} eip170_headroom={24576-deployed} target_overrun={max(0,deployed-22500)} coverage={coverage} snapshot={snapshot} compiler=Vyper-0.4.3 optimize=codesize evm=prague action_delay=2 expiration_duration=100')
 
 
 @pytest.mark.parametrize('tick,reverse',[(524287,False),(-524287,True)])
@@ -196,3 +196,219 @@ def test_deep_ring_with_dense_tick_bits_and_both_quote_precision_branches(gas_la
         assert child.msg.gas==250000 and child.output==words(expected,1) and not child.is_error
         assert_source_budget(child.get_gas_used())
         print(f'TWAP_DENSE_TICK tick={tick} reverse={reverse} direct_source={direct} forwarded_source={child.get_gas_used()} desk={comp.get_gas_used()} source_target_overrun={max(0,direct-210000,child.get_gas_used()-210000)}')
+
+
+# D20's warm budget is measured against transaction-cold reads; passing a
+# governance callback alone is deliberately not claimed to qualify every route.
+from .gas_tools import qualification_meter, qualification_touch_set, warm_qualification_ceiling
+from .graph import ZERO, quote_price_source
+from .raw import Pool
+
+
+def admission_lab(slot_count=0,metadata_warm=False):
+    g=make_graph()
+    a=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18);a.setDecimals(18)
+    w=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18);w.setDecimals(18)
+    q=boa.load('tests/priceSources/uniswap_v3/StorageQuoteSource.vy',ZERO if metadata_warm else w,slot_count,metadata_warm)
+    if metadata_warm:w=q
+    register(g.desk,q,g.gov)
+    f=boa.load('contracts/mock/MockUniV3Factory.vy')
+    p=Pool(a,w,f);f.setPool(a,w,10000,p.address)
+    s=source(g,f)
+    return SimpleNamespace(g=g,a=a,w=w,q=q,p=p,s=s)
+
+
+def propose_for_gas(l,kind):
+    if kind=='update':
+        count=l.q.loadCount()
+        l.q.configure(0)
+        admit(l.g,l.s,l.a,params(l.p))
+        l.q.configure(count)
+        l.s.updatePriceFeed(l.a,*params(l.p),sender=l.g.gov)
+    else:
+        l.s.addNewPriceFeed(l.a,*params(l.p),sender=l.g.gov)
+    advance_timelock_blocks(2)
+    return l.s.confirmPriceFeedUpdate if kind=='update' else l.s.confirmNewPriceFeed
+
+
+@pytest.mark.parametrize('kind',['add','update'])
+@pytest.mark.parametrize('slots',[40,58,59,60,80,100])
+def test_confirm_then_cold_desk_read_stays_under_target(kind,slots):
+    l=admission_lab(slots)
+    confirm=propose_for_gas(l,kind)
+    pending=l.s.pendingUpdates(l.a)
+    cold(l.s,sender=l.g.gov)
+    with qualification_meter(l.s) as meter:
+        try:
+            result=confirm(l.a,sender=l.g.gov)
+        except boa.BoaError as exc:
+            with boa.reverts('route too expensive'):
+                raise exc
+            assert len(meter)==2
+            warm=meter[0]['gas']-meter[1]['gas']
+            assert warm>warm_qualification_ceiling(l.s)
+            assert l.s.pendingUpdates(l.a)==pending and l.s.pendingQuoteCount(l.w)==1
+            print(f'TWAP_ADMISSION kind={kind} slots={slots} rejected warm={warm}')
+            return
+    assert result and len(meter)==2
+    warm=meter[0]['gas']-meter[1]['gas']
+    assert warm<=warm_qualification_ceiling(l.s)
+    if l.g.desk.getRegId(l.s)==0:register(l.g.desk,l.s,l.g.gov)
+    cold(l.g.desk)
+    assert l.g.desk.getPrice(l.a,True)==10**18
+    child=calls(l.g.desk._computation,l.s)[0]
+    assert child.msg.gas==250000 and not child.is_error
+    assert_source_budget(child.get_gas_used())
+    print(f'TWAP_ADMISSION kind={kind} slots={slots} confirmed warm={warm} cold={child.get_gas_used()} delta={child.get_gas_used()-warm}')
+
+
+@pytest.mark.parametrize('kind',['add','update'])
+@pytest.mark.parametrize('slots',[0,40,58])
+def test_warm_to_cold_delta_is_within_margin(kind,slots):
+    l=admission_lab(slots)
+    confirm=propose_for_gas(l,kind)
+    touches=qualification_touch_set(l.g,l.s,l.p,l.a.address)
+    cold(l.s,sender=l.g.gov)
+    with storage_reads() as before_reads:
+        with qualification_meter(l.s,touches,before_reads) as meter:
+            assert confirm(l.a,sender=l.g.gov)
+    assert len(meter)==2 and all(meter[0]['warm_addresses'].values())
+    assert all(meter[0]['warm_slots'])
+    warm=meter[0]['gas']-meter[1]['gas']
+    if l.g.desk.getRegId(l.s)==0:register(l.g.desk,l.s,l.g.gov)
+    cold(l.g.desk)
+    with storage_reads() as cold_reads:
+        assert l.g.desk.getPrice(l.a,True)==10**18
+    child=calls(l.g.desk._computation,l.s)[0]
+    expected={(bytes.fromhex(address[2:]),slot) for address,slot,label in touches['storage']}
+    overlap=set(before_reads[:meter[0]['read_index']]) & set(cold_reads)
+    assert overlap==expected, 'enumerate every overlapping slot, including staging writes'
+    pre_addresses=meter[0]['called_addresses']
+    cold_addresses={c.msg.code_address for c in walk(l.g.desk._computation)}
+    assert pre_addresses & cold_addresses=={bytes.fromhex(a[2:]) for a in touches['addresses'].values()}
+    delta=child.get_gas_used()-warm
+    ceiling=warm_qualification_ceiling(l.s)
+    assert ceiling<=170000 and delta<=210000-ceiling
+    print('TWAP_WARM_TOUCH_SET '+json.dumps(touches,sort_keys=True))
+    print(f'TWAP_WARM_DELTA kind={kind} slots={slots} warm={warm} cold={child.get_gas_used()} delta={delta} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')
+
+
+def test_confirmation_is_not_cold_qualification():
+    # The quote token's decimals() warms its own price-source SLOADs. Those
+    # metadata-induced slots lie outside the enumerated standard touch set.
+    l=admission_lab(100,metadata_warm=True)
+    confirm=propose_for_gas(l,'add')
+    cold(l.s,sender=l.g.gov)
+    with qualification_meter(l.s) as meter:
+        assert confirm(l.a,sender=l.g.gov)
+    warm=meter[0]['gas']-meter[1]['gas']
+    assert warm<=warm_qualification_ceiling(l.s)
+    register(l.g.desk,l.s,l.g.gov)
+    cold(l.g.desk)
+    assert l.g.desk.getPrice(l.w,True)==10**18
+    quote_call=calls(l.g.desk._computation,l.q)[0]
+    assert not quote_call.is_error and quote_call.msg.gas==250000
+    assert quote_call.get_gas_used()<250000  # quote alone fits its own stipend
+    cold(l.g.desk)
+    assert l.g.desk.getPrice(l.a)==0
+    child=calls(l.g.desk._computation,l.s)[0]
+    assert child.msg.gas==250000
+    assert child.is_error or child.output==words(0,1)  # combined route fails outer stipend
+    print(f'TWAP_EXTRA_WARMING warm={warm} quote_alone={quote_call.get_gas_used()} combined_cold={child.get_gas_used()} unavailable=True')
+
+
+def registry_lab(gas_lab,source_first=False,fat=False):
+    # A new actual desk preserves the canonical V3 pool's 65535-slot cold path.
+    l=gas_lab;g=l.g
+    if source_first:register(g.desk,l.s,g.gov)
+    misses=[]
+    for _ in range(10 if fat else 2):
+        mock=boa.load('contracts/mock/MockRawPriceSource.vy')
+        mock.configure(0,False)
+        register(g.desk,mock,g.gov)
+        misses.append(mock)
+    chainlink_id=register(g.desk,g.chainlink,g.gov)
+    if not source_first:register(g.desk,l.s,g.gov)
+    # RH-shaped route: Chainlink first, then Curve/V2-like no-feed sources, V3 last.
+    if not fat:
+        g.mc.setPriorityPriceSourceIds([chainlink_id,1],sender=g.actor.address)
+    return misses
+
+
+def test_rh_shaped_registry_source_last_cold_read_under_target(gas_lab):
+    l=gas_lab
+    with temporary_desk(l.g):
+        # The live ordering is Chainlink, Curve-like, V2-like, V3; priority [1,2].
+        register(l.g.desk,l.g.chainlink,l.g.gov)
+        for _ in range(2):
+            mock=boa.load('contracts/mock/MockRawPriceSource.vy');mock.configure(0,False)
+            register(l.g.desk,mock,l.g.gov)
+        register(l.g.desk,l.s,l.g.gov)
+        l.g.mc.setPriorityPriceSourceIds([1,2],sender=l.g.actor.address)
+        cold(l.g.desk)
+        assert l.g.desk.getPrice(l.a,True)==2500*10**18
+        child=calls(l.g.desk._computation,l.s)[0]
+        assert_source_budget(child.get_gas_used())
+        print(f'TWAP_REGISTRY shape=RH source_last={child.get_gas_used()} priority=[1,2]')
+
+
+def test_fat_registry_source_first_fails_cold_documented(gas_lab):
+    l=gas_lab
+    with temporary_desk(l.g):
+        registry_lab(l,source_first=True,fat=True)
+        cold(l.g.desk)
+        assert l.g.desk.getPrice(l.a)==0
+        child=calls(l.g.desk._computation,l.s)[0]
+        assert child.is_error or child.output==words(0,1)
+        print(f'TWAP_REGISTRY shape=fat source_first={child.get_gas_used()} unavailable=True')
+
+
+def test_fat_registry_source_last_succeeds(gas_lab):
+    l=gas_lab
+    with temporary_desk(l.g):
+        registry_lab(l,source_first=False,fat=True)
+        cold(l.g.desk)
+        assert l.g.desk.getPrice(l.a,True)==2500*10**18
+        child=calls(l.g.desk._computation,l.s)[0]
+        assert_source_budget(child.get_gas_used())
+        print(f'TWAP_REGISTRY shape=fat source_last={child.get_gas_used()} unavailable=False')
+
+
+@pytest.mark.parametrize('kind',['add','update'])
+def test_warm_to_cold_delta_is_within_margin_canonical(gas_lab,kind):
+    """The same touch-set proof on the compiled 65535-slot pool and Chainlink."""
+    l=gas_lab;g=l.g
+    with temporary_desk(g):
+        register(g.desk,g.chainlink,g.gov)
+        s=source(g,l.p.factory())
+        if kind=='update':
+            admit(g,s,l.a,params(l.p,window=14400))
+            s.updatePriceFeed(l.a,*params(l.p,window=14400),sender=g.gov)
+            confirm=s.confirmPriceFeedUpdate
+        else:
+            s.addNewPriceFeed(l.a,*params(l.p,window=14400),sender=g.gov)
+            confirm=s.confirmNewPriceFeed
+        advance_timelock_blocks(2)
+        touches=qualification_touch_set(g,s,l.p,l.a.address)
+        cold(s,sender=g.gov)
+        with storage_reads() as before_reads:
+            with qualification_meter(s,touches,before_reads) as meter:
+                assert confirm(l.a,sender=g.gov)
+        assert len(meter)==2 and all(meter[0]['warm_addresses'].values())
+        assert all(meter[0]['warm_slots'])
+        warm=meter[0]['gas']-meter[1]['gas']
+        if g.desk.getRegId(s)==0:register(g.desk,s,g.gov)
+        cold(g.desk)
+        with storage_reads() as cold_reads:
+            assert g.desk.getPrice(l.a,True)==2500*10**18
+        child=calls(g.desk._computation,s)[0]
+        expected={(bytes.fromhex(address[2:]),slot) for address,slot,label in touches['storage']}
+        assert set(before_reads[:meter[0]['read_index']]) & set(cold_reads)==expected
+        cold_addresses={c.msg.code_address for c in walk(g.desk._computation)}
+        assert meter[0]['called_addresses'] & cold_addresses=={bytes.fromhex(a[2:]) for a in touches['addresses'].values()}
+        delta=child.get_gas_used()-warm
+        ceiling=warm_qualification_ceiling(s)
+        assert ceiling<=170000 and delta<=210000-ceiling
+        assert_source_budget(child.get_gas_used())
+        print('TWAP_WARM_TOUCH_SET '+json.dumps(touches,sort_keys=True))
+        print(f'TWAP_WARM_DELTA kind={kind} route=canonical warm={warm} cold={child.get_gas_used()} delta={delta} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')

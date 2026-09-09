@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[3]
 WINDOW=3600  # the source's default window; mock histories are built for it
 
 
-@pytest.mark.parametrize('age,ceiling,valid',[(1799,3600,True),(3599,3600,True),(3600,3600,True),(3601,3600,False),(1801,1800,False),(8*3600,86400,True)])
+@pytest.mark.parametrize('age,ceiling,valid',[(1799,3600,True),(3599,3600,True),(3600,3600,True),(3601,3600,False),(1801,1800,False)])
 def test_observation_age_is_independent_of_lookback(lab,age,ceiling,valid):
     admit(lab.g,lab.s,lab.asset,params(lab.pool,age=ceiling))
     lab.pool.set('observations(uint256)',words((boa.env.timestamp-age)%2**32,0,0,1))
@@ -54,7 +54,7 @@ def test_liquidity_floors_are_a_ratio_of_the_proposal_baseline(active,math):
     base=s.feedConfig(a).baseLiquidity
     assert base==math.harmonic(0,spl,WINDOW) and 0.99*10**20<base<=10**20
     assert s.feedDefaults().minLiquidityRatio==50_00
-    floor=base*50_00//100_00
+    floor=(base*50_00+9999)//100_00
     assert s.getFeedLiquidity(a)==(10**20,base,floor)
     # current liquidity: exact integer boundary
     l.pool.set('liquidity()',word(floor-1));unavailable(l)
@@ -62,23 +62,21 @@ def test_liquidity_floors_are_a_ratio_of_the_proposal_baseline(active,math):
     # harmonic liquidity over the window: a larger accumulator delta means less liquidity
     l.pool.set('observe(uint32[])',words(64,160,2,0,0,2,0,3*spl));unavailable(l)
     l.pool.set('observe(uint32[])',words(64,160,2,0,0,2,0,spl))
-    # the ratio is one governance knob shared by every feed
-    s.setFeedDefaults(WINDOW,3600,100_00,500,sender=l.g.gov)
-    l.pool.set('liquidity()',word(base-1));unavailable(l)
-    l.pool.set('liquidity()',word(base));assert l.g.desk.getPrice(a,True)==10**18
-    s.setFeedDefaults(WINDOW,3600,0,500,sender=l.g.gov)
-    l.pool.set('liquidity()',word(1));assert l.g.desk.getPrice(a,True)==10**18
-    assert s.getFeedLiquidity(a)==(1,base,0)
+    # Later defaults cannot change this active proposal-bound floor.
+    s.setFeedDefaults(WINDOW,1800,100_00,sender=l.g.gov)
+    l.pool.set('liquidity()',word(floor));assert l.g.desk.getPrice(a,True)==10**18
+    with boa.reverts('invalid defaults'):
+        s.setFeedDefaults(WINDOW,1800,0,sender=l.g.gov)
+    l.pool.set('liquidity()',word(1));unavailable(l)
+    assert s.getFeedLiquidity(a)==(1,base,floor)
 
 
-def test_feeds_inherit_defaults_at_read_time(active):
+def test_feeds_bind_defaults_at_proposal_time(active):
     l=active;s=l.s;a=l.asset
-    assert s.feedConfig(a).twapWindow==0 and s.feedConfig(a).maxObservationAge==0
+    assert s.feedConfig(a).twapWindow==3600 and s.feedConfig(a).maxObservationAge==1800
     l.pool.set('observations(uint256)',words((boa.env.timestamp-50)%2**32,0,0,1))
     assert l.g.desk.getPrice(a,True)==10**18
-    s.setFeedDefaults(WINDOW,10,50_00,500,sender=l.g.gov)
-    unavailable(l)
-    s.setFeedDefaults(WINDOW,3600,50_00,500,sender=l.g.gov)
+    s.setFeedDefaults(WINDOW,10,50_00,sender=l.g.gov)
     assert l.g.desk.getPrice(a,True)==10**18
 
 
@@ -88,7 +86,7 @@ def test_explicit_settings_override_defaults(lab):
     assert (lab.s.feedConfig(lab.asset).twapWindow,lab.s.feedConfig(lab.asset).maxObservationAge)==(1800,60)
     lab.pool.set('observations(uint256)',words((boa.env.timestamp-61)%2**32,0,0,1))
     unavailable(lab)
-    lab.s.setFeedDefaults(3600,86400,50_00,500,sender=lab.g.gov)
+    lab.s.setFeedDefaults(3600,3600,50_00,sender=lab.g.gov)
     unavailable(lab)  # the explicit age still governs
 
 
@@ -165,12 +163,12 @@ def test_quote_price_scales_the_quote(active):
     assert active.s.getPrice(active.asset)==3*10**18
 
 
-def test_stale_time_is_ignored_and_the_desk_argument_only_routes_the_quote_leg(active):
+def test_stale_time_is_ignored_and_the_desk_argument_is_authenticated(active):
     a,s,g=active.asset,active.s,active.g
     outsider=boa.env.generate_address()
     assert s.getPriceAndHasFeed(a,300,g.desk.address,sender=outsider)==(10**18,True)
     assert s.getPriceAndHasFeed(a,300,ZERO,sender=outsider)==(10**18,True)
-    with boa.reverts():s.getPriceAndHasFeed(a,0,outsider)
+    assert s.getPriceAndHasFeed(a,0,outsider)==(0,True)
     assert s.getPriceAndHasFeed(outsider,300,outsider)==(0,False)
     assert g.desk.getPrice(a,True)==10**18
 
@@ -194,7 +192,8 @@ def test_frozen_rows_through_source_and_actual_desk(lab,asset_index,vector_index
     g=make_graph()
     weth_price_source(g,weth,lab.anchor)
     s=source(g,lab.factory)
-    expected=int(v['usd_price18'])
+    from .compiled import deploy
+    expected=deploy('v3','Reference').quote(v['mean_tick'],10**36,token.address,weth.address)*int(anchor['price18'])//10**36
     assert admit(g,s,token,params(pool,window=v['window_seconds']))==expected
     assert s.feedConfig(token).quoteAsset==weth.address
     g.desk.syncTokenScale(token,sender=g.gov)

@@ -23,7 +23,8 @@ def test_compiler_layout_seed_matches_organic_history_and_repeated_timestamps():
     with boa.reverts('OLD'):p.observe([3601,0])
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
     weth_price_source(g,w,anchor)
-    s=source(g,f.address,min_cardinality=8)
+    grow_ring(p,actor,3601)
+    s=source(g,f.address)
     admit(g,s,a.address,params(p,window=3600))
     assert g.desk.getPrice(a.address,True)==10**18
     actor.remove(p.address,10**20)
@@ -40,7 +41,8 @@ def test_authentic_uint32_wrap_and_observation_only_writes():
     assert p.observe([1800,0])[0]==[0,0]
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
     weth_price_source(g,w,anchor)
-    s=source(g,f.address,min_cardinality=8)
+    grow_ring(p,actor,3601)
+    s=source(g,f.address)
     admit(g,s,a.address,params(p,window=1800))
     assert g.desk.getPrice(a.address,True)==10**18
 
@@ -49,7 +51,8 @@ def test_authentic_crash_lag_extrapolation_and_halt_restart():
     g=make_graph();f,p,a,w,actor,ref=organic_pool(g)
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
     weth_price_source(g,w,anchor)
-    s=source(g,f.address,min_cardinality=8)
+    grow_ring(p,actor,3601)
+    s=source(g,f.address)
     admit(g,s,a.address,params(p,window=1800))
     actor.move(p.address,True,ref.sqrt(-6932))
     actual_tick=p.slot0()[1]
@@ -58,10 +61,10 @@ def test_authentic_crash_lag_extrapolation_and_halt_restart():
     boa.env.time_travel(seconds=900)
     expected=ref.quote(actual_tick//2,10**18,a.address,w.address)
     assert s.getPrice(a.address)==expected and 7*10**17<expected<8*10**17
-    boa.env.time_travel(seconds=2100)
-    # Fully extrapolated interval; no write in the last 3,000 seconds.
+    boa.env.time_travel(seconds=900)
+    # At the explicit/default age limit, the entire 1,800s window is extrapolated.
     assert s.getPrice(a.address)==ref.quote(actual_tick,10**18,a.address,w.address)
-    boa.env.time_travel(seconds=601)
+    boa.env.time_travel(seconds=1)
     assert s.getPriceAndHasFeed(a.address)==(0,True)
     # A liquidity action after the halt refreshes observation age, without
     # establishing a newly traded full window or a restart circuit breaker.
@@ -72,3 +75,14 @@ def test_authentic_crash_lag_extrapolation_and_halt_restart():
     assert s.getPriceAndHasFeed(a.address)==(0,True)
     anchor.setMockData(10**8)
     assert g.desk.getPrice(a.address,True)>0
+
+
+def grow_ring(pool,actor,cardinality):
+    """Grow the canonical ring with genuine observation writes before admission."""
+    pool.increaseObservationCardinalityNext(cardinality)
+    for _ in range(pool.slot0()[3]):
+        if pool.slot0()[3]>=cardinality:
+            return
+        boa.env.time_travel(seconds=1)
+        actor.add(pool.address,1);actor.remove(pool.address,1)
+    assert pool.slot0()[3]>=cardinality

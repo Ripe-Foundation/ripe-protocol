@@ -14,13 +14,13 @@ PENDING_EVENT={1:'NewUniV3FeedPending',2:'UniV3FeedUpdatePending',3:'DisableUniV
 CONFIRMED_EVENT={1:'NewUniV3FeedAdded',2:'UniV3FeedUpdated',3:'UniV3FeedDisabled'}
 CANCELLED_EVENT={1:'NewUniV3FeedCancelled',2:'UniV3FeedUpdateCancelled',3:'DisableUniV3FeedCancelled'}
 NO_PENDING={1:'no pending new feed',2:'no pending update feed',3:'no pending disable feed'}
-DEFAULTS=(3600,3600,50_00,500)
+DEFAULTS=(3600,1800,50_00)
 
 
 def start(lab,kind):
     if kind!=1:admit(lab.g,lab.s,lab.asset,params(lab.pool))
     if kind==1:lab.s.addNewPriceFeed(lab.asset,*params(lab.pool),sender=lab.g.gov)
-    elif kind==2:lab.s.updatePriceFeed(lab.asset,*params(lab.pool,age=3601),sender=lab.g.gov)
+    elif kind==2:lab.s.updatePriceFeed(lab.asset,*params(lab.pool,age=1799),sender=lab.g.gov)
     else:lab.s.disablePriceFeed(lab.asset,sender=lab.g.gov)
     return filter_logs(lab.s,PENDING_EVENT[kind])[0]
 
@@ -67,15 +67,15 @@ def test_constructor_retains_module_validation(lab,minimum,maximum):
 
 def test_feed_defaults_permissions_domains_and_event(lab):
     s=lab.s
-    with boa.reverts('no perms'):s.setFeedDefaults(1800,3600,50_00,500,sender=boa.env.generate_address())
-    for bad in [(1799,3600,50_00,500),(14401,3600,50_00,500),(1800,0,50_00,500),(1800,86401,50_00,500),(1800,3600,100_01,500),(1800,3600,50_00,0)]:
+    with boa.reverts('no perms'):s.setFeedDefaults(1800,1800,50_00,sender=boa.env.generate_address())
+    for bad in [(1799,1800,50_00),(14401,3600,50_00),(1800,0,50_00),(1800,1801,50_00),(1800,1800,100_01),(1800,1800,0)]:
         assert not s.isValidFeedDefaults(*bad)
         with boa.reverts('invalid defaults'):s.setFeedDefaults(*bad,sender=lab.g.gov)
-    for good in [(1800,1,0,1),(14400,86400,100_00,65535)]:
+    for good in [(1800,1,1),(14400,14400,100_00)]:
         assert s.isValidFeedDefaults(*good)
         assert s.setFeedDefaults(*good,sender=lab.g.gov)
         event=filter_logs(s,'FeedDefaultsSet')[0]
-        assert (event.twapWindow,event.maxObservationAge,event.minLiquidityRatio,event.minObservationCardinality)==good
+        assert (event.twapWindow,event.maxObservationAge,event.minLiquidityRatio)==good
         assert tuple(s.feedDefaults())==good
     assert tuple(s.feedDefaults())!=DEFAULTS
 
@@ -122,7 +122,7 @@ def test_wrong_selectors_pending_collision_and_expired_cancel(lab,kind):
             with boa.reverts(NO_PENDING[other]):getattr(s,CANCEL[other])(a,sender=g.gov)
             assert state(s,a)==before
     proposals=[lambda:s.addNewPriceFeed(a,*params(lab.pool),sender=g.gov),
-               lambda:s.updatePriceFeed(a,*params(lab.pool,age=3602),sender=g.gov),
+               lambda:s.updatePriceFeed(a,*params(lab.pool,age=1798),sender=g.gov),
                lambda:s.disablePriceFeed(a,sender=g.gov)]
     for expired in (False,True):
         if expired:advance_timelock_blocks(102)
@@ -166,13 +166,13 @@ def test_numeric_admission_domains(lab,field,value):
     assert state(lab.s,lab.asset)==before
 
 
-@pytest.mark.parametrize('window,age',[(0,0),(1800,1),(14400,86400),(3600,3600)])
+@pytest.mark.parametrize('window,age',[(0,0),(1800,1),(14400,14400),(3600,3600)])
 def test_inclusive_admission_domains(lab,window,age):
     # Synthetic raw observations match the chosen lookback; this tests domains.
     lab.pool.set_history(window=window or 3600)
     assert lab.s.isValidNewFeed(lab.asset,*params(lab.pool,window=window,age=age))
     assert admit(lab.g,lab.s,lab.asset,params(lab.pool,window=window,age=age))==10**18
-    assert settings(lab.s.feedConfig(lab.asset))==params(lab.pool,window=window,age=age)
+    assert settings(lab.s.feedConfig(lab.asset))==params(lab.pool,window=window or 3600,age=age or 1800)
 
 
 @pytest.mark.parametrize('asset_kind',['zero','native','eoa','not_in_pool'])
@@ -194,10 +194,10 @@ def test_pool_identity_is_bound_to_the_factory(lab,pool_kind):
     with boa.reverts('invalid feed'):lab.s.addNewPriceFeed(lab.asset,*p,sender=lab.g.gov)
 
 
-@pytest.mark.parametrize('cardinality',[499,500,1000])
+@pytest.mark.parametrize('cardinality',[3599,3600,3601])
 def test_observation_cardinality_floor_is_an_admission_check(lab,cardinality):
     lab.pool.set_history(cardinality=cardinality)
-    valid=cardinality>=500
+    valid=cardinality>=3601
     assert lab.s.isValidNewFeed(lab.asset,*params(lab.pool))==valid
     if not valid:
         with boa.reverts('invalid feed'):lab.s.addNewPriceFeed(lab.asset,*params(lab.pool),sender=lab.g.gov)
@@ -206,7 +206,7 @@ def test_observation_cardinality_floor_is_an_admission_check(lab,cardinality):
     # a shrunk ring later does not stop reads; a raised floor applies to new proposals
     lab.pool.set_history(cardinality=1)
     assert lab.g.desk.getPrice(lab.asset,True)==10**18
-    lab.s.setFeedDefaults(3600,3600,50_00,cardinality+1,sender=lab.g.gov)
+    lab.s.setFeedDefaults(cardinality,1800,50_00,sender=lab.g.gov)
     lab.pool.set_history(cardinality=cardinality)
     assert not lab.s.isValidUpdateFeed(lab.asset,*params(lab.pool))
 
@@ -260,27 +260,28 @@ def test_update_replaces_settings_and_rebaselines_liquidity(active,math):
     # the same settings are a valid update: it re-baselines the liquidity floor
     l.pool.set_history(liquidity=4*10**20)
     assert s.isValidUpdateFeed(a,*params(l.pool))
-    p=params(l.pool,window=1800,age=4000)
+    p=params(l.pool,window=1800,age=1600)
     l.pool.set_history(window=1800,liquidity=4*10**20)
     s.updatePriceFeed(a,*p,sender=l.g.gov)
-    assert settings(s.feedConfig(a))==params(l.pool) and s.feedConfig(a).baseLiquidity==base
+    assert settings(s.feedConfig(a))==params(l.pool,window=3600,age=1800) and s.feedConfig(a).baseLiquidity==base
     pending=s.pendingUpdates(a).config
     assert settings(pending)==p and pending.baseLiquidity==math.harmonic(0,1800*2**128//(4*10**20),1800)>base
     advance_timelock_blocks(2)
     assert s.confirmPriceFeedUpdate(a,sender=l.g.gov)
     assert settings(s.feedConfig(a))==p and s.feedConfig(a).baseLiquidity==pending.baseLiquidity
-    assert s.getFeedLiquidity(a)==(4*10**20,pending.baseLiquidity,pending.baseLiquidity//2)
+    assert s.getFeedLiquidity(a)==(4*10**20,pending.baseLiquidity,(pending.baseLiquidity+1)//2)
 
 
-def test_update_revalidation_failure_cancels_the_proposal(active):
+def test_update_transient_quote_failure_keeps_the_proposal(active):
     l=active
-    l.s.updatePriceFeed(l.asset,*params(l.pool,age=4000),sender=l.g.gov)
+    l.s.updatePriceFeed(l.asset,*params(l.pool,age=1600),sender=l.g.gov)
     aid=l.s.pendingUpdates(l.asset).actionId
     advance_timelock_blocks(2)
     l.anchor.setMockData(0)
-    assert not l.s.confirmPriceFeedUpdate(l.asset,sender=l.g.gov)
-    assert l.s.pendingUpdates(l.asset).actionId==0 and not l.s.hasPendingAction(aid)
-    assert settings(l.s.feedConfig(l.asset))==params(l.pool)
+    with boa.reverts('price source not executable'):
+        l.s.confirmPriceFeedUpdate(l.asset,sender=l.g.gov)
+    assert l.s.pendingUpdates(l.asset).actionId==aid and l.s.hasPendingAction(aid)
+    assert settings(l.s.feedConfig(l.asset))==params(l.pool,window=3600,age=1800)
     l.anchor.setMockData(10**8)
     assert l.g.desk.getPrice(l.asset,True)==10**18
 
@@ -317,13 +318,13 @@ def test_failed_update_callback_rolls_back_staged_config(lab):
     g,s,witness=staged_graph(lab,False)
     admit(g,s,lab.asset,params(lab.pool))
     witness.watch(s,lab.asset,1,True)
-    s.updatePriceFeed(lab.asset,*params(lab.pool,age=4000),sender=g.gov)
+    s.updatePriceFeed(lab.asset,*params(lab.pool,age=1600),sender=g.gov)
     before=state(s,lab.asset)
     advance_timelock_blocks(2)
     with boa.reverts('price source not executable'):s.confirmPriceFeedUpdate(lab.asset,sender=g.gov)
     assert s._computation.get_log_entries()==()
     assert state(s,lab.asset)==before
-    assert settings(s.feedConfig(lab.asset))==params(lab.pool)
+    assert settings(s.feedConfig(lab.asset))==params(lab.pool,window=3600,age=1800)
 
 
 def test_disable_during_market_outage(active):

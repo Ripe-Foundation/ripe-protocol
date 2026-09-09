@@ -162,7 +162,7 @@ FACTORY: public(immutable(address))
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICED_ASSETS: constant(uint256) = 50
-MAX_WARM_QUALIFY_GAS: constant(uint256) = 170_000 # cold margin qualified in the gas lane
+MAX_WARM_QUALIFY_GAS: constant(uint256) = 170_000 # T11 measured delta 9_115; sum 179_115 <= 210_000
 MIN_TWAP_WINDOW: constant(uint32) = 30 * 60 # 30 minutes
 MAX_TWAP_WINDOW: constant(uint32) = 4 * 60 * 60 # 4 hours
 

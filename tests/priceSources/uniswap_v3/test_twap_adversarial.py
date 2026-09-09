@@ -16,7 +16,7 @@ def test_callback_status_and_abi_faults_roll_back_every_staged_write(lab,fault):
     payloads={'zero_price':words(0,1),'status0':words(10**18,0),'status2':words(10**18,2),
               'wide_status':words(10**18,2**255),'empty':b'','short':words(10**18,1)[:-1]}
     # Fault injection only: the normal/staging/gas suites use actual PriceDesk.
-    responses={'getPrice(address,bool)':word(10**18)}
+    responses={'getPrice(address,bool)':word(10**18),'tokenScale(address)':word(0)}
     if fault!='revert':responses['qualifyCallerPriceSource(address)']=payloads[fault]
     Raw(responses,address=l.g.desk.address)
     advance_timelock_blocks(2)

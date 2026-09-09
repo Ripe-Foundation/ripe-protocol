@@ -115,3 +115,77 @@ def dependency_trace(computation):
                 'gas_headroom':c.msg.gas-used,'failed':c.is_error,
                 'return_bytes':len(c.output),'children':[item(d) for d in c.children]}
     return [item(c) for c in computation.children]
+
+
+def mapping_slot(contract, path, key):
+    """Vyper mapping layout: keccak(slot || key), with module-qualified path."""
+    from eth_utils import keccak
+    from .raw import words
+    layout=contract.compiler_data.storage_layout['storage_layout']
+    for name in path.split('.'):
+        layout=layout[name]
+    return int.from_bytes(keccak(words(layout['slot'],key)),'big')
+
+
+def qualification_touch_set(g,source,pool,asset):
+    """All standard pre-callback touches also used by the V3 price path.
+
+    Pool metadata reads warm its address, not slot0/liquidity/observations.
+    Staging warms all ten feed fields. Scale validation warms the priced
+    asset's desk scale and Addys' HQ registry entry 7. Other governance,
+    timelock, metadata, loop-check and factory slots are not price inputs.
+    HQ entry 5 / MissionControl policy are first read inside the callback.
+    """
+    base=mapping_slot(source,'feedConfig',asset)
+    names=('pool','fee','quoteAsset','assetIsToken0','assetDecimals',
+           'quoteDecimals','baseLiquidity','twapWindow','maxObservationAge','minLiquidity')
+    return {'addresses':{'source':str(source.address),'pool':str(pool.address),
+                         'desk':str(g.desk.address),'RipeHq':str(g.hq.address)},
+            'storage':[(str(source.address),base+i,'feedConfig[asset].'+name) for i,name in enumerate(names)]
+                      +[(str(g.desk.address),mapping_slot(g.desk,'tokenScale',asset),'PriceDesk.tokenScale[asset]'),
+                        (str(g.hq.address),mapping_slot(g.hq,'registry.addrInfo',7),'RipeHq.addrInfo[7].addr')]}
+
+
+@contextmanager
+def qualification_meter(source,touch_set=None,reads=None):
+    """Observe the exact two GAS opcodes compiled from _qualifyPriceSource.
+
+    Instrumentation runs outside the EVM and neither changes bytecode nor
+    introduces EVM reads. Snapshots include only accesses preceding callback.
+    """
+    assert not boa.env.evm._fast_mode_enabled
+    source_address=bytes.fromhex(str(source.address)[2:])
+    pcs={pc for pc,node in source.compiler_data.source_map['pc_raw_ast_map'].items()
+         if getattr(node,'node_source_code','')=='msg.gas'
+         and source.compiler_data.bytecode_runtime[pc]==0x5a}
+    assert len(pcs)==2, 'review the GAS instrumentation after compiler/source changes'
+    opcodes=boa.env.evm.vm.state.computation_class.opcodes
+    original=opcodes[0x5a]
+    readings=[]
+    def record(computation):
+        pc=computation.code.program_counter-1
+        original(computation=computation)
+        if computation.msg.code_address==source_address and pc in pcs:
+            snapshot={'gas':computation.get_gas_remaining(),'pc':pc,
+                      'read_index':len(reads) if reads is not None else None,
+                      'called_addresses':{c.msg.code_address for c in walk(computation)}}
+            if touch_set is not None:
+                state=boa.env.evm.vm.state
+                snapshot['warm_addresses']={label:state.is_address_warm(bytes.fromhex(address[2:]))
+                                            for label,address in touch_set['addresses'].items()}
+                snapshot['warm_slots']=[state.is_storage_warm(bytes.fromhex(address[2:]),slot)
+                                        for address,slot,label in touch_set['storage']]
+            readings.append(snapshot)
+    opcodes[0x5a]=record
+    try:
+        yield readings
+    finally:
+        opcodes[0x5a]=original
+
+
+def warm_qualification_ceiling(source):
+    """Read the actual compiled source constant; do not mirror it in the harness."""
+    for node in source.compiler_data.annotated_vyper_module.body:
+        if getattr(getattr(node,'target',None),'id',None)=='MAX_WARM_QUALIFY_GAS':
+            return node.value.value
+    raise AssertionError('missing admission ceiling')

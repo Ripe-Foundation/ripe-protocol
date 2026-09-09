@@ -27,13 +27,13 @@ def test_exported_source_overloads_events_and_internal_module_boundary():
         assert {tuple(i['type'] for i in e['inputs']) for e in entries if e.get('name')==method}==expected
     feed=[('asset','address',True),('pool','address',True)]
     pending=[('confirmationBlock','uint256',False),('actionId','uint256',False)]
-    quote=[('quoteAsset','address',False),('twapWindow','uint32',False)]
+    quote=[('quoteAsset','address',False),('twapWindow','uint32',False),('maxObservationAge','uint32',False),('minLiquidity','uint128',False)]
     base=[('baseLiquidity','uint128',False)]
     prev=[('prevPool','address',True)]
     events={'NewUniV3FeedPending':feed+quote+base+pending,'NewUniV3FeedAdded':feed+quote,'NewUniV3FeedCancelled':feed,
             'UniV3FeedUpdatePending':feed+prev+quote+base+pending,'UniV3FeedUpdated':feed+prev+quote,'UniV3FeedUpdateCancelled':feed+prev,
             'DisableUniV3FeedPending':feed+pending,'UniV3FeedDisabled':feed,'DisableUniV3FeedCancelled':feed,
-            'FeedDefaultsSet':[('twapWindow','uint32',False),('maxObservationAge','uint32',False),('minLiquidityRatio','uint256',False),('minObservationCardinality','uint16',False)]}
+            'FeedDefaultsSet':[('twapWindow','uint32',False),('maxObservationAge','uint32',False),('minLiquidityRatio','uint256',False)]}
     for name,fields in events.items():
         event=next(e for e in entries if e.get('name')==name)
         assert event=={'name':name,'type':'event','anonymous':False,
@@ -41,7 +41,7 @@ def test_exported_source_overloads_events_and_internal_module_boundary():
     proposal={('address','address'),('address','address','uint32'),('address','address','uint32','uint32')}
     for method in ('addNewPriceFeed','updatePriceFeed','isValidNewFeed','isValidUpdateFeed'):
         assert {tuple(i['type'] for i in e['inputs']) for e in entries if e.get('name')==method}==proposal
-    assert {tuple(i['type'] for i in e['inputs']) for e in entries if e.get('name')=='setFeedDefaults'}=={('uint32','uint32','uint256','uint16')}
+    assert {tuple(i['type'] for i in e['inputs']) for e in entries if e.get('name')=='setFeedDefaults'}=={('uint32','uint32','uint256')}
     assert {tuple(i['type'] for i in e['inputs']) for e in entries if e.get('name')=='getPoolLiquidity'}=={('address',),('address','uint32')}
     assert 'priceSources/modules/UniswapV3TwapMath.vy' in NON_STANDALONE_VYPER_SOURCES
     assert not (path.parent/'UniswapV3TwapMath.json').exists()

@@ -46,7 +46,7 @@ def test_any_desk_priced_quote_asset(lab,math,quote_decimals):
     assert not s.isValidNewFeed(lab.asset,*params(pool))
     with boa.reverts('invalid feed'):s.addNewPriceFeed(lab.asset,*params(pool),sender=g.gov)
     quote_price_source(g,usdc,10**18)  # $1
-    expected=math.quote(tick,10**18,asset_is_token0)*10**18//10**quote_decimals
+    expected=math.quote(tick,10**36,asset_is_token0)//10**quote_decimals
     assert 199*10**16<expected<201*10**16
     assert admit(g,s,lab.asset,params(pool))==expected
     config=s.feedConfig(lab.asset)
@@ -164,8 +164,8 @@ def test_current_desk_rotation_routes_the_quote_leg_through_the_new_desk(active)
         assert l.s.getPriceAndHasFeed(l.asset)==(10**18,True)
         assert g.desk.getPrice(l.asset,True)==10**18
         assert g.desk.getUsdValue(l.asset,10**18,True)==10**18
-        # pointing the quote leg at the retired desk yields nothing: sources
-        # authenticate the forwarding desk against HQ's current one
+        # Chainlink authenticates the forwarding desk; this source now rejects
+        # any non-canonical supplied desk itself, including with stale time zero.
         assert l.s.getPrice(l.asset,0,old.address)==0
 
 

@@ -25,6 +25,10 @@ def push(value, width=2):
     return bytes([0x5f + width]) + value.to_bytes(width, 'big')
 
 
+class Revert(bytes):
+    """Exact revert data, rather than a successful response."""
+
+
 def runtime(responses):
     """signature -> bytes or (bytes, burn_iterations); None exhausts all gas."""
     code = bytearray()
@@ -51,7 +55,7 @@ def runtime(responses):
             code.extend(b'\x5b\x60\x01\x90\x03\x80' + push(loop) + b'\x57\x50')
         # CODECOPY exactly N bytes then RETURN, including N=0/extra trailing bytes.
         data_pointer = len(code) + 4
-        code.extend(push(len(response)) + push(0) + b'\x5f\x39' + push(len(response)) + b'\x5f\xf3')
+        code.extend(push(len(response)) + push(0) + b'\x5f\x39' + push(len(response)) + b'\x5f' + (b'\xfd' if isinstance(response, Revert) else b'\xf3'))
         payloads.append((data_pointer, response))
     # Keep arbitrary return bytes after every JUMPDEST: bytes that resemble
     # PUSH opcodes must not hide later handlers from the EVM jump scanner.
