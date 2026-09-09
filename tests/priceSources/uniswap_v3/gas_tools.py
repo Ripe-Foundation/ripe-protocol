@@ -60,11 +60,7 @@ def storage_reads():
 
 
 # Engineering target exceptions must be named, bounded and explained in source.
-# This deliberately over-budget synthetic route must fail cleanly under the
-# unchanged stipend; it is not an admitted canonical/live success benchmark.
-TARGET_EXCEPTIONS={
-    'synthetic_dependency_reserve':(235000,'Cumulative valid dependency burns force the reserved-gas unavailable return.')
-}
+TARGET_EXCEPTIONS={}  # Future D2 exceptions must name a (bound, reason).
 
 SIZE_TARGET_EXCEPTIONS={}  # Future D2 exceptions must name a (bound, reason).
 

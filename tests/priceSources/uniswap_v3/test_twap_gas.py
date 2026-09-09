@@ -8,10 +8,11 @@ import boa
 import pytest
 from conf_utils import advance_timelock_blocks
 
-from .graph import make_graph,source,admit,params,temporary_desk,register
+from .graph import make_graph,source,admit,params,temporary_desk,register,weth_price_source
+from .helpers import settings
 from .pools import organic_pool,seed_ring,search_indices,assert_runtime,SLOTS
 from .gas_tools import cold,calls,storage_reads,walk,assert_source_budget,assert_deployed_size
-from .raw import Raw,words,word,selector,costly_valid_dependencies
+from .raw import Raw,words,word,selector
 
 pytestmark=pytest.mark.gas
 
@@ -22,16 +23,17 @@ def gas_lab():
     g=make_graph();f,p,a,w,actor,ref=organic_pool(g)
     ring=seed_ring(p,65535)
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',2500*10**18)
-    s=source(g,f.address,w,anchor)
+    weth_price_source(g,w,anchor)
+    s=source(g,f.address)
     admit(g,s,a.address,params(p,window=14400))
     g.desk.syncTokenScale(a.address,sender=g.local)
     print(f'TWAP_GAS_SETUP python={platform.python_version()} machine={platform.machine()} seconds={time.monotonic()-started:.3f} pool_runtime_sha256={assert_runtime(p)} source_bytes={len(boa.env.get_code(s.address))} synthetic_ring=65535')
     return SimpleNamespace(g=g,s=s,p=p,a=a,w=w,anchor=anchor,ring=ring)
 
 
-def set_config(lab,window=14400,local=0):
-    if tuple(lab.s.getFeedConfig(lab.a.address).params)!=params(lab.p,window=window,quote_age=local):
-        lab.s.updatePriceFeed(lab.a.address,params(lab.p,window=window,quote_age=local),sender=lab.g.gov)
+def set_config(lab,window=14400):
+    if settings(lab.s.feedConfig(lab.a.address))!=params(lab.p,window=window):
+        lab.s.updatePriceFeed(lab.a.address,*params(lab.p,window=window),sender=lab.g.gov)
         advance_timelock_blocks(lab.s.actionTimeLock())
         assert lab.s.confirmPriceFeedUpdate(lab.a.address,sender=lab.g.gov)
 
@@ -74,10 +76,9 @@ def test_canonical_deep_cold_ring_reads(gas_lab,count,index,initialized,window):
     print(f'TWAP_COLD ring={count} index={ring["index"]} initialized={ring["initialized"]} window={window} model_depth={len(expected_indices)//2} observation_slots={len(touched)} source={child.get_gas_used()} desk={comp.get_gas_used()} observe={observe.get_gas_used()} source_target_overrun={max(0,child.get_gas_used()-210000)}')
 
 
-@pytest.mark.parametrize('local',[0,3600])
 @pytest.mark.parametrize('target',['source','desk'])
-def test_cold_and_in_transaction_warm_policy_paths(gas_lab,local,target):
-    l=gas_lab;set_config(l,local=local)
+def test_cold_and_in_transaction_warm_paths(gas_lab,target):
+    l=gas_lab;set_config(l)
     probe=boa.load('tests/priceSources/uniswap_v3/WarmProbe.vy')
     dest=l.s if target=='source' else l.g.desk
     data=l.s.getPriceAndHasFeed.prepare_calldata(l.a.address) if target=='source' else l.g.desk.getPrice.prepare_calldata(l.a.address,True)
@@ -89,7 +90,8 @@ def test_cold_and_in_transaction_warm_policy_paths(gas_lab,local,target):
         assert l.g.desk.getPrice(l.a.address,True)==2500*10**18
         direct=l.g.desk._computation
     source_call=calls(direct,l.s)[0]
-    assert len(source_call.children)==(11 if target=='source' and local==0 else 9)
+    # slot0, liquidity, observations, observe and the desk's WETH price; a direct call also resolves the desk
+    assert len(source_call.children)==(6 if target=='source' else 5)
     assert_source_budget(source_call.get_gas_used())
     cold(probe)
     before=boa.env.evm.vm.state
@@ -104,26 +106,30 @@ def test_cold_and_in_transaction_warm_policy_paths(gas_lab,local,target):
     for cost in source_costs:assert_source_budget(cost)
     assert source_costs[1]<source_costs[0]
     dependency_costs=[[{'selector':bytes(d.msg.data[:4]).hex(),'gas':d.get_gas_used()} for d in calls(c,l.s)[0].children] for c in children]
-    print('TWAP_DEPENDENCIES '+json.dumps({'target':target,'local':local,'call_counts':list(map(len,dependency_costs)),'cold_warm_calls':dependency_costs},sort_keys=True))
-    print(f'TWAP_WARM target={target} local={local} source_cold={source_call.get_gas_used()} direct_total={direct.get_gas_used()} transaction_children={child_costs} source_children={source_costs} wrapper_overhead={root.get_gas_used()-sum(child_costs)}')
+    print('TWAP_DEPENDENCIES '+json.dumps({'target':target,'call_counts':list(map(len,dependency_costs)),'cold_warm_calls':dependency_costs},sort_keys=True))
+    print(f'TWAP_WARM target={target} source_cold={source_call.get_gas_used()} direct_total={direct.get_gas_used()} transaction_children={child_costs} source_children={source_costs} wrapper_overhead={root.get_gas_used()-sum(child_costs)}')
 
 
-@pytest.mark.parametrize('fault',['burn','empty','extra','invalid_round'])
-def test_expensive_successful_observe_then_late_dependency_failure(gas_lab,fault):
+@pytest.mark.parametrize('fault',['stale','empty','invalid_round','burn'])
+def test_expensive_successful_observe_then_late_weth_failure(gas_lab,fault):
     l=gas_lab
-    rounds={'burn':None,'empty':b'','extra':words(1,2500*10**8,0,boa.env.timestamp,1)+b'\x00','invalid_round':words(0,2500*10**8,0,boa.env.timestamp,1)}
+    rounds={'stale':words(1,2500*10**8,0,boa.env.timestamp-86401,1),'empty':b'','invalid_round':words(0,2500*10**8,0,boa.env.timestamp,1),'burn':None}
     Raw({'decimals()':word(8),'latestRoundData()':rounds[fault]},address=l.anchor.address)
     cold(l.g.desk)
     assert l.g.desk.getPrice(l.a.address)==0
     comp=l.g.desk._computation;child=calls(comp,l.s)[0]
     observe=[c for c in calls(child,l.p) if bytes(c.msg.data[:4])==selector('observe(uint32[])')][0]
     assert not observe.is_error and len(observe.output)==256 and observe.get_gas_used()>80000
-    assert not child.is_error and child.output==words(0,1)
-    assert_source_budget(child.get_gas_used())
+    if fault=='burn':
+        # the desk's WETH leg burns its stipend; the desk isolates whatever fails and still returns 0
+        assert child.is_error or child.output==words(0,1)
+    else:
+        assert not child.is_error and child.output==words(0,1)
+        assert_source_budget(child.get_gas_used())
     print(f'TWAP_LATE_FAILURE kind={fault} observe={observe.get_gas_used()} source={child.get_gas_used()} desk={comp.get_gas_used()}')
 
 
-def test_legitimate_old_is_distinct_from_exhausted_observe(gas_lab):
+def test_legitimate_old_reverts_the_source_and_the_desk_isolates_it(gas_lab):
     l=gas_lab
     seed_ring(l.p,8,spacing=1)
     cold(l.g.desk)
@@ -131,14 +137,14 @@ def test_legitimate_old_is_distinct_from_exhausted_observe(gas_lab):
     child=calls(l.g.desk._computation,l.s)[0]
     observe=[c for c in calls(child,l.p) if bytes(c.msg.data[:4])==selector('observe(uint32[])')][0]
     assert observe.is_error and b'OLD' in observe.output
-    assert observe.get_gas_used()<120000
-    assert child.output==words(0,1)
-    assert_source_budget(child.get_gas_used())
+    assert child.is_error and child.msg.gas==250000
+    with boa.reverts('has price config, no price'):l.g.desk.getPrice(l.a.address,True)
 
 
 def test_cold_current_desk_rotation(gas_lab):
     l=gas_lab;g=l.g
     with temporary_desk(g):
+        register(g.desk,g.chainlink,g.gov)
         register(g.desk,l.s,g.gov)
         g.desk.syncTokenScale(l.a.address,sender=g.local)
         cold(g.desk)
@@ -161,41 +167,7 @@ def test_final_deployed_size_coverage_and_noop_snapshot(gas_lab):
     assert not l.s.addPriceSnapshot(l.a.address,gas=150000)
     snapshot=l.s._computation.get_gas_used()
     assert l.s._computation.children==[]
-    print(f'TWAP_SIZE deployed={deployed} eip170_headroom={24576-deployed} target_overrun={max(0,deployed-22500)} coverage={coverage} snapshot={snapshot} compiler=Vyper-0.4.3 optimize=gas evm=prague constructor_action_delay=2 expiration_duration=100')
-
-
-@pytest.mark.parametrize('fault',['hq_burn','policy_burn','scale_mismatch','scale_burn'])
-def test_early_dependency_failure_reserve_at_real_call_positions(gas_lab,fault):
-    l=gas_lab
-    if fault in ('hq_burn','policy_burn'):
-        mock=boa.load('tests/priceSources/uniswap_v3/EarlyFault.vy',l.g.desk,l.g.mc)
-        target=l.g.hq if fault=='hq_burn' else l.g.mc
-        boa.env.set_code(target.address,boa.env.get_code(mock.address))
-    elif fault=='scale_mismatch':
-        # Actual desk's real scale getter cannot burn gas: poison the scale with
-        # an explicitly synthetic storage write, preserving its full runtime.
-        position=l.g.desk.compiler_data.storage_layout['storage_layout']['tokenScale']['slot']
-        from eth_utils import keccak
-        slot=int.from_bytes(keccak(words(position,l.a.address)),'big')
-        boa.env.evm.set_storage(l.g.desk.address,slot,10**6)
-        assert l.g.desk.tokenScale(l.a.address)==10**6
-    else:
-        # A malformed desk getter is a separate direct-source fault fixture.
-        Raw({'tokenScale(address)':None},address=l.g.desk.address)
-        cold(l.s)
-        assert l.s.getPriceAndHasFeed(l.a.address,gas=250000)==(0,True)
-        child=l.s._computation
-        assert not child.is_error
-        assert_source_budget(child.get_gas_used())
-        print(f'TWAP_EARLY_FAILURE fault={fault} source={child.get_gas_used()}')
-        return
-    cold(l.g.desk)
-    assert l.g.desk.getPrice(l.a.address)==0
-    child=calls(l.g.desk._computation,l.s)[0]
-    assert child.msg.gas==250000 and child.output==words(0,1) and not child.is_error
-    assert_source_budget(child.get_gas_used())
-    assert calls(child,l.p)==[]
-    print(f'TWAP_EARLY_FAILURE fault={fault} source={child.get_gas_used()} desk={l.g.desk._computation.get_gas_used()}')
+    print(f'TWAP_SIZE deployed={deployed} eip170_headroom={24576-deployed} target_overrun={max(0,deployed-22500)} coverage={coverage} snapshot={snapshot} compiler=Vyper-0.4.3 optimize=gas evm=prague action_delay=2 expiration_duration=100')
 
 
 @pytest.mark.parametrize('tick,reverse',[(524287,False),(-524287,True)])
@@ -206,7 +178,8 @@ def test_deep_ring_with_dense_tick_bits_and_both_quote_precision_branches(gas_la
     seed_ring(l.p,65535,tick=tick)
     asset,weth=(l.w,l.a) if reverse else (l.a,l.w)
     with temporary_desk(g):
-        s=source(g,l.p.factory(),weth,l.anchor)
+        register(g.desk,weth_price_source(g,weth,l.anchor) if reverse else g.chainlink,g.gov)
+        s=source(g,l.p.factory())
         ref=deploy('v3','Reference')
         sqrt=ref.sqrt(tick)
         assert (sqrt>2**128-1)==(not reverse)
@@ -223,16 +196,3 @@ def test_deep_ring_with_dense_tick_bits_and_both_quote_precision_branches(gas_la
         assert child.msg.gas==250000 and child.output==words(expected,1) and not child.is_error
         assert_source_budget(child.get_gas_used())
         print(f'TWAP_DENSE_TICK tick={tick} reverse={reverse} direct_source={direct} forwarded_source={child.get_gas_used()} desk={comp.get_gas_used()} source_target_overrun={max(0,direct-210000,child.get_gas_used()-210000)}')
-
-
-def test_cumulative_dependency_burn_preserves_unavailable_return_under_desk_stipend(active):
-    l=active
-    costly_valid_dependencies(l)
-    cold(l.g.desk)
-    assert l.g.desk.getPrice(l.asset)==0
-    child=calls(l.g.desk._computation,l.s)[0]
-    assert child.msg.gas==250000
-    assert not child.is_error and child.output==words(0,1)
-    assert_source_budget(child.get_gas_used(),exception='synthetic_dependency_reserve')
-    assert child.get_gas_used()>210000  # Non-vacuous cumulative pressure.
-    print(f'TWAP_RESERVE source={child.get_gas_used()} returned_unavailable=True')

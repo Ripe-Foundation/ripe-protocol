@@ -2,6 +2,22 @@
 
 Revision 5 · September 7, 2026 · RIPE Protocol · contracts and tests handoff
 
+> **Revision 6 note (September 9, 2026).** The shipped `UniswapV3TwapPrices.vy`
+> was simplified to the repository's standard price-source pattern after review:
+> typed `staticcall` reads instead of gas-bounded `raw_call`s, WETH priced through
+> `PriceDesk.getPrice(WETH)` instead of a bound Chainlink anchor, per-operation
+> add/update/disable functions and events like `ChainlinkPrices`, asset decimals
+> snapshotted per proposal, and the standard `(min, max, 0, max)` time lock
+> initialization. Sections 3–6 below describe the earlier design; where they
+> conflict with the contract (administrative ABI, anchor, decimal binding, desk
+> scale check, bounded calls and failure reserve, `quoteStaleTime`), the contract
+> and `tests/priceSources/uniswap_v3/README.md` are authoritative. The quote asset
+> is now whichever pool token is not the asset (any desk-priced token, not only
+> WETH); per-feed liquidity minima became one governance ratio of the liquidity
+> snapshotted at proposal, with window / observation-age defaults and an
+> observation-cardinality floor in `feedDefaults`. The math module, reference
+> artifacts, provenance and licensing requirements are unchanged.
+
 ## 1. Objective, authority and scope
 
 Build `UniswapV3TwapPrices.vy`, a reusable Vyper 0.4.3 RIPE `PriceSource` for a governance-selected ERC-20/WETH Uniswap V3 pool. Use **PONS, CASHCAT, Artificial Inu (AI), and INDEX** as offline and fork-test targets. PONS is the token called “pawns” in discussion; INDEX's reported on-chain symbol is `Index`. These labels do not establish borrowing readiness.

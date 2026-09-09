@@ -125,7 +125,7 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
     from .fork_results import atomic_save,failure
     from .compiled import deploy
     from .raw import Raw
-    from .graph import make_graph
+    from .graph import make_graph,weth_price_source
     data=json.loads((Path(__file__).parent/'fixtures/fresh-57185814.json').read_text())
     captured=data['cases'][0]
     case={'asset':captured['asset'],'window':captured['window'],'pin':data['pin'],
@@ -140,6 +140,7 @@ def test_fork_measurements_survive_mismatch_or_descriptive_failure(tmp_path,monk
     Raw({'getPool(address,address,uint24)':decoded('canonicalPool')},address=worker.VECTORS['factory'])
     pool=Raw({**{key+'()':decoded(key) for key in ('factory','token0','token1','fee','liquidity','slot0')},
          'observations(uint256)':decoded('observation'),'observe(uint32[])':decoded('observe')},address=asset['pool'])
+    weth_price_source(g,worker.VECTORS['weth'],worker.VECTORS['anchor']['address'])
     ref=deploy('v3','Reference')
     if fault=='price':
         reference=worker.reference_price

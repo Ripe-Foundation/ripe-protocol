@@ -1,5 +1,24 @@
 # Uniswap V3 TWAP tests
 
+`UniswapV3TwapPrices.vy` prices a governance-selected Uniswap V3 pool: geometric
+TWAP of the asset against the pool's other token (the quote asset), multiplied
+by the quote asset's PriceDesk price. Any quote asset the desk prices works
+(WETH, a stablecoin, ...); a quote asset may not itself be priced by this
+source. It follows the same shape as the other price sources (typed
+`staticcall` reads, Chainlink-style add/update/disable lifecycle, desk
+qualification at confirmation), so a malformed or reverting dependency reverts
+the read and PriceDesk isolates the source.
+
+A proposal is `addNewPriceFeed(asset, pool, twapWindow=0, maxObservationAge=0)`.
+Zero inherits `feedDefaults` (1h window, 1h observation age, 50% liquidity
+ratio, 500 observation cardinality), which governance sets with
+`setFeedDefaults`. The proposal snapshots the pool's harmonic liquidity over the
+window as `baseLiquidity`; every read requires current and harmonic liquidity to
+stay above `minLiquidityRatio` of it, and an update re-baselines. Admission also
+requires the pool's observation ring to hold at least
+`minObservationCardinality` slots. `getPoolLiquidity` / `getFeedLiquidity` show
+the live numbers.
+
 Run from the repository root with Python 3.12, Vyper 0.4.3, Titanoboa 0.2.7
 and, for parallel runs, pytest-xdist 3.8.0. Set `RIPE_TWAP_PYTHON` to that
 interpreter. Without xdist, omit `-n 4 --dist loadfile` for the serial fallback.
@@ -14,8 +33,6 @@ export RIPE_TWAP_FORK_CACHE="$(mktemp -d)/fork"
 "$RIPE_TWAP_PYTHON" scripts/export_abis.py --check
 "$RIPE_TWAP_PYTHON" -m pytest -o addopts='' tests/deployment/test_abi_export.py -q
 "$RIPE_TWAP_PYTHON" -m pytest tests/priceSources tests/registries tests/inventory tests/test_price_desk_aggregate_source_count_guard.py tests/test_lean_shard_coverage.py -n 4 --dist loadfile -q
-# After staging, include newly tracked fixtures in hygiene checks.
-"$RIPE_TWAP_PYTHON" -m pytest tests/inventory/test_repository_hygiene.py -q
 ```
 
 Rebuild the actual Solidity wrappers and compare checked artifact bytes:
@@ -41,29 +58,34 @@ text from SPDX license-list-data v3.25.0; the pool's license change date is no
 later than April 1, 2023. V4 MIT notices and all upstream hashes remain pinned.
 The specification's later release legal review remains required.
 
-Frozen rows are unchanged; missing replay metadata is synthetic. The separately
-captured `fixtures/fresh-57185814.json` uses synthetic dispatch offline, which
-does not measure live lookup gas. Stress tests verify canonical compiled pool
-runtime except compiler-listed immutables, calibrate storage against organic
-history, and reuse synthetic 20,000/65,535-slot rings. The independent search
-model predicts a subset of measured observation slots, not the live read order.
+The local graph prices WETH through a real `ChainlinkPrices` source bound to a
+mock ETH/USD feed (`graph.weth_price_source`), so anchor freshness, round
+validation and the desk's global stale policy are exercised through the same
+path production uses. `StagingWethSource.vy` is a test WETH source that
+witnesses the V3 source's staged config while the unchanged desk runs the
+confirmation callback; `graph.quote_price_source` prices any other quote token
+through a mock source. Mock pool histories are built for the 1h default window;
+the graph's global stale time is 86,400. Delay/expiry are
+2/100 block counts, with the delay set through `setActionTimeLockAfterSetup`
+exactly as FinishSetup does for every source; block-only advances preserve the
+timestamp.
 
-Cold tests reset metering, transient storage and access journals, preserving
-snapshot IDs in an empty journal. Only sender/top-level recipient are warmed;
-SLOAD controls prove cold/warm/cold. The private journal recipe has an explicit
-version/layout guard. Gas excludes intrinsic cost and chain data fees. Local
-stress tests enforce 210,000 source gas and 22,500 deployed bytes; D2 exceptions
-are named, bounded and explained in `gas_tools.py`. The deliberate cumulative-burn
-failure has one such exception; hard stipend/EIP-170 limits always apply.
-The 27 gas tests took 11.66s on Python 3.12.13/arm64 with a warm compile cache,
-within the five-minute target; the combined 35-test gas selection took 57.59s
-with four workers, within the unchanged 30-minute CI job. Final source size
-is 21,030 bytes; canonical peak cold direct/forwarded source gas is 171,597/157,428.
+Stress tests verify canonical compiled pool runtime except compiler-listed
+immutables, calibrate storage against organic history, and reuse synthetic
+20,000/65,535-slot rings. The independent search model predicts a subset of
+measured observation slots, not the live read order. Cold tests reset metering,
+transient storage and access journals, preserving snapshot IDs in an empty
+journal. Only sender/top-level recipient are warmed; SLOAD controls prove
+cold/warm/cold. Gas excludes intrinsic cost and chain data fees. Local stress
+tests enforce 210,000 source gas and 22,500 deployed bytes; hard stipend/EIP-170
+limits always apply. A pool that lacks history for the window reverts with
+`OLD`; the source propagates that and the desk isolates it, which the gas suite
+checks separately from an exhausted `observe`.
+Deployed runtime is 20,986 bytes (EIP-170 headroom 3,590). Canonical peak cold
+direct/forwarded source gas is 187,303/166,710, of which the desk's quote-asset
+read is roughly 33k forwarded; the 20 gas tests took 18.9s on Python 3.12.13/arm64.
 
-Fork workers deploy the graph after selecting the pin. Laboratory liquidity
-minima are 1, observation age 3,600, local quote age 0 and global quote age 86,400.
-Delay/expiry are 2/100 block counts; block-only advances preserve the timestamp.
-Exclude this source from FinishSetup's `setActionTimeLockAfterSetup` sweep.
+Fork workers deploy the graph after selecting the pin.
 
 ```sh
 unset RIPE_TWAP_BLOCK RIPE_TWAP_BLOCK_HASH

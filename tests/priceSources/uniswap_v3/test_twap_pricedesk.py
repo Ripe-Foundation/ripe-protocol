@@ -1,11 +1,12 @@
 import boa
-from contextlib import nullcontext
 import pytest
 from conf_utils import advance_timelock_blocks
 
-from .graph import admit,params,register,temporary_desk,source,ZERO
-from .raw import words,word,Raw
+from .graph import admit,params,register,temporary_desk,source,make_graph,weth_price_source,quote_price_source,ZERO
+from .raw import Pool,words,word,Raw
 from .helpers import unavailable,state
+
+WITNESS='tests/priceSources/uniswap_v3/StagingWethSource.vy'
 
 
 @pytest.mark.parametrize('decimals',[0,6,9,18])
@@ -13,7 +14,7 @@ def test_whole_token_price_and_both_amount_conversions(lab,decimals):
     lab.asset.setDecimals(decimals)
     expected=10**decimals  # tick 0: raw asset unit = raw WETH unit; $1 ETH anchor
     assert admit(lab.g,lab.s,lab.asset,params(lab.pool))==expected
-    assert lab.s.getBoundAssetDecimals(lab.asset)==(True,decimals)
+    assert lab.s.feedConfig(lab.asset).assetDecimals==decimals
     assert lab.g.desk.tokenScale(lab.asset)==0
     assert lab.g.desk.getPrice(lab.asset,True)==expected
     for method in ('getUsdValue','getAssetAmount'):
@@ -28,87 +29,40 @@ def test_whole_token_price_and_both_amount_conversions(lab,decimals):
     assert lab.g.desk.getAssetAmount(lab.asset,3*expected,True)==3*10**decimals
 
 
-@pytest.mark.parametrize('rotate',[False,True])
-@pytest.mark.parametrize('repair',['governor','switchboard'])
-def test_permissionless_scale_poisoning_restoration_and_explicit_recovery(lab,rotate,repair):
-    g,s,a=lab.g,lab.s,lab.asset
-    admit(g,s,a,params(lab.pool))
-    old_desk=g.desk
-    with temporary_desk(g) if rotate else nullcontext():
-        if rotate:register(g.desk,s,g.gov)
-        assert g.desk.tokenScale(a)==0
-        outsider=boa.env.generate_address()
-        a.setDecimals(6)
-        assert s.getPriceAndHasFeed(a)==(0,True)
-        assert g.desk.hasPriceFeed(a)
-        g.desk.syncTokenScale(a,sender=outsider)
-        assert g.desk.tokenScale(a)==10**6
-        a.setDecimals(18)
-        unavailable(lab)
-        assert s.getPriceAndHasFeed(a,0,old_desk.address,sender=old_desk.address)==(0,True)
-        for method,amount in [('getUsdValue',10**18),('getAssetAmount',10**18)]:
-            fn=getattr(g.desk,method)
-            assert fn(a,amount)==0
-            with boa.reverts('has price config, no price'):fn(a,amount,True)
-        # ensure_token_scale and Golf's zero-only auto-sync cannot repair this state.
-        with boa.reverts('already set'):g.desk.syncTokenScale(a,sender=outsider)
-        caller=g.local if repair=='governor' else g.actor.address
-        g.desk.syncTokenScale(a,sender=caller)
-        assert g.desk.tokenScale(a)==10**18
-        assert s.getPrice(a)==10**18
-        assert g.desk.getUsdValue(a,10**18,True)==10**18  # never erroneous 10**30
-        assert g.desk.getAssetAmount(a,10**18,True)==10**18
-        if rotate:
-            assert s.getPriceAndHasFeed(a,86400,old_desk.address,sender=old_desk.address)==(0,True)
-            assert s.getPriceAndHasFeed(a,86400,g.desk.address,sender=g.desk.address)==(10**18,True)
-            assert s.getPrice(a,0,old_desk.address,sender=old_desk.address)==10**18
-
-
-
-def test_current_desk_rotation_checks_existing_wrong_scale(active):
-    l=active;g=l.g;old=g.desk
-    new=boa.load('contracts/registries/PriceDesk.vy',g.hq,g.local,old.ETH(),1,100)
-    l.asset.setDecimals(6);new.syncTokenScale(l.asset,sender=g.local);l.asset.setDecimals(18)
-    with temporary_desk(g,new):
-        assert l.s.getPriceAndHasFeed(l.asset)==(0,True)
-        register(new,l.s,g.gov)
-        assert new.getPrice(l.asset)==0
-        new.syncTokenScale(l.asset,sender=g.local)
-        assert new.getUsdValue(l.asset,10**18,True)==10**18
-        assert new.getAssetAmount(l.asset,10**18,True)==10**18
-        assert old.getPrice(l.asset)==0
-
-
-
-@pytest.mark.parametrize('initial',[0,6,9,18])
-def test_permanent_binding_survives_disable_readd_and_restoration(lab,initial):
-    lab.asset.setDecimals(initial)
-    admit(lab.g,lab.s,lab.asset,params(lab.pool))
-    for anchor_drift in (False,True):
-        target=lab.anchor if anchor_drift else lab.asset
-        old=8 if anchor_drift else initial
-        target.setDecimals(old+1)
-        unavailable(lab)
-        target.setDecimals(old)
-        assert lab.s.getPrice(lab.asset)==10**initial
-    lab.asset.setDecimals((initial+6)%19)
-    with boa.reverts('asset decimals changed'):lab.s.updatePriceFeed(lab.asset,params(lab.pool,age=4000),sender=lab.g.gov)
-    lab.s.disablePriceFeed(lab.asset,sender=lab.g.gov);advance_timelock_blocks(2)
-    assert lab.s.confirmDisablePriceFeed(lab.asset,sender=lab.g.gov)
-    assert lab.s.getBoundAssetDecimals(lab.asset)==(True,initial)
-    assert lab.s.getFeedConfig(lab.asset).params.pool==ZERO
-    with boa.reverts('asset decimals changed'):lab.s.addNewPriceFeed(lab.asset,params(lab.pool),sender=lab.g.gov)
-    lab.asset.setDecimals(initial)
-    assert admit(lab.g,lab.s,lab.asset,params(lab.pool))==10**initial
+@pytest.mark.parametrize('quote_decimals',[6,18])
+def test_any_desk_priced_quote_asset(lab,math,quote_decimals):
+    """A stablecoin-quoted pool: the pool decides the quote asset; the desk prices it."""
+    usdc=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18);usdc.setDecimals(quote_decimals)
+    pool=Pool(lab.asset,usdc,lab.factory);lab.factory.setPool(lab.asset,usdc,10000,pool.address)
+    asset_is_token0=int(lab.asset.address,16)<int(usdc.address,16)
+    # 1 asset = 2 quote tokens: raw ratio 2*10**quote_decimals / 10**18, as a tick
+    import math as pymath
+    ratio=2*10**quote_decimals/10**18
+    tick=round(pymath.log(ratio if asset_is_token0 else 1/ratio)/pymath.log(1.0001))
+    pool.set_history(tick=tick)
+    g=make_graph()
+    s=source(g,lab.factory)
+    # the quote asset must be priced by the desk before the pool can be admitted
+    assert not s.isValidNewFeed(lab.asset,*params(pool))
+    with boa.reverts('invalid feed'):s.addNewPriceFeed(lab.asset,*params(pool),sender=g.gov)
+    quote_price_source(g,usdc,10**18)  # $1
+    expected=math.quote(tick,10**18,asset_is_token0)*10**18//10**quote_decimals
+    assert 199*10**16<expected<201*10**16
+    assert admit(g,s,lab.asset,params(pool))==expected
+    config=s.feedConfig(lab.asset)
+    assert (config.quoteAsset,config.quoteDecimals,config.assetIsToken0)==(usdc.address,quote_decimals,asset_is_token0)
+    g.desk.syncTokenScale(lab.asset,sender=g.gov)
+    assert g.desk.getPrice(lab.asset,True)==expected
+    assert g.desk.getUsdValue(lab.asset,10**18,True)==expected
+    assert s.getPoolLiquidity(pool.address)==(10**20,config.baseLiquidity)
 
 
 def test_zero_decimal_less_than_one_wei_quote_remains_unavailable(lab):
     """At tick -1, one raw token0 unit quotes less than one wei WETH: floor is 0."""
     lab.asset.setDecimals(0)
     lab.pool.set_history(tick=-1)
-    with boa.reverts('invalid feed'):lab.s.addNewPriceFeed(lab.asset,params(lab.pool),sender=lab.g.gov)
-    assert lab.s.getBoundAssetDecimals(lab.asset)==(False,0)
-    assert lab.s.getPendingFeed(lab.asset).actionId==0
+    with boa.reverts('invalid feed'):lab.s.addNewPriceFeed(lab.asset,*params(lab.pool),sender=lab.g.gov)
+    assert lab.s.pendingUpdates(lab.asset).actionId==0
     lab.pool.set_history(tick=0)
     assert admit(lab.g,lab.s,lab.asset,params(lab.pool))==1
     lab.g.desk.syncTokenScale(lab.asset,sender=lab.g.gov)
@@ -149,62 +103,70 @@ def test_actual_desk_failure_and_fallback_matrix(lab,status):
 
 
 def test_registered_fallback_cannot_rescue_unregistered_candidate_callback(lab):
-    healthy=boa.load('contracts/mock/MockRawPriceSource.vy');healthy.configure(3*10**18,True)
-    register(lab.g.desk,healthy,lab.g.gov)
-    observer=boa.load('tests/priceSources/uniswap_v3/StagingAnchor.vy')
-    s=source(lab.g,lab.factory,lab.weth,observer)
-    observer.watch(s,lab.asset,0,True)
-    assert s.addNewPriceFeed(lab.asset,params(lab.pool),sender=lab.g.gov)
-    pending=s.getPendingFeed(lab.asset)
+    g=make_graph()
+    # a registered source already prices the asset (only the asset: WETH stays with the witness)
+    healthy=boa.load('contracts/mock/MockPriceSource.vy',g.hq,1,100);healthy.setPrice(lab.asset,3*10**18)
+    register(g.desk,healthy,g.gov)
+    witness=boa.load(WITNESS,lab.weth)
+    register(g.desk,witness,g.gov)
+    s=source(g,lab.factory)
+    witness.watch(s,lab.asset,0,True)
+    assert s.addNewPriceFeed(lab.asset,*params(lab.pool),sender=g.gov)
+    pending=s.pendingUpdates(lab.asset)
     advance_timelock_blocks(2)
-    assert lab.g.desk.getPrice(lab.asset,True)==3*10**18
-    with boa.reverts('price source not executable'):s.confirmNewPriceFeed(lab.asset,sender=lab.g.gov)
-    assert s.getPendingFeed(lab.asset)==pending
-    assert s.getBoundAssetDecimals(lab.asset)==(False,0)
-    assert lab.g.desk.getRegId(s)==0
+    assert g.desk.getPrice(lab.asset,True)==3*10**18
+    with boa.reverts('price source not executable'):s.confirmNewPriceFeed(lab.asset,sender=g.gov)
+    assert s.pendingUpdates(lab.asset)==pending
+    assert g.desk.getRegId(s)==0
 
 
 def test_snapshot_and_coverage_are_storage_only_even_during_outage(active):
     l=active
     Raw({},address=l.pool.address);Raw({},address=l.anchor.address);Raw({},address=l.g.hq.address)
-    before=l.s.getFeedConfig(l.asset)
+    before=l.s.feedConfig(l.asset)
     assert not l.s.addPriceSnapshot(l.asset,gas=150000)
     assert l.s._computation.children==[] and l.s._computation.get_log_entries()==()
     assert l.s.hasPriceFeed(l.asset,gas=75000)
     assert l.s._computation.children==[]
-    assert l.s.getFeedConfig(l.asset)==before
+    assert l.s.feedConfig(l.asset)==before
 
 
-def test_reverse_order_lifecycle_poisoning_and_amount_recovery(lab):
+def test_reverse_token_order_lifecycle_and_amount_conversions(lab):
     from .compiled import deploy
     a,w=lab.weth,lab.asset
-    s=source(lab.g,lab.factory,w,lab.anchor)
+    g=make_graph()
+    weth_price_source(g,w,lab.anchor)
+    s=source(g,lab.factory)
     lab.pool.set_history(tick=37)
     expected=deploy('v3','Reference').quote(37,10**18,a.address,w.address)
-    assert admit(lab.g,s,a,params(lab.pool))==expected
-    assert not s.getFeedConfig(a).assetIsToken0
-    a.setDecimals(6)
-    lab.g.desk.syncTokenScale(a,sender=boa.env.generate_address())
-    a.setDecimals(18)
-    from types import SimpleNamespace
-    unavailable(SimpleNamespace(s=s,asset=a,g=lab.g))
-    for method in ('getUsdValue','getAssetAmount'):
-        assert getattr(lab.g.desk,method)(a,10**18)==0
-        with boa.reverts('has price config, no price'):
-            getattr(lab.g.desk,method)(a,10**18,True)
-    lab.g.desk.syncTokenScale(a,sender=lab.g.gov)
-    assert lab.g.desk.getUsdValue(a,3*10**18,True)==3*expected
-    assert lab.g.desk.getAssetAmount(a,3*expected,True)==3*10**18
-    s.disablePriceFeed(a,sender=lab.g.gov);advance_timelock_blocks(2)
-    assert s.confirmDisablePriceFeed(a,sender=lab.g.gov)
-    assert s.getBoundAssetDecimals(a)==(True,18) and not s.hasPriceFeed(a)
-    a.setDecimals(6)
-    with boa.reverts('asset decimals changed'):s.addNewPriceFeed(a,params(lab.pool),sender=lab.g.gov)
-    a.setDecimals(18)
-    assert admit(lab.g,s,a,params(lab.pool))==expected
+    assert admit(g,s,a,params(lab.pool))==expected
+    assert not s.feedConfig(a).assetIsToken0 and s.feedConfig(a).quoteAsset==w.address
+    g.desk.syncTokenScale(a,sender=g.gov)
+    assert g.desk.getUsdValue(a,3*10**18,True)==3*expected
+    assert g.desk.getAssetAmount(a,3*expected,True)==3*10**18
+    s.disablePriceFeed(a,sender=g.gov);advance_timelock_blocks(2)
+    assert s.confirmDisablePriceFeed(a,sender=g.gov)
+    assert not s.hasPriceFeed(a) and s.getPricedAssets()==[]
+    assert admit(g,s,a,params(lab.pool))==expected
     assert s.getPricedAssets()==[a.address]
-    assert lab.g.desk.getUsdValue(a,3*10**18,True)==3*expected
-    assert lab.g.desk.getAssetAmount(a,3*expected,True)==3*10**18
+    assert g.desk.getUsdValue(a,3*10**18,True)==3*expected
+
+
+def test_current_desk_rotation_routes_the_quote_leg_through_the_new_desk(active):
+    l=active;g=l.g;old=g.desk
+    with temporary_desk(g):
+        # the new desk has no sources yet: no WETH price, so the feed is unavailable
+        assert l.s.getPriceAndHasFeed(l.asset)==(0,True)
+        assert old.getPrice(l.asset)==0
+        register(g.desk,g.chainlink,g.gov)
+        register(g.desk,l.s,g.gov)
+        g.desk.syncTokenScale(l.asset,sender=g.local)
+        assert l.s.getPriceAndHasFeed(l.asset)==(10**18,True)
+        assert g.desk.getPrice(l.asset,True)==10**18
+        assert g.desk.getUsdValue(l.asset,10**18,True)==10**18
+        # pointing the quote leg at the retired desk yields nothing: sources
+        # authenticate the forwarding desk against HQ's current one
+        assert l.s.getPrice(l.asset,0,old.address)==0
 
 
 def test_actual_desk_coverage_and_snapshot_forward_fixed_stipends(active):
@@ -231,7 +193,6 @@ def test_actual_desk_coverage_and_snapshot_forward_fixed_stipends(active):
 
 
 def test_temporary_desk_restores_python_and_registry_on_failure(lab):
-    from .graph import temporary_desk
     old=lab.g.desk
     with pytest.raises(AssertionError,match='injected failure'):
         with temporary_desk(lab.g) as replacement:

@@ -21,18 +21,20 @@ def math():
 @pytest.fixture(scope='module')
 def lab():
     from types import SimpleNamespace
-    from .graph import make_graph, source
+    from .graph import make_graph, source, weth_price_source
     from .raw import Pool
     g=make_graph()
     tokens=[boa.load('contracts/mock/MockChainlinkFeed.vy',10**18) for _ in range(2)]
     asset,weth=sorted(tokens,key=lambda t:int(t.address,16))
     for token in tokens:
         token.setDecimals(18)
+    # $1 ETH anchor: a USD price equals the raw WETH quote per whole token.
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
+    weth_price_source(g,weth,anchor)
     factory=boa.load('contracts/mock/MockUniV3Factory.vy')
     pool=Pool(asset,weth,factory)
     factory.setPool(asset,weth,10000,pool.address)
-    s=source(g,factory,weth,anchor)
+    s=source(g,factory)
     return SimpleNamespace(g=g,s=s,asset=asset,weth=weth,anchor=anchor,factory=factory,pool=pool)
 
 

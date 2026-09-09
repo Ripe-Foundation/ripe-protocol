@@ -7,6 +7,7 @@ from conf_utils import advance_timelock_blocks
 ZERO = '0x' + '00' * 20
 ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
 SOURCE = 'contracts/priceSources/UniswapV3TwapPrices.vy'
+CHAINLINK = 'contracts/priceSources/ChainlinkPrices.vy'
 
 
 def identity():
@@ -39,7 +40,7 @@ def make_graph():
     assert hq.getAddr(5) == mc.address
     assert mc.getPriceStaleTime() == 86400
     assert boa.env.timestamp == timestamp
-    return SimpleNamespace(gov=gov, local=local, hq=hq, mc=mc, board=board, actor=actor, desk=desk)
+    return SimpleNamespace(gov=gov, local=local, hq=hq, mc=mc, board=board, actor=actor, desk=desk, chainlink=None)
 
 
 def set_policy(g, age):
@@ -68,16 +69,45 @@ def temporary_desk(g, desk=None):
             g.desk=old
 
 
-def source(g, factory, weth, anchor):
-    return boa.load(SOURCE, g.hq, g.local, 2, 100, factory, weth, anchor)
+def weth_price_source(g, weth, anchor, stale_time=0):
+    """WETH is priced through a real ChainlinkPrices source, as in production.
+
+    Zero stale time inherits the graph's MissionControl policy (86,400s)."""
+    btc = boa.env.generate_address('twap btc placeholder')
+    chainlink = boa.load(CHAINLINK, g.hq, g.local, 1, 100, weth, ETH, btc, anchor, ZERO, stale_time)
+    if g.chainlink is None:
+        register(g.desk, chainlink, g.gov)
+        g.chainlink = chainlink
+    return chainlink
 
 
-def params(pool, window=1800, current=1, harmonic=1, age=3600, quote_age=0):
-    return (getattr(pool, 'address', pool), window, current, harmonic, age, quote_age)
+def quote_price_source(g, token, price):
+    """Price any quote token through a mock source registered in the desk."""
+    mock = boa.load('contracts/mock/MockPriceSource.vy', g.hq, 1, 100)
+    mock.setPrice(token, price)
+    register(g.desk, mock, g.gov)
+    return mock
+
+
+def source(g, factory, delay=2, min_cardinality=None):
+    s = boa.load(SOURCE, g.hq, g.local, 2, 100, factory)
+    if delay:
+        s.setActionTimeLockAfterSetup(delay, sender=g.gov)
+    if min_cardinality is not None:
+        d = s.feedDefaults()
+        s.setFeedDefaults(d.twapWindow, d.maxObservationAge, d.minLiquidityRatio, min_cardinality, sender=g.gov)
+    return s
+
+
+def params(pool, window=0, age=0):
+    """Positional addNewPriceFeed/updatePriceFeed arguments after the asset.
+
+    Zero window / age inherit the source's feedDefaults."""
+    return (getattr(pool, 'address', pool), window, age)
 
 
 def admit(g, s, asset, p, register_source=True):
-    assert s.addNewPriceFeed(asset, p, sender=g.gov)
+    assert s.addNewPriceFeed(asset, *p, sender=g.gov)
     advance_timelock_blocks(s.actionTimeLock())
     assert s.confirmNewPriceFeed(asset, sender=g.gov)
     if register_source and g.desk.getRegId(s) == 0:

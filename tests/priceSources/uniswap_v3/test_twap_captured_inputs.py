@@ -6,7 +6,7 @@ import boa
 import pytest
 
 from .compiled import deploy
-from .graph import make_graph,source,params,admit
+from .graph import make_graph,source,params,admit,weth_price_source
 from .raw import Raw
 from .fork_worker import reference_price,VECTORS
 
@@ -27,7 +27,8 @@ def test_captured_fresh_inputs_through_source_and_actual_desk(case):
     Raw({'getPool(address,address,uint24)':decoded('canonicalPool')},address=VECTORS['factory'])
     Raw({**{key+'()':decoded(key) for key in ('factory','token0','token1','fee','liquidity','slot0')},
          'observations(uint256)':decoded('observation'),'observe(uint32[])':decoded('observe')},address=asset['pool'])
-    s=source(g,VECTORS['factory'],VECTORS['weth'],VECTORS['anchor']['address'])
+    weth_price_source(g,VECTORS['weth'],VECTORS['anchor']['address'])
+    s=source(g,VECTORS['factory'])
     expected=reference_price(raw,asset,case['window'],DATA['pin']['timestamp'],deploy('v3','Reference'))
     assert expected==case['reference']==case['actual']
     assert admit(g,s,asset['asset'],params(asset['pool'],window=case['window']))==expected

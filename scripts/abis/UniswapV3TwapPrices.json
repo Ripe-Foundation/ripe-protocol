@@ -1,6 +1,6 @@
 [
   {
-    "name": "UniV3FeedProposed",
+    "name": "NewUniV3FeedPending",
     "inputs": [
       {
         "name": "asset",
@@ -8,13 +8,23 @@
         "indexed": true
       },
       {
-        "name": "actionId",
-        "type": "uint256",
+        "name": "pool",
+        "type": "address",
         "indexed": true
       },
       {
-        "name": "kind",
-        "type": "uint256",
+        "name": "quoteAsset",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "twapWindow",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "baseLiquidity",
+        "type": "uint128",
         "indexed": false
       },
       {
@@ -23,53 +33,8 @@
         "indexed": false
       },
       {
-        "name": "expirationBlock",
+        "name": "actionId",
         "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": false
-      },
-      {
-        "name": "twapWindowSeconds",
-        "type": "uint32",
-        "indexed": false
-      },
-      {
-        "name": "minCurrentLiquidity",
-        "type": "uint128",
-        "indexed": false
-      },
-      {
-        "name": "minHarmonicLiquidity",
-        "type": "uint128",
-        "indexed": false
-      },
-      {
-        "name": "maxObservationAgeSeconds",
-        "type": "uint32",
-        "indexed": false
-      },
-      {
-        "name": "quoteStaleTime",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "assetIsToken0",
-        "type": "bool",
-        "indexed": false
-      },
-      {
-        "name": "assetDecimals",
-        "type": "uint8",
-        "indexed": false
-      },
-      {
-        "name": "fee",
-        "type": "uint24",
         "indexed": false
       }
     ],
@@ -77,7 +42,7 @@
     "type": "event"
   },
   {
-    "name": "UniV3FeedConfirmed",
+    "name": "NewUniV3FeedAdded",
     "inputs": [
       {
         "name": "asset",
@@ -85,13 +50,72 @@
         "indexed": true
       },
       {
-        "name": "actionId",
-        "type": "uint256",
+        "name": "pool",
+        "type": "address",
         "indexed": true
       },
       {
-        "name": "kind",
-        "type": "uint256",
+        "name": "quoteAsset",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "twapWindow",
+        "type": "uint32",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "NewUniV3FeedCancelled",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "UniV3FeedUpdatePending",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "prevPool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "quoteAsset",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "twapWindow",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "baseLiquidity",
+        "type": "uint128",
         "indexed": false
       },
       {
@@ -100,53 +124,8 @@
         "indexed": false
       },
       {
-        "name": "expirationBlock",
+        "name": "actionId",
         "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": false
-      },
-      {
-        "name": "twapWindowSeconds",
-        "type": "uint32",
-        "indexed": false
-      },
-      {
-        "name": "minCurrentLiquidity",
-        "type": "uint128",
-        "indexed": false
-      },
-      {
-        "name": "minHarmonicLiquidity",
-        "type": "uint128",
-        "indexed": false
-      },
-      {
-        "name": "maxObservationAgeSeconds",
-        "type": "uint32",
-        "indexed": false
-      },
-      {
-        "name": "quoteStaleTime",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "assetIsToken0",
-        "type": "bool",
-        "indexed": false
-      },
-      {
-        "name": "assetDecimals",
-        "type": "uint8",
-        "indexed": false
-      },
-      {
-        "name": "fee",
-        "type": "uint24",
         "indexed": false
       }
     ],
@@ -154,7 +133,7 @@
     "type": "event"
   },
   {
-    "name": "UniV3FeedCancelled",
+    "name": "UniV3FeedUpdated",
     "inputs": [
       {
         "name": "asset",
@@ -162,13 +141,133 @@
         "indexed": true
       },
       {
-        "name": "actionId",
-        "type": "uint256",
+        "name": "pool",
+        "type": "address",
         "indexed": true
       },
       {
-        "name": "kind",
+        "name": "prevPool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "quoteAsset",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "twapWindow",
+        "type": "uint32",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "UniV3FeedUpdateCancelled",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "prevPool",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DisableUniV3FeedPending",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
         "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "UniV3FeedDisabled",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DisableUniV3FeedCancelled",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "FeedDefaultsSet",
+    "inputs": [
+      {
+        "name": "twapWindow",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "maxObservationAge",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "minLiquidityRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minObservationCardinality",
+        "type": "uint16",
         "indexed": false
       }
     ],
@@ -1247,205 +1346,71 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getFeedConfig",
+    "name": "getPoolLiquidity",
     "inputs": [
       {
-        "name": "_asset",
+        "name": "_pool",
         "type": "address"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "params",
-            "type": "tuple",
-            "components": [
-              {
-                "name": "pool",
-                "type": "address"
-              },
-              {
-                "name": "twapWindowSeconds",
-                "type": "uint32"
-              },
-              {
-                "name": "minCurrentLiquidity",
-                "type": "uint128"
-              },
-              {
-                "name": "minHarmonicLiquidity",
-                "type": "uint128"
-              },
-              {
-                "name": "maxObservationAgeSeconds",
-                "type": "uint32"
-              },
-              {
-                "name": "quoteStaleTime",
-                "type": "uint256"
-              }
-            ]
-          },
-          {
-            "name": "assetIsToken0",
-            "type": "bool"
-          },
-          {
-            "name": "assetDecimals",
-            "type": "uint8"
-          },
-          {
-            "name": "fee",
-            "type": "uint24"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getPendingFeed",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "actionId",
-            "type": "uint256"
-          },
-          {
-            "name": "kind",
-            "type": "uint256"
-          },
-          {
-            "name": "config",
-            "type": "tuple",
-            "components": [
-              {
-                "name": "params",
-                "type": "tuple",
-                "components": [
-                  {
-                    "name": "pool",
-                    "type": "address"
-                  },
-                  {
-                    "name": "twapWindowSeconds",
-                    "type": "uint32"
-                  },
-                  {
-                    "name": "minCurrentLiquidity",
-                    "type": "uint128"
-                  },
-                  {
-                    "name": "minHarmonicLiquidity",
-                    "type": "uint128"
-                  },
-                  {
-                    "name": "maxObservationAgeSeconds",
-                    "type": "uint32"
-                  },
-                  {
-                    "name": "quoteStaleTime",
-                    "type": "uint256"
-                  }
-                ]
-              },
-              {
-                "name": "assetIsToken0",
-                "type": "bool"
-              },
-              {
-                "name": "assetDecimals",
-                "type": "uint8"
-              },
-              {
-                "name": "fee",
-                "type": "uint24"
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getBoundAssetDecimals",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
+        "type": "uint256"
       },
       {
         "name": "",
-        "type": "uint8"
+        "type": "uint256"
       }
     ]
   },
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "factory",
-    "inputs": [],
+    "name": "getPoolLiquidity",
+    "inputs": [
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      }
+    ],
     "outputs": [
       {
         "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getFeedLiquidity",
+    "inputs": [
+      {
+        "name": "_asset",
         "type": "address"
       }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "weth",
-    "inputs": [],
+    ],
     "outputs": [
       {
         "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "ethUsdFeed",
-    "inputs": [],
-    "outputs": [
+        "type": "uint256"
+      },
       {
         "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "anchorDecimals",
-    "inputs": [],
-    "outputs": [
+        "type": "uint256"
+      },
       {
         "name": "",
-        "type": "uint8"
+        "type": "uint256"
       }
     ]
   },
@@ -1459,34 +1424,62 @@
         "type": "address"
       },
       {
-        "name": "_params",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "pool",
-            "type": "address"
-          },
-          {
-            "name": "twapWindowSeconds",
-            "type": "uint32"
-          },
-          {
-            "name": "minCurrentLiquidity",
-            "type": "uint128"
-          },
-          {
-            "name": "minHarmonicLiquidity",
-            "type": "uint128"
-          },
-          {
-            "name": "maxObservationAgeSeconds",
-            "type": "uint32"
-          },
-          {
-            "name": "quoteStaleTime",
-            "type": "uint256"
-          }
-        ]
+        "name": "_pool",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addNewPriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addNewPriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      },
+      {
+        "name": "_maxObservationAge",
+        "type": "uint32"
       }
     ],
     "outputs": [
@@ -1531,6 +1524,81 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidNewFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidNewFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidNewFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      },
+      {
+        "name": "_maxObservationAge",
+        "type": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "updatePriceFeed",
@@ -1540,34 +1608,62 @@
         "type": "address"
       },
       {
-        "name": "_params",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "pool",
-            "type": "address"
-          },
-          {
-            "name": "twapWindowSeconds",
-            "type": "uint32"
-          },
-          {
-            "name": "minCurrentLiquidity",
-            "type": "uint128"
-          },
-          {
-            "name": "minHarmonicLiquidity",
-            "type": "uint128"
-          },
-          {
-            "name": "maxObservationAgeSeconds",
-            "type": "uint32"
-          },
-          {
-            "name": "quoteStaleTime",
-            "type": "uint256"
-          }
-        ]
+        "name": "_pool",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updatePriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updatePriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      },
+      {
+        "name": "_maxObservationAge",
+        "type": "uint32"
       }
     ],
     "outputs": [
@@ -1602,6 +1698,81 @@
       {
         "name": "_asset",
         "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidUpdateFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidUpdateFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidUpdateFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      },
+      {
+        "name": "_maxObservationAge",
+        "type": "uint32"
       }
     ],
     "outputs": [
@@ -1663,6 +1834,243 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidDisablePriceFeed",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setFeedDefaults",
+    "inputs": [
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      },
+      {
+        "name": "_maxObservationAge",
+        "type": "uint32"
+      },
+      {
+        "name": "_minLiquidityRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_minObservationCardinality",
+        "type": "uint16"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidFeedDefaults",
+    "inputs": [
+      {
+        "name": "_twapWindow",
+        "type": "uint32"
+      },
+      {
+        "name": "_maxObservationAge",
+        "type": "uint32"
+      },
+      {
+        "name": "_minLiquidityRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_minObservationCardinality",
+        "type": "uint16"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "feedConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "pool",
+            "type": "address"
+          },
+          {
+            "name": "fee",
+            "type": "uint24"
+          },
+          {
+            "name": "quoteAsset",
+            "type": "address"
+          },
+          {
+            "name": "assetIsToken0",
+            "type": "bool"
+          },
+          {
+            "name": "assetDecimals",
+            "type": "uint256"
+          },
+          {
+            "name": "quoteDecimals",
+            "type": "uint256"
+          },
+          {
+            "name": "baseLiquidity",
+            "type": "uint128"
+          },
+          {
+            "name": "twapWindow",
+            "type": "uint32"
+          },
+          {
+            "name": "maxObservationAge",
+            "type": "uint32"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "feedDefaults",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "twapWindow",
+            "type": "uint32"
+          },
+          {
+            "name": "maxObservationAge",
+            "type": "uint32"
+          },
+          {
+            "name": "minLiquidityRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "minObservationCardinality",
+            "type": "uint16"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingUpdates",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "actionId",
+            "type": "uint256"
+          },
+          {
+            "name": "config",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "pool",
+                "type": "address"
+              },
+              {
+                "name": "fee",
+                "type": "uint24"
+              },
+              {
+                "name": "quoteAsset",
+                "type": "address"
+              },
+              {
+                "name": "assetIsToken0",
+                "type": "bool"
+              },
+              {
+                "name": "assetDecimals",
+                "type": "uint256"
+              },
+              {
+                "name": "quoteDecimals",
+                "type": "uint256"
+              },
+              {
+                "name": "baseLiquidity",
+                "type": "uint128"
+              },
+              {
+                "name": "twapWindow",
+                "type": "uint32"
+              },
+              {
+                "name": "maxObservationAge",
+                "type": "uint32"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "FACTORY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "constructor",
     "inputs": [
@@ -1675,23 +2083,15 @@
         "type": "address"
       },
       {
-        "name": "_minActionTimeLock",
+        "name": "_minPriceChangeTimeLock",
         "type": "uint256"
       },
       {
-        "name": "_maxActionTimeLock",
+        "name": "_maxPriceChangeTimeLock",
         "type": "uint256"
       },
       {
         "name": "_factory",
-        "type": "address"
-      },
-      {
-        "name": "_weth",
-        "type": "address"
-      },
-      {
-        "name": "_ethUsdFeed",
         "type": "address"
       }
     ],

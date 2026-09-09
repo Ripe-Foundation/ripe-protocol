@@ -16,7 +16,7 @@ from eth_abi import decode,encode
 from eth_utils import keccak
 from boa.interpret import set_cache_dir
 from conf_utils import advance_timelock_blocks
-from priceSources.uniswap_v3.graph import make_graph,source,params,register,SOURCE
+from priceSources.uniswap_v3.graph import make_graph,source,params,register,weth_price_source,SOURCE,CHAINLINK
 from priceSources.uniswap_v3.compiled import deploy,artifact
 from priceSources.uniswap_v3.gas_tools import cold,calls,dependency_trace,assert_source_hard_limit,assert_size_hard_limit,target_overruns
 from priceSources.uniswap_v3.fork_results import atomic_save,initial_results,failure,sanitized,exception_reason,rpc_endpoints
@@ -143,7 +143,7 @@ def reference_price(raw,a,window,timestamp,ref):
     spl=(sc[1]-sc[0])%2**160
     mean=delta//window
     harmonic=window*(2**160-1)//(spl*2**32) if spl else 0
-    valid=(4295128739<=sqrt<1461446703485210103287273052203988822378723970342 and -887272<=tick<=887272 and 0<=index<card<=card_next<=65535 and unlocked and initialized and (timestamp%2**32-ot)%2**32<=3600 and decoded('liquidity',['uint128'])[0]>=1 and 1<=harmonic<=2**128-1 and -887272<=mean<=887272 and round_id>0 and answer>0 and answered>=round_id and 0<updated<=timestamp and timestamp-updated<=86400)
+    valid=(4295128739<=sqrt<1461446703485210103287273052203988822378723970342 and -887272<=tick<=887272 and 0<=index<card<=card_next<=65535 and unlocked and initialized and card>=LAB['minObservationCardinality'] and (timestamp%2**32-ot)%2**32<=LAB['maxObservationAge'] and decoded('liquidity',['uint128'])[0]>=harmonic*LAB['minLiquidityRatio']//100_00 and 1<=harmonic<=2**128-1 and -887272<=mean<=887272 and round_id>0 and answer>0 and answered>=round_id and 0<updated<=timestamp and timestamp-updated<=86400)
     assert decoded('factory',['address'])[0].lower()==VECTORS['factory'].lower()
     assert decoded('canonicalPool',['address'])[0].lower()==a['pool'].lower()
     tokens=[decoded(k,['address'])[0].lower() for k in ('token0','token1')]
@@ -176,20 +176,21 @@ def qualify_case(g,ref,a,case,checkpoint):
     checkpoint()
     with boa.env.anchor():
         stage('constructor')
-        s=source(g,VECTORS['factory'],VECTORS['weth'],VECTORS['anchor']['address'])
+        s=source(g,VECTORS['factory'])
         case['deployed_bytes']=deployed_size(s)
         case['target_overrun']=target_overruns(size=case['deployed_bytes'])
         checkpoint()
         assert_size_hard_limit(case['deployed_bytes'])
         stage('proposal')
         if expected==0:
-            with boa.reverts('invalid feed'):
-                s.addNewPriceFeed(a['asset'],params(a['pool'],window=window),sender=g.gov)
+            # unusable routes are rejected as `invalid feed`, or revert inside the pool (`OLD`)
+            with boa.reverts():
+                s.addNewPriceFeed(a['asset'],*params(a['pool'],window=window),sender=g.gov)
             case.update(status='unavailable',behavior_passed=True,
                         reason='route unavailable under laboratory guards; admission rejected as expected')
             checkpoint()
             return
-        assert s.addNewPriceFeed(a['asset'],params(a['pool'],window=window),sender=g.gov)
+        assert s.addNewPriceFeed(a['asset'],*params(a['pool'],window=window),sender=g.gov)
         stage('confirmation')
         advance_timelock_blocks(s.actionTimeLock())
         assert s.confirmNewPriceFeed(a['asset'],sender=g.gov)
@@ -246,7 +247,7 @@ def run():
     try:
         stage('compilation')
         # Compile before selecting a fresh pin, without any deployments.
-        for contract in (SOURCE,'contracts/registries/RipeHq.vy','contracts/registries/PriceDesk.vy','contracts/registries/Switchboard.vy','contracts/data/MissionControl.vy'):
+        for contract in (SOURCE,CHAINLINK,'contracts/registries/RipeHq.vy','contracts/registries/PriceDesk.vy','contracts/registries/Switchboard.vy','contracts/data/MissionControl.vy'):
             boa.load_partial(str(ROOT/contract))
         artifact('v3','Reference')
         stage('pin')
@@ -262,6 +263,8 @@ def run():
         with boa.fork(url,block_identifier=selected['block'],cache_dir=os.environ.get('RIPE_TWAP_FORK_CACHE') or None):
             assert boa.env.timestamp==selected['timestamp'], 'fork timestamp mismatch'
             g=make_graph();ref=deploy('v3','Reference')
+            # WETH is priced through a real ChainlinkPrices source bound to the live ETH/USD anchor
+            weth_price_source(g,VECTORS['weth'],VECTORS['anchor']['address'])
             assert boa.env.timestamp==selected['timestamp'], 'graph timestamp drift'
             number=boa.env.evm.patch.block_number
             stage('cases')

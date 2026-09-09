@@ -1,5 +1,5 @@
 import boa
-from .graph import make_graph,source,admit,params
+from .graph import make_graph,source,admit,params,weth_price_source
 from .pools import organic_pool,seed_ring,pack,SLOTS
 
 
@@ -22,7 +22,8 @@ def test_compiler_layout_seed_matches_organic_history_and_repeated_timestamps():
     # The exact oldest boundary succeeds; one older second is genuine OLD.
     with boa.reverts('OLD'):p.observe([3601,0])
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
-    s=source(g,f.address,w,anchor)
+    weth_price_source(g,w,anchor)
+    s=source(g,f.address,min_cardinality=8)
     admit(g,s,a.address,params(p,window=3600))
     assert g.desk.getPrice(a.address,True)==10**18
     actor.remove(p.address,10**20)
@@ -38,16 +39,18 @@ def test_authentic_uint32_wrap_and_observation_only_writes():
     assert p.observations(6)[0]==600
     assert p.observe([1800,0])[0]==[0,0]
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
-    s=source(g,f.address,w,anchor)
-    admit(g,s,a.address,params(p))
+    weth_price_source(g,w,anchor)
+    s=source(g,f.address,min_cardinality=8)
+    admit(g,s,a.address,params(p,window=1800))
     assert g.desk.getPrice(a.address,True)==10**18
 
 
 def test_authentic_crash_lag_extrapolation_and_halt_restart():
     g=make_graph();f,p,a,w,actor,ref=organic_pool(g)
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
-    s=source(g,f.address,w,anchor)
-    admit(g,s,a.address,params(p))
+    weth_price_source(g,w,anchor)
+    s=source(g,f.address,min_cardinality=8)
+    admit(g,s,a.address,params(p,window=1800))
     actor.move(p.address,True,ref.sqrt(-6932))
     actual_tick=p.slot0()[1]
     assert actual_tick in (-6932,-6933)  # boundary tick semantics are canonical
@@ -64,6 +67,7 @@ def test_authentic_crash_lag_extrapolation_and_halt_restart():
     # establishing a newly traded full window or a restart circuit breaker.
     actor.add(p.address,1);actor.remove(p.address,1)
     assert g.desk.getPrice(a.address,True)==ref.quote(actual_tick,10**18,a.address,w.address)
+    # a stale WETH feed makes the desk's WETH leg, and so this feed, unavailable
     anchor.setMockData(10**8,1,1,0,boa.env.timestamp-86401)
     assert s.getPriceAndHasFeed(a.address)==(0,True)
     anchor.setMockData(10**8)
