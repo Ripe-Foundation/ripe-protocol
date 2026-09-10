@@ -158,7 +158,11 @@ minimum acceptable smaller-direction 2% depth in the runbook before proposal.
 `MAX_WARM_QUALIFY_GAS = 170000`. T11 measures the same priced-asset source
 child on both sides: cold minus warm is 18000, so ceiling + delta =
 188000 <= 210000. The full admission callback costs 8885 more than its source
-child; cold source minus that callback is separately labelled 9115. The
+child; cold source minus that callback is separately labelled 9115. The 18000
+is a desk-routed net, because the outer desk call pre-warms MissionControl's
+price configuration; a cold call made directly into the source measures a
+37956 delta, and T11 also asserts ceiling + direct delta = 207956 <= 210000.
+Neither figure may raise the ceiling. The
 pre-callback/read intersection is:
 source, pool, desk and RipeHq addresses; all ten staged feedConfig[asset]
 slots; PriceDesk.tokenScale[asset]; RipeHq.addrInfo[7].addr. Pool observation,

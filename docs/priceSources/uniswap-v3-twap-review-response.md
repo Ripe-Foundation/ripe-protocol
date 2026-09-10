@@ -139,3 +139,26 @@ The attachment binds the raw JSON SHA-256 and exact Git revision. The original
 reviewed-head raw JSON and Phase 1 logs are also preserved under
 [evidence/uniswap-v3-twap](evidence/uniswap-v3-twap/README.md).
 The owner-required three-reviewer pass must target the same new head.
+
+## Second-round dispositions (reviews of `c17fb8f3`)
+
+The contract is byte-identical to `c17fb8f3`; every §3 measurement, the
+committed fixture identity and the PR-attached final-head evidence for that
+contract remain valid.
+
+| Feedback | Resolution |
+| --- | --- |
+| A: brief and follow-up complete; process and deployment obligations restated | No code change. Three-reviewer sign-off on the final head, D4 as operator procedure, real-registry cold T11/T22, D11, D12, D18, the unset 2% depth value and registration remain owner work. |
+| A5: no empty-desk short-circuit in `_hasCompatibleScale` | Not changed. A typed staticcall to an empty desk reverts, PriceDesk isolates that as status 2, and an empty desk entry means RipeHq itself is broken. Editing the contract would invalidate the size/gas table and restart review for a fail-closed corner. |
+| B P3: null, empty, odd-length or short `eth_call` results escaped the depth CLI's error handling | `decode_result` validates the payload as non-empty even-length hex and translates ABI decoding failures into the normal `No verified depth snapshot` error; twelve CLI cases and a unit test cover it. |
+| C1: `git show 11d3bd30` in the archive test breaks under a squash or rebase merge | The test now fails with an explicit message naming the merge-commit requirement; README and evidence README state it. Merge PR #229 with a merge commit. |
+| C2: the 18000 delta is a desk-routed net, not the touch set's cost | T11 now also measures a cold call made directly into the source (delta 37956, route-invariant) and asserts ceiling + direct delta <= 210000 on every route; README and spec state both figures and that neither may raise the ceiling. |
+| C3: the 59-admit / 60-reject boundary is hardcoded | Retained deliberately: a future PriceDesk or source gas change must re-measure and re-derive, not edit the expectation. |
+
+Validation on this tree (Python 3.12.0, Vyper 0.4.3, Titanoboa 0.2.7, arm64):
+default TWAP suite 446 passed; snapshot-gas V3 lane 46 passed with the
+direct-call reading asserted on all eight T11 delta samples (direct delta
+37956, ceiling + direct delta 207956); required tooling 49 passed; ABI export
+tests and shard coverage 35 passed; fuzz 2 passed; `export_abis.py --check`
+matched all 60 artifacts. A fresh fixed-WETH run on the committed clean head
+is attached to the PR report with the same pack/unpack tool.

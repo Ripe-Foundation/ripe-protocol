@@ -149,6 +149,36 @@ def test_operator_malformed_header_is_normal_cli_failure(monkeypatch,capsys,fiel
     assert 'Traceback' not in output.err
 
 
+@pytest.mark.parametrize('value',[None,'',0,42,[],{},'0x','0x1','0xzz','0x'+'00'*8,'0x'+'ff'*32])
+def test_operator_malformed_eth_call_result_is_normal_cli_failure(monkeypatch,capsys,value):
+    # null, empty, odd-length, non-hex, short and non-canonical-padding payloads;
+    # trailing bytes are tolerated by ABI decoding and are not a malformed case
+    class Rpc:
+        def call(self,method,args):
+            if method=='eth_chainId':return '0x1237'
+            if method=='eth_blockNumber':return '0x7'
+            if method=='eth_getBlockByNumber':return {'number':'0x7','hash':'0x'+'ab'*32,'timestamp':'0x64'}
+            assert method=='eth_call' and args[-1]=='0x7'
+            return value
+    monkeypatch.setattr(depth,'Rpc',lambda _:Rpc())
+    monkeypatch.setattr(depth.sys,'argv',['twap_pool_depth.py','https://example.invalid','0x'+'01'*20,'0x'+'02'*20])
+    assert depth.main()==1
+    output=capsys.readouterr()
+    assert output.out=='' and output.err.startswith('No verified depth snapshot: token0()')
+    assert 'Traceback' not in output.err
+
+
+def test_operator_decode_result_accepts_canonical_payloads_only():
+    from eth_abi import encode
+    word='0x'+encode(['uint256'],[42]).hex()
+    assert depth.decode_result(word,('uint256',),'value()')==(42,)
+    address='0x'+encode(['address'],['0x'+'01'*20]).hex()
+    assert depth.decode_result(address,('address',),'token0()')[0].lower()=='0x'+'01'*20
+    for bad in ('0x'+'ff'*32,word[:-2]):
+        with pytest.raises(ValueError,match='does not decode'):
+            depth.decode_result(bad,('address',),'token0()')
+
+
 @pytest.mark.parametrize('fault',['missing_history','zero_quote'])
 def test_operator_unavailable_inputs_produce_no_depth_estimate(monkeypatch,capsys,fault):
     l=ranged_pool();quote_price_source(l.g,l.b,0 if fault=='zero_quote' else 10**18)

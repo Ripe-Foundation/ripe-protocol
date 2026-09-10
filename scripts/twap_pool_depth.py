@@ -17,6 +17,7 @@ import sys
 
 import requests
 from eth_abi import decode, encode
+from eth_abi.exceptions import DecodingError
 from eth_utils import keccak, to_checksum_address
 
 # Copyright 2023 Universal Navigation Inc.
@@ -113,6 +114,16 @@ def rpc_quantity(value, label):
     return int(value, 16)
 
 
+def decode_result(raw, outputs, label):
+    """ABI-decode one eth_call result; a null, empty, odd, or short payload is a normal failure."""
+    if not isinstance(raw, str) or not re.fullmatch(r'0x(?:[0-9a-fA-F]{2})+', raw):
+        raise ValueError(f'{label} returned no ABI-encoded data')
+    try:
+        return decode(outputs, bytes.fromhex(raw[2:]))
+    except (DecodingError, ValueError, OverflowError):
+        raise ValueError(f'{label} returned data that does not decode as {outputs}') from None
+
+
 class Pinned:
     def __init__(self, rpc, block=None):
         self.rpc = rpc
@@ -141,7 +152,7 @@ class Pinned:
     def read(self, address, signature, outputs, inputs=(), args=()):
         data = keccak(text=signature)[:4] + encode(inputs, args)
         raw = self.rpc.call('eth_call', [{'to': to_checksum_address(address), 'data': '0x' + data.hex()}, hex(self.block)])
-        return decode(outputs, bytes.fromhex(raw[2:]))
+        return decode_result(raw, outputs, signature)
 
 
 class PoolTicks:

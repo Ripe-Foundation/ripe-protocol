@@ -22,3 +22,7 @@ new separate callback/source meters. `followup-gas.log` is the complete
 `followup-gas-model.json` identifies its source/model content and environment.
 Both source-child delta measurements are 18000; the callback-denominated delta
 is separately 9115.
+
+The archive check reads commit `11d3bd30` with `git show`. PR #229 must be
+merged with a merge commit, never squashed or rebased, or the required
+`twap-tooling` job fails on master; the test names this condition when it fails.

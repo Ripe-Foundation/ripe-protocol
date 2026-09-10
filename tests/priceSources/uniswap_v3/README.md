@@ -151,6 +151,14 @@ MissionControl policy are first read during the callback. CI preserves these
 printed measurements with `-s`. The [dated review response](../../../docs/priceSources/uniswap-v3-twap-review-response.md)
 records current samples; the table above preserves the original checkpoints.
 
+The 18000 figure is a desk-routed net: the outer desk call pre-warms
+MissionControl's price configuration, which the confirmation callback pays
+cold. A cold call made directly into the source pays the desk, RipeHq and
+MissionControl touches as well; T11 measures that direct delta at **37956**,
+so ceiling + direct delta = **207956 <= 210000**, with about 2000 gas of
+margin, and asserts it on every route. Neither delta may be used to raise
+the ceiling; growth in either lowers it.
+
 Both a hostile metadata path and a governance batch that reads the quote
 before confirming can warm extra storage, pass admission, and fail cold.
 Confirm in a transaction whose only other call is a preceding scale sync for
@@ -192,7 +200,10 @@ hashes, rather than that revision alone, identify the replayed implementation.
 
 The exact reviewed-head `11d3bd30` output is preserved unchanged in
 [repository evidence](../../../docs/priceSources/evidence/uniswap-v3-twap/README.md),
-with all recorded hashes checked against that Git revision. Its 10 qualified /
+with all recorded hashes checked against that Git revision. That check reads
+commit `11d3bd30` with `git show`, so PR #229 must be merged with a merge
+commit; a squash or rebase merge would make the required `twap-tooling` job
+fail on master. Its 10 qualified /
 2 expected-rejected split belongs to that pin, not a permanent pool assumption.
 The final follow-up head's complete raw JSON is attached losslessly to the PR
 report, outside the commit it qualifies, to avoid a self-referential commit hash.

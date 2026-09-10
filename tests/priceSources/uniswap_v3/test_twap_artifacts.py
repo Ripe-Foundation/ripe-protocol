@@ -106,7 +106,12 @@ def test_reviewed_head_fork_archive_matches_recorded_git_sources():
     import subprocess
     path=ROOT/'docs/priceSources/evidence/uniswap-v3-twap/fresh-11d3bd30.json'
     data=json.loads(path.read_text())
-    assert data['code_revision']=='11d3bd30d6a51d98c0d8eb5052a672c8c5a8aa51'
+    revision='11d3bd30d6a51d98c0d8eb5052a672c8c5a8aa51'
+    assert data['code_revision']==revision
+    reachable=subprocess.run(['git','cat-file','-e',revision+'^{commit}'],cwd=ROOT,capture_output=True).returncode==0
+    assert reachable,(f'reviewed head {revision} is not in this checkout. PR #229 must be merged with a merge '
+                      'commit, never squashed or rebased, and CI must fetch full history; otherwise this '
+                      'archive cannot be verified against its recorded sources.')
     for source,expected in data['code_sha256'].items():
         original=subprocess.check_output(['git','show',data['code_revision']+':'+source],cwd=ROOT)
         assert hashlib.sha256(original).hexdigest()==expected

@@ -289,8 +289,18 @@ def test_warm_to_cold_delta_is_within_margin(kind,slots):
     delta=child.get_gas_used()-warm_source
     ceiling=warm_qualification_ceiling(l.s)
     assert ceiling<=170000 and delta<=210000-ceiling
+    # The desk-routed delta is a net: the outer desk call pre-warms MissionControl's
+    # price configuration that the callback pays cold. A cold call made directly into
+    # the source also pays the desk, RipeHq and MissionControl touches, so the ceiling
+    # must hold under that reading too. Lower the ceiling if this ever fails.
+    cold(l.s)
+    assert l.s.getPriceAndHasFeed(l.a)==(10**18,True)
+    direct=l.s._computation.get_gas_used()
+    direct_delta=direct-warm_source
+    assert_source_budget(direct)
+    assert ceiling+direct_delta<=210000, 'lower MAX_WARM_QUALIFY_GAS; the desk-routed delta alone does not bound a direct cold call'
     print('TWAP_WARM_TOUCH_SET '+json.dumps(touches,sort_keys=True))
-    print(f'TWAP_WARM_DELTA kind={kind} slots={slots} callback={warm} warm_source={warm_source} cold={child.get_gas_used()} source_delta={delta} callback_delta={child.get_gas_used()-warm} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')
+    print(f'TWAP_WARM_DELTA kind={kind} slots={slots} callback={warm} warm_source={warm_source} cold={child.get_gas_used()} source_delta={delta} callback_delta={child.get_gas_used()-warm} direct_cold={direct} direct_delta={direct_delta} ceiling={ceiling} ceiling_plus_delta={ceiling+delta} ceiling_plus_direct_delta={ceiling+direct_delta}')
 
 
 def test_confirmation_is_not_cold_qualification():
@@ -410,8 +420,15 @@ def test_warm_to_cold_delta_is_within_margin_canonical(gas_lab,kind):
         ceiling=warm_qualification_ceiling(s)
         assert ceiling<=170000 and delta<=210000-ceiling
         assert_source_budget(child.get_gas_used())
+        # Direct-call reading on the canonical pool; see the raw-pool variant above.
+        cold(s)
+        assert s.getPriceAndHasFeed(l.a)==(2500*10**18,True)
+        direct=s._computation.get_gas_used()
+        direct_delta=direct-warm_source
+        assert_source_budget(direct)
+        assert ceiling+direct_delta<=210000, 'lower MAX_WARM_QUALIFY_GAS; the desk-routed delta alone does not bound a direct cold call'
         print('TWAP_WARM_TOUCH_SET '+json.dumps(touches,sort_keys=True))
-        print(f'TWAP_WARM_DELTA kind={kind} route=canonical callback={warm} warm_source={warm_source} cold={child.get_gas_used()} source_delta={delta} callback_delta={child.get_gas_used()-warm} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')
+        print(f'TWAP_WARM_DELTA kind={kind} route=canonical callback={warm} warm_source={warm_source} cold={child.get_gas_used()} source_delta={delta} callback_delta={child.get_gas_used()-warm} direct_cold={direct} direct_delta={direct_delta} ceiling={ceiling} ceiling_plus_delta={ceiling+delta} ceiling_plus_direct_delta={ceiling+direct_delta}')
 
 
 @pytest.mark.parametrize('kind',['add','update'])
