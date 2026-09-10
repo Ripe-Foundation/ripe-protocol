@@ -75,3 +75,64 @@ def test_cold_recipe_rejects_incompatible_boa_version_or_journal(monkeypatch):
     monkeypatch.setattr(gas_tools,'version',lambda name:'future-version')
     with pytest.raises(RuntimeError,match='review the recipe'):
         gas_tools.access_checkpoints(SimpleNamespace())
+
+
+def test_fresh_fixture_attests_current_contract_worker_and_laboratory():
+    from .fork_inputs import FRESH_FIXTURE
+    from .fork_provenance import assert_current_identity
+    assert_current_identity(json.loads(FRESH_FIXTURE.read_text()))
+
+
+def test_fixture_identity_rejects_changed_source_or_lab_and_ignores_pointer(monkeypatch):
+    import copy
+    import pytest
+    from . import fork_inputs
+    from .fork_provenance import source_identity,assert_current_identity,laboratory_hash
+    good={**source_identity(),'laboratory':fork_inputs.LAB}
+    assert_current_identity(good)
+    for path in ('contracts/priceSources/UniswapV3TwapPrices.vy',
+                 'contracts/priceSources/modules/UniswapV3TwapMath.vy',
+                 'tests/priceSources/uniswap_v3/fork_worker.py'):
+        bad=copy.deepcopy(good);bad['code_sha256'][path]='0'*64
+        with pytest.raises(AssertionError,match='code_sha256'):assert_current_identity(bad)
+    bad=copy.deepcopy(good);bad['laboratory_sha256']='0'*64
+    with pytest.raises(AssertionError,match='laboratory_sha256'):assert_current_identity(bad)
+    assert laboratory_hash({**fork_inputs.LAB,'twapWindow':1800})!=good['laboratory_sha256']
+    monkeypatch.setattr(fork_inputs,'FRESH_FIXTURE',Path('a-different-filename.json'))
+    assert source_identity()=={k:good[k] for k in ('code_sha256','laboratory_sha256')}
+
+
+def test_reviewed_head_fork_archive_matches_recorded_git_sources():
+    import subprocess
+    path=ROOT/'docs/priceSources/evidence/uniswap-v3-twap/fresh-11d3bd30.json'
+    data=json.loads(path.read_text())
+    assert data['code_revision']=='11d3bd30d6a51d98c0d8eb5052a672c8c5a8aa51'
+    for source,expected in data['code_sha256'].items():
+        original=subprocess.check_output(['git','show',data['code_revision']+':'+source],cwd=ROOT)
+        assert hashlib.sha256(original).hexdigest()==expected
+    assert data['header_consistency']=='matched'
+    assert {k:len(v) for k,v in data['buckets'].items()}=={'qualified':10,'expected_rejected':2,'unverified':0,'failed':0}
+
+
+def test_archived_evidence_bytes_match_manifest():
+    folder=ROOT/'docs/priceSources/evidence/uniswap-v3-twap'
+    manifest=json.loads((folder/'sha256.json').read_text())
+    assert {p.name for p in folder.iterdir() if p.is_file() and p.name not in ('README.md','sha256.json')}==set(manifest)
+    for filename,digest in manifest.items():
+        assert hashlib.sha256((folder/filename).read_bytes()).hexdigest()==digest
+
+
+def test_pr_fork_attachment_roundtrips_exact_bytes_and_rejects_tampering():
+    import pytest
+    from scripts.twap_fork_evidence import pack,unpack
+    raw=(ROOT/'docs/priceSources/evidence/uniswap-v3-twap/fresh-11d3bd30.json').read_bytes()
+    report='PR introduction\n'+pack(raw)+'\nPR conclusions'
+    assert unpack(report)==raw
+    assert pack(raw)==pack(raw)
+    with pytest.raises(ValueError,match='digest mismatch'):
+        unpack(report.replace(hashlib.sha256(raw).hexdigest(),'0'*64))
+    with pytest.raises(ValueError,match='missing fork evidence'):
+        unpack('No attachment')
+    incomplete=json.loads(raw);incomplete['cases'][0]['status']='unverified'
+    with pytest.raises(ValueError,match='verified outcomes'):
+        pack(json.dumps(incomplete).encode())

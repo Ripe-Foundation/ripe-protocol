@@ -321,3 +321,29 @@ def test_end_header_downgrade_preserves_first_observed_status_and_reason():
     assert case['status']=='unverified' and not case['behavior_passed']
     assert case['observed_status']=='expected_rejected' and case['observed_reason']=='invalid feed'
     assert buckets({'cases':[case]})=={'qualified':[],'expected_rejected':[],'unverified':['TEST/3600'],'failed':[]}
+
+
+def test_missing_initial_header_marks_every_case_unverified(tmp_path,monkeypatch,capsys):
+    import json
+    from . import fork_worker as worker
+    path=tmp_path/'missing-header.json'
+    for name in ('RIPE_TWAP_BLOCK','RIPE_TWAP_BLOCK_HASH'):monkeypatch.delenv(name,raising=False)
+    monkeypatch.setenv('RIPE_TWAP_PIN_MODE','fresh')
+    monkeypatch.setenv('RIPE_TWAP_RPC_URL','https://example.invalid')
+    monkeypatch.setenv('RIPE_TWAP_FORK_OUTPUT',str(path))
+    class MissingHeader:
+        def __init__(self,*args):pass
+        def call(self,method,args):
+            if method=='eth_chainId':return hex(4663)
+            if method=='eth_blockNumber':return hex(1000)
+            assert method=='eth_getBlockByNumber'
+            return {'number':None,'hash':None,'timestamp':None}
+    monkeypatch.setattr(worker,'Rpc',MissingHeader)
+    monkeypatch.setattr(worker.boa,'load_partial',lambda *args:None)
+    monkeypatch.setattr(worker,'artifact',lambda *args:None)
+    assert worker.run()==0
+    data=json.loads(path.read_text())
+    assert {k:len(v) for k,v in data['buckets'].items()}=={'qualified':0,'expected_rejected':0,'unverified':12,'failed':0}
+    assert len(data['cases'])==12 and all(c['status']=='unverified' for c in data['cases'])
+    assert all(c['stage']=='pin' and 'header' in c['reason'] for c in data['cases'])
+    assert data['pin'] is None and data['header_consistency']=='unverified'

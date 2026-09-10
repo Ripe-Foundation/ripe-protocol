@@ -10,7 +10,8 @@ resolved window/age, initialized history and cardinality >= window+1. Review
 all potentially authoritative quote sources, including fallbacks: each must
 never call back into PriceDesk, and V3 must be after all of them. Repeat this
 review after every registry or MissionControl priority change. Re-run the cold
-T11/T22 qualification for the selected registry/route before production use.
+T11/T22 qualification against the actual selected registry and quote route before
+any proposal. The fixed-WETH laboratory alone does not qualify a production registry.
 
 Run `scripts/twap_pool_depth.py RPC POOL ASSET --source SOURCE` at a printed,
 pinned block. With no source, supply window/age/ratio explicitly or accept
@@ -29,6 +30,23 @@ that value, or while the value remains unset. This PR selects no financial
 threshold, LTV, cap or borrowing policy. Depth is fee-inclusive market depth
 at the pinned block, not the cost to manipulate a TWAP for the window.
 
+**Confirmation transaction:** confirm on its own, or with only a preceding
+`PriceDesk.syncTokenScale(asset)` for that same asset. Do not put quote-price
+reads, route preflights, other feeds, or other calls in that transaction.
+Perform those checks in a separate prior transaction: they can warm quote
+storage and let the admission ceiling pass a route that later fails cold.
+Both standalone and batched confirmation still require cold qualification.
+Estimate the complete intended transaction and use a generous gas buffer;
+a tight transaction limit can starve the inner 250,000-gas call under EIP-150
+and revert with `price source not executable` even for a valid route.
+
+Do not leave a newly admitted asset's cached scale at zero in production.
+Prefer `[syncTokenScale(asset), confirmNewPriceFeed(asset)]`; if confirmed
+separately, sync immediately before using any USD/asset conversion. An unset
+scale permits a USD18 price read, but `getUsdValue` and `getAssetAmount` return
+zero, or revert with `missing token scale` when their raising flag is true.
+Verify the exact cached scale after syncing.
+
 For a priced-asset scale mismatch that arises after a valid proposal, wait for
 the proposal timelock and batch `[PriceDesk.syncTokenScale(asset), confirm]`.
 A transient confirmation failure reverts both calls and preserves the proposal.
@@ -42,6 +60,11 @@ while its old decimal snapshot still matches the old cached scale, until the
 sync. A successful confirmation installs the new snapshot; an identity cancel
 after the sync can leave the old feed dark. Disable and re-add does not bypass
 the confirmation scale check.
+
+**Identity cancellation precedes the timelock check.** Calling `confirm*`
+before unlock while token or pool identity has drifted cancels the proposal
+and consumes it; it does not leave a retryable timelock failure. Check current
+identity before submitting, including for tokens with upgradeable metadata.
 
 After any batch, verify the exact `NewUniV3FeedAdded` or `UniV3FeedUpdated` event
 for the asset, pool, quote and resolved policy, then verify pending state,

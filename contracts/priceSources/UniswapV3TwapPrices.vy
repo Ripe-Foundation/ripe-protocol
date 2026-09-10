@@ -162,7 +162,7 @@ FACTORY: public(immutable(address))
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICED_ASSETS: constant(uint256) = 50
-MAX_WARM_QUALIFY_GAS: constant(uint256) = 170_000 # T11 measured delta 9_115; sum 179_115 <= 210_000
+MAX_WARM_QUALIFY_GAS: constant(uint256) = 170_000 # T11 source-child cold delta 18_000; sum 188_000 <= 210_000
 MIN_TWAP_WINDOW: constant(uint32) = 30 * 60 # 30 minutes
 MAX_TWAP_WINDOW: constant(uint32) = 4 * 60 * 60 # 4 hours
 
@@ -226,7 +226,7 @@ def _getPrice(_asset: address, _config: UniV3FeedConfig, _priceDesk: address, _c
         return 0
 
     # Only the proposal probe skips this guard: governance may sync then confirm.
-    if _checkScale and not self._hasCompatibleScale(_asset, _config.assetDecimals):
+    if _checkScale and not self._hasCompatibleScale(_asset, _config.assetDecimals, priceDesk):
         return 0
 
     # quote one whole asset token at 1e18 extra precision; scaling is removed
@@ -249,8 +249,8 @@ def _getPrice(_asset: address, _config: UniV3FeedConfig, _priceDesk: address, _c
 
 @view
 @internal
-def _hasCompatibleScale(_asset: address, _assetDecimals: uint256) -> bool:
-    scale: uint256 = staticcall PriceDesk(addys._getPriceDeskAddr()).tokenScale(_asset)
+def _hasCompatibleScale(_asset: address, _assetDecimals: uint256, _priceDesk: address) -> bool:
+    scale: uint256 = staticcall PriceDesk(_priceDesk).tokenScale(_asset)
     return scale == 0 or scale == 10 ** _assetDecimals
 
 
@@ -432,7 +432,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
-    assert self._isValidNewFeed(_asset, d.config) and self._hasCompatibleScale(_asset, d.config.assetDecimals) # dev: invalid feed
+    assert self._isValidNewFeed(_asset, d.config) and self._hasCompatibleScale(_asset, d.config.assetDecimals, addys._getPriceDeskAddr()) # dev: invalid feed
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
@@ -546,7 +546,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
-    assert self._isValidUpdateFeed(_asset, d.config) and self._hasCompatibleScale(_asset, d.config.assetDecimals) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, d.config) and self._hasCompatibleScale(_asset, d.config.assetDecimals, addys._getPriceDeskAddr()) # dev: invalid feed
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached

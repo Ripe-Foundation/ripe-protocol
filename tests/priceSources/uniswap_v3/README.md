@@ -131,10 +131,12 @@ source-isolation case, not supported route qualification.
 | §3.7 | 20650 | 165782 | 174984 | 248173 | 185738 |
 | §3.8 | 20650 | 165782 | 174984 | 248173 | 185738 |
 
-Phase 2 `cb69a688`: 95 new remediation cases and 44 gas cases passed. T11
-measures **9115 gas** cold-minus-warm for add and update, canonical and synthetic
-storage-heavy quote routes. `MAX_WARM_QUALIFY_GAS` remains **170000**, so ceiling
-plus delta = **179115 <= 210000**. The enumerated pre-callback/read touch set is:
+Phase 2 `cb69a688` had 95 new remediation cases and 44 gas cases. The review
+follow-up distinguishes **warm source child**, **admission callback**, and
+**cold source child**. Across add/update, canonical and storage-heavy routes,
+source-to-source delta is **18000 gas**; callback overhead is **8885** and
+cold-source minus callback remains **9115**. `MAX_WARM_QUALIFY_GAS` remains
+**170000**, conservatively giving **188000 <= 210000**. The touch set is:
 
 - Addresses: source itself (top-level recipient), pool, canonical desk, RipeHq.
 - Storage: all ten staged `feedConfig[asset]` fields (pool, fee, quoteAsset,
@@ -142,16 +144,19 @@ plus delta = **179115 <= 210000**. The enumerated pre-callback/read touch set is
   maxObservationAge, minLiquidity); `PriceDesk.tokenScale[asset]`;
   `RipeHq.addrInfo[7].addr`.
 
-T11 prints the concrete addresses/slot indices and verifies the intersection
-with executed reads. Pool metadata immutables do not warm slot0/liquidity/
-observations. RipeHq ID 5 and MissionControl policy are first read during the
-callback. Canonical add/update samples: warm 153500 / cold 162615. Storage-heavy
-59-slot sample: warm 169893 / cold 179008; 60 slots exceed the ceiling and reject.
-An adversarial metadata path warms extra quote slots, passes the ceiling and
-fails cold: the quote alone costs 228350 (<250000), while the combined outer
-route exhausts its stipend (246724 measured before forwarding loss). The fat
-registry miss is tested separately in T22: source-first 248171/unavailable;
-source-last 183235/success. RH-shaped source-last sample is 162655.
+T11 derives member offsets from compiler layout/types, prints concrete
+addresses/slots, and verifies the intersection with executed reads. The pool's
+metadata immutables do not warm slot0/liquidity/observations. HQ entry 5 and
+MissionControl policy are first read during the callback. CI preserves these
+printed measurements with `-s`. The [dated review response](../../../docs/priceSources/uniswap-v3-twap-review-response.md)
+records current samples; the table above preserves the original checkpoints.
+
+Both a hostile metadata path and a governance batch that reads the quote
+before confirming can warm extra storage, pass admission, and fail cold.
+Confirm in a transaction whose only other call is a preceding scale sync for
+the same asset. Quote reads and preflights belong in a separate transaction.
+The runbook covers gas estimation, zero-scale conversion failures, identity
+cancellation before unlock, and verification of confirmed events after a batch.
 
 Successful confirmation does not replace cold qualification of a production route; the CI cold tests are the qualification.
 
@@ -177,11 +182,20 @@ RIPE_TWAP_PIN_MODE=fresh RIPE_TWAP_RPC_URL="$RPC" RIPE_TWAP_FORK_OUTPUT=/tmp/twa
 
 Atomic checkpoints retain inputs, stages, discrepancies, dependency traces
 and sanitized failure reasons. A 600-second worker deadline retains evidence
-but fails incomplete execution. The fixture selected by `fork_inputs.py` is
-fresh block 58904245: 10 qualified, INDEX 3600/14400 expected rejected, zero
-unverified/failed. INDEX cardinality was 1801 at that pin; this is captured
-state, not a permanent expectation about that pool. Final-head fresh evidence
-is recorded separately after the evidence commit.
+but fails incomplete execution. The active fixture selected by `fork_inputs.py`
+is regenerated from the current model. Its source hashes cover the contract,
+math, worker, graph/gas helpers and transitive Vyper dependencies. A canonical
+hash of `LAB` plus reference vectors excludes the fixture filename, avoiding
+a self-reference. Required offline tests reject source/model drift. Captures
+also record their Git revision and whether the worktree was dirty; content
+hashes, rather than that revision alone, identify the replayed implementation.
+
+The exact reviewed-head `11d3bd30` output is preserved unchanged in
+[repository evidence](../../../docs/priceSources/evidence/uniswap-v3-twap/README.md),
+with all recorded hashes checked against that Git revision. Its 10 qualified /
+2 expected-rejected split belongs to that pin, not a permanent pool assumption.
+The final follow-up head's complete raw JSON is attached losslessly to the PR
+report, outside the commit it qualifies, to avoid a self-referential commit hash.
 
 ## Provenance and ratified residuals
 

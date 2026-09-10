@@ -317,7 +317,8 @@ def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
     tooling_command = _step(_workflow()["jobs"]["twap-tooling"], "Run TWAP tooling and artifact tests")["run"]
     tooling_args = _pytest_args(tooling_command)
     assert {arg for arg in tooling_args if arg.startswith("tests/")} == TWAP_TOOLING_FILES
-    assert _flag_values(tooling_args, "-o") == ["addopts="]
+    assert _flag_values(tooling_args, "-o") == ["addopts=", "cache_dir=$RUNNER_TEMP/pytest-cache"]
+    assert "--basetemp=$RUNNER_TEMP/pytest-basetemp" in tooling_args
     assert not _flag_values(tooling_args, "-m")
     shard_arguments = _workflow_lean_shard_arguments()
     unmatched = []
@@ -413,7 +414,8 @@ def test_python_workflow_uses_full_history_for_python_tests():
     # tests/config/test_defaults_robinhood.py pins a historical commit and
     # reads config/BluePrint.py out of it with `git show`. That file runs in
     # the lean config shard, so a shallow checkout fails the test job outright.
-    # Both checkouts are pinned so that shortening either one has to be a
+    # TWAP tooling also checks the preserved reviewed-head capture with git show.
+    # All three checkouts are pinned so shortening one has to be a
     # deliberate edit rather than an invisible speedup.
     depths = {
         job_name: step["with"]["fetch-depth"]
@@ -421,7 +423,7 @@ def test_python_workflow_uses_full_history_for_python_tests():
         for step in job.get("steps", [])
         if "fetch-depth" in (step.get("with") or {})
     }
-    assert depths == {"test": "0", "deployment-controls": "0"}
+    assert depths == {"test": "0", "deployment-controls": "0", "twap-tooling": "0"}
 
 
 def test_python_workflow_bounds_every_job_runtime():
@@ -579,3 +581,8 @@ def test_python_workflow_enforces_all_snapshot_gas_suites():
         argument.startswith("tests/registries/test_price_desk_gas.py::")
         for argument in arguments
     )
+
+
+def test_snapshot_gas_preserves_printed_measurement_evidence():
+    command=_step(_workflow()['jobs']['snapshot-gas'],'Enforce snapshot gas budgets')['run']
+    assert '-s' in _pytest_args(command), 'gas samples and warm touch sets must remain visible in successful CI logs'

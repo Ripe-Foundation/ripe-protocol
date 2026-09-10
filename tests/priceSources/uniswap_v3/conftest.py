@@ -18,24 +18,31 @@ def math():
     return boa.load('tests/priceSources/uniswap_v3/MathHarness.vy')
 
 
-@pytest.fixture(scope='module')
-def lab():
+def make_lab(*,quote_decimals=18,quote_price=None,asset_is_token0=True):
     from types import SimpleNamespace
-    from .graph import make_graph, source, weth_price_source
+    from .graph import make_graph, source, weth_price_source, quote_price_source
     from .raw import Pool
     g=make_graph()
     tokens=[boa.load('contracts/mock/MockChainlinkFeed.vy',10**18) for _ in range(2)]
-    asset,weth=sorted(tokens,key=lambda t:int(t.address,16))
-    for token in tokens:
-        token.setDecimals(18)
+    asset,weth=sorted(tokens,key=lambda t:int(t.address,16),reverse=not asset_is_token0)
+    asset.setDecimals(18)
+    weth.setDecimals(quote_decimals)
     # $1 ETH anchor: a USD price equals the raw WETH quote per whole token.
     anchor=boa.load('contracts/mock/MockChainlinkFeed.vy',10**18)
-    weth_price_source(g,weth,anchor)
+    if quote_price is None:
+        weth_price_source(g,weth,anchor)
+    else:
+        quote_price_source(g,weth,quote_price)
     factory=boa.load('contracts/mock/MockUniV3Factory.vy')
     pool=Pool(asset,weth,factory)
     factory.setPool(asset,weth,10000,pool.address)
     s=source(g,factory)
     return SimpleNamespace(g=g,s=s,asset=asset,weth=weth,anchor=anchor,factory=factory,pool=pool)
+
+
+@pytest.fixture(scope='module')
+def lab():
+    return make_lab()
 
 
 @pytest.fixture(autouse=True)

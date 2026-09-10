@@ -203,12 +203,15 @@ def test_observation_cardinality_floor_is_an_admission_check(lab,cardinality):
         with boa.reverts('invalid feed'):lab.s.addNewPriceFeed(lab.asset,*params(lab.pool),sender=lab.g.gov)
         return
     admit(lab.g,lab.s,lab.asset,params(lab.pool))
-    # a shrunk ring later does not stop reads; a raised floor applies to new proposals
+    # Cardinality is admission-only; a longer default window raises the next proposal requirement.
     lab.pool.set_history(cardinality=1)
     assert lab.g.desk.getPrice(lab.asset,True)==10**18
-    lab.s.setFeedDefaults(cardinality,1800,50_00,sender=lab.g.gov)
+    longer_window=7200
+    lab.s.setFeedDefaults(longer_window,1800,50_00,sender=lab.g.gov)
     lab.pool.set_history(cardinality=cardinality)
     assert not lab.s.isValidUpdateFeed(lab.asset,*params(lab.pool))
+    assert lab.s.feedConfig(lab.asset).twapWindow==3600
+    assert lab.g.desk.getPrice(lab.asset,True)==10**18
 
 
 def test_no_v3_feed_may_depend_on_another_v3_feed(lab):

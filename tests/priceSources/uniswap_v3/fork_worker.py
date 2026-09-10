@@ -257,7 +257,10 @@ def run():
     path=os.environ['RIPE_TWAP_FORK_OUTPUT']
     output=initial_results(mode,[a['label'] for a in VECTORS['assets']],LAB)
     output['code_revision']=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
-    output['code_sha256']={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [ROOT/SOURCE,ROOT/'contracts/priceSources/modules/UniswapV3TwapMath.vy',Path(__file__),ROOT/'tests/priceSources/uniswap_v3/fork_inputs.py']}
+    from priceSources.uniswap_v3.fork_provenance import source_identity
+    output.update(source_identity())
+    output['laboratory']=LAB
+    output['capture_worktree_dirty']=bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip())
     output['model']='fixed-WETH laboratory; local RipeHq/PriceDesk/ChainlinkPrices; pinned live pool and ETH/USD anchor'
     def save():atomic_save(path,output)
     def stage(name):

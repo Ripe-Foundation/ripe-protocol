@@ -1,0 +1,15 @@
+{
+  "followup-gas-model.json": "d5f920090bc44dece5dd2fc5dad785e6ba8fde3ed8b956ba938273e56bf9a305",
+  "followup-gas.log": "843559d609215cc6340b4b78de69b14e0fb770258a581d062e373070d60e8ce6",
+  "fresh-11d3bd30.json": "256ca8c7a4713b1d0278a5b5ed2ae497f09489cd5974499c57fcc1ea0087fb54",
+  "reviewed-source-delta.log": "fc4caf74cf77532e94643b649942fbeebaa3c2a26b2ce1e0b648f7f6070eec25",
+  "ripe-twap-phase1-3.1.log": "606156bdbfd105b6ede901ec04fc38ba3df04a450bee6beae12f42d3772a8bb7",
+  "ripe-twap-phase1-3.2.log": "97c02c31cd801e3fefa1f00642d8d7d07cc297aba53f0ccd486f8d73c772e64e",
+  "ripe-twap-phase1-3.3.log": "1768b2b318ede04281f2237f71884b601249d2ce29836bbe58f8711125520bad",
+  "ripe-twap-phase1-3.4.log": "d9b1e57708117ce171bbc8004a9091cdf7551a6e8a1dcea9a9507870b3b162ec",
+  "ripe-twap-phase1-3.5.log": "2f0c22681d533a1712037a72f0217857a18f8d979035d0d82f27ae99c239393c",
+  "ripe-twap-phase1-3.6.log": "cdbef8a60e986fb35595e8343772369e8ac138a6fb80e7a657d191f44c0f9830",
+  "ripe-twap-phase1-3.7.log": "8a1510f57b633e25449a855c49d3c165231bc3b5499334c33b1cb082705b09af",
+  "ripe-twap-phase1-3.8.log": "55d68b3f4f4a113e22533b7b41d4f10f70dada9b522e618731225c4eb79cff4f",
+  "ripe-twap-phase1-baseline.log": "8f22d874844fb042eb6c116a68c5f9757ff76357c3da4e23a0a7ce65bff076b5"
+}

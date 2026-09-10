@@ -1,5 +1,9 @@
 # PR #229 remediation evidence
 
+Historical implementation evidence for reviewed head `11d3bd30`. The
+[current follow-up and review disposition](uniswap-v3-twap-review-response.md)
+records subsequent changes and validation.
+
 2026-09-09. Python 3.12.0, Vyper 0.4.3, Titanoboa 0.2.7, arm64;
 `RIPE_BOA_CACHE_DIR` set to a writable external cache. Commands run from the
 isolated remediation worktree on `codex/uniswap-v3-twap-remediation`.
@@ -12,12 +16,13 @@ isolated remediation worktree on `codex/uniswap-v3-twap-remediation`.
 | Contracts and minimal compatibility changes | `8a9b90ec2101c29b4ab7cac23f9f01d8024e7200` |
 | Remediation tests and measured admission margin | `cb69a688eba34438c7d4ac936c4988ced73ea378` |
 | Docs, exact depth helper, fork tooling/fixture, required CI job | `15b337d36a0c777f6f8894b190cd767db66c8ee0` |
-| Evidence | This commit |
+| Evidence | `11d3bd30d6a51d98c0d8eb5052a672c8c5a8aa51` |
 
 The merge includes master `1ede38351e6da918806dff70d34b2066bf8cde8c` and is
 preserved. Its first real [workflow run](https://github.com/Ripe-Foundation/ripe-protocol/actions/runs/34409655035)
-completed successfully. Remediation edits to production source are limited to
-`UniswapV3TwapPrices.vy` and its new math module. Existing production contracts,
+completed successfully. The final reviewed head also passed [all 17 jobs](https://github.com/Ripe-Foundation/ripe-protocol/actions/runs/34414009563). Remediation edits to production source are limited to
+`UniswapV3TwapPrices.vy` and the PR-added `UniswapV3TwapMath.vy`
+module, which already existed before remediation. Existing production contracts,
 shared modules, deployment scripts and migrations were not changed by the
 remediation. D4 remains operator policy; no priority walk, allowlist or new
 governance arguments were introduced.
@@ -57,11 +62,13 @@ of pre-callback touches with price-path reads comprises:
 Concrete addresses and numeric storage slots are printed and compared with
 executed reads in T11. Pool metadata does not warm pool slot0, liquidity or
 observations. RipeHq entry 5 and MissionControl policy are first touched inside
-the callback. Both add and update measure **9115 gas** cold-minus-warm, across
+the callback. Both add and update measured **9115 gas** cold-source-minus-full-callback, across
 canonical and storage-heavy quote routes. The retained ceiling **170000** plus
-the measured delta is **179115 <= 210000**.
+that callback-denominated delta is **179115 <= 210000**. The follow-up
+additionally measures source-child to source-child: **18000**, giving the more
+conservative **188000 <= 210000** with the same ceiling.
 
-| Named sample | Warm | Cold forwarded | Result |
+| Named sample | Full callback | Cold forwarded | Result |
 | --- | ---: | ---: | --- |
 | Canonical add/update | 153500 | 162615 | Admitted and priceable |
 | 59 quote storage slots | 169893 | 179008 | Admitted and priceable |
@@ -79,23 +86,28 @@ needed.
 
 ## Fresh input evidence
 
-The committed fixture `tests/priceSources/uniswap_v3/fixtures/fresh-58904245.json`
-is a fresh fixed-WETH laboratory capture against the final implementation:
+The original replay fixture (since replaced by the follow-up) was a fresh
+fixed-WETH laboratory capture against the original implementation:
 block **58904245**, hash
 `0x9d1d632b5132d851213a1c93ff74127afae0b9f9ae74a79351264d4bb3b1d86d`.
 All per-case and end headers matched. Buckets: **10 qualified, 2 expected
-rejected, 0 unverified, 0 failed**. INDEX had cardinality1801 and rejected the
+rejected, 0 unverified, 0 failed**. INDEX had cardinality 1801 and rejected the
 3600/14400 windows; the other outcomes were independently computed from the
 captured state, not hardcoded to an old INDEX observation. All 12 replay cases
-pass offline under the new model. The fixture preserves raw responses,
-reference outputs, actual measurements, dependency traces and source hashes.
+pass offline under the new model. That capture recorded a pre-pointer-update `fork_inputs.py` hash that was not
+a committed file version; the follow-up replaces it with canonical model
+content attestation. Its measured contract/model outputs were unaffected.
 
 Final contract source SHA-256:
 `2332c92dfcaabeace3821ee50917d23b418016c3bb0dcb68f2f7ed059f8766b5`.
 Math module SHA-256:
 `1428f02f6e12f2b7b2df93c9d66e30a5819af450ef9d4829e56f59b0358172f6`.
 
-The final pushed-head fresh run and complete workflow URL are bound in the
+The exact final reviewed-head JSON is now [preserved unchanged](evidence/uniswap-v3-twap/fresh-11d3bd30.json):
+block 58915768, hash `0x785f3406c1ae3cbbca1e85d46f85e73a90425e01c75db79bad7b488fdab85c4d`,
+10 qualified, 2 expected rejected, 0 unverified/failed, maximum source gas 160795.
+All four recorded source hashes match `11d3bd30`; required tests verify this.
+The final pushed-head fresh run and complete workflow URL are also bound in the
 [PR report](https://github.com/Ripe-Foundation/ripe-protocol/pull/229).
 Three-reviewer re-review of that same head remains the separate owner gate;
 this implementing agent does not substitute self-review for those reviewers.

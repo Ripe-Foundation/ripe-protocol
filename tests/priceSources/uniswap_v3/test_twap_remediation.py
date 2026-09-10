@@ -4,7 +4,7 @@ T11/T22 live in test_twap_gas.py. Canonical pools cover liquidity and ring
 claims; raw pools isolate ABI faults and governance state transitions.
 """
 from fractions import Fraction
-import math as pymath
+from decimal import Decimal, localcontext
 from types import SimpleNamespace
 
 import boa
@@ -71,6 +71,10 @@ def test_positive_ratio_never_rounds_to_zero_floor(lab,liquidity,ratio):
 def test_scale_poisoning_confirm_while_unset_then_hostile_sync_goes_dark(lab):
     admit(lab.g,lab.s,lab.asset,params(lab.pool))
     assert lab.g.desk.tokenScale(lab.asset)==0
+    assert lab.g.desk.getPrice(lab.asset,True)==10**18
+    for convert in (lab.g.desk.getUsdValue,lab.g.desk.getAssetAmount):
+        assert convert(lab.asset,10**18)==0
+        with boa.reverts('missing token scale'):convert(lab.asset,10**18,True)
     lab.asset.setDecimals(6)
     lab.g.desk.syncTokenScale(lab.asset,sender=boa.env.generate_address())
     assert lab.g.desk.tokenScale(lab.asset)==10**6
@@ -166,31 +170,48 @@ def test_identity_cancel_after_sync_leaves_scale_and_darkens_feed(active):
 
 @pytest.mark.parametrize('quote_decimals',[0,6])
 @pytest.mark.parametrize('quote_usd',[1,100])
-def test_low_decimal_quote_economic_precision(lab,math,quote_decimals,quote_usd):
-    lab.weth.setDecimals(quote_decimals)
-    g=make_graph()
+@pytest.mark.parametrize('order',[True,False])
+def test_low_decimal_quote_economic_precision(math,quote_decimals,quote_usd,order):
+    from .conftest import make_lab
     quote_price=quote_usd*10**18
-    quote_price_source(g,lab.weth,quote_price)
-    s=source(g,lab.factory)
-    ratio=1e-3/quote_usd*10**quote_decimals/10**18
-    tick=round(pymath.log(ratio)/pymath.log(1.0001))
-    lab.pool.set_history(tick=tick)
-    actual=admit(g,s,lab.asset,params(lab.pool))
-    # Independent exact rational ideal; no source result enters the reference.
-    ideal=Fraction(10001,10000)**tick
-    expected=10**18*ideal*quote_price/10**quote_decimals
+    l=make_lab(quote_decimals=quote_decimals,quote_price=quote_price,asset_is_token0=order)
+    g,s,asset,quote=l.g,l.s,l.asset,l.weth
+    # Decimal logs only select a candidate. Exact rational inequalities below
+    # prove the tick bracket and reference; no binary float or source price.
+    target=Fraction(10**quote_decimals,1000*quote_usd*10**18)
+    raw_ratio=target if order else 1/target
+    with localcontext() as ctx:
+        ctx.prec=80
+        tick=int((Decimal(raw_ratio.numerator)/Decimal(raw_ratio.denominator)).ln()/Decimal('1.0001').ln())
+    ideal_ratio=Fraction(10001,10000)**tick
+    if ideal_ratio>raw_ratio:
+        tick-=1;ideal_ratio*=Fraction(10000,10001)
+    assert ideal_ratio<=raw_ratio<ideal_ratio*Fraction(10001,10000)
+    l.pool.set_history(tick=tick)
+    actual=admit(g,s,asset,params(l.pool))
     sqrt=math.sqrt(tick)
-    assert Fraction((sqrt-1)**2,2**192)<ideal<=Fraction(sqrt*sqrt,2**192)
-    tick_bound=Fraction(2*sqrt+1,2**192)*10**18*quote_price/10**quote_decimals
-    tolerance=Fraction(quote_price*10**quote_decimals,10**18)+tick_bound+1
-    assert abs(actual-expected)<=tolerance
-    assert 9*10**14<actual<11*10**14  # a sub-cent asset, approximately $0.001
-    assert g.desk.getPrice(lab.asset,True)==actual
+    # TickMath's finite-precision constants need not yield the exact rational
+    # square root rounded by one unit at large positive ticks. Bound its error
+    # against the exact ideal, including the Q128 branch's ratio truncation.
+    quantized_ratio=Fraction(sqrt*sqrt,2**192) if sqrt<=2**128-1 else Fraction(sqrt*sqrt//2**64,2**128)
+    ideal_quote=ideal_ratio if order else 1/ideal_ratio
+    expected=10**18*ideal_quote*quote_price/10**quote_decimals
+    quantized_quote=quantized_ratio if order else 1/quantized_ratio
+    tick_bound=abs(quantized_quote-ideal_quote)*10**18*quote_price/10**quote_decimals
+    # One scaled raw-quote unit and one final USD wei, plus TickMath error.
+    tolerance=Fraction(quote_price,10**quote_decimals*10**18)+tick_bound+1
+    assert tolerance<1000  # < 1e-15 USD, not a broad sub-cent price band
+    assert expected-tolerance<=actual<=expected+tolerance
+    old_unscaled=math.quote(tick,10**18,order)*quote_price//10**quote_decimals
+    assert abs(old_unscaled-expected)>tolerance
+    assert g.desk.getPrice(asset,True)==actual
 
 
 @pytest.mark.parametrize('tick',[-887272,0,443636,443637,887272])
 @pytest.mark.parametrize('order',[True,False])
-def test_scaled_quote_domain_at_tick_extremes_both_orders(lab,math,tick,order):
+def test_scaled_quote_domain_at_tick_extremes_both_orders(math,tick,order):
+    from .conftest import make_lab
+    lab=make_lab(quote_price=10**18,asset_is_token0=order)
     ref=deploy('v3','Reference')
     sqrt=ref.sqrt(tick)
     if sqrt<=2**128-1:
@@ -209,9 +230,8 @@ def test_scaled_quote_domain_at_tick_extremes_both_orders(lab,math,tick,order):
         assert (sqrt>2**128-1)==(tick==443637)
     if (tick,order) in [(-887272,True),(887272,False)]:
         assert expected==0  # unavailable, with no revert or arithmetic truncation
-    asset,quote=(lab.asset,lab.weth) if order else (lab.weth,lab.asset)
-    g=make_graph();quote_price_source(g,quote,10**18)
-    s=source(g,lab.factory)
+    g,s,asset=lab.g,lab.s,lab.asset
+    # Admission starts at a nonzero quote; this specifically tests later read-time extremes.
     admit(g,s,asset,params(lab.pool))
     lab.pool.set_history(tick=tick)
     assert s.getPriceAndHasFeed(asset)==(expected//10**18,True)
@@ -561,3 +581,55 @@ def test_cross_instance_and_wrapper_cycles_fail_closed_when_fallback_removed(lab
     assert g.desk.confirmAddressDisableInRegistry(rid,sender=g.gov)
     assert g.desk.getPrice(lab.asset)==0
     assert g.desk.getPrice(lab.weth)==0
+
+
+@pytest.mark.parametrize('tick,order',[(-887272,True),(887272,False)])
+def test_zero_scaled_quote_at_extreme_is_rejected_at_proposal(lab,tick,order):
+    asset,quote=(lab.asset,lab.weth) if order else (lab.weth,lab.asset)
+    g=make_graph();quote_price_source(g,quote,10**18)
+    s=source(g,lab.factory)
+    lab.pool.set_history(tick=tick)
+    before=state(s,asset)
+    with boa.reverts('invalid feed'):
+        s.addNewPriceFeed(asset,*params(lab.pool),sender=g.gov)
+    assert state(s,asset)==before and s.pendingQuoteCount(quote)==0
+
+
+def test_add_batch_sync_then_confirm_recovers_hostile_first_sync():
+    # Stable caller-independent metadata cannot produce a poisoned first sync.
+    # This hostile token lies only to the desk during the attack; the source's
+    # proposed identity and normal decimals() remain 18 throughout.
+    from .conftest import make_lab
+    l=make_lab()
+    token=boa.load('tests/priceSources/uniswap_v3/CallerDecimalsToken.vy',l.g.desk)
+    l.asset=token
+    l.pool=Pool(token,l.weth,l.factory)
+    l.factory.setPool(token,l.weth,10000,l.pool.address)
+    # A pending V3 add alone is not a PriceDesk feed. The existing independent
+    # oracle makes permissionless first sync available during this proposal.
+    previous=quote_price_source(l.g,token,10**18)
+    assert l.s.addNewPriceFeed(token,*params(l.pool),sender=l.g.gov)
+    pending=l.s.pendingUpdates(token)
+    token.setDeskSpoof(True)
+    l.g.desk.syncTokenScale(token,sender=boa.env.generate_address())
+    token.setDeskSpoof(False)
+    assert token.decimals()==18 and token.decimals(sender=l.s.address)==18
+    assert l.g.desk.tokenScale(token)==10**6
+    assert l.s.pendingUpdates(token)==pending and pending.config.assetDecimals==18
+    advance_timelock_blocks(2)
+    with boa.reverts('invalid feed'):l.s.confirmNewPriceFeed(token,sender=l.g.gov)
+    batch=batch_at_governor(l.g)
+    with boa.env.anchor():
+        l.anchor.setMockData(0)
+        with boa.reverts('price source not executable'):
+            sync_and_confirm(batch,l,'confirmNewPriceFeed')
+        assert l.g.desk.tokenScale(token)==10**6 and l.s.pendingUpdates(token)==pending
+        assert batch._computation.get_log_entries()==()
+    assert sync_and_confirm(batch,l,'confirmNewPriceFeed')==[b'',word(1)]
+    assert len(filter_logs(batch,'NewUniV3FeedAdded'))==1
+    assert l.g.desk.tokenScale(token)==10**18
+    assert l.s.pendingUpdates(token).actionId==0 and l.s.pendingQuoteCount(l.weth)==0
+    register(l.g.desk,l.s,l.g.gov)
+    previous.setPrice(token,0)
+    assert l.g.desk.getPrice(token,True)==10**18
+    assert l.g.desk.getUsdValue(token,10**18,True)==10**18

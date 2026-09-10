@@ -155,19 +155,26 @@ crossings, and reports fee-inclusive 1%/2% spot depth separately by direction,
 marked using the pinned live PriceDesk quote. Governance must record the
 minimum acceptable smaller-direction 2% depth in the runbook before proposal.
 
-`MAX_WARM_QUALIFY_GAS = 170000`. The measured warm-to-cold delta is 9115, so
-ceiling + delta = 179115 <= 210000. The pre-callback/read intersection is:
+`MAX_WARM_QUALIFY_GAS = 170000`. T11 measures the same priced-asset source
+child on both sides: cold minus warm is 18000, so ceiling + delta =
+188000 <= 210000. The full admission callback costs 8885 more than its source
+child; cold source minus that callback is separately labelled 9115. The
+pre-callback/read intersection is:
 source, pool, desk and RipeHq addresses; all ten staged feedConfig[asset]
 slots; PriceDesk.tokenScale[asset]; RipeHq.addrInfo[7].addr. Pool observation,
 slot0 and liquidity storage are cold; metadata immutables do not warm those
 slots. HQ entry 5 and MissionControl pricing policy are first touched during
 the callback. T11 prints concrete addresses and slot indices and checks the
-intersection against execution reads for both add and update.
+intersection against execution reads for both add and update. Member offsets
+come from the compiler storage layout and resolved struct types.
 
 This is a scoped guarantee for that touch set. An adversarial metadata path
-can warm additional quote storage and pass confirmation while failing the
-cold outer route; T11 preserves that demonstration and separately checks the
-quote's own stipend. T22 covers RH-shaped and fat registries. Successful
+or a preceding quote-price read in the same governance batch can warm
+additional quote storage and pass confirmation while failing the cold outer
+route; T11 preserves that demonstration and separately checks the
+quote's own stipend. The runbook limits confirmation's other transaction calls
+to a preceding scale sync for the same asset. T22 covers RH-shaped and fat
+registries. Successful
 confirmation does not replace cold qualification of a production route; the
 CI cold tests are the qualification.
 
@@ -187,16 +194,17 @@ MAX_PRICED_ASSETS=50, MIN_TWAP_WINDOW=1800, MAX_TWAP_WINDOW=14400,
 MAX_WARM_QUALIFY_GAS=170000; math uses canonical Q32/Q64/Q128/Q192 and tick bounds.
 Unused sqrt-ratio constants were removed.
 
-Contract implementation `8a9b90ec`, measurement comment/tests `cb69a688`:
-Vyper 0.4.3 codesize, Python 3.12, Titanoboa 0.2.7. Runtime is 20650 bytes
-(target <=22500, EIP-170 <=24576). The original 20-case matrix's maximum
-successful forwarded source cost is 165782; its bounded late-failure maximum
-is 174984. Intentional hostile stipend burn reaches 248173 and is a
-fault-isolation case. Expanded T11 has admitted cold samples up to 179008;
-T22's fat-source-last sample is 183235. These are measured maxima over named
+The review follow-up reuses the already authenticated canonical desk in the
+scale guard. Runtime is 20698 bytes under Vyper 0.4.3 codesize (target <=22500,
+EIP-170 <=24576). It costs 48 more runtime bytes and saves 633 gas in the measured successful
+price paths compared with reviewed head `11d3bd30`. The original 20-case matrix's
+maximum successful forwarded source cost is now 165149; its bounded
+late-failure maximum is 174351. Intentional hostile stipend burn reaches
+248163 and is a fault-isolation case. These are measured maxima over named
 fixtures, not a universal worst-case proof. Hard per-source stipend is 250000;
-engineering forwarded target remains <=210000. The complete per-item table
-and final-head evidence are maintained in the test README/evidence record.
+engineering forwarded target remains <=210000. The complete original per-item
+table and dated follow-up evidence are maintained in the test README and
+[review response](uniswap-v3-twap-review-response.md).
 
 Provenance facts: production math derives from pinned MIT V4 TickMath/FullMath;
 V3 behavior references are separately licensed, compiled and hash-bound. The
@@ -209,7 +217,10 @@ The following original packet, including its intermediate Revision 6 note, is
 retained as history. Its old decisions, interfaces and gates are superseded by
 the current body above and owner decisions D1–D20 dated 2026-09-09.
 
-# Reusable Uniswap V3 TWAP price source — implementation specification
+<details>
+<summary>Expand the complete superseded Revision 5 packet and intermediate Revision 6 note</summary>
+
+# [Historical / superseded] Reusable Uniswap V3 TWAP price source — implementation specification
 
 Revision 5 · September 7, 2026 · RIPE Protocol · contracts and tests handoff
 
@@ -229,7 +240,7 @@ Revision 5 · September 7, 2026 · RIPE Protocol · contracts and tests handoff
 > observation-cardinality floor in `feedDefaults`. The math module, reference
 > artifacts, provenance and licensing requirements are unchanged.
 
-## 1. Objective, authority and scope
+## [Historical / superseded] 1. Objective, authority and scope
 
 Build `UniswapV3TwapPrices.vy`, a reusable Vyper 0.4.3 RIPE `PriceSource` for a governance-selected ERC-20/WETH Uniswap V3 pool. Use **PONS, CASHCAT, Artificial Inu (AI), and INDEX** as offline and fork-test targets. PONS is the token called “pawns” in discussion; INDEX's reported on-chain symbol is `Index`. These labels do not establish borrowing readiness.
 
@@ -275,7 +286,7 @@ Do not implement or design NET/sNET, PairOracle, Pyth, Stork, USDG quote routes/
 
 An additional lower-priority PriceDesk source would be an availability fallback, **not corroboration**: the desk accepts the first usable price. Adding this source does not change that behavior.
 
-## 2. Repository integration and failure contract
+## [Historical / superseded] 2. Repository integration and failure contract
 
 Reference base: `7916d2f7327198e39513308135e244306de52c6b`, on `codex/rh-reviewed-correctness-fixes` in the reference checkout named by the implementation prompt. Do not branch from `master`. The immutable base pin is authoritative; a branch name can move. This is a source-code binding, not an attestation of deployed bytecode.
 
@@ -300,7 +311,7 @@ Paths in this spec are repository-relative so its committed copy remains portabl
 
 Coverage/enumeration/pending getters are storage-only. `hasPendingPriceFeedUpdate(asset)` is true for any uncleared pending ADD, UPDATE or DISABLE. An expired action remains pending until cancelled: TimeLock's `hasPendingAction` tests existence, not whether confirmation is currently allowed.
 
-### Caller and quote freshness
+### [Historical / superseded] Caller and quote freshness
 
 - `_staleTime == 0` is the direct-call sentinel, never “disable freshness.” With zero, ignore the supplied registry for authority/dependency selection.
 - Accept nonzero `_staleTime` only if both `msg.sender` and the supplied PriceDesk/registry argument equal HQ's **current** PriceDesk. A forged or unreadable identity makes an active feed unavailable. Do not cache a former desk indefinitely.
@@ -311,7 +322,7 @@ Coverage/enumeration/pending getters are storage-only. `hasPendingPriceFeedUpdat
 - Quote age governs only the dollar leg. Pool lookback and observation age are separate, in seconds.
 - Pause retains PriceSourceData's administrative meaning: it blocks governed feed mutations, including cancellation/disable, but does not stop price reads. It is not an oracle circuit breaker.
 
-### Actual PriceDesk composition
+### [Historical / superseded] Actual PriceDesk composition
 
 Assuming the desk's own configuration reads succeed, and absent another usable source:
 
@@ -324,7 +335,7 @@ Assuming the desk's own configuration reads succeed, and absent another usable s
 
 This table concerns price retrieval. Missing token scale has its own valuation behavior in §3. Do not equate an unavailable feed with collateral being safely valued at zero. Unavailability can block health checks and liquidation, while fallback may bypass this source entirely.
 
-## 3. Exact administrative ABI and lifecycle
+## [Historical / superseded] 3. Exact administrative ABI and lifecycle
 
 Use the following public ABI names, field order and types; internal helper names and storage packing remain implementation choices:
 
@@ -370,7 +381,7 @@ Export immutable getters `factory() -> address`, `weth() -> address`, `ethUsdFee
 
 Events are `UniV3FeedProposed`, `UniV3FeedConfirmed` and `UniV3FeedCancelled`. Each has indexed `asset: address` and `actionId: uint256`, followed by `kind: uint256`. Proposed/Confirmed additionally expose, in order: `confirmationBlock: uint256`, `expirationBlock: uint256`, then the six flattened FeedParams fields and `assetIsToken0: bool`, `assetDecimals: uint8`, `fee: uint24`. Use the types above. Cancellation is linked to the complete proposal by actionId. For DISABLE, proposal/confirmation events carry the config being removed. This fixes the public event schema without requiring nested struct event encoding.
 
-### Constructor and admission
+### [Historical / superseded] Constructor and admission
 
 Initialize modules with these exact argument meanings, subject to their existing validity checks:
 
@@ -402,7 +413,7 @@ For ADD and UPDATE proposals, and again at confirmation:
 
 There are no production defaults for liquidity, observation age or quote freshness. Bounds establish accepted input domains. A setting that merely passes a numerical or gas test is not an economically qualified setting.
 
-### Permanent decimals and PriceDesk token scale
+### [Historical / superseded] Permanent decimals and PriceDesk token scale
 
 Bind asset decimals on **first successful ADD confirmation**, using a separate bound flag because zero-decimal tokens are valid. Preserve that binding through UPDATE, DISABLE and re-ADD. Cancelled/failed initial admission does not bind. With an existing binding, a changed decimal value cannot be adopted by updating the feed or cycling disable/re-add.
 
@@ -422,7 +433,7 @@ Before describing valuations as qualified, require a matching nonzero scale. Tes
 
 Retain PriceDesk's existing dust behavior: positive sub-unit USD value can round up to 1. Its `price * amount` and `usdValue * tokenScale` intermediates are still checked uint256 arithmetic; the source's full-precision math does not remove extreme-input conversion overflow/reverts. Document and test that existing limit rather than editing the desk.
 
-### Feed state transitions and confirmation atomicity
+### [Historical / superseded] Feed state transitions and confirmation atomicity
 
 Only one pending action per asset, including expired uncleared actions. ADD requires no active feed; UPDATE/DISABLE require an active feed. Reject an exact full-config no-op UPDATE. Pending ADD does not count as active capacity, so recheck the 50-active limit at confirmation; another pending ADD may have filled the last slot.
 
@@ -444,7 +455,7 @@ Only successful completion finalizes enumeration, clears remaining pending state
 
 This deliberately differs from Chainlink's mixed behavior: it auto-cancels some invalid revalidations before consumption, while later callback assertions revert. V1 always reverts failed confirmations. DISABLE and cancellation never need a working pool, quote or desk; an administrative pause still blocks them.
 
-### Revert catalog
+### [Historical / superseded] Revert catalog
 
 Use these exact `# dev:` strings for the new source's assertions. These are Boa developer-revert annotations, not a promise of distinct production revert payloads. Test each cause with all preceding predicates valid. Invalid external calldata may be rejected by Vyper's ABI decoder before these checks.
 
@@ -470,9 +481,9 @@ Use these exact `# dev:` strings for the new source's assertions. These are Boa 
 
 Existing module-owned assertions retain their existing strings. For overlapping conditions, follow the lifecycle order above and make any necessary finer ordering explicit in the relevant test; do not make tests depend on an unlisted accidental decode revert. Runtime price-read failures in §4–5 return unavailable, not these administrative reverts.
 
-## 4. Complete price path and exact arithmetic
+## [Historical / superseded] 4. Complete price path and exact arithmetic
 
-### Pool read and guard sequence
+### [Historical / superseded] Pool read and guard sequence
 
 For an active feed, resolve HQ's current desk once, enforce the §3 scale compatibility check, authenticate nonzero forwarding, resolve effective quote age, and validate live asset/anchor decimals. Use HQ-bound identities, never an address supplied by the caller to choose a dependency. On the hot path, use bounded raw reads for required HQ/MissionControl/desk-scale lookups as well as market dependencies; importing Addys must not accidentally introduce unbounded typed calls where this spec requires unavailable-on-failure behavior. Its immutable HQ getter can be reused without an external lookup. PriceDesk's own upstream failure behavior does not remove this source's direct-call and authentication obligations.
 
@@ -499,7 +510,7 @@ Test explicit outcomes: with lookback 1,800 and age ceiling 3,600, latest-observ
 
 After a halt, a new observation can satisfy the age check without establishing a fresh full historical interval. Test passing guards returning the extrapolated/historical result and stale anchor or other failing guards returning unavailable; do not assert a nonexistent restart circuit breaker. Current/harmonic liquidity thresholds do not prove manipulation is uneconomic or establish stressed liquidation proceeds. Longer age limits need cadence and economic evidence, and actual per-asset settings remain unapproved.
 
-### Vyper arithmetic requirements
+### [Historical / superseded] Vyper arithmetic requirements
 
 Verified in the repository's Vyper 0.4.3 environment:
 
@@ -521,7 +532,7 @@ Preserve both quote branches: square directly only when the sqrt ratio fits uint
 
 The SharesVault helper is reference material; do not import vault state, refactor shared math, or assume copying it proves correctness. Use no floating point, approximate exponentiation or externally deployed mutable math helper.
 
-### Dollar anchor
+### [Historical / superseded] Dollar anchor
 
 Read the bound anchor directly; no recursive `PriceDesk.getPrice(WETH)`. Require:
 
@@ -537,7 +548,7 @@ Then return:
 
 Use full-precision multiplication/division when the intermediate overflows but the quotient fits. Final zero, division by zero or quotient/normalization overflow means unavailable; never saturate. Do not multiply again by asset decimals or by a user's balance.
 
-### Production provenance and revision-pinned reference math
+### [Historical / superseded] Production provenance and revision-pinned reference math
 
 Under selected decision D3, derive the production math module from **MIT-licensed** [V4 TickMath](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/TickMath.sol) and [V4 FullMath](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/FullMath.sol), commit `46c6834698c48bc4a463a86d8420f4eb1d7f3b75`. This selects math-source provenance only; pools, factory admission and observe semantics remain V3.
 
@@ -568,7 +579,7 @@ Before production math porting, create minimal compilable wrappers importing the
 
 Provide and run committed regeneration/check commands and exact compiled differential evidence before declaring implementation complete. Merely documenting a Forge command is insufficient. If compiler/setup access remains unavailable, finish independent work and label that required gate incomplete; do not waive it because the twelve frozen vectors pass. Those historical vectors cover 18-decimal tokens and only one quote-precision branch, so endpoints, the other branch and other decimals remain separate tests.
 
-## 5. External-call ABI and unavailable outcomes
+## [Historical / superseded] 5. External-call ABI and unavailable outcomes
 
 All price-path dependencies use static, explicitly gas-bounded calls with `revert_on_failure=False`. For an expected payload of **N bytes, capture N+1 and accept only length N**. Capturing N would conceal surplus bytes by truncation.
 
@@ -600,7 +611,7 @@ Addresses/metadata used only at constructor/proposal/confirmation still require 
 
 A caller can supply insufficient outer transaction gas; no source can guarantee it never reverts. PriceDesk's status-2 isolation remains required. Tests must show that ordinary bounded dependency failures leave enough source gas to return the specified result.
 
-## 6. Gas, runtime size and early feasibility gate
+## [Historical / superseded] 6. Gas, runtime size and early feasibility gate
 
 | Budget | Requirement |
 |---|---|
@@ -661,7 +672,7 @@ Size checkpoints: (1) math in a minimal deployed test wrapper, diagnostic only; 
 
 Do not optimize by deleting getters/events required by this ABI, weakening guard assertions, changing lookback, caching prices or lifting desk stipends. Reducing duplication and unnecessary operations is permitted. Under D2, exceeding a target is a disclosed review result, not permission to weaken the hard limit or a safety property. A public ABI/scope reduction still requires a new decision.
 
-## 7. Required tests and evidence
+## [Historical / superseded] 7. Required tests and evidence
 
 Tests must falsify mistakes, with deterministic seeds and explicit developer-revert expectations. Avoid using a duplicate of the port as its only oracle.
 
@@ -694,7 +705,7 @@ The existing lean price-source shard already covers this new subtree; no shard e
 
 The aggregate source-count guard depends on unchanged `ROBINHOOD_REGISTRY_TOPOLOGY`, not discovery of another source file. Do not change topology to satisfy it. Measure this source's deployed size in its named source-specific gate; adding it to an unrelated historical `EXPECTED_RUNTIME_BYTES` table is not a requirement of this task.
 
-## 8. Candidate bindings, frozen vectors and route characterization
+## [Historical / superseded] 8. Candidate bindings, frozen vectors and route characterization
 
 These are September 7 research inputs, not production config. Use addresses for identity and independently revalidate the selected block. The contract must not hardcode this list.
 
@@ -718,7 +729,7 @@ Historical comparison-pool references; additional comparison analysis is not req
 
 These are historical reviewer observations; B did not supply the block hash. Fresh results can differ. A comparison OLD at that pin is not an implementation failure and does not authorize shortening the window or substituting another pool. No 0.05% pools are in scope. All four 1% pools reportedly served 30m, 60m and 4h in both reviews. Main-pool cardinalities were 20,000 for PONS/CASHCAT/AI and 1,801 for INDEX.
 
-### Frozen numerical fixtures
+### [Historical / superseded] Frozen numerical fixtures
 
 Companion artifact: `docs/priceSources/uniswap-v3-twap-reference-vectors.json`. It contains all twelve raw cumulative pairs, modular deltas, mean ticks, harmonic liquidity, sqrt ratios, WETH quotes and USD18 results. Large integers are decimal strings to prevent JavaScript precision loss.
 
@@ -745,7 +756,7 @@ The full historical slot0/return bytes, startedAt and answeredInRound were not s
 
 The reported anchor is **2,958 seconds old** at the pinned timestamp. A 1,800-second quote-age policy must reject it; 2,958 passes the age predicate alone. The numerical USD output is not a promise that the complete source returns it under every tested policy. Latest pool observations were reported 9–24 seconds old. The AI seconds-per-liquidity accumulator is large but valid uint160; preserve it without lossy conversions.
 
-### Laboratory settings and fork tests
+### [Historical / superseded] Laboratory settings and fork tests
 
 For comparable primary-pool numerical runs use this explicit **laboratory** tuple, not production recommendations:
 
@@ -782,7 +793,7 @@ Keep sanitized raw inputs needed to reproduce a test in the source-specific test
 
 Extended observation/anchor cadence analysis, monitoring thresholds, token-control investigation and economic qualification are deferred to asset admission. The existing comparison pool table is retained as reference, not extra implementation scope. V1 still has no sequencer-uptime/grace-period guard; a new observation after a halt does not establish a trustworthy full interval. The stale-tick, liquidation-availability and fallback limitations already stated remain unchanged. Passing these contract tests does not approve borrowing settings.
 
-## 9. Build, test and finish
+## [Historical / superseded] 9. Build, test and finish
 
 1. Use the pinned isolated worktree and the four-file packet; D1–D3 are already selected. Copy the spec and two JSON inputs into the worktree. Missing inputs must be obtained, not regenerated. Do not perform another planning round or write a pre-port design memo.
 2. Build both pinned Solidity reference projects, implement the internal math and run actual compiled differentials plus independent integer tests.
@@ -822,3 +833,5 @@ The test README should contain only the commands needed to rerun local, differen
 Finish when all required local contract/math/behavioral/integration/gas/deployed-size checks pass and the scoped result is committed. A missing compiled differential or a hard-limit failure is incomplete. Disclosed engineering-target overruns are allowed under selected D2. Missing RPC state leaves the corresponding fork cases unverified and does not waive any local test.
 
 Final response: branch/worktree/commit; test outcomes and meaningful fuzz input counts; source/desk gas and deployed bytes/headroom; target overruns; fork-case status; unresolved concrete issues. Keep it concise. No separate design, monitoring, readiness or qualification report is required. Implementation completion is distinct from production route qualification and borrowing readiness; deployment, registration, LTVs/caps/liquidation settings and activation remain outside this task.
+
+</details>

@@ -95,19 +95,31 @@ class Rpc:
             data = response.json()
         except (requests.RequestException, ValueError):
             raise ValueError('RPC transport or response failure') from None
+        if not isinstance(data, dict):
+            raise ValueError('RPC response is not an object')
         if 'error' in data:
             # Do not echo endpoint credentials or provider-supplied URLs.
-            raise ValueError(f'RPC {method} failed (code {data["error"].get("code")})')
+            error = data['error']
+            code = error.get('code') if isinstance(error, dict) else None
+            raise ValueError(f'RPC {method} failed (code {code if isinstance(code, int) else "unknown"})')
         if 'result' not in data:
             raise ValueError('RPC result missing')
         return data['result']
 
 
+def rpc_quantity(value, label):
+    if not isinstance(value, str) or not re.fullmatch(r'0x(?:0|[1-9a-fA-F][0-9a-fA-F]*)', value):
+        raise ValueError(f'invalid {label}')
+    return int(value, 16)
+
+
 class Pinned:
     def __init__(self, rpc, block=None):
         self.rpc = rpc
-        self.chain_id = int(rpc.call('eth_chainId', []), 16)
-        self.block = int(rpc.call('eth_blockNumber', []), 16) if block is None else block
+        self.chain_id = rpc_quantity(rpc.call('eth_chainId', []), 'chain ID')
+        self.block = rpc_quantity(rpc.call('eth_blockNumber', []), 'block number') if block is None else block
+        if type(self.block) is not int or self.block < 0:
+            raise ValueError('invalid block number')
         self.header = self._header()
         self.timestamp = int(self.header['timestamp'], 16)
 
@@ -115,7 +127,9 @@ class Pinned:
         header = self.rpc.call('eth_getBlockByNumber', [hex(self.block), False])
         if not isinstance(header, dict) or not all(k in header for k in ('number', 'hash', 'timestamp')):
             raise ValueError('pinned header incomplete')
-        if int(header['number'], 16) != self.block or not re.fullmatch('0x[0-9a-fA-F]{64}', header['hash']):
+        number = rpc_quantity(header['number'], 'pinned header number')
+        rpc_quantity(header['timestamp'], 'pinned header timestamp')
+        if number != self.block or not isinstance(header['hash'], str) or not re.fullmatch('0x[0-9a-fA-F]{64}', header['hash']):
             raise ValueError('pinned header invalid')
         return {key: header[key] for key in ('number', 'hash', 'timestamp')}
 

@@ -35,6 +35,7 @@ def test_observation_uint32_timestamp_wrap(lab,timestamp):
 
 @pytest.mark.parametrize('kind', ['constant_zero','cancelling','int56_positive_wrap','int56_negative_wrap','uint160_wrap'])
 def test_zero_delta_and_modular_accumulators(active,kind,math):
+    active.anchor.setMockData(3*10**8)
     p=active.pool;past=0;current=0;lp=0;ln=WINDOW*2**128//10**20
     if kind=='cancelling':past=current=WINDOW*12345
     if kind=='int56_positive_wrap':past=2**55-10;current=-2**55+WINDOW-10
@@ -43,7 +44,7 @@ def test_zero_delta_and_modular_accumulators(active,kind,math):
     p.set('observe(uint32[])',words(64,160,2,past,current,2,lp,ln))
     delta=(current-past+2**55)%2**56-2**55
     tick=delta//WINDOW
-    expected=math.quote(tick,10**18,True)
+    expected=math.quote(tick,10**36,True)*3//10**18
     assert active.s.getPriceAndHasFeed(active.asset)==(expected,True)
     assert active.g.desk.getPrice(active.asset,True)==expected
 

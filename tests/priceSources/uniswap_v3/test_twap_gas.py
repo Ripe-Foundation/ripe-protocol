@@ -90,8 +90,8 @@ def test_cold_and_in_transaction_warm_paths(gas_lab,target):
         assert l.g.desk.getPrice(l.a.address,True)==2500*10**18
         direct=l.g.desk._computation
     source_call=calls(direct,l.s)[0]
-    # Canonical desk resolution, scale guard (HQ + desk), four pool reads, quote desk.
-    assert len(source_call.children)==8
+    # Canonical desk resolution, scale guard (desk), four pool reads, quote desk.
+    assert len(source_call.children)==7
     assert_source_budget(source_call.get_gas_used())
     cold(probe)
     before=boa.env.evm.vm.state
@@ -200,7 +200,7 @@ def test_deep_ring_with_dense_tick_bits_and_both_quote_precision_branches(gas_la
 
 # D20's warm budget is measured against transaction-cold reads; passing a
 # governance callback alone is deliberately not claimed to qualify every route.
-from .gas_tools import qualification_meter, qualification_touch_set, warm_qualification_ceiling
+from .gas_tools import qualification_meter, qualification_touch_set, warm_qualification_ceiling, qualification_gas
 from .graph import ZERO, quote_price_source
 from .raw import Pool
 
@@ -232,26 +232,26 @@ def propose_for_gas(l,kind):
 
 
 @pytest.mark.parametrize('kind',['add','update'])
-@pytest.mark.parametrize('slots',[40,58,59,60,80,100])
-def test_confirm_then_cold_desk_read_stays_under_target(kind,slots):
+@pytest.mark.parametrize('slots,admitted',[(40,True),(58,True),(59,True),(60,False),(80,False),(100,False)])
+def test_confirm_then_cold_desk_read_stays_under_target(kind,slots,admitted):
     l=admission_lab(slots)
     confirm=propose_for_gas(l,kind)
     pending=l.s.pendingUpdates(l.a)
     cold(l.s,sender=l.g.gov)
     with qualification_meter(l.s) as meter:
-        try:
+        if admitted:
             result=confirm(l.a,sender=l.g.gov)
-        except boa.BoaError as exc:
+        else:
             with boa.reverts('route too expensive'):
-                raise exc
-            assert len(meter)==2
-            warm=meter[0]['gas']-meter[1]['gas']
-            assert warm>warm_qualification_ceiling(l.s)
-            assert l.s.pendingUpdates(l.a)==pending and l.s.pendingQuoteCount(l.w)==1
-            print(f'TWAP_ADMISSION kind={kind} slots={slots} rejected warm={warm}')
-            return
+                confirm(l.a,sender=l.g.gov)
+    if not admitted:
+        warm,warm_source=qualification_gas(meter)
+        assert warm>warm_qualification_ceiling(l.s)
+        assert l.s.pendingUpdates(l.a)==pending and l.s.pendingQuoteCount(l.w)==1
+        print(f'TWAP_ADMISSION kind={kind} slots={slots} rejected callback={warm} warm_source={warm_source}')
+        return
     assert result and len(meter)==2
-    warm=meter[0]['gas']-meter[1]['gas']
+    warm,warm_source=qualification_gas(meter)
     assert warm<=warm_qualification_ceiling(l.s)
     if l.g.desk.getRegId(l.s)==0:register(l.g.desk,l.s,l.g.gov)
     cold(l.g.desk)
@@ -259,7 +259,7 @@ def test_confirm_then_cold_desk_read_stays_under_target(kind,slots):
     child=calls(l.g.desk._computation,l.s)[0]
     assert child.msg.gas==250000 and not child.is_error
     assert_source_budget(child.get_gas_used())
-    print(f'TWAP_ADMISSION kind={kind} slots={slots} confirmed warm={warm} cold={child.get_gas_used()} delta={child.get_gas_used()-warm}')
+    print(f'TWAP_ADMISSION kind={kind} slots={slots} confirmed callback={warm} warm_source={warm_source} cold={child.get_gas_used()} source_delta={child.get_gas_used()-warm_source} callback_delta={child.get_gas_used()-warm}')
 
 
 @pytest.mark.parametrize('kind',['add','update'])
@@ -274,7 +274,7 @@ def test_warm_to_cold_delta_is_within_margin(kind,slots):
             assert confirm(l.a,sender=l.g.gov)
     assert len(meter)==2 and all(meter[0]['warm_addresses'].values())
     assert all(meter[0]['warm_slots'])
-    warm=meter[0]['gas']-meter[1]['gas']
+    warm,warm_source=qualification_gas(meter)
     if l.g.desk.getRegId(l.s)==0:register(l.g.desk,l.s,l.g.gov)
     cold(l.g.desk)
     with storage_reads() as cold_reads:
@@ -286,11 +286,11 @@ def test_warm_to_cold_delta_is_within_margin(kind,slots):
     pre_addresses=meter[0]['called_addresses']
     cold_addresses={c.msg.code_address for c in walk(l.g.desk._computation)}
     assert pre_addresses & cold_addresses=={bytes.fromhex(a[2:]) for a in touches['addresses'].values()}
-    delta=child.get_gas_used()-warm
+    delta=child.get_gas_used()-warm_source
     ceiling=warm_qualification_ceiling(l.s)
     assert ceiling<=170000 and delta<=210000-ceiling
     print('TWAP_WARM_TOUCH_SET '+json.dumps(touches,sort_keys=True))
-    print(f'TWAP_WARM_DELTA kind={kind} slots={slots} warm={warm} cold={child.get_gas_used()} delta={delta} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')
+    print(f'TWAP_WARM_DELTA kind={kind} slots={slots} callback={warm} warm_source={warm_source} cold={child.get_gas_used()} source_delta={delta} callback_delta={child.get_gas_used()-warm} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')
 
 
 def test_confirmation_is_not_cold_qualification():
@@ -301,7 +301,7 @@ def test_confirmation_is_not_cold_qualification():
     cold(l.s,sender=l.g.gov)
     with qualification_meter(l.s) as meter:
         assert confirm(l.a,sender=l.g.gov)
-    warm=meter[0]['gas']-meter[1]['gas']
+    warm,warm_source=qualification_gas(meter)
     assert warm<=warm_qualification_ceiling(l.s)
     register(l.g.desk,l.s,l.g.gov)
     cold(l.g.desk)
@@ -396,7 +396,7 @@ def test_warm_to_cold_delta_is_within_margin_canonical(gas_lab,kind):
                 assert confirm(l.a,sender=g.gov)
         assert len(meter)==2 and all(meter[0]['warm_addresses'].values())
         assert all(meter[0]['warm_slots'])
-        warm=meter[0]['gas']-meter[1]['gas']
+        warm,warm_source=qualification_gas(meter)
         if g.desk.getRegId(s)==0:register(g.desk,s,g.gov)
         cold(g.desk)
         with storage_reads() as cold_reads:
@@ -406,9 +406,35 @@ def test_warm_to_cold_delta_is_within_margin_canonical(gas_lab,kind):
         assert set(before_reads[:meter[0]['read_index']]) & set(cold_reads)==expected
         cold_addresses={c.msg.code_address for c in walk(g.desk._computation)}
         assert meter[0]['called_addresses'] & cold_addresses=={bytes.fromhex(a[2:]) for a in touches['addresses'].values()}
-        delta=child.get_gas_used()-warm
+        delta=child.get_gas_used()-warm_source
         ceiling=warm_qualification_ceiling(s)
         assert ceiling<=170000 and delta<=210000-ceiling
         assert_source_budget(child.get_gas_used())
         print('TWAP_WARM_TOUCH_SET '+json.dumps(touches,sort_keys=True))
-        print(f'TWAP_WARM_DELTA kind={kind} route=canonical warm={warm} cold={child.get_gas_used()} delta={delta} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')
+        print(f'TWAP_WARM_DELTA kind={kind} route=canonical callback={warm} warm_source={warm_source} cold={child.get_gas_used()} source_delta={delta} callback_delta={child.get_gas_used()-warm} ceiling={ceiling} ceiling_plus_delta={ceiling+delta}')
+
+
+@pytest.mark.parametrize('kind',['add','update'])
+def test_quote_preflight_in_confirmation_batch_can_hide_cold_failure(kind):
+    """Runbook forbids this batch: its quote read warms outside the standard set."""
+    from .test_twap_remediation import batch_at_governor
+    l=admission_lab(100)
+    confirm=propose_for_gas(l,kind)
+    pending=l.s.pendingUpdates(l.a)
+    cold(l.s,sender=l.g.gov)
+    with boa.reverts('route too expensive'):
+        confirm(l.a,sender=l.g.gov)
+    assert l.s.pendingUpdates(l.a)==pending
+    batch=batch_at_governor(l.g)
+    cold(batch)
+    with qualification_meter(l.s) as meter:
+        assert batch.execute([l.g.desk.address,l.s.address],
+            [l.g.desk.getPrice.prepare_calldata(l.w),confirm.prepare_calldata(l.a)])==[words(10**18),words(1)]
+    callback,warm_source=qualification_gas(meter)
+    assert callback<=warm_qualification_ceiling(l.s)
+    if l.g.desk.getRegId(l.s)==0:register(l.g.desk,l.s,l.g.gov)
+    cold(l.g.desk)
+    assert l.g.desk.getPrice(l.a)==0
+    child=calls(l.g.desk._computation,l.s)[0]
+    assert child.msg.gas==250000 and (child.is_error or child.output==words(0,1))
+    print(f'TWAP_BATCH_EXTRA_WARMING kind={kind} callback={callback} warm_source={warm_source} cold={child.get_gas_used()} unavailable=True')

@@ -402,7 +402,7 @@ jobs:
             -o addopts='' \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
-            -m gas \
+            -s -m gas \
             tests/priceSources/blueChip/test_bluechip_local.py \
             tests/priceSources/curve/test_robinhood_launch_route.py \
             tests/core/test_sc24_gas_matrix.py \
@@ -425,6 +425,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Use Python 3.12.0
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -455,6 +457,8 @@ jobs:
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
           unset RIPE_TWAP_RPC_URL RIPE_TWAP_ARCHIVE_RPC_URL RIPE_TWAP_PIN_MODE
           python -m pytest -o addopts='' \
+            -o cache_dir="$RUNNER_TEMP/pytest-cache" \
+            --basetemp="$RUNNER_TEMP/pytest-basetemp" \
             tests/priceSources/uniswap_v3/test_twap_fork_config.py \
             tests/priceSources/uniswap_v3/test_twap_artifacts.py
 

@@ -136,14 +136,33 @@ def qualification_touch_set(g,source,pool,asset):
     timelock, metadata, loop-check and factory slots are not price inputs.
     HQ entry 5 / MissionControl policy are first read inside the callback.
     """
-    base=mapping_slot(source,'feedConfig',asset)
-    names=('pool','fee','quoteAsset','assetIsToken0','assetDecimals',
-           'quoteDecimals','baseLiquidity','twapWindow','maxObservationAge','minLiquidity')
     return {'addresses':{'source':str(source.address),'pool':str(pool.address),
                          'desk':str(g.desk.address),'RipeHq':str(g.hq.address)},
-            'storage':[(str(source.address),base+i,'feedConfig[asset].'+name) for i,name in enumerate(names)]
+            'storage':[(str(source.address),slot,'feedConfig[asset].'+name)
+                       for name,slot in mapping_struct_slots(source,'feedConfig',asset).items()]
                       +[(str(g.desk.address),mapping_slot(g.desk,'tokenScale',asset),'PriceDesk.tokenScale[asset]'),
-                        (str(g.hq.address),mapping_slot(g.hq,'registry.addrInfo',7),'RipeHq.addrInfo[7].addr')]}
+                        (str(g.hq.address),mapping_struct_slots(g.hq,'registry.addrInfo',7,('addr',))['addr'],'RipeHq.addrInfo[7].addr')]}
+
+
+def mapping_struct_slots(contract,path,key,fields=None):
+    """Derive member offsets from the pinned compiler's resolved Vyper types."""
+    module=contract.compiler_data.annotated_vyper_module._metadata['type']
+    parts=path.split('.')
+    for name in parts[:-1]:
+        module=module.members[name].module_t
+    struct=module.variables[parts[-1]].typ.value_type
+    offset=mapping_slot(contract,path,key)
+    slots={}
+    for name,typ in struct.member_types.items():
+        # These structs currently have scalar fields. Fail explicitly if their
+        # shape changes: the executed-read intersection must be reviewed too.
+        if fields is None or name in fields:
+            assert typ.storage_size_in_words==1, 'review the TWAP touch-set struct shape'
+            slots[name]=offset
+        offset+=typ.storage_size_in_words
+    assert offset-mapping_slot(contract,path,key)==struct.storage_size_in_words
+    return slots
+
 
 
 @contextmanager
@@ -168,7 +187,11 @@ def qualification_meter(source,touch_set=None,reads=None):
         if computation.msg.code_address==source_address and pc in pcs:
             snapshot={'gas':computation.get_gas_remaining(),'pc':pc,
                       'read_index':len(reads) if reads is not None else None,
-                      'called_addresses':{c.msg.code_address for c in walk(computation)}}
+                      'called_addresses':{c.msg.code_address for c in walk(computation)},
+                      'price_calls':[c.get_gas_used() for c in walk(computation)
+                                     if c is not computation and c.msg.code_address==source_address
+                                     and bytes(c.msg.data[4:36])==bytes(computation.msg.data[4:36])
+                                     and bytes(c.msg.data[:4])==source.getPriceAndHasFeed.prepare_calldata(boa.env.eoa,0,boa.env.eoa)[:4]]}
             if touch_set is not None:
                 state=boa.env.evm.vm.state
                 snapshot['warm_addresses']={label:state.is_address_warm(bytes.fromhex(address[2:]))
@@ -189,3 +212,10 @@ def warm_qualification_ceiling(source):
         if getattr(getattr(node,'target',None),'id',None)=='MAX_WARM_QUALIFY_GAS':
             return node.value.value
     raise AssertionError('missing admission ceiling')
+
+
+def qualification_gas(meter):
+    """Keep the admission callback and its source child on distinct meters."""
+    assert len(meter)==2 and meter[0]['price_calls']==[]
+    assert len(meter[1]['price_calls'])==1
+    return meter[0]['gas']-meter[1]['gas'],meter[1]['price_calls'][0]
