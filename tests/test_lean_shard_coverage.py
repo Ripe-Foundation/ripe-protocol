@@ -15,6 +15,10 @@ PYTEST_INI_PATH = ROOT / "pytest.ini"
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
 }
+TWAP_TOOLING_FILES = {
+    "tests/priceSources/uniswap_v3/test_twap_fork_config.py",
+    "tests/priceSources/uniswap_v3/test_twap_artifacts.py",
+}
 BOA_CACHE_PREFIX = "boa-${{ runner.os }}-py312-${{ matrix.lane }}"
 BOA_INPUT_HASH = (
     "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
@@ -310,6 +314,12 @@ def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
         )
     }
 
+    tooling_command = _step(_workflow()["jobs"]["twap-tooling"], "Run TWAP tooling and artifact tests")["run"]
+    tooling_args = _pytest_args(tooling_command)
+    assert {arg for arg in tooling_args if arg.startswith("tests/")} == TWAP_TOOLING_FILES
+    assert _flag_values(tooling_args, "-o") == ["addopts=", "cache_dir=$RUNNER_TEMP/pytest-cache"]
+    assert "--basetemp=$RUNNER_TEMP/pytest-basetemp" in tooling_args
+    assert not _flag_values(tooling_args, "-m")
     shard_arguments = _workflow_lean_shard_arguments()
     unmatched = []
     multiply_matched = {}
@@ -319,6 +329,9 @@ def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
             for shard, arguments in shard_arguments.items()
             if _shard_selects_path(path, arguments)
         ]
+        if path in TWAP_TOOLING_FILES:
+            assert not matches, f"TWAP tooling also selected by lean shard: {path}"
+            matches.append("twap-tooling")
         if not matches:
             unmatched.append(path)
         elif len(matches) != 1:
@@ -401,7 +414,8 @@ def test_python_workflow_uses_full_history_for_python_tests():
     # tests/config/test_defaults_robinhood.py pins a historical commit and
     # reads config/BluePrint.py out of it with `git show`. That file runs in
     # the lean config shard, so a shallow checkout fails the test job outright.
-    # Both checkouts are pinned so that shortening either one has to be a
+    # TWAP tooling also checks the preserved reviewed-head capture with git show.
+    # All three checkouts are pinned so shortening one has to be a
     # deliberate edit rather than an invisible speedup.
     depths = {
         job_name: step["with"]["fetch-depth"]
@@ -409,7 +423,7 @@ def test_python_workflow_uses_full_history_for_python_tests():
         for step in job.get("steps", [])
         if "fetch-depth" in (step.get("with") or {})
     }
-    assert depths == {"test": "0", "deployment-controls": "0"}
+    assert depths == {"test": "0", "deployment-controls": "0", "twap-tooling": "0"}
 
 
 def test_python_workflow_bounds_every_job_runtime():
@@ -419,6 +433,7 @@ def test_python_workflow_bounds_every_job_runtime():
         "test": "${{ matrix.lane == 'comprehensive' && 180 || 120 }}",
         "deployment-controls": "60",
         "snapshot-gas": "30",
+        "twap-tooling": "30",
         "rh-pr-gate": "5",
     }
     assert all("timeout-minutes" in job for job in jobs.values())
@@ -449,9 +464,11 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
         "test",
         "deployment-controls",
         "snapshot-gas",
+        "twap-tooling",
     ]
 
     expected_results = {
+        "Require successful TWAP tooling": ("TWAP_TOOLING_RESULT", "${{ needs.twap-tooling.result }}"),
         "Require successful Solidity lane": (
             "SOLIDITY_RESULT",
             "${{ needs.solidity.result }}",
@@ -549,6 +566,7 @@ def test_python_workflow_enforces_all_snapshot_gas_suites():
         "tests/priceSources/curve/test_robinhood_launch_route.py",
         "tests/core/test_sc24_gas_matrix.py",
         "tests/registries/test_price_desk_gas.py",
+        "tests/priceSources/uniswap_v3/test_twap_gas.py",
         (
             "tests/registries/test_price_desk_aggregate_protocol_gas.py::"
             "test_aggregate_protocol_gas[valuation-intended_prompt]"
@@ -563,3 +581,8 @@ def test_python_workflow_enforces_all_snapshot_gas_suites():
         argument.startswith("tests/registries/test_price_desk_gas.py::")
         for argument in arguments
     )
+
+
+def test_snapshot_gas_preserves_printed_measurement_evidence():
+    command=_step(_workflow()['jobs']['snapshot-gas'],'Enforce snapshot gas budgets')['run']
+    assert '-s' in _pytest_args(command), 'gas samples and warm touch sets must remain visible in successful CI logs'

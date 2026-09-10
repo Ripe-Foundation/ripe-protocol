@@ -23,6 +23,7 @@ PRODUCTION_PRICE_SOURCES = {
     "StorkPrices.vy",
     "UndyVaultPrices.vy",
     "UniswapV2Prices.vy",
+    "UniswapV3TwapPrices.vy",
     "wsuperOETHbPrices.vy",
 }
 QUALIFIED_GLOBAL_STALE_TIME = 86_400

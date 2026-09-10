@@ -1,0 +1,42 @@
+{
+  "laboratory": {
+    "twapWindow": 3600,
+    "maxObservationAge": 1800,
+    "minLiquidityRatio": 5000,
+    "localGraphGlobalStaleTime": 86400
+  },
+  "code_sha256": {
+    "contracts/data/MissionControl.vy": "5fa4683d23a2c477d7a6ad22a673eff99b5d2418ca1f84fd491225ff9dc121c1",
+    "contracts/modules/Addys.vy": "db23f14c93f6897fae890575d24fe9766e726df65b3f8b63343bb430060ccdf4",
+    "contracts/modules/DeptBasics.vy": "41c6d1b6fe6ca13f8721fb819406115192b745cf51e5036254f933d7963649c2",
+    "contracts/modules/LocalGov.vy": "ff9fa3133ec3dbe53301d4ab0598e17ea93dc403e1ab4f89d4573fc6b12a9751",
+    "contracts/modules/TimeLock.vy": "c42c8c606f1ab9625ea8d758052b52c1d9d6a5cd4144ae75c9ec549f98de0ef8",
+    "contracts/priceSources/ChainlinkPrices.vy": "710bcd0faa6dfb1b15eeb1c910c795e6a336077069dc84720a44685f98bfae33",
+    "contracts/priceSources/UniswapV3TwapPrices.vy": "a9de43ffaaf83f84d59216fdd6fcd3f0bc19f65894e3a3ba51389db18b9cf643",
+    "contracts/priceSources/modules/PriceSourceData.vy": "41a151b05e6ca7b2ecb82392f92b5fb31b8aa57c886bb2e47e92f660e57b2628",
+    "contracts/priceSources/modules/UniswapV3TwapMath.vy": "1428f02f6e12f2b7b2df93c9d66e30a5819af450ef9d4829e56f59b0358172f6",
+    "contracts/registries/PriceDesk.vy": "47f5e72334e3e9ebefb7836767196024b8c17b151d6c6339d83782b9d85f7bcf",
+    "contracts/registries/RipeHq.vy": "5f1932bdc10886855e908044397cd2d153a8ecb84b84f62b488653cae46b58f5",
+    "contracts/registries/Switchboard.vy": "b0ec25ecc89286fd14a941d5581497094e12fe64e5af784c9fc90787eae9d546",
+    "contracts/registries/modules/AddressRegistry.vy": "6d0d5d06d7fe5acbced6c82890668869803f64dd4ab6570d5634ff2045657ff1",
+    "docs/priceSources/uniswap-v3-twap-upstream-lock.json": "1f82c03b97212e35ef4f654123f8e307ee19270f21e355c3e6cb815d52a899a0",
+    "interfaces/ConfigStructs.vyi": "def6208cd81de43d0d33656f9d05b5394d3a74c695fdc27ffe3c9711ccd67c2c",
+    "interfaces/Department.vyi": "4022e08f4321cf2a061b4e6b15820958c96ff499d4fa72fcf789ed97dc234ed8",
+    "interfaces/PriceSource.vyi": "7530b4cb747dc9b6fab3207ac23a05050bf93bccdbbc65d018089f644ef06c77",
+    "requirements.txt": "4f0097670e618e8210fc7d961d851df643332b3b52d156a0a0b9171e86d1906f",
+    "tests/priceSources/uniswap_v3/compiled.py": "0e382fac609d1548264d19b186f165b10f2e69f9e3d39938e57948582a882790",
+    "tests/priceSources/uniswap_v3/fork_provenance.py": "7f100cf2b52b9fff14b8292803b76b9f35c0b60c9c6187f11e65d9d7febd3108",
+    "tests/priceSources/uniswap_v3/fork_results.py": "4a23317fef23d3965f88176f37712c441273f748413d3c9dc6885eb1822b3d7c",
+    "tests/priceSources/uniswap_v3/fork_worker.py": "247581e4eb8233fe597b6f1c3a6d23554dbaad65d86ab1117f119f8b1ad3eb80",
+    "tests/priceSources/uniswap_v3/gas_tools.py": "924fb365869635137eaec21f7465399bf2377d11163ce7db6fc4634987f5ccc1",
+    "tests/priceSources/uniswap_v3/graph.py": "64e6dc39ca9c97ca136905fc887f26e2d6236df849a8fb5e91f15ecfec891034",
+    "tests/priceSources/uniswap_v3/reference/v3/artifacts.json": "7be48b669ff0ea7732a15c1783e0b038a91ed9dc10164f8ac7d95e758352b0a0"
+  },
+  "laboratory_sha256": "3c9265a08d0a9d787c291d31aa719fd71b6c42a1504be1a9617163532788843d",
+  "python": "3.12.0",
+  "vyper": "0.4.3",
+  "titanoboa": "0.2.7",
+  "architecture": "arm64",
+  "result": "67 passed, 85 deselected; 46 V3 gas cases",
+  "meter": "gas excludes intrinsic and chain data fees; child gas excludes caller CALL overhead"
+}
