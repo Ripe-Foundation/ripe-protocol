@@ -1,5 +1,8 @@
 # Uniswap V3 TWAP operator notes
 
+The full operator handoff (status, footguns, gate checklist, per-asset procedures,
+monitoring and incident playbook) is [uniswap-v3-twap-operator-handoff.md](uniswap-v3-twap-operator-handoff.md).
+
 Owner decisions D1–D20, 2026-09-09. These notes specify proposal checks and scale
 recovery semantics. PR #229 does not deploy, register or activate any feed.
 FinishSetup inclusion and token-scale first-sync hardening are separate work.
