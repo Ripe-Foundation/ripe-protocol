@@ -1,3 +1,4 @@
+import ast
 import re
 from pathlib import Path
 
@@ -120,13 +121,21 @@ def test_ltv_bearing_assets_remain_within_direct_price_allowlist():
 
 
 def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
-    assert _source_uint_constant(
-        "contracts/registries/PriceDesk.vy",
-        "PRICE_SOURCE_PRICE_GAS",
-    ) == QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND, (
-        "PriceDesk price-source stipend changed; aggregate protocol-gas "
-        "requalification is required"
-    )
+    # Qualification applies to the runtime fixtures' constructor budget, not a
+    # universal constant. Historical deployment migrations remain untouched.
+    for fixture_path in (
+        "tests/conf_core.py",
+        "tests/registries/test_price_desk_aggregate_protocol_gas.py",
+    ):
+        tree = ast.parse(Path(fixture_path).read_text())
+        calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Attribute) and node.func.attr == "load"
+                 and node.args and isinstance(node.args[0], ast.Constant)
+                 and node.args[0].value == "contracts/registries/PriceDesk.vy"]
+        assert len(calls) == 1
+        assert ast.literal_eval(calls[0].args[-1]) == QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND, (
+            "Qualified fixture budget changed; aggregate protocol-gas requalification required"
+        )
     assert _source_uint_constant(
         "contracts/core/Teller.vy",
         "MAX_LIQ_USERS",

@@ -119,32 +119,11 @@ def _register_source(desk, source, deployer, description):
 
 def _isolated_price_desk(ripe_hq, deploy3r, sources, price_limit=None):
     source_path = Path("contracts/registries/PriceDesk.vy")
-    if price_limit is None:
-        desk = boa.load(
-            str(source_path),
-            ripe_hq,
-            deploy3r,
-            ETH,
-            1,
-            2,
-            name="gas_measurement_price_desk",
-        )
-    else:
-        source = source_path.read_text().replace(
-            "PRICE_SOURCE_PRICE_GAS: constant(uint256) = 250_000",
-            f"PRICE_SOURCE_PRICE_GAS: constant(uint256) = {price_limit}",
-            1,
-        )
-        desk = boa.loads(
-            source,
-            ripe_hq,
-            deploy3r,
-            ETH,
-            1,
-            2,
-            name=f"gas_boundary_price_desk_{price_limit}",
-            filename=str(source_path),
-        )
+    desk = boa.load(
+        str(source_path), ripe_hq, deploy3r, ETH, 1, 2,
+        250_000 if price_limit is None else price_limit,
+        name="gas_measurement_price_desk",
+    )
     for index, source in enumerate(sources, start=1):
         assert _register_source(desk, source, deploy3r, f"gas source {index}") == index
     return desk

@@ -65,7 +65,7 @@ def _gas_source(
     return source
 
 
-def _isolated_price_desk(ripe_hq, deploy3r, sources):
+def _isolated_price_desk(ripe_hq, deploy3r, sources, price_gas=250_000):
     desk = boa.load(
         "contracts/registries/PriceDesk.vy",
         ripe_hq,
@@ -73,6 +73,7 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources):
         ETH,
         1,
         2,
+        price_gas,
         name="isolated_price_desk",
     )
     for index, source in enumerate(sources, start=1):
@@ -83,6 +84,21 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources):
         )
         assert desk.confirmNewAddressToRegistry(source, sender=deploy3r) == index
     return desk
+
+
+def test_price_source_gas_is_set_per_deployment(ripe_hq, deploy3r):
+    source = _gas_source(price=EIGHTEEN_DECIMALS, has_feed=True)
+    small = _isolated_price_desk(ripe_hq, deploy3r, [source], price_gas=1)
+    large = _isolated_price_desk(ripe_hq, deploy3r, [source], price_gas=1_500_000)
+    assert small.PRICE_SOURCE_PRICE_GAS() == 1
+    assert large.PRICE_SOURCE_PRICE_GAS() == 1_500_000
+    assert small.getPrice(ETH) == 0
+    assert large.getPrice(ETH, True) == EIGHTEEN_DECIMALS
+
+
+def test_price_source_gas_rejects_zero(ripe_hq, deploy3r):
+    with boa.reverts("invalid price source gas"):
+        _isolated_price_desk(ripe_hq, deploy3r, [], price_gas=0)
 
 
 STALE_TIME_PROBE = """

@@ -12,13 +12,17 @@ def _desk_params(fork):
     )
 
 
-def test_defaults_base_priority_omits_id9():
+def test_base_launch_priority_and_live_snapshot_priority_are_distinct():
     defaults = boa.load("contracts/config/DefaultsBase.vy", name="defaults_base_id9")
-    live = boa.load("contracts/config/DefaultsBaseLive.vy", name="defaults_base_live_id9")
+    live = boa.load(
+        "contracts/config/DefaultsBaseLive.vy",
+        boa.env.generate_address("snapshot_contributor_template"),
+        name="defaults_base_live_id9",
+    )
     assert list(defaults.priorityPriceSourceIds()) == [1, 8, 2, 4, 5]
-    assert list(live.priorityPriceSourceIds()) == [1, 8, 2, 4, 5]
+    assert list(live.priorityPriceSourceIds()) == [1, 8, 2, 9, 4, 5]
     assert 9 not in defaults.priorityPriceSourceIds()
-    assert 9 not in live.priorityPriceSourceIds()
+    assert 9 in live.priorityPriceSourceIds()
 
 
 def test_defaults_base_id9_does_not_win_ahead_of_id4(
@@ -41,6 +45,7 @@ def test_defaults_base_id9_does_not_win_ahead_of_id4(
             "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
             min_tl,
             max_tl,
+            250_000,
             name="id9_desk",
         )
         sources = []
@@ -213,6 +218,7 @@ def test_replacement_mission_control_uses_own_price_desk(
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         min_tl,
         max_tl,
+        250_000,
         name="replacement_mc_own_desk",
     )
     src = boa.load(

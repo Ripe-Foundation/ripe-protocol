@@ -5,7 +5,7 @@
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py --network base-mainnet --block-number 51318877
+# Regenerate with:  python scripts/prepare_defaults.py --network base-mainnet --block-number 51312366
 #
 # Snapshot provenance:
 #   repository: ripe-foundation/ripe-protocol
@@ -19,8 +19,8 @@
 #   Ledger compiler-input integrity: 266f985b2ae1049342bac32e9bcd6d0f330ced7e55fcb5cb2456b53da8646e04
 #   Ledger canonical ABI sha256: 2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c
 #   chain id: 8453
-#   snapshot block: 51318877
-#   snapshot block hash: 0xc3fb0c9e51cbeb6472b2476c4576a755effcc9bfb98812d7734e2ba5eefac6a5
+#   snapshot block: 51312366
+#   snapshot block hash: 0x309867a798010d47ada7686fd2c1124118d5c76a82864e8a196a56b53c222248
 #   snapshot finality: verified against the provider finalized tag
 #   MissionControl: 0x559E53F42b68b4995732Dba4aF300796761DBC19
 #   MissionControl code sha256: 32432e24dd701d80430d70b59408d156d9a1a6b9d537224354b9f97dc22db008

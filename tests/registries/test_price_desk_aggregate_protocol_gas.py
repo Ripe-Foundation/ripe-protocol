@@ -260,6 +260,7 @@ def _install_price_desk(
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         1,
         2,
+        250_000,
         name="aggregate_protocol_price_desk",
     )
     for index, (name, source) in enumerate(sources, start=1):

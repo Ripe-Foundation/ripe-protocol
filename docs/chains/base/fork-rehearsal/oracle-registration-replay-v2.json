@@ -1,0 +1,3985 @@
+{
+  "status": "not_qualified",
+  "live_writes": false,
+  "block": 51312366,
+  "harness_sha256": "e0dace3aecb0238438974bafc53b35bfc122c4543e59faabab037ea80cd1d675",
+  "source_commit": "1ede38351e6da918806dff70d34b2066bf8cde8c",
+  "deployments": {
+    "Switchboard": {
+      "address": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "runtime_bytes": 12595,
+      "source_sha256": "b0ec25ecc89286fd14a941d5581497094e12fe64e5af784c9fc90787eae9d546"
+    },
+    "SwitchboardAlpha": {
+      "address": "0x3d06E92f20305D9a2D71a1D479E9EE22690Ae7E4",
+      "runtime_bytes": 23962,
+      "source_sha256": "f930bba73913095f69d5a32487b7997a6d9fa1acc63891ece0f2d7299f41b7d1"
+    },
+    "SwitchboardBravo": {
+      "address": "0x78548820b365886d05009F1127bf553603E5A836",
+      "runtime_bytes": 16423,
+      "source_sha256": "97056b3fc1bb6918838d8a0548f2d6693068832425ee9b80655d5aaeb0ab4513"
+    },
+    "SwitchboardCharlie": {
+      "address": "0x88DD242155C50c2b91F288391b4D8d4C93e0552a",
+      "runtime_bytes": 22317,
+      "source_sha256": "1331c49036ebaeba538052f63294006a30258e6b1c9a447e14634739a40b16e4"
+    },
+    "SwitchboardDelta": {
+      "address": "0x10761621062878CEdEfEb54dFFfb5fde5187bbB7",
+      "runtime_bytes": 23869,
+      "source_sha256": "c90b51311ee70988a8df8c1f8ec27b4675bc283239e90be295632c8b4129853a"
+    },
+    "SwitchboardEcho": {
+      "address": "0xc0E0bc04A7EF550053792c30782E38E34d3Dd70D",
+      "runtime_bytes": 23930,
+      "source_sha256": "dc780952ef79d6c2e37b6a192a8eb86085c1b483eb2115059872c3bf92f0d8cf"
+    },
+    "SwitchboardFoxtrot": {
+      "address": "0xD10829C06F95D40004aFc4379579Bc05Aa3982e5",
+      "runtime_bytes": 12061,
+      "source_sha256": "02d69b9d0634c04d6f7c466da43ab2dd31657bd69196466c68bcf960ecf18853"
+    },
+    "SwitchboardGolf": {
+      "address": "0x2E5CcDbd412588ceE58516Fa732658CEF7944233",
+      "runtime_bytes": 20932,
+      "source_sha256": "d47381f89963a254e58b0521ce67f9cd470c1d2d561ab047328c2d66ca18091d"
+    },
+    "VaultBook": {
+      "address": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "runtime_bytes": 14410,
+      "source_sha256": "ebfb72dbcd7e2d73b281310b95405afc924e42f23c9dd7e5fab4366b8c3f37a6"
+    },
+    "StabilityPool": {
+      "address": "0xB854c1f42f9ccedB43Ef646c94c2512ecbB05BA1",
+      "runtime_bytes": 24332,
+      "source_sha256": "8b205fbf9754d361ba166458638c8cc77d341959b682a7b3f896f7cc7b8d9929"
+    },
+    "RipeGov": {
+      "address": "0x064e88f9CD0eF0525f7A125D4396eE93468C7cdD",
+      "runtime_bytes": 24116,
+      "source_sha256": "ea19ac30f63bc862b987d1e603a0a169ee432684e155c42b04c4c0e661f65432"
+    },
+    "SimpleErc20": {
+      "address": "0x41e9951B2C85C295630C8a304A8410BB561ba87d",
+      "runtime_bytes": 9568,
+      "source_sha256": "6f1b29619bc14c2893a95cd7d88348a813152bb92835fb4c411d79db38c08a07"
+    },
+    "RebaseErc20": {
+      "address": "0x9a849C83B41c261974d438cc56ac48Fb5f568a52",
+      "runtime_bytes": 11602,
+      "source_sha256": "5e448fb6ebfed4d4632af0e1926e05140025387033f397148a8f072da7f5dd82"
+    },
+    "UnderscoreVault": {
+      "address": "0xAB032BFa41AD31090C2744727C2cdA502e9025e0",
+      "runtime_bytes": 9568,
+      "source_sha256": "6f1b29619bc14c2893a95cd7d88348a813152bb92835fb4c411d79db38c08a07"
+    },
+    "VaultMigrator": {
+      "address": "0x05a710A8CfCeaEAd0A2533bA3dc137EC37B1E2dD",
+      "runtime_bytes": 15626,
+      "source_sha256": "4310b5c8650674bd83f651d16dcc9e82d05feeaa909f4276dd0093ce4cff5d63"
+    },
+    "AuctionHouse": {
+      "address": "0x2Fe42d5dC25658CE5A4D13A8D7E8C523011e59CE",
+      "runtime_bytes": 24564,
+      "source_sha256": "2407eb962709fdc068dbe32d3738343fc4640cd51c788b2aae55bbf9d6ac4a9f"
+    },
+    "AuctionHouseNFT": {
+      "address": "0x6970932a453F1ee612ffEAd6574123289DB94958",
+      "runtime_bytes": 2812,
+      "source_sha256": "a77d332e29d24d608ab7da1703836e32cfd9e0da78b1ad826695954e0d879cb6"
+    },
+    "Boardroom": {
+      "address": "0xA87f42e2101CEada8f6A8105635fD40d141ba5CF",
+      "runtime_bytes": 3218,
+      "source_sha256": "cfe01e3a97e972b1d39477e63c21076a60044619bd8b579afbde2ccef318660e"
+    },
+    "CreditRedeem": {
+      "address": "0x91bd328378E0aFAc2936B38F91D62fc8b893e741",
+      "runtime_bytes": 8504,
+      "source_sha256": "2041c3e4cb4d316073a47415d565d9f81535f460a38d43857b01c6406e579192"
+    },
+    "TellerUtils": {
+      "address": "0x3f67b2ec379A94398029994e48ea1421E933103A",
+      "runtime_bytes": 9113,
+      "source_sha256": "ca0e85225270942c3d415e17a73157218374c553a3354d07e548b6c4c95df011"
+    },
+    "EndaomentFunds": {
+      "address": "0xE1fb055fE1Fad2D5f980a7954Ebf1539CA676D1e",
+      "runtime_bytes": 2554,
+      "source_sha256": "66e283ba33c16ba49c9ae15a9c97720d4e7d794ab8654063a6925be70916a357"
+    },
+    "BondBooster": {
+      "address": "0x94D287b679c9eB26067b1Aa59D230B2D559e66bb",
+      "runtime_bytes": 4844,
+      "source_sha256": "0dc697c5d346938896ac0ece74ce1d062f57e73d7cf742df4516a5b36cc00b00"
+    },
+    "BondRoom": {
+      "address": "0x09437b00357c02a30B9aFB30292B087eC2E36983",
+      "runtime_bytes": 10927,
+      "source_sha256": "2e64060a836bfe6e4d678bb907d45271524c9efde5ce45168a20e68402a43b4a"
+    },
+    "CreditEngine": {
+      "address": "0xef443Aaa7981166948cEd9499bD69E3C0E19003f",
+      "runtime_bytes": 24543,
+      "source_sha256": "294aac86d656e9607ba3765071c7e1e04ae7c9622687f08a1c95025119917164"
+    },
+    "HumanResources": {
+      "address": "0x8512b12Cb48b05aF19bDE28DeaD6B6AB479f4409",
+      "runtime_bytes": 14932,
+      "source_sha256": "5ef1628dff3c9e4ca82f162815846e91b0bea631f7461b0ee1bc5d267a0a2fb6"
+    },
+    "Lootbox": {
+      "address": "0x48B98EC58E5389B317847ff590776BC01629f297",
+      "runtime_bytes": 24411,
+      "source_sha256": "c4b2602f8adaab65f9ff53b8bcb2631421fa441f14c57afbae53300ef9be05b6"
+    },
+    "Teller": {
+      "address": "0xa55A5e2F9dA4F0FbaF566285788d53be3EF969E4",
+      "runtime_bytes": 24552,
+      "source_sha256": "82ebba3a26168d78445a6dbcf4aaff8083b028b1497cbe29868ac3f04daf2c26"
+    },
+    "Deleverage": {
+      "address": "0xd3dD8E2B10e77e938867d6df1b1181ea2Cd657CD",
+      "runtime_bytes": 24559,
+      "source_sha256": "6c173b229788e6eef54c94f0dfaab2236999fe4c8d348b1af9281094cd114a54"
+    },
+    "Endaoment": {
+      "address": "0xfCE3Ebb91c61D7d06D0435e851d7ededD7352602",
+      "runtime_bytes": 23386,
+      "source_sha256": "610856c2b9ff7ec6ba1102028375ec38b9bf64554c0946cde8dbdce253bc4fc5"
+    },
+    "Contributor": {
+      "address": "0x32FCCC51b7E76a3E19884626466a3EE675D4e35E",
+      "blueprint": true
+    },
+    "DefaultsBaseLive": {
+      "address": "0xD9f71b82C44DFb08FC16BFFCa3650EbBfE89b70e",
+      "runtime_bytes": 7662,
+      "source_sha256": "07d8e8f49bb326f4fa817cbc627379258d0ec5684360de8dfcc665198975c4ca"
+    },
+    "MissionControl": {
+      "address": "0x464531AB3b51B4654e08364815FA4E236E95244a",
+      "runtime_bytes": 18948,
+      "source_sha256": "5fa4683d23a2c477d7a6ad22a673eff99b5d2418ca1f84fd491225ff9dc121c1"
+    },
+    "PriceDesk": {
+      "address": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "runtime_bytes": 17742,
+      "source_sha256": "47f5e72334e3e9ebefb7836767196024b8c17b151d6c6339d83782b9d85f7bcf"
+    },
+    "ChainlinkPrices": {
+      "address": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "runtime_bytes": 16988,
+      "source_sha256": "710bcd0faa6dfb1b15eeb1c910c795e6a336077069dc84720a44685f98bfae33"
+    },
+    "CurvePrices": {
+      "address": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "runtime_bytes": 23406,
+      "source_sha256": "273751fb21d48e5705e3f1d5409e2967ea158601b55e08b931416ce75db6cf54"
+    },
+    "BlueChipYieldPrices": {
+      "address": "0x9E6178ef05D593C86c13704B9Bc5A84FB45f301E",
+      "runtime_bytes": 20857,
+      "source_sha256": "b369f9e2a3cf11ff77e2e724e99aece0e99e7aabbadd5c65290486a41477cc51"
+    },
+    "PythPrices": {
+      "address": "0x42F591213Be3fB0Cc6B9A11D479657F60e0d335B",
+      "runtime_bytes": 16055,
+      "source_sha256": "32e4c92eb21296ff6a330b1190b4e9b2268927a6ff3842d90507f7c438e5d767"
+    },
+    "StorkPrices": {
+      "address": "0xCAF963d78c286243a62F3e3dFD1DBb66794Be51F",
+      "runtime_bytes": 15067,
+      "source_sha256": "c534e068bd9a66f3a32e8e8795e1e3889c8ffc1314798c53c326b0fd98bf7b21"
+    },
+    "wsuperOETHbPrices": {
+      "address": "0x9052BE889B4dBE60431c5407E602fC369c037429",
+      "runtime_bytes": 8336,
+      "source_sha256": "b200822a400558bc952de90ab59c6f798316e4c9170be969d7501032521d8f99"
+    },
+    "RedStone": {
+      "address": "0x26d580Fb35De59ae5c6D39d6733B736A71996332",
+      "runtime_bytes": 15325,
+      "source_sha256": "29ad9b6cafbd7f7daf296c0ad99368624f33cfd17e9024b359e0259852b449ab"
+    },
+    "UndyVaultPrices": {
+      "address": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "runtime_bytes": 18306,
+      "source_sha256": "1458e2cd8798d61088eb63e5ff56e0e3fa042aef5b4d69166274adb7810989f2"
+    },
+    "AeroRipePrices": {
+      "address": "0xA158F3f3ee031d890464CCdb907D9ad8B9769FCe",
+      "runtime_bytes": 3433,
+      "source_sha256": "bfd777be453f826ae07a49f1f82a2357bc6cfd10482b8847f6033e9f66c0fee6"
+    },
+    "EndaomentPSM": {
+      "address": "0xb4641a335919ab04Dc94b9893B3987FD6aD23621",
+      "runtime_bytes": 15217,
+      "source_sha256": "b09dc366a29538a7ba807d84794fddec4487bce25aef327743b7db3402ece39d"
+    },
+    "RipeReserveEngine": {
+      "address": "0x83c92e5B5431afb1DeCD4b41eC3A1319e447bD7f",
+      "runtime_bytes": 14443,
+      "source_sha256": "4a33d5f9587081ee37f58d482cf858a507fdaadf653dee0b8633ce8400b3b59c"
+    },
+    "RipeReserveVesting": {
+      "address": "0xde41026C8633f2d0d6db35A4EeEaeD0723000b32",
+      "runtime_bytes": 6104,
+      "source_sha256": "01ef0c0f32cfa0378fad3baf317e5dd2932a2bb06b78a7f64af67f6eda11f21d"
+    }
+  },
+  "probes": [],
+  "completed_migrations": [],
+  "scope": "oracle-registration-only; not a full treasury or user migration rehearsal",
+  "full_update_harness_sha256": "2ea76b4eed6d536d843ddb004e5f9762915b80e0eb4717de0f3e5c2bddf00e07",
+  "block_hash": "0x309867a798010d47ada7686fd2c1124118d5c76a82864e8a196a56b53c222248",
+  "governance": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+  "hq_delay_blocks": 21600,
+  "active_hq": {
+    "Ledger": "0x365256e322a47Aa2015F6724783F326e9B24fA47",
+    "MissionControl": "0x559E53F42b68b4995732Dba4aF300796761DBC19",
+    "Switchboard": "0x20Fb680786004902DaCa00b1070B32F070716Cab",
+    "PriceDesk": "0x2F7901BE53cC94AEF174f1a0764430840360Ef53",
+    "VaultBook": "0xB758e30C14825519b895Fd9928d5d8748A71a944",
+    "AuctionHouse": "0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084",
+    "AuctionHouseNFT": "0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A",
+    "Boardroom": "0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1",
+    "BondRoom": "0x707f660A7834d00792DF9a28386Bb2cCC6446154",
+    "CreditEngine": "0xEdd0563D06CC52fb5F264A2366A31d9776f6dcC7",
+    "Endaoment": "0x70fA85Aa99a39161A2623627377F1c791fd091f6",
+    "HumanResources": "0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b",
+    "Lootbox": "0x1f90ef42Da9B41502d2311300E13FAcf70c64be7",
+    "Teller": "0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13",
+    "Deleverage": "0x62591b3058c1428FA4b5eD2160387725be285a64",
+    "CreditRedeem": "0x3bfB0F72642aeFA2486da00Db855c5F0b787e3FB",
+    "TellerUtils": "0x57f071AB96D1798C6bB3e314D2D283502DEDDcdD",
+    "EndaomentFunds": "0x4Ce5FB8D572917Eb96724eA1866b505B2a6B0873",
+    "EndaomentPSM": "0x58Eed464070BF2249DF6273157367041394527D4"
+  },
+  "ledger_before": {
+    "totalDebt": 22975389678308022946054,
+    "badDebt": 0,
+    "ripeRewards": {
+      "borrowers": 2929455934750237989181,
+      "stakers": 12122610644927123502963,
+      "voters": 0,
+      "genDepositors": 0,
+      "newRipeRewards": 30000000000000000,
+      "lastUpdate": 51311477
+    },
+    "globalDepositPoints": {
+      "lastUsdValue": 57396,
+      "ripeStakerPoints": 18008712473,
+      "ripeVotePoints": 0,
+      "ripeGenPoints": 2315888919696,
+      "lastUpdate": 51311477
+    },
+    "globalBorrowPoints": {
+      "lastPrincipal": 22523,
+      "points": 117081390933,
+      "lastUpdate": 51311458
+    },
+    "ripeAvailForRewards": 862702481075241806703575,
+    "ripeAvailForHr": 800000000000000000000,
+    "ripeAvailForBonds": 288556649469530000000000
+  },
+  "borrowers": {
+    "0x2f537C2C1D263e66733DA492414359B6B70e1269": {
+      "amount": 53082447975175766614,
+      "principal": 50000000000000000000,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0x64DD1ABDF58f3066095E9240d66986fbE13709cB": {
+      "amount": 5781834112673717865,
+      "principal": 5495138917266273706,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8": {
+      "amount": 5433906916534654882873,
+      "principal": 5253725612722796120124,
+      "debtTerms": {
+        "ltv": 7605,
+        "redemptionThreshold": 8247,
+        "liqThreshold": 8712,
+        "liqFee": 618,
+        "borrowRate": 561,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0x7190081341F0e0223E237270b8479159951A5a46": {
+      "amount": 48607743716692642994,
+      "principal": 45897749764195345498,
+      "debtTerms": {
+        "ltv": 7118,
+        "redemptionThreshold": 7811,
+        "liqThreshold": 8142,
+        "liqFee": 926,
+        "borrowRate": 672,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad": {
+      "amount": 407101085814277794,
+      "principal": 387616337112982852,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0xbb78B430C2020a8655c32AEF37Bcd1705A82a7b7": {
+      "amount": 1001092254856408764882,
+      "principal": 999784961028916559730,
+      "debtTerms": {
+        "ltv": 7317,
+        "redemptionThreshold": 7977,
+        "liqThreshold": 8346,
+        "liqFee": 826,
+        "borrowRate": 315,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0x69370c4D1916C8Fd50C8bBD6D166c93dD7dbBDf0": {
+      "amount": 6388711151381374725953,
+      "principal": 6322416750578753815310,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789347969,
+      "inLiquidation": false
+    },
+    "0xD7A48E684Da48cc384fD80bb1Fed7D8970bfe91b": {
+      "amount": 982796745232664627,
+      "principal": 982796745232664627,
+      "debtTerms": {
+        "ltv": 0,
+        "redemptionThreshold": 0,
+        "liqThreshold": 0,
+        "liqFee": 0,
+        "borrowRate": 0,
+        "daowry": 0
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": true
+    },
+    "0xE5aB77408c25E7C1562C09067A8Fa3d0C00ac999": {
+      "amount": 126807288588630824,
+      "principal": 126807288588630824,
+      "debtTerms": {
+        "ltv": 0,
+        "redemptionThreshold": 0,
+        "liqThreshold": 0,
+        "liqFee": 0,
+        "borrowRate": 0,
+        "daowry": 0
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": true
+    },
+    "0x0789f1A32872271e1A0a6be09FBc6988B9e68e76": {
+      "amount": 1016656212031285203,
+      "principal": 1000000000000000000,
+      "debtTerms": {
+        "ltv": 5393,
+        "redemptionThreshold": 6486,
+        "liqThreshold": 6986,
+        "liqFee": 1063,
+        "borrowRate": 741,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789347949,
+      "inLiquidation": false
+    },
+    "0x59b429647fCC0a29166BAF2707Db5D61F0572865": {
+      "amount": 159961187180,
+      "principal": 148755824443,
+      "debtTerms": {
+        "ltv": 6999,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0x39fEdC7c60cB20d58Ed76a77793f9dDC8B70DFDc": {
+      "amount": 1000866379991227379777,
+      "principal": 999999962449950244953,
+      "debtTerms": {
+        "ltv": 8000,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 250,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344511,
+      "inLiquidation": false
+    },
+    "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567": {
+      "amount": 52942592572795424856,
+      "principal": 49989681866840573456,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f": {
+      "amount": 77385948603808416616,
+      "principal": 74158548261222822869,
+      "debtTerms": {
+        "ltv": 6999,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x41BF39033C732F884A52ddf38F647aD63457CEEC": {
+      "amount": 7412382382443848953,
+      "principal": 7000000000000000000,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x19284cD63083583cf5C5e1F945fAE112a39976c6": {
+      "amount": 2353994950469057282,
+      "principal": 2282508786527996245,
+      "debtTerms": {
+        "ltv": 7912,
+        "redemptionThreshold": 8437,
+        "liqThreshold": 8922,
+        "liqFee": 538,
+        "borrowRate": 515,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660": {
+      "amount": 603337186288483551031,
+      "principal": 600835221774277273384,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0xd088BDC872076691aBb10eF128703E089e463047": {
+      "amount": 18998406510787803,
+      "principal": 18051128648721153,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x3A3af2ea20d59DA1cAAE5408C48a313ae12EEd90": {
+      "amount": 5043983021,
+      "principal": 5022444088,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x381490fF607bb11de75E730FF0698d72573fAedb": {
+      "amount": 1001801088707965402319,
+      "principal": 977219574964082744716,
+      "debtTerms": {
+        "ltv": 7933,
+        "redemptionThreshold": 8466,
+        "liqThreshold": 8966,
+        "liqFee": 508,
+        "borrowRate": 506,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F": {
+      "amount": 3736935487986136814460,
+      "principal": 3678685606611057343991,
+      "debtTerms": {
+        "ltv": 8000,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084": {
+      "amount": 9276598186648687523,
+      "principal": 8682019093802451253,
+      "debtTerms": {
+        "ltv": 5000,
+        "redemptionThreshold": 6000,
+        "liqThreshold": 6500,
+        "liqFee": 1200,
+        "borrowRate": 1100,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0xFC7c1D00b2eC6d3653E9De72590684456846c53D": {
+      "amount": 1749019454757,
+      "principal": 1746562797385,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x3BdFde86869874b101466035B57835A087EadC0f": {
+      "amount": 1123972634654333794,
+      "principal": 1121802591999553512,
+      "debtTerms": {
+        "ltv": 7000,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344515,
+      "inLiquidation": false
+    },
+    "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0": {
+      "amount": 295505016828023324241,
+      "principal": 291843643986682351200,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789348005,
+      "inLiquidation": false
+    },
+    "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738": {
+      "amount": 13700809940108052,
+      "principal": 13700809940108052,
+      "debtTerms": {
+        "ltv": 0,
+        "redemptionThreshold": 0,
+        "liqThreshold": 0,
+        "liqFee": 0,
+        "borrowRate": 0,
+        "daowry": 0
+      },
+      "lastTimestamp": 1789085321,
+      "inLiquidation": true
+    },
+    "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D": {
+      "amount": 835672069179738332495,
+      "principal": 813456786237628048386,
+      "debtTerms": {
+        "ltv": 6999,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789140241,
+      "inLiquidation": false
+    },
+    "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90": {
+      "amount": 261071114998583309461,
+      "principal": 260000979480463887249,
+      "debtTerms": {
+        "ltv": 7000,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789328781,
+      "inLiquidation": false
+    },
+    "0xe0d8293733dCC20BD2aBE0E29bD9Bf4021EA7B4d": {
+      "amount": 1011843105152760020,
+      "principal": 1000000000000000000,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789347941,
+      "inLiquidation": false
+    },
+    "0xCA0073964efe7f9422CeB16901018b1DB0cC4785": {
+      "amount": 1862516423415608918,
+      "principal": 1814200429014661753,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275": {
+      "amount": 2810841328260473905,
+      "principal": 2711714019132242829,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x37a1621bd89b75FF761AC9d9145Bc34920e75AdE": {
+      "amount": 15627886171301409637,
+      "principal": 14769348525716101660,
+      "debtTerms": {
+        "ltv": 6999,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5": {
+      "amount": 320246023970982928121,
+      "principal": 299999983520264552609,
+      "debtTerms": {
+        "ltv": 7456,
+        "redemptionThreshold": 8091,
+        "liqThreshold": 8489,
+        "liqFee": 755,
+        "borrowRate": 602,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0xCFFE08BDf20918007f8Ab268C32f8756494fC8D8": {
+      "amount": 1413445463583,
+      "principal": 1412509061748,
+      "debtTerms": {
+        "ltv": 7019,
+        "redemptionThreshold": 7718,
+        "liqThreshold": 8022,
+        "liqFee": 988,
+        "borrowRate": 695,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x7cb71C594FEBACE6b6bA11126abeB8Cc860cB24A": {
+      "amount": 23900374784505180921,
+      "principal": 21993459576765601221,
+      "debtTerms": {
+        "ltv": 4999,
+        "redemptionThreshold": 6000,
+        "liqThreshold": 6500,
+        "liqFee": 1200,
+        "borrowRate": 1100,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0xd060D0C2bbd34AB116bd6c917147B560C66F875b": {
+      "amount": 68260520361387739,
+      "principal": 68260520361387739,
+      "debtTerms": {
+        "ltv": 0,
+        "redemptionThreshold": 0,
+        "liqThreshold": 0,
+        "liqFee": 0,
+        "borrowRate": 0,
+        "daowry": 0
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": true
+    },
+    "0xeE6629D668FD86d1D3533c49D1A4dDfe6B8dBB45": {
+      "amount": 2867519860591,
+      "principal": 2672352267484,
+      "debtTerms": {
+        "ltv": 7000,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x6b34e50bDfC20A0869BF28249bac24d12Cc3fbbd": {
+      "amount": 22905936042316810,
+      "principal": 22905936042316810,
+      "debtTerms": {
+        "ltv": 0,
+        "redemptionThreshold": 0,
+        "liqThreshold": 0,
+        "liqFee": 0,
+        "borrowRate": 0,
+        "daowry": 0
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": true
+    },
+    "0x3D89d2653636eECDd286b7399C194D885Ac1A159": {
+      "amount": 2783487151251543630,
+      "principal": 2630596232567259341,
+      "debtTerms": {
+        "ltv": 7000,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E": {
+      "amount": 257547140184901938,
+      "principal": 257547140184901938,
+      "debtTerms": {
+        "ltv": 0,
+        "redemptionThreshold": 0,
+        "liqThreshold": 0,
+        "liqFee": 0,
+        "borrowRate": 0,
+        "daowry": 0
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": true
+    },
+    "0xb4f6C55B3E51D1ECEF78F9c149E4aeA7E7ae86a1": {
+      "amount": 202501711167449861,
+      "principal": 193178802368185108,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d": {
+      "amount": 1000415147042020764666,
+      "principal": 999000000000000000000,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8499,
+        "liqThreshold": 8999,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789189645,
+      "inLiquidation": false
+    },
+    "0xA0ed9aC5878983DA938a99f416AaDB29D98E778d": {
+      "amount": 95682450655878151773,
+      "principal": 90128983314705720704,
+      "debtTerms": {
+        "ltv": 8000,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788480513,
+      "inLiquidation": false
+    },
+    "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753": {
+      "amount": 487639045489279944,
+      "principal": 468669901680211245,
+      "debtTerms": {
+        "ltv": 7945,
+        "redemptionThreshold": 8461,
+        "liqThreshold": 8951,
+        "liqFee": 524,
+        "borrowRate": 509,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0xe09e4C7b1FEB007aAEc6c66282031D6b8F7A6Ee2": {
+      "amount": 31744239071286555560,
+      "principal": 31339813768544768954,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789347955,
+      "inLiquidation": false
+    },
+    "0x9e949d2756933b3846816afdCCaa725f17dF86Cf": {
+      "amount": 546848351078710834300,
+      "principal": 526284678288916877671,
+      "debtTerms": {
+        "ltv": 6999,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789353007,
+      "inLiquidation": false
+    },
+    "0x5D58EDC7a7C91239Ec2FD56a646679780886323c": {
+      "amount": 41986104689758895,
+      "principal": 39246369728659901,
+      "debtTerms": {
+        "ltv": 6999,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x2c1e54f815529467be8F3B78E46C14168852322A": {
+      "amount": 74774494739449816,
+      "principal": 69101601151134692,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x66212a3c4eB5c934A5cB998C8F5D74138022767c": {
+      "amount": 105443299200996024586,
+      "principal": 99651509335480145193,
+      "debtTerms": {
+        "ltv": 6999,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1788394067,
+      "inLiquidation": false
+    },
+    "0x8d804669c3E1DEc71Ba8d460CAAeD5bf9Fa415e2": {
+      "amount": 1301916304893,
+      "principal": 1274138174583,
+      "debtTerms": {
+        "ltv": 7661,
+        "redemptionThreshold": 8252,
+        "liqThreshold": 8690,
+        "liqFee": 654,
+        "borrowRate": 561,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789347935,
+      "inLiquidation": false
+    },
+    "0x902768128C224FEbFF1147aDd4fc9dCbF39d0C56": {
+      "amount": 10117043515369691,
+      "principal": 9351916316255251,
+      "debtTerms": {
+        "ltv": 4999,
+        "redemptionThreshold": 6000,
+        "liqThreshold": 6500,
+        "liqFee": 1000,
+        "borrowRate": 800,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344521,
+      "inLiquidation": false
+    },
+    "0xdd2ba66B25DCC26d0850787f79678dE906bD6B98": {
+      "amount": 889933635820815489,
+      "principal": 848669456514386979,
+      "debtTerms": {
+        "ltv": 5000,
+        "redemptionThreshold": 6000,
+        "liqThreshold": 6500,
+        "liqFee": 1000,
+        "borrowRate": 800,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344521,
+      "inLiquidation": false
+    },
+    "0xE87a10d5B212D169CCBC9a50Cf5E23DD3da27cb6": {
+      "amount": 885804979434537903,
+      "principal": 835449453393048496,
+      "debtTerms": {
+        "ltv": 5000,
+        "redemptionThreshold": 6000,
+        "liqThreshold": 6500,
+        "liqFee": 1000,
+        "borrowRate": 800,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344521,
+      "inLiquidation": false
+    },
+    "0xb53009E4dC25a494F3Bee03Ab121517e74b59F75": {
+      "amount": 4639495940283303286,
+      "principal": 4383067466263352528,
+      "debtTerms": {
+        "ltv": 7000,
+        "redemptionThreshold": 7700,
+        "liqThreshold": 8000,
+        "liqFee": 1000,
+        "borrowRate": 700,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344521,
+      "inLiquidation": false
+    },
+    "0xc6E4Ad3ccdfC65687D2d60a454a8bdDc1F4d6c06": {
+      "amount": 1839549746328,
+      "principal": 1819102603072,
+      "debtTerms": {
+        "ltv": 7999,
+        "redemptionThreshold": 8500,
+        "liqThreshold": 9000,
+        "liqFee": 500,
+        "borrowRate": 500,
+        "daowry": 25
+      },
+      "lastTimestamp": 1789344521,
+      "inLiquidation": false
+    }
+  },
+  "vaults": {
+    "1": {
+      "address": "0x2a157096af6337b2b4bd47de435520572ed5a439",
+      "assets": {
+        "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": {
+          "total_shares_or_balance": 3291584456034961963396896045631
+        },
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc": {
+          "total_shares_or_balance": 4284868479780679896437044643495
+        }
+      }
+    },
+    "2": {
+      "address": "0xe42b3dC546527EB70D741B185Dc57226cA01839D",
+      "assets": {
+        "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": {
+          "total_shares_or_balance": 10292412254960554896115409156747
+        },
+        "0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526": {
+          "total_shares_or_balance": 0
+        },
+        "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": {
+          "total_shares_or_balance": 15169692280561399353552525354
+        }
+      }
+    },
+    "3": {
+      "address": "0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD",
+      "assets": {
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": {
+          "total_shares_or_balance": 0
+        },
+        "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": {
+          "total_shares_or_balance": 1900134
+        },
+        "0x4200000000000000000000000000000000000006": {
+          "total_shares_or_balance": 1084189131038540202
+        },
+        "0xcbD06E5A2B0C65597161de254AA074E489dEb510": {
+          "total_shares_or_balance": 14500000000
+        },
+        "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": {
+          "total_shares_or_balance": 823425136048272240
+        },
+        "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A": {
+          "total_shares_or_balance": 0
+        },
+        "0x940181a94A35A4569E4529A3CDfB74e38FD98631": {
+          "total_shares_or_balance": 100189614669483620066
+        },
+        "0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6": {
+          "total_shares_or_balance": 0
+        },
+        "0xcb585250f852C6c6bf90434AB21A00f02833a4af": {
+          "total_shares_or_balance": 0
+        },
+        "0xA88594D404727625A9437C3f886C7643872296AE": {
+          "total_shares_or_balance": 11986269878969919127060
+        },
+        "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": {
+          "total_shares_or_balance": 1054012762792834343376
+        },
+        "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": {
+          "total_shares_or_balance": 0
+        },
+        "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": {
+          "total_shares_or_balance": 0
+        },
+        "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": {
+          "total_shares_or_balance": 0
+        },
+        "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": {
+          "total_shares_or_balance": 800000000000000000
+        },
+        "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22": {
+          "total_shares_or_balance": 0
+        },
+        "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca": {
+          "total_shares_or_balance": 0
+        },
+        "0x616a4E1db48e22028f6bbf20444Cd3b8e3273738": {
+          "total_shares_or_balance": 0
+        },
+        "0xf42f5795D9ac7e9D757dB633D693cD548Cfd9169": {
+          "total_shares_or_balance": 0
+        },
+        "0x0A1a3b5f2041F33522C4efc754a7D096f880eE16": {
+          "total_shares_or_balance": 0
+        },
+        "0xF877ACaFA28c19b96727966690b2f44d35aD5976": {
+          "total_shares_or_balance": 0
+        },
+        "0xa0E430870c4604CcfC7B38Ca7845B1FF653D0ff1": {
+          "total_shares_or_balance": 0
+        },
+        "0x27D8c7273fd3fcC6956a0B370cE5Fd4A7fc65c18": {
+          "total_shares_or_balance": 0
+        },
+        "0x859160DB5841E5cfB8D3f144C6b3381A85A4b410": {
+          "total_shares_or_balance": 0
+        },
+        "0x543257eF2161176D7C8cD90BA65C2d4CaEF5a796": {
+          "total_shares_or_balance": 0
+        },
+        "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": {
+          "total_shares_or_balance": 830694343423510974
+        },
+        "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": {
+          "total_shares_or_balance": 0
+        }
+      }
+    },
+    "4": {
+      "address": "0xce2E96C9F6806731914A7b4c3E4aC1F296d98597",
+      "assets": {
+        "0x784efeB622244d2348d4F2522f8860B96fbEcE89": {
+          "total_shares_or_balance": 0
+        },
+        "0xBdb9300b7CDE636d9cD4AFF00f6F009fFBBc8EE6": {
+          "total_shares_or_balance": 0
+        },
+        "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB": {
+          "total_shares_or_balance": 0
+        },
+        "0xD4a0e0b9149BCee3C920d2E00b5dE09138fd8bb7": {
+          "total_shares_or_balance": 0
+        },
+        "0xb125E6687d4313864e53df431d5425969c15Eb2F": {
+          "total_shares_or_balance": 0
+        },
+        "0x46e6b214b524310239732D51387075E0e70970bf": {
+          "total_shares_or_balance": 0
+        }
+      }
+    },
+    "5": {
+      "address": "0x4549A368c00f803862d457C4C0c659a293F26C66",
+      "assets": {
+        "0xcF9F72237d4135a6D8b3ee717DC414Ae5b56E41e": {
+          "total_shares_or_balance": 0
+        },
+        "0x01ECc16CE82CCf7e6f734351d5d3AdCf2f8D3497": {
+          "total_shares_or_balance": 0
+        },
+        "0x4cD99832E44D1154bd7841f5E5E9ce66dA0437d4": {
+          "total_shares_or_balance": 0
+        },
+        "0xcdD894E6c11d6444e0c3d974928Dd71b28b09356": {
+          "total_shares_or_balance": 0
+        },
+        "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": {
+          "total_shares_or_balance": 0
+        },
+        "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": {
+          "total_shares_or_balance": 2805894
+        },
+        "0x02981DB1a99A14912b204437e7a2E02679B57668": {
+          "total_shares_or_balance": 1262075849141995041
+        },
+        "0x96F1a7ce331F40afe866F3b707c223e377661087": {
+          "total_shares_or_balance": 12029553531129772849
+        },
+        "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": {
+          "total_shares_or_balance": 874302
+        },
+        "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": {
+          "total_shares_or_balance": 39961172261
+        }
+      }
+    }
+  },
+  "legacy_stability_claim_inventory": [
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+      "raw_claim_balance": 2
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x4200000000000000000000000000000000000006",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xA88594D404727625A9437C3f886C7643872296AE",
+      "raw_claim_balance": 56
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x96F1a7ce331F40afe866F3b707c223e377661087",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+      "raw_claim_balance": 12
+    }
+  ],
+  "wave1_deployments_complete": true,
+  "fork_transactions": [
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x2a157096af6337b2b4bd47de435520572ed5a439",
+        "Retained 1"
+      ],
+      "result": true,
+      "execution_gas": 100530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x2a157096af6337b2b4bd47de435520572ed5a439"
+      ],
+      "result": 1,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xe42b3dC546527EB70D741B185Dc57226cA01839D",
+        "Retained 2"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xe42b3dC546527EB70D741B185Dc57226cA01839D"
+      ],
+      "result": 2,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD",
+        "Retained 3"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD"
+      ],
+      "result": 3,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xce2E96C9F6806731914A7b4c3E4aC1F296d98597",
+        "Retained 4"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xce2E96C9F6806731914A7b4c3E4aC1F296d98597"
+      ],
+      "result": 4,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x4549A368c00f803862d457C4C0c659a293F26C66",
+        "Retained 5"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x4549A368c00f803862d457C4C0c659a293F26C66"
+      ],
+      "result": 5,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xB854c1f42f9ccedB43Ef646c94c2512ecbB05BA1",
+        "StabilityPool"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xB854c1f42f9ccedB43Ef646c94c2512ecbB05BA1"
+      ],
+      "result": 6,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x064e88f9CD0eF0525f7A125D4396eE93468C7cdD",
+        "RipeGov"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x064e88f9CD0eF0525f7A125D4396eE93468C7cdD"
+      ],
+      "result": 7,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x41e9951B2C85C295630C8a304A8410BB561ba87d",
+        "SimpleErc20"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x41e9951B2C85C295630C8a304A8410BB561ba87d"
+      ],
+      "result": 8,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x9a849C83B41c261974d438cc56ac48Fb5f568a52",
+        "RebaseErc20"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x9a849C83B41c261974d438cc56ac48Fb5f568a52"
+      ],
+      "result": 9,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xAB032BFa41AD31090C2744727C2cdA502e9025e0",
+        "UnderscoreVault"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xAB032BFa41AD31090C2744727C2cdA502e9025e0"
+      ],
+      "result": 10,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x3d06E92f20305D9a2D71a1D479E9EE22690Ae7E4",
+        "Alpha"
+      ],
+      "result": true,
+      "execution_gas": 100530,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x3d06E92f20305D9a2D71a1D479E9EE22690Ae7E4"
+      ],
+      "result": 1,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x78548820b365886d05009F1127bf553603E5A836",
+        "Bravo"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x78548820b365886d05009F1127bf553603E5A836"
+      ],
+      "result": 2,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x88DD242155C50c2b91F288391b4D8d4C93e0552a",
+        "Charlie"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x88DD242155C50c2b91F288391b4D8d4C93e0552a"
+      ],
+      "result": 3,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x10761621062878CEdEfEb54dFFfb5fde5187bbB7",
+        "Delta"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x10761621062878CEdEfEb54dFFfb5fde5187bbB7"
+      ],
+      "result": 4,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xc0E0bc04A7EF550053792c30782E38E34d3Dd70D",
+        "Echo"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xc0E0bc04A7EF550053792c30782E38E34d3Dd70D"
+      ],
+      "result": 5,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xD10829C06F95D40004aFc4379579Bc05Aa3982e5",
+        "Foxtrot"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xD10829C06F95D40004aFc4379579Bc05Aa3982e5"
+      ],
+      "result": 6,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x2E5CcDbd412588ceE58516Fa732658CEF7944233",
+        "Golf"
+      ],
+      "result": true,
+      "execution_gas": 98530,
+      "block": 51312366
+    },
+    {
+      "target": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x2E5CcDbd412588ceE58516Fa732658CEF7944233"
+      ],
+      "result": 7,
+      "execution_gas": 137477,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+        "ChainlinkPrices"
+      ],
+      "result": true,
+      "execution_gas": 100507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c"
+      ],
+      "result": 1,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+        "CurvePrices"
+      ],
+      "result": true,
+      "execution_gas": 98507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF"
+      ],
+      "result": 2,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x9E6178ef05D593C86c13704B9Bc5A84FB45f301E",
+        "BlueChip Yield Prices"
+      ],
+      "result": true,
+      "execution_gas": 98507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x9E6178ef05D593C86c13704B9Bc5A84FB45f301E"
+      ],
+      "result": 3,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddressDisableInRegistry",
+      "args": [
+        3
+      ],
+      "result": true,
+      "execution_gas": 50844,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmAddressDisableInRegistry",
+      "args": [
+        3
+      ],
+      "result": true,
+      "execution_gas": 7864,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x42F591213Be3fB0Cc6B9A11D479657F60e0d335B",
+        "PythPrices"
+      ],
+      "result": true,
+      "execution_gas": 98507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x42F591213Be3fB0Cc6B9A11D479657F60e0d335B"
+      ],
+      "result": 4,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xCAF963d78c286243a62F3e3dFD1DBb66794Be51F",
+        "StorkPrices"
+      ],
+      "result": true,
+      "execution_gas": 98507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xCAF963d78c286243a62F3e3dFD1DBb66794Be51F"
+      ],
+      "result": 5,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x5ce2BbD5eBe9f7d9322a8F56740F95b9576eE0A2",
+        "Retained legacy Aero collateral source"
+      ],
+      "result": true,
+      "execution_gas": 120919,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x5ce2BbD5eBe9f7d9322a8F56740F95b9576eE0A2"
+      ],
+      "result": 6,
+      "execution_gas": 160022,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x9052BE889B4dBE60431c5407E602fC369c037429",
+        "wsuperOETHbPrices"
+      ],
+      "result": true,
+      "execution_gas": 98507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x9052BE889B4dBE60431c5407E602fC369c037429"
+      ],
+      "result": 7,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+        "UndyVaultPrices"
+      ],
+      "result": true,
+      "execution_gas": 98507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF"
+      ],
+      "result": 8,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x26d580Fb35De59ae5c6D39d6733B736A71996332",
+        "RedStone"
+      ],
+      "result": true,
+      "execution_gas": 98507,
+      "block": 51312366
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x26d580Fb35De59ae5c6D39d6733B736A71996332"
+      ],
+      "result": 9,
+      "execution_gas": 137454,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        5,
+        "0x464531AB3b51B4654e08364815FA4E236E95244a"
+      ],
+      "result": true,
+      "execution_gas": 80896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        6,
+        "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        7,
+        "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "cancelAddressUpdateToRegistry",
+      "args": [
+        8
+      ],
+      "result": true,
+      "execution_gas": 22604,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        8,
+        "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C"
+      ],
+      "result": true,
+      "execution_gas": 11196,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        9,
+        "0x2Fe42d5dC25658CE5A4D13A8D7E8C523011e59CE"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        10,
+        "0x6970932a453F1ee612ffEAd6574123289DB94958"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        11,
+        "0xA87f42e2101CEada8f6A8105635fD40d141ba5CF"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        12,
+        "0x09437b00357c02a30B9aFB30292B087eC2E36983"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        13,
+        "0xef443Aaa7981166948cEd9499bD69E3C0E19003f"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        14,
+        "0xfCE3Ebb91c61D7d06D0435e851d7ededD7352602"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        15,
+        "0x8512b12Cb48b05aF19bDE28DeaD6B6AB479f4409"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        16,
+        "0x48B98EC58E5389B317847ff590776BC01629f297"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        17,
+        "0xa55A5e2F9dA4F0FbaF566285788d53be3EF969E4"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        18,
+        "0xd3dD8E2B10e77e938867d6df1b1181ea2Cd657CD"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        19,
+        "0x91bd328378E0aFAc2936B38F91D62fc8b893e741"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        20,
+        "0x3f67b2ec379A94398029994e48ea1421E933103A"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        21,
+        "0xE1fb055fE1Fad2D5f980a7954Ebf1539CA676D1e"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddressUpdateToRegistry",
+      "args": [
+        22,
+        "0xb4641a335919ab04Dc94b9893B3987FD6aD23621"
+      ],
+      "result": true,
+      "execution_gas": 78896,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x05a710A8CfCeaEAd0A2533bA3dc137EC37B1E2dD",
+        "VaultMigrator"
+      ],
+      "result": true,
+      "execution_gas": 97398,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0x83c92e5B5431afb1DeCD4b41eC3A1319e447bD7f",
+        "RipeReserveEngine"
+      ],
+      "result": true,
+      "execution_gas": 97398,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "startAddNewAddressToRegistry",
+      "args": [
+        "0xde41026C8633f2d0d6db35A4EeEaeD0723000b32",
+        "RipeReserveVesting"
+      ],
+      "result": true,
+      "execution_gas": 97398,
+      "block": 51312366
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        8
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        5
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        6
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        7
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        9
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        10
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        11
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        12
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        13
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        14
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        15
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        16
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        17
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        18
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        19
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        20
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        21
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmAddressUpdateToRegistry",
+      "args": [
+        22
+      ],
+      "result": true,
+      "execution_gas": 41181,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x05a710A8CfCeaEAd0A2533bA3dc137EC37B1E2dD"
+      ],
+      "result": 25,
+      "execution_gas": 139151,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0x83c92e5B5431afb1DeCD4b41eC3A1319e447bD7f"
+      ],
+      "result": 26,
+      "execution_gas": 136351,
+      "block": 51333966
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "confirmNewAddressToRegistry",
+      "args": [
+        "0xde41026C8633f2d0d6db35A4EeEaeD0723000b32"
+      ],
+      "result": 27,
+      "execution_gas": 136351,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      ],
+      "result": null,
+      "execution_gas": 26905,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2"
+      ],
+      "result": null,
+      "execution_gas": 28664,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x4200000000000000000000000000000000000006"
+      ],
+      "result": null,
+      "execution_gas": 26198,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x02981DB1a99A14912b204437e7a2E02679B57668"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22"
+      ],
+      "result": null,
+      "execution_gas": 33575,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
+      ],
+      "result": null,
+      "execution_gas": 38016,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6"
+      ],
+      "result": null,
+      "execution_gas": 33622,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b"
+      ],
+      "result": null,
+      "execution_gas": 28621,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x940181a94A35A4569E4529A3CDfB74e38FD98631"
+      ],
+      "result": null,
+      "execution_gas": 28584,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55"
+      ],
+      "result": null,
+      "execution_gas": 36564,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xcbD06E5A2B0C65597161de254AA074E489dEb510"
+      ],
+      "result": null,
+      "execution_gas": 37972,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x96F1a7ce331F40afe866F3b707c223e377661087"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c"
+      ],
+      "result": null,
+      "execution_gas": 37972,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xcb585250f852C6c6bf90434AB21A00f02833a4af"
+      ],
+      "result": null,
+      "execution_gas": 37972,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xcb17C9Db87B595717C857a08468793f5bAb6445F"
+      ],
+      "result": null,
+      "execution_gas": 37972,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf"
+      ],
+      "result": null,
+      "execution_gas": 28603,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+      ],
+      "result": null,
+      "execution_gas": 28621,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xA88594D404727625A9437C3f886C7643872296AE"
+      ],
+      "result": null,
+      "execution_gas": 35939,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0"
+      ],
+      "result": null,
+      "execution_gas": 25989,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
+      ],
+      "result": null,
+      "execution_gas": 28634,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9"
+      ],
+      "result": null,
+      "execution_gas": 26339,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+      "method": "syncTokenScale",
+      "args": [
+        "0x99e65176F7FA8743E3fbaEF277d1Da448e361367"
+      ],
+      "result": null,
+      "execution_gas": 28489,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 191344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+        "0x975043adBb80fc32276CbF9Bbcfd4A601a12462D",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 192354,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55"
+      ],
+      "result": true,
+      "execution_gas": 137157,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
+        "0x8422f3d3CAFf15Ca682939310d6A5e619AE08e57",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 192178,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xcbD06E5A2B0C65597161de254AA074E489dEb510"
+      ],
+      "result": true,
+      "execution_gas": 136783,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+        "0x4EC5970fC728C5f65ba413992CD5fF6FD70fcfF0",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x940181a94A35A4569E4529A3CDfB74e38FD98631"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c",
+        "0x34cD971a092d5411bD69C10a5F0A7EEF72C69041",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 192178,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c"
+      ],
+      "result": true,
+      "execution_gas": 136783,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xcb585250f852C6c6bf90434AB21A00f02833a4af",
+        "0x9f0C1dD78C4CBdF5b9cf923a549A201EdC676D34",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 192178,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xcb585250f852C6c6bf90434AB21A00f02833a4af"
+      ],
+      "result": true,
+      "execution_gas": 136783,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xcb17C9Db87B595717C857a08468793f5bAb6445F",
+        "0x206a34e47093125fbf4C75b7c7E88b84c6A77a69",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 190178,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xcb17C9Db87B595717C857a08468793f5bAb6445F"
+      ],
+      "result": true,
+      "execution_gas": 136783,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
+        "0xd7818272B9e248357d13057AAb0B417aF31E817d",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189520,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22"
+      ],
+      "result": true,
+      "execution_gas": 135511,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2",
+        "0x79cf4a31B29D69191f0b6E97916eB93FEB81E533",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+        "0xEaf310161c9eF7c813A14f8FEF6Fb271434019F7",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xDBFeFD2e8460a6Ee4955A68582F85708BAEA60A3",
+        "0x39C6E14CdE46D4FFD9F04Ff159e7ce8eC20E10B4",
+        86400,
+        true,
+        false
+      ],
+      "result": true,
+      "execution_gas": 215754,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xDBFeFD2e8460a6Ee4955A68582F85708BAEA60A3"
+      ],
+      "result": true,
+      "execution_gas": 168057,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xA88594D404727625A9437C3f886C7643872296AE",
+        "0xc15d9944dAefE2dB03e53bef8DDA25a56832C5fe",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xA88594D404727625A9437C3f886C7643872296AE"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+        "0xE62BcE5D7CB9d16AB8b4D622538bc0A50A5799c2",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee",
+        "0x42868EFcee13C0E71af89c04fF7d96f5bec479b0",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x820C137fa70C8691f0e44Dc420a5e53c168921Dc",
+        "0x2330aaE3bca5F05169d5f4597964D44522F62930",
+        86400,
+        false,
+        false
+      ],
+      "result": true,
+      "execution_gas": 189344,
+      "block": 51333966
+    },
+    {
+      "target": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x820C137fa70C8691f0e44Dc420a5e53c168921Dc"
+      ],
+      "result": true,
+      "execution_gas": 135137,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf",
+        300,
+        20,
+        1000,
+        86400
+      ],
+      "result": true,
+      "execution_gas": 346797,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf"
+      ],
+      "result": true,
+      "execution_gas": 579515,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x02981DB1a99A14912b204437e7a2E02679B57668",
+        300,
+        20,
+        1000,
+        86400
+      ],
+      "result": true,
+      "execution_gas": 853894,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x02981DB1a99A14912b204437e7a2E02679B57668"
+      ],
+      "result": true,
+      "execution_gas": 769703,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493",
+        300,
+        20,
+        1000,
+        86400
+      ],
+      "result": true,
+      "execution_gas": 509033,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493"
+      ],
+      "result": true,
+      "execution_gas": 575542,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x96F1a7ce331F40afe866F3b707c223e377661087",
+        300,
+        20,
+        1000,
+        86400
+      ],
+      "result": true,
+      "execution_gas": 300308,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x96F1a7ce331F40afe866F3b707c223e377661087"
+      ],
+      "result": true,
+      "execution_gas": 550117,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+        300,
+        20,
+        1000,
+        86400
+      ],
+      "result": true,
+      "execution_gas": 2081421,
+      "block": 51333966
+    },
+    {
+      "target": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0x99e65176F7FA8743E3fbaEF277d1Da448e361367"
+      ],
+      "result": true,
+      "execution_gas": 1397230,
+      "block": 51333966
+    },
+    {
+      "target": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
+      ],
+      "result": true,
+      "execution_gas": 443977,
+      "block": 51333966
+    },
+    {
+      "target": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707"
+      ],
+      "result": true,
+      "execution_gas": 325213,
+      "block": 51333966
+    },
+    {
+      "target": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "method": "addNewPriceFeed",
+      "args": [
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
+      ],
+      "result": true,
+      "execution_gas": 439242,
+      "block": 51333966
+    },
+    {
+      "target": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "method": "confirmNewPriceFeed",
+      "args": [
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
+      ],
+      "result": true,
+      "execution_gas": 344074,
+      "block": 51333966
+    },
+    {
+      "target": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "method": "setGreenRefPoolConfig",
+      "args": [
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        10,
+        6000,
+        43200,
+        7500,
+        5000000000000000000000000
+      ],
+      "result": 3,
+      "execution_gas": 376271,
+      "block": 51333966
+    },
+    {
+      "target": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "method": "confirmGreenRefPoolConfig",
+      "args": [
+        3
+      ],
+      "result": true,
+      "execution_gas": 1377341,
+      "block": 51333966
+    }
+  ],
+  "retained_legacy_aero_slot6": "0x5ce2BbD5eBe9f7d9322a8F56740F95b9576eE0A2",
+  "blockers": [
+    "LEGACY_AERO_COLLATERAL_SOURCE_HAS_NO_DROP_IN_REPLACEMENT",
+    "LIVE_PENDING_REGISTRY_UPDATE_REQUIRES_DECISION:8",
+    "configure_ChainlinkPrices_0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42",
+    "configure_ChainlinkPrices",
+    "configure_UndyVaultPrices_0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8",
+    "configure_UndyVaultPrices",
+    "configure_wsuperOETHbPrices_0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5",
+    "configure_wsuperOETHbPrices_0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf",
+    "configure_wsuperOETHbPrices",
+    "ZERO_POST_ACTIVATION_PRICES",
+    "ORACLE_SNAPSHOT_WARMUP_AND_LIVE_STATE_REPLAY_NOT_QUALIFIED"
+  ],
+  "staged_registry_ids": {
+    "vaults": {
+      "1": "0x2a157096af6337b2b4bd47de435520572ed5a439",
+      "2": "0xe42b3dC546527EB70D741B185Dc57226cA01839D",
+      "3": "0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD",
+      "4": "0xce2E96C9F6806731914A7b4c3E4aC1F296d98597",
+      "5": "0x4549A368c00f803862d457C4C0c659a293F26C66",
+      "6": "0xB854c1f42f9ccedB43Ef646c94c2512ecbB05BA1",
+      "7": "0x064e88f9CD0eF0525f7A125D4396eE93468C7cdD",
+      "8": "0x41e9951B2C85C295630C8a304A8410BB561ba87d",
+      "9": "0x9a849C83B41c261974d438cc56ac48Fb5f568a52",
+      "10": "0xAB032BFa41AD31090C2744727C2cdA502e9025e0"
+    },
+    "sources": {
+      "ChainlinkPrices": 1,
+      "CurvePrices": 2,
+      "PythPrices": 4,
+      "StorkPrices": 5,
+      "wsuperOETHbPrices": 7,
+      "UndyVaultPrices": 8,
+      "RedStone": 9
+    }
+  },
+  "live_pending_registry_changes": {
+    "8": {
+      "newAddr": "0x09f45F56b218756ab092f7470F8199db56849867",
+      "initiatedBlock": 49890175,
+      "confirmBlock": 49911775
+    }
+  },
+  "wave1_active_hq": {
+    "1": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+    "2": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+    "3": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+    "4": "0x365256e322a47Aa2015F6724783F326e9B24fA47",
+    "5": "0x464531AB3b51B4654e08364815FA4E236E95244a",
+    "6": "0xC6Acb7D16D51f72eAA659668F30A40d87E2E0551",
+    "7": "0xEe24e5Ee2C1330D14C8Cb15753A11518941774D3",
+    "8": "0x0757B84433Fc529cC4A4a9829b08AB4B68e9c49C",
+    "9": "0x2Fe42d5dC25658CE5A4D13A8D7E8C523011e59CE",
+    "10": "0x6970932a453F1ee612ffEAd6574123289DB94958",
+    "11": "0xA87f42e2101CEada8f6A8105635fD40d141ba5CF",
+    "12": "0x09437b00357c02a30B9aFB30292B087eC2E36983",
+    "13": "0xef443Aaa7981166948cEd9499bD69E3C0E19003f",
+    "14": "0xfCE3Ebb91c61D7d06D0435e851d7ededD7352602",
+    "15": "0x8512b12Cb48b05aF19bDE28DeaD6B6AB479f4409",
+    "16": "0x48B98EC58E5389B317847ff590776BC01629f297",
+    "17": "0xa55A5e2F9dA4F0FbaF566285788d53be3EF969E4",
+    "18": "0xd3dD8E2B10e77e938867d6df1b1181ea2Cd657CD",
+    "19": "0x91bd328378E0aFAc2936B38F91D62fc8b893e741",
+    "20": "0x3f67b2ec379A94398029994e48ea1421E933103A",
+    "21": "0xE1fb055fE1Fad2D5f980a7954Ebf1539CA676D1e",
+    "22": "0xb4641a335919ab04Dc94b9893B3987FD6aD23621",
+    "23": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+    "24": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+    "25": "0x05a710A8CfCeaEAd0A2533bA3dc137EC37B1E2dD",
+    "26": "0x83c92e5B5431afb1DeCD4b41eC3A1319e447bD7f",
+    "27": "0xde41026C8633f2d0d6db35A4EeEaeD0723000b32"
+  },
+  "ledger_globals_and_borrower_records_equal": true,
+  "checks": {
+    "token_scale_0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": "passed",
+    "token_scale_0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": "passed",
+    "token_scale_0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": "passed",
+    "token_scale_0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": "passed",
+    "token_scale_0x4200000000000000000000000000000000000006": "passed",
+    "token_scale_0x02981DB1a99A14912b204437e7a2E02679B57668": "passed",
+    "token_scale_0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": "passed",
+    "token_scale_0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": "passed",
+    "token_scale_0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": "passed",
+    "token_scale_0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": "passed",
+    "token_scale_0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": "passed",
+    "token_scale_0x940181a94A35A4569E4529A3CDfB74e38FD98631": "passed",
+    "token_scale_0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": "passed",
+    "token_scale_0xcbD06E5A2B0C65597161de254AA074E489dEb510": "passed",
+    "token_scale_0x96F1a7ce331F40afe866F3b707c223e377661087": "passed",
+    "token_scale_0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": "passed",
+    "token_scale_0xcb585250f852C6c6bf90434AB21A00f02833a4af": "passed",
+    "token_scale_0xcb17C9Db87B595717C857a08468793f5bAb6445F": "passed",
+    "token_scale_0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": "passed",
+    "token_scale_0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": "passed",
+    "token_scale_0xA88594D404727625A9437C3f886C7643872296AE": "passed",
+    "token_scale_0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": "passed",
+    "token_scale_0xd6c283655B42FA0eb2685F7AB819784F071459dc": "passed",
+    "token_scale_0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": "passed",
+    "token_scale_0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": "passed",
+    "token_scale_0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": "passed",
+    "token_scale_0x99e65176F7FA8743E3fbaEF277d1Da448e361367": "passed",
+    "configure_ChainlinkPrices_0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE": "passed",
+    "configure_ChainlinkPrices_0x4200000000000000000000000000000000000006": "passed",
+    "configure_ChainlinkPrices_0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB": "passed",
+    "configure_ChainlinkPrices_0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": "passed",
+    "configure_ChainlinkPrices_0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": "passed",
+    "configure_ChainlinkPrices_0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": "passed",
+    "configure_ChainlinkPrices_0xcbD06E5A2B0C65597161de254AA074E489dEb510": "passed",
+    "configure_ChainlinkPrices_0x940181a94A35A4569E4529A3CDfB74e38FD98631": "passed",
+    "configure_ChainlinkPrices_0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": "passed",
+    "configure_ChainlinkPrices_0xcb585250f852C6c6bf90434AB21A00f02833a4af": "passed",
+    "configure_ChainlinkPrices_0xcb17C9Db87B595717C857a08468793f5bAb6445F": "passed",
+    "configure_ChainlinkPrices_0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": "passed",
+    "configure_ChainlinkPrices_0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": "passed",
+    "configure_ChainlinkPrices_0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": "passed",
+    "configure_ChainlinkPrices_0xDBFeFD2e8460a6Ee4955A68582F85708BAEA60A3": "passed",
+    "configure_ChainlinkPrices_0xA88594D404727625A9437C3f886C7643872296AE": "passed",
+    "configure_ChainlinkPrices_0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": "passed",
+    "configure_ChainlinkPrices_0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42": {
+      "error": "\n========================================================================\n[E] [27689] ChainlinkPrices.addNewPriceFeed:505(_asset = \"0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42\", _newFeed = \"0xDAe398520e2B67cd3f27aeF9Cf14D93D927f8250\", _staleTime = 86400, _needsEthToUsd = False, _needsBtcToUsd = False) <0x>\n    [220] RipeHq.governance() => (\"0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf\")\n    [5615] Unknown contract 0xDAe398520e2B67cd3f27aeF9Cf14D93D927f8250.0x313ce567\n        [273] Unknown contract 0x9b3d0cCdeD2343CF7FfbAEC5a7ed1DB00B09F996.0x313ce567\n    [11142] Unknown contract 0xDAe398520e2B67cd3f27aeF9Cf14D93D927f8250.0xfeaf968c\n        [7409] Unknown contract 0x9b3d0cCdeD2343CF7FfbAEC5a7ed1DB00B09F996.0xfeaf968c\n========================================================================\n\nRevert(b'')\n\n</Users/diogoperillo/Projects/Ripe/ripe-protocol/contracts/priceSources/ChainlinkPrices.vy at 0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c, compiled with vyper-0.4.3+bff19ea2>\n<storage: feedConfig={'0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE': ChainlinkConfig({'feed': '0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22': ChainlinkConfig({'feed': '0xd7818272B9e248357d13057AAb0B417aF31E817d', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0xA88594D404727625A9437C3f886C7643872296AE': ChainlinkConfig({'feed': '0xc15d9944dAefE2dB03e53bef8DDA25a56832C5fe', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf': ChainlinkConfig({'feed': '0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0xcbD06E5A2B0C65597161de254AA074E489dEb510': ChainlinkConfig({'feed': '0x8422f3d3CAFf15Ca682939310d6A5e619AE08e57', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c': ChainlinkConfig({'feed': '0x34cD971a092d5411bD69C10a5F0A7EEF72C69041', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB': ChainlinkConfig({'feed': '0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2': ChainlinkConfig({'feed': '0x79cf4a31B29D69191f0b6E97916eB93FEB81E533', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55': ChainlinkConfig({'feed': '0x975043adBb80fc32276CbF9Bbcfd4A601a12462D', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': False, 'staleTime': 86400}), '0xcb585250f852C6c6bf90434AB21A00f02833a4af': ChainlinkConfig({'feed': '0x9f0C1dD78C4CBdF5b9cf923a549A201EdC676D34', 'decimals': 8, 'needsEthToUsd': False, 'needsBtcToUsd': Fal",
+      "frames": [
+        {
+          "address": "0x7f10fd7c935a3c6ef27b3033f875ec7177fb746c",
+          "selector": "0xd3d3202a",
+          "error": "Revert(\"Revert(b'')\")",
+          "output": "0x"
+        }
+      ]
+    },
+    "configure_ChainlinkPrices_0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee": "passed",
+    "configure_ChainlinkPrices_0x820C137fa70C8691f0e44Dc420a5e53c168921Dc": "passed",
+    "configure_ChainlinkPrices": {
+      "error": "('INCOMPLETE_SOURCE_REGISTRATION', 'ChainlinkPrices', ['0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42'])",
+      "frames": []
+    },
+    "configure_PythPrices": "passed",
+    "configure_StorkPrices": "passed",
+    "configure_RedStone": "passed",
+    "configure_UndyVaultPrices_0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": "passed",
+    "configure_UndyVaultPrices_0x02981DB1a99A14912b204437e7a2E02679B57668": "passed",
+    "configure_UndyVaultPrices_0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": "passed",
+    "configure_UndyVaultPrices_0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": {
+      "error": "Revert(\"Revert(b'')\")",
+      "frames": [
+        {
+          "address": "0xa7218b664a741ca55bc7a3e7a50289ebaa04eacf",
+          "selector": "0xe08e6b66",
+          "error": "Revert(\"Revert(b'')\")",
+          "output": "0x"
+        }
+      ]
+    },
+    "configure_UndyVaultPrices_0x96F1a7ce331F40afe866F3b707c223e377661087": "passed",
+    "configure_UndyVaultPrices_0x99e65176F7FA8743E3fbaEF277d1Da448e361367": "passed",
+    "configure_UndyVaultPrices": {
+      "error": "('INCOMPLETE_SOURCE_REGISTRATION', 'UndyVaultPrices', ['0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8'])",
+      "frames": []
+    },
+    "configure_wsuperOETHbPrices_0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": "passed",
+    "configure_wsuperOETHbPrices_0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": {
+      "error": "('REMOVED_WRAPPED_PRICE_ROUTE', Address('0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5'))",
+      "frames": []
+    },
+    "configure_wsuperOETHbPrices_0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": {
+      "error": "('REMOVED_WRAPPED_PRICE_ROUTE', Address('0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf'))",
+      "frames": []
+    },
+    "configure_wsuperOETHbPrices": {
+      "error": "('INCOMPLETE_SOURCE_REGISTRATION', 'wsuperOETHbPrices', ['0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5', '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf'])",
+      "frames": []
+    },
+    "configure_CurvePrices_0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": "passed",
+    "configure_CurvePrices_0xd6c283655B42FA0eb2685F7AB819784F071459dc": "passed",
+    "configure_CurvePrices": "passed"
+  },
+  "oracle_registration_replay": {
+    "ChainlinkPrices": {
+      "old_source": "0xD11B23b6391e294DF49961E64231bddDE5bB5E89",
+      "new_source": "0x7f10fd7c935A3C6ef27B3033F875EC7177fb746c",
+      "assets": {
+        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE": {
+          "registered": true,
+          "live_config": [
+            "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x4200000000000000000000000000000000000006": {
+          "registered": true,
+          "live_config": [
+            "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB": {
+          "registered": true,
+          "live_config": [
+            "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": {
+          "registered": true,
+          "live_config": [
+            "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": {
+          "registered": true,
+          "live_config": [
+            "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": {
+          "registered": true,
+          "live_config": [
+            "0x975043adBb80fc32276CbF9Bbcfd4A601a12462D",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x975043adBb80fc32276CbF9Bbcfd4A601a12462D",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0xcbD06E5A2B0C65597161de254AA074E489dEb510": {
+          "registered": true,
+          "live_config": [
+            "0x8422f3d3CAFf15Ca682939310d6A5e619AE08e57",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x8422f3d3CAFf15Ca682939310d6A5e619AE08e57",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x940181a94A35A4569E4529A3CDfB74e38FD98631": {
+          "registered": true,
+          "live_config": [
+            "0x4EC5970fC728C5f65ba413992CD5fF6FD70fcfF0",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x4EC5970fC728C5f65ba413992CD5fF6FD70fcfF0",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": {
+          "registered": true,
+          "live_config": [
+            "0x34cD971a092d5411bD69C10a5F0A7EEF72C69041",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x34cD971a092d5411bD69C10a5F0A7EEF72C69041",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0xcb585250f852C6c6bf90434AB21A00f02833a4af": {
+          "registered": true,
+          "live_config": [
+            "0x9f0C1dD78C4CBdF5b9cf923a549A201EdC676D34",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x9f0C1dD78C4CBdF5b9cf923a549A201EdC676D34",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0xcb17C9Db87B595717C857a08468793f5bAb6445F": {
+          "registered": true,
+          "live_config": [
+            "0x206a34e47093125fbf4C75b7c7E88b84c6A77a69",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x206a34e47093125fbf4C75b7c7E88b84c6A77a69",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": {
+          "registered": true,
+          "live_config": [
+            "0xd7818272B9e248357d13057AAb0B417aF31E817d",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0xd7818272B9e248357d13057AAb0B417aF31E817d",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": {
+          "registered": true,
+          "live_config": [
+            "0x79cf4a31B29D69191f0b6E97916eB93FEB81E533",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x79cf4a31B29D69191f0b6E97916eB93FEB81E533",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": {
+          "registered": true,
+          "live_config": [
+            "0xEaf310161c9eF7c813A14f8FEF6Fb271434019F7",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0xEaf310161c9eF7c813A14f8FEF6Fb271434019F7",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0xDBFeFD2e8460a6Ee4955A68582F85708BAEA60A3": {
+          "registered": true,
+          "live_config": [
+            "0x39C6E14CdE46D4FFD9F04Ff159e7ce8eC20E10B4",
+            18,
+            true,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x39C6E14CdE46D4FFD9F04Ff159e7ce8eC20E10B4",
+            18,
+            true,
+            false,
+            86400
+          ]
+        },
+        "0xA88594D404727625A9437C3f886C7643872296AE": {
+          "registered": true,
+          "live_config": [
+            "0xc15d9944dAefE2dB03e53bef8DDA25a56832C5fe",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0xc15d9944dAefE2dB03e53bef8DDA25a56832C5fe",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": {
+          "registered": true,
+          "live_config": [
+            "0xE62BcE5D7CB9d16AB8b4D622538bc0A50A5799c2",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0xE62BcE5D7CB9d16AB8b4D622538bc0A50A5799c2",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42": {
+          "registered": false,
+          "live_config": [
+            "0xDAe398520e2B67cd3f27aeF9Cf14D93D927f8250",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee": {
+          "registered": true,
+          "live_config": [
+            "0x42868EFcee13C0E71af89c04fF7d96f5bec479b0",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x42868EFcee13C0E71af89c04fF7d96f5bec479b0",
+            8,
+            false,
+            false,
+            86400
+          ]
+        },
+        "0x820C137fa70C8691f0e44Dc420a5e53c168921Dc": {
+          "registered": true,
+          "live_config": [
+            "0x2330aaE3bca5F05169d5f4597964D44522F62930",
+            8,
+            false,
+            false,
+            86400
+          ],
+          "new_config": [
+            "0x2330aaE3bca5F05169d5f4597964D44522F62930",
+            8,
+            false,
+            false,
+            86400
+          ]
+        }
+      },
+      "snapshot_block": 51312366
+    },
+    "PythPrices": {
+      "old_source": "0x16371fAf6f603f8d8D6cef8C46253c80AdEe8b98",
+      "new_source": "0x42F591213Be3fB0Cc6B9A11D479657F60e0d335B",
+      "assets": {},
+      "snapshot_block": 51312366
+    },
+    "StorkPrices": {
+      "old_source": "0xceE8Ed804f72b6EcB6B2D679ca17B545bD654bF6",
+      "new_source": "0xCAF963d78c286243a62F3e3dFD1DBb66794Be51F",
+      "assets": {},
+      "snapshot_block": 51312366
+    },
+    "RedStone": {
+      "old_source": "0x9f20F25f037046721A292B19A486932ef390EAf9",
+      "new_source": "0x26d580Fb35De59ae5c6D39d6733B736A71996332",
+      "assets": {},
+      "snapshot_block": 51312366
+    },
+    "UndyVaultPrices": {
+      "old_source": "0x64D0F785c3D4bf4675f4b8432D765175F014A8Ac",
+      "new_source": "0xA7218B664a741cA55bC7A3E7a50289EBaA04eACF",
+      "assets": {
+        "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": {
+          "registered": true,
+          "live_config": [
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            6,
+            6,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              50103,
+              1023508,
+              1789412459
+            ],
+            15
+          ],
+          "new_config": [
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            6,
+            6,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              50103,
+              1023508,
+              1789457279
+            ],
+            1
+          ]
+        },
+        "0x02981DB1a99A14912b204437e7a2E02679B57668": {
+          "registered": true,
+          "live_config": [
+            "0x4200000000000000000000000000000000000006",
+            18,
+            18,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              4,
+              1011620433902522405,
+              1789412459
+            ],
+            4
+          ],
+          "new_config": [
+            "0x4200000000000000000000000000000000000006",
+            18,
+            18,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              4,
+              1011641478990828408,
+              1789457279
+            ],
+            1
+          ]
+        },
+        "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": {
+          "registered": true,
+          "live_config": [
+            "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+            8,
+            8,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              0,
+              100061992,
+              1789412459
+            ],
+            7
+          ],
+          "new_config": [
+            "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+            8,
+            8,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              0,
+              100062077,
+              1789457279
+            ],
+            1
+          ]
+        },
+        "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": {
+          "registered": false,
+          "live_config": [
+            "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42",
+            6,
+            6,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              87,
+              1017563,
+              1789412459
+            ],
+            12
+          ]
+        },
+        "0x96F1a7ce331F40afe866F3b707c223e377661087": {
+          "registered": true,
+          "live_config": [
+            "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+            18,
+            18,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              4921,
+              1017959794817377516,
+              1789412459
+            ],
+            5
+          ],
+          "new_config": [
+            "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+            18,
+            18,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              4921,
+              1017959794817377516,
+              1789457279
+            ],
+            1
+          ]
+        },
+        "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": {
+          "registered": true,
+          "live_config": [
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            6,
+            6,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              295535,
+              1015136,
+              1789412459
+            ],
+            15
+          ],
+          "new_config": [
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            6,
+            6,
+            300,
+            20,
+            1000,
+            86400,
+            [
+              295535,
+              1015180,
+              1789457279
+            ],
+            1
+          ]
+        }
+      },
+      "snapshot_block": 51312366
+    },
+    "wsuperOETHbPrices": {
+      "old_source": "0x064488f53849616eeE3EE32c29307922B319bb7C",
+      "new_source": "0x9052BE889B4dBE60431c5407E602fC369c037429",
+      "assets": {
+        "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": {
+          "registered": true
+        },
+        "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": {
+          "registered": false
+        },
+        "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": {
+          "registered": false
+        }
+      },
+      "snapshot_block": 51312366
+    },
+    "CurvePrices": {
+      "old_source": "0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d",
+      "new_source": "0x716f4efE4717854b979362CBe2Ce26A8b0cc31aF",
+      "assets": {
+        "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": {
+          "registered": true,
+          "live_config": [
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            2,
+            [
+              "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+              "0x0000000000000000000000000000000000000000",
+              "0x0000000000000000000000000000000000000000"
+            ],
+            1,
+            true
+          ],
+          "new_config": [
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            2,
+            [
+              "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+              "0x0000000000000000000000000000000000000000",
+              "0x0000000000000000000000000000000000000000"
+            ],
+            1,
+            true
+          ]
+        },
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc": {
+          "registered": true,
+          "live_config": [
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            2,
+            [
+              "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+              "0x0000000000000000000000000000000000000000",
+              "0x0000000000000000000000000000000000000000"
+            ],
+            1,
+            true
+          ],
+          "new_config": [
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            2,
+            [
+              "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+              "0x0000000000000000000000000000000000000000",
+              "0x0000000000000000000000000000000000000000"
+            ],
+            1,
+            true
+          ]
+        }
+      },
+      "snapshot_block": 51312366
+    }
+  },
+  "post_activation_asset_prices": {
+    "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 1023338251198200000,
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 999834150000000000,
+    "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 1247543990000000000,
+    "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 0,
+    "0x4200000000000000000000000000000000000006": 2548883122500000000000,
+    "0x02981DB1a99A14912b204437e7a2E02679B57668": 0,
+    "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 2899762015830000000000,
+    "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 79029110460180000000000,
+    "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 2820899749218103200943,
+    "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 79078169361080365938600,
+    "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 630799810000000000,
+    "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 577792250000000000,
+    "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 103222410000000000000,
+    "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 85140810000000000,
+    "0x96F1a7ce331F40afe866F3b707c223e377661087": 588169280257070894,
+    "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": 212642780000000000,
+    "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 1466103260000000000,
+    "0xcb17C9Db87B595717C857a08468793f5bAb6445F": 53955889650000000000,
+    "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 0,
+    "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 1012630000000000,
+    "0xA88594D404727625A9437C3f886C7643872296AE": 1975490000000000,
+    "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 678806077835477586,
+    "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 1006787739705263417,
+    "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 1093829979466653352,
+    "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 0,
+    "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": 999568310909513881,
+    "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 0
+  }
+}

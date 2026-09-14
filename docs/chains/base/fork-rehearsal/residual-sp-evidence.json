@@ -1,0 +1,1354 @@
+{
+  "block": 51187713,
+  "block_hash": "0x6ca601e81fc80a71459f42c6a0e71fec797712f88e7cfc9fbf1ab9f8090dd8b6",
+  "source_commit": "1ede38351e6da918806dff70d34b2066bf8cde8c",
+  "harness_sha256": "e0dace3aecb0238438974bafc53b35bfc122c4543e59faabab037ea80cd1d675",
+  "snapshot_finalized": false,
+  "live_writes": false,
+  "blockers": [
+    "REWARD_CONTINUITY_FAILED",
+    "STABILITY_UNDERLYING_DRIFT"
+  ],
+  "stability_migration": {
+    "status": "users_moved_governance_residual_retained_routes_not_finalized",
+    "target_id": 6,
+    "results": [
+      {
+        "user": "0x0a8f4E308B17F836eAb6493F42E48ac07D30946D",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 10000000000000000000001,
+            "source_shares_after": 0,
+            "target_amount_after": 10000000000000000000000
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 40409032104898241745944,
+            "source_shares_after": 0,
+            "target_amount_after": 40409032104898241745944
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 635472941268837692769,
+            "source_shares_after": 0,
+            "target_amount_after": 635472941268837692767
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x135b51920B362fCB4037Ed8D5e0B4315E4Bd9BB7",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 1648545316564200999,
+            "source_shares_after": 0,
+            "target_amount_after": 1648545316564200997
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x15040E3857f1BE911c8Ca16484B8d3496f7BB51A",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 3618138453532945383,
+            "source_shares_after": 0,
+            "target_amount_after": 3618138453532945382
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x16c7E68Ca75eb0B7ca65eaDd4D067aF7D7654E11",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 5224493151393273019,
+            "source_shares_after": 0,
+            "target_amount_after": 5224493151393273017
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x172A91eE5941D31F0937F7b64D37F84139b27ad7",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 729457542875609870,
+            "source_shares_after": 0,
+            "target_amount_after": 729457542875609869
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x1816227b996A38C7f3a332011ce1Dc57e64D8987",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 1463453846331335188,
+            "source_shares_after": 0,
+            "target_amount_after": 1463453846331335187
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x192a3911918a641D5B32eD7766376cf9fe095f4C",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 1075296511776700729,
+            "source_shares_after": 0,
+            "target_amount_after": 1075296511776700727
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 286912392477241407044,
+            "source_shares_after": 0,
+            "target_amount_after": 286912392477241407042
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x214F32A20aEB13f0e525456107021282D30Def90",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 23004595399766108151,
+            "source_shares_after": 0,
+            "target_amount_after": 23004595399766108150
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x22269027048eA46cb3d9C48131Cb142B2d6C3B0e",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 10604888935594523,
+            "source_shares_after": 0,
+            "target_amount_after": 10604888935594522
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x263164f323926e33434F1829272ef167509F9285",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 20845204074571872,
+            "source_shares_after": 0,
+            "target_amount_after": 20845204074571871
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 267430174527712425923,
+            "source_shares_after": 0,
+            "target_amount_after": 267430174527712425922
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x2975dA2D891ac4d43797cd43684C4f9F9261155c",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 999999999999999999,
+            "source_shares_after": 0,
+            "target_amount_after": 999999999999999998
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 1105579895977031433,
+            "source_shares_after": 0,
+            "target_amount_after": 1105579895977031431
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x2f537C2C1D263e66733DA492414359B6B70e1269",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 4851522889476372967,
+            "source_shares_after": 0,
+            "target_amount_after": 4851522889476372965
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x35c64c652c0A7E757E194dA34b256d00991C811b",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 234690022995846144,
+            "source_shares_after": 0,
+            "target_amount_after": 234690022995846142
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x37a1621bd89b75FF761AC9d9145Bc34920e75AdE",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 8791917553234715577,
+            "source_shares_after": 0,
+            "target_amount_after": 8791917553234715576
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 29167885295943666483,
+            "source_shares_after": 0,
+            "target_amount_after": 29167885295943666482
+          },
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 2715441754258083331,
+            "source_shares_after": 0,
+            "target_amount_after": 2715441754258083330
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x38330af55A6c7334828999432eECA6c3801D7e25",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 923268030703211448,
+            "source_shares_after": 0,
+            "target_amount_after": 923268030703211447
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x3A0e76342969203Bbd485a38DE4BF7a1F04BE448",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 1820239257789642796,
+            "source_shares_after": 0,
+            "target_amount_after": 1820239257789642795
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x3A26f0C7817d4DF4345BC8999B4a02F095b2c1D3",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 2392425301229085565322,
+            "source_shares_after": 0,
+            "target_amount_after": 2392425301229085565320
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x3A3af2ea20d59DA1cAAE5408C48a313ae12EEd90",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 587235648194760787,
+            "source_shares_after": 0,
+            "target_amount_after": 587235648194760785
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x3D608e9aa2e45764dfc32b9CF0A232935502A0dA",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 141825703643181929187,
+            "source_shares_after": 0,
+            "target_amount_after": 141825703643181929185
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x3D89d2653636eECDd286b7399C194D885Ac1A159",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 839194764334598972,
+            "source_shares_after": 0,
+            "target_amount_after": 839194764334598971
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x3E422A0C76E1200f189A1aE1EAffAD1A955fD9Ec",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 27812867821550066,
+            "source_shares_after": 0,
+            "target_amount_after": 27812867821550065
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 297113324412628171676,
+            "source_shares_after": 0,
+            "target_amount_after": 297113324412628171674
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x4277699C66795245ddb7C7C5d805920B78f1186F",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 6882052843870546,
+            "source_shares_after": 0,
+            "target_amount_after": 6882052843870544
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 21020839620498150718,
+            "source_shares_after": 0,
+            "target_amount_after": 21020839620498150716
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x4FfD0A59a26cB2Aa76D403215e4cC2845C053994",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 17223295970064565347,
+            "source_shares_after": 0,
+            "target_amount_after": 17223295970064565345
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 16539547729779497324,
+            "source_shares_after": 0,
+            "target_amount_after": 16539547729779497322
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x545600a87dbb48162432fe9FbAce1083c79495d7",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 954842253129479901761,
+            "source_shares_after": 0,
+            "target_amount_after": 954842253129479901759
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x5478D320615A076038DF86E39C18B468cd264745",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 15206045767566544478,
+            "source_shares_after": 0,
+            "target_amount_after": 15206045767566544476
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x5936431C01645220CD2520125A5cEa130aD63c12",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 956894777414594823,
+            "source_shares_after": 0,
+            "target_amount_after": 956894777414594822
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x64DD1ABDF58f3066095E9240d66986fbE13709cB",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 7709966949944136774,
+            "source_shares_after": 0,
+            "target_amount_after": 7709966949944136773
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x66212a3c4eB5c934A5cB998C8F5D74138022767c",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 210268183726104778420,
+            "source_shares_after": 0,
+            "target_amount_after": 210268183726104778418
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x67fb6F2B7D631b2c6FAc6728E628220a531a85b4",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 5245471945398672164,
+            "source_shares_after": 0,
+            "target_amount_after": 5245471945398672162
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x6888B77f2aFd854E41450696c679F0Ed10b825ae",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 6221967500600123382,
+            "source_shares_after": 0,
+            "target_amount_after": 6221967500600123381
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 238014747301444615797,
+            "source_shares_after": 0,
+            "target_amount_after": 238014747301444615795
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 17510691416455015378,
+            "source_shares_after": 0,
+            "target_amount_after": 17510691416455015377
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x777a610a76223D7f0cd3Bf7eA974E77b00c8e732",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 10446682690910269,
+            "source_shares_after": 0,
+            "target_amount_after": 10446682690910268
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 6118347079616021476,
+            "source_shares_after": 0,
+            "target_amount_after": 6118347079616021475
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x7b7C80053e72fDC7be6B44271a66b0b960F913ca",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 4631451915385599496,
+            "source_shares_after": 0,
+            "target_amount_after": 4631451915385599495
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x7cb71C594FEBACE6b6bA11126abeB8Cc860cB24A",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 286858673782273908119,
+            "source_shares_after": 0,
+            "target_amount_after": 286858673782273908118
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x8aD19587A09580fbfcA0BC31B99FA5f46080510a",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 907767231798245295561,
+            "source_shares_after": 0,
+            "target_amount_after": 907767231798245295560
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x8cb145bbE8Bdca6Fd194744618e36cb904bE982c",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 1359001853013418159,
+            "source_shares_after": 0,
+            "target_amount_after": 1359001853013418157
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 913580816952477316742,
+            "source_shares_after": 0,
+            "target_amount_after": 913580816952477316741
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 8562651715194789655969,
+            "source_shares_after": 0,
+            "target_amount_after": 8562651715194789655968
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 1497686104619003081,
+            "source_shares_after": 0,
+            "target_amount_after": 1497686104619003080
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 1012561120782463768,
+            "source_shares_after": 0,
+            "target_amount_after": 1012561120782463767
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0x9e949d2756933b3846816afdCCaa725f17dF86Cf",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 477888246223340403808,
+            "source_shares_after": 0,
+            "target_amount_after": 477888246223340403807
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xA7Ad75cc1471D952480b156cc85cccf5AFc64820",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 2863714256116884758,
+            "source_shares_after": 0,
+            "target_amount_after": 2863714256116884757
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xB0868fc1AF373706a0dCD0cAe4E0655e093d9baA",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 176979586085070397950,
+            "source_shares_after": 0,
+            "target_amount_after": 176979586085070397949
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xC90de947c028252601F91366210FD35f7Cf8932E",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 632019720052320046,
+            "source_shares_after": 0,
+            "target_amount_after": 632019720052320044
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xCAb2a32EEbdf73d2CD0a60acF8C7389b5d9EBE05",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 107083256817557823,
+            "source_shares_after": 0,
+            "target_amount_after": 107083256817557822
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xD21185C965Db9a93504971DE49a670907FCCff99",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 178773472369020993183,
+            "source_shares_after": 0,
+            "target_amount_after": 178773472369020993182
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 1016894881136529319,
+            "source_shares_after": 0,
+            "target_amount_after": 1016894881136529318
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 215696739481179591376,
+            "source_shares_after": 0,
+            "target_amount_after": 215696739481179591375
+          },
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 111759225723013957110,
+            "source_shares_after": 0,
+            "target_amount_after": 111759225723013957109
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xD935A63d629cac4cfC8F632A2f4AaB3ca8D99E38",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 18843996038454358189,
+            "source_shares_after": 0,
+            "target_amount_after": 18843996038454358188
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xDa6656efBc596de0DA330a75C51317857cb1FE4D",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 923920846434534266,
+            "source_shares_after": 0,
+            "target_amount_after": 923920846434534265
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 363108965652636959592,
+            "source_shares_after": 0,
+            "target_amount_after": 363108965652636959591
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 3817453229530244150612,
+            "source_shares_after": 0,
+            "target_amount_after": 3817453229530244150610
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 2954903107403414194201,
+            "source_shares_after": 0,
+            "target_amount_after": 2954903107403414194200
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xa6a72f4b01C2F0F909d1225Aa1A75205bFE79e3d",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 227910681633299388,
+            "source_shares_after": 0,
+            "target_amount_after": 227910681633299387
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xaf24F203078B31b677D9C5E559ec40F790e76090",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 916367258226373423,
+            "source_shares_after": 0,
+            "target_amount_after": 916367258226373421
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xb0D1D56171fC5464C0Be8b0c4284f8294A7Ddb09",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 93896545813505550098,
+            "source_shares_after": 0,
+            "target_amount_after": 93896545813505550097
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xbDb7ede18CE3d0217591cbe586cc8232d36626e8",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 5864494695434449247,
+            "source_shares_after": 0,
+            "target_amount_after": 5864494695434449245
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xc1178D5BADA448126A5054EAF4e7c2f3fCa5E974",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 1052174449437332210468,
+            "source_shares_after": 0,
+            "target_amount_after": 1052174449437332210466
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xc2a9034Ba0F708Eef831C68BE6B4367975c90b38",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 18905724977313663207,
+            "source_shares_after": 0,
+            "target_amount_after": 18905724977313663206
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xcFB3134DFb7912a2DaF24f2C25712C0e247E4722",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 43920479068251764667,
+            "source_shares_after": 0,
+            "target_amount_after": 43920479068251764666
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 24130504949212045864,
+            "source_shares_after": 0,
+            "target_amount_after": 24130504949212045863
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xdd2ba66B25DCC26d0850787f79678dE906bD6B98",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 531118968726161767939,
+            "source_shares_after": 0,
+            "target_amount_after": 531118968726161767938
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xe09e4C7b1FEB007aAEc6c66282031D6b8F7A6Ee2",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 67535288388302065997,
+            "source_shares_after": 0,
+            "target_amount_after": 67535288388302065995
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xe0Ff229aD3b4d09De74c20Fb0EF5623e8CC09625",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 9451957436970866156,
+            "source_shares_after": 0,
+            "target_amount_after": 9451957436970866155
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xe0d8293733dCC20BD2aBE0E29bD9Bf4021EA7B4d",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 1724227642018227931,
+            "source_shares_after": 0,
+            "target_amount_after": 1724227642018227930
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xf3bF633759E993D7849B6C25B442432A81139367",
+        "positions": 1,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 2499999999999999999,
+            "source_shares_after": 0,
+            "target_amount_after": 2499999999999999998
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      },
+      {
+        "user": "0xf5E85494bA635F6C8B0B39709A998FB73eD61c34",
+        "positions": 2,
+        "balances": [
+          {
+            "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+            "before": 8048667554545028654,
+            "source_shares_after": 0,
+            "target_amount_after": 8048667554545028652
+          },
+          {
+            "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+            "before": 67055576243406702755,
+            "source_shares_after": 0,
+            "target_amount_after": 67055576243406702755
+          }
+        ],
+        "underlying_equal": false,
+        "current_debt_equal": true
+      }
+    ],
+    "claim_inventory_before": [
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+        "raw_claim_balance": 2
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x4200000000000000000000000000000000000006",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xA88594D404727625A9437C3f886C7643872296AE",
+        "raw_claim_balance": 56
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x96F1a7ce331F40afe866F3b707c223e377661087",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+        "raw_claim_balance": 1
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        "raw_claim_balance": 12
+      }
+    ],
+    "residual": {
+      "owner": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+      "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "green_spent": 100000000000000000,
+      "lp_deposited": 99263666937123520,
+      "source_shares": 9660862855322131427933282,
+      "excluded_from_migration": true,
+      "final_amount": 99263666937125639
+    },
+    "attempt": {
+      "user": "0xf5E85494bA635F6C8B0B39709A998FB73eD61c34",
+      "source_amounts": {
+        "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 8048667554545028654,
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 67055576243406702755
+      },
+      "source_totals": {
+        "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 806883965367922671121035393,
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 6535862702471822768963240401
+      },
+      "balances": [
+        {
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "before": 8048667554545028654,
+          "source_shares_after": 0,
+          "target_amount_after": 8048667554545028652
+        },
+        {
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "before": 67055576243406702755,
+          "source_shares_after": 0,
+          "target_amount_after": 67055576243406702755
+        }
+      ]
+    },
+    "claim_inventory_after": [
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+        "raw_claim_balance": 2,
+        "source_remaining": 2,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x4200000000000000000000000000000000000006",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xA88594D404727625A9437C3f886C7643872296AE",
+        "raw_claim_balance": 56,
+        "source_remaining": 56,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x96F1a7ce331F40afe866F3b707c223e377661087",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+        "raw_claim_balance": 1,
+        "source_remaining": 1,
+        "target_received": 0
+      },
+      {
+        "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+        "claim_asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        "raw_claim_balance": 12,
+        "source_remaining": 12,
+        "target_received": 0
+      }
+    ]
+  },
+  "remediation": {
+    "caller": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+    "repayments": [
+      {
+        "user": "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad",
+        "green_spent": 407012971318231203,
+        "debt_after": 0,
+        "healthy_after": true,
+        "deposits_and_locks_unchanged": true,
+        "permissions_restored": true
+      },
+      {
+        "user": "0xD7A48E684Da48cc384fD80bb1Fed7D8970bfe91b",
+        "green_spent": 982796745232664627,
+        "debt_after": 0,
+        "healthy_after": true,
+        "deposits_and_locks_unchanged": true,
+        "permissions_restored": true
+      },
+      {
+        "user": "0xE5aB77408c25E7C1562C09067A8Fa3d0C00ac999",
+        "green_spent": 126807288588630824,
+        "debt_after": 0,
+        "healthy_after": true,
+        "deposits_and_locks_unchanged": true,
+        "permissions_restored": true
+      },
+      {
+        "user": "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738",
+        "green_spent": 13700809940108052,
+        "debt_after": 0,
+        "healthy_after": true,
+        "deposits_and_locks_unchanged": true,
+        "permissions_restored": true
+      },
+      {
+        "user": "0xd060D0C2bbd34AB116bd6c917147B560C66F875b",
+        "green_spent": 68260520361387739,
+        "debt_after": 0,
+        "healthy_after": true,
+        "deposits_and_locks_unchanged": true,
+        "permissions_restored": true
+      },
+      {
+        "user": "0x6b34e50bDfC20A0869BF28249bac24d12Cc3fbbd",
+        "green_spent": 22905936042316810,
+        "debt_after": 0,
+        "healthy_after": true,
+        "deposits_and_locks_unchanged": true,
+        "permissions_restored": true
+      },
+      {
+        "user": "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E",
+        "green_spent": 257547140184901938,
+        "debt_after": 0,
+        "healthy_after": true,
+        "deposits_and_locks_unchanged": true,
+        "permissions_restored": true
+      }
+    ],
+    "safe_green_before": 9239380679435388320,
+    "deleverage": {
+      "reverted": true,
+      "error": "Revert(\"Revert(b'')\")",
+      "frames": [
+        {
+          "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+          "selector": "0x4f08c95c",
+          "error": "Revert(\"Revert(b'')\")",
+          "output": "0x"
+        },
+        {
+          "address": "0x48b98ec58e5389b317847ff590776bc01629f297",
+          "selector": "0x2c2b81af",
+          "error": "Revert(b'')",
+          "output": "0x"
+        }
+      ],
+      "debt_before": 295439418691631067624,
+      "debt_after": 295439418691631067624
+    },
+    "delegated_deleverage": {
+      "repaid": 1000000000000000000,
+      "healthy_after": true,
+      "debt_after": 294439418691631067624,
+      "sgreen_before": 268343998732271985495,
+      "sgreen_after": 267430174527712425923,
+      "ripe_balance_and_lock_unchanged": true,
+      "delegation_restored": true
+    },
+    "safe_green_after": 7360349267767147127
+  },
+  "without_residual": {
+    "positions_moved": 79,
+    "failure": {
+      "user": "0xf5E85494bA635F6C8B0B39709A998FB73eD61c34",
+      "source_amounts": {
+        "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 8048667554545028654,
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 67055576243405270673
+      },
+      "source_totals": {
+        "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 806883965367922671121035393,
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 6526201839616500637535307119
+      },
+      "diagnostic": {
+        "error_detail": "external call failed",
+        "dev_reason": "<dev: source position not depleted>",
+        "source_node": "None"
+      }
+    }
+  },
+  "production_qualified": false
+}

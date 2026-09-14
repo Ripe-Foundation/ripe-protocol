@@ -750,11 +750,12 @@ class Migration:
         self._save_log_file()
         return contract
 
-    def deploy_bp(self, name):
+    def deploy_bp(self, name, *, label=None):
         """
         Deploys contract with given name as blueprint or skips if already deployed
         Returns the deployed contract.
         """
+        label = label or name
         args = []
         kwargs = {}
 
@@ -769,12 +770,12 @@ class Migration:
             name,
             deploy_bp_wrapper,
             *args,
-            name=name,
+            name=label,
             **kwargs,
         )
         return self._register_contract(
             name,
-            name,
+            label,
             contract,
             args,
             blueprint=True,

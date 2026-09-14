@@ -261,6 +261,7 @@ def _load_isolated_desk(mock_hq, name):
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         1,
         100,
+        250_000,
         name=name,
     )
 

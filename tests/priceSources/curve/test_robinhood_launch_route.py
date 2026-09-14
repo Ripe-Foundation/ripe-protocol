@@ -307,6 +307,7 @@ def test_final_curve_worst_case_honest_nested_price_desk_gas(
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         1,
         2,
+        250_000,
         name="final_curve_gas_price_desk",
     )
     for index, source in enumerate(sources, start=1):
