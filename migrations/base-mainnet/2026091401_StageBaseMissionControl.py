@@ -4,6 +4,7 @@ import boa
 
 from scripts.utils import log
 from scripts.utils.migration import Migration
+from scripts.verify_defaults import compare_mission_control_config, _normalize
 
 
 ZERO = "0x" + "00" * 20
@@ -52,20 +53,11 @@ def migrate(migration: Migration):
     log.info(f"STAGED ONLY MissionControl: {candidate.address}")
 
     log.h1("4. Compare the staged configuration with the live configuration")
-    for getter in ("genConfig", "genDebtConfig", "hrConfig", "ripeBondConfig",
-                   "rewardsConfig", "totalPointsAllocs"):
-        expected = list(getattr(old, getter)())
-        if getter == "hrConfig":
-            expected[0] = contributor.address
-        if tuple(getattr(candidate, getter)()) != tuple(expected):
-            raise RuntimeError(f"BASE_UPGRADE_CONFIG_DRIFT:{getter}")
-    if int(candidate.numAssets()) != int(old.numAssets()):
-        raise RuntimeError("BASE_UPGRADE_ASSET_COUNT_DRIFT")
-    for i in range(1, int(old.numAssets())):
-        asset = old.assets(i)
-        if (address(candidate.assets(i)) != address(asset)
-                or tuple(candidate.assetConfig(asset)) != tuple(old.assetConfig(asset))):
-            raise RuntimeError(f"BASE_UPGRADE_ASSET_DRIFT:{asset}")
+    def compare(field, actual, expected):
+        if _normalize(actual) != _normalize(expected):
+            raise RuntimeError(f"BASE_UPGRADE_CONFIG_DRIFT:{field}")
+    compare_mission_control_config(candidate, lambda name, *args: getattr(old, name)(*args),
+                                   compare, contributor.address)
     if address(hq.getAddr(5)) != address(active_address):
         raise RuntimeError("BASE_UPGRADE_ACTIVE_ADDRESS_CHANGED:MissionControl")
 

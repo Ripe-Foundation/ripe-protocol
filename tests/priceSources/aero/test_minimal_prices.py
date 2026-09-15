@@ -498,6 +498,7 @@ def test_price_desk_composition_treats_monitor_as_valid_no_feed(
         1,
         2,
         250_000,
+        150_000,
     )
     assert _register_source(
         price_desk,

@@ -8,6 +8,8 @@ from scripts.utils.migration import Migration
 
 ZERO = "0x" + "00" * 20
 SUFFIX = "BaseUpgradeCandidate20260914"
+BASE_MIN_UNDERSCORE_SEND_INTERVAL = 43_200
+BASE_ACTIVE_VAULT_BOOK_MIN_TIMELOCK = 21_600
 HQ_IDS = {
     "Ledger": 4, "MissionControl": 5, "Switchboard": 6, "PriceDesk": 7,
     "VaultBook": 8, "BondRoom": 12, "Endaoment": 14,
@@ -31,6 +33,8 @@ def migrate(migration: Migration):
     min_lock = params["MIN_SWITCHBOARD_CHANGE_TIMELOCK"]
     max_lock = params["MAX_SWITCHBOARD_CHANGE_TIMELOCK"]
     legacy_gov = active["VaultBook"].getAddr(2)
+    if active["VaultBook"].minRegistryTimeLock() != BASE_ACTIVE_VAULT_BOOK_MIN_TIMELOCK:
+        raise RuntimeError("BASE_UPGRADE_ACTIVE_VAULT_BOOK_FLOOR_DRIFT")
     if address(legacy_gov) == ZERO:
         raise RuntimeError("BASE_UPGRADE_MISSING_LEGACY_GOV")
 
@@ -93,10 +97,12 @@ def migrate(migration: Migration):
     log.h1("3. Deploy the empty vault registry and replacement vaults")
     candidates["VaultBook"] = migration.deploy(
         "VaultBook", hq.address, ZERO,
-        params["VAULT_BOOK_MIN_REG_TIMELOCK"],
+        BASE_ACTIVE_VAULT_BOOK_MIN_TIMELOCK,
         params["VAULT_BOOK_MAX_REG_TIMELOCK"],
         label=f"VaultBook{SUFFIX}",
     )
+    if candidates["VaultBook"].minRegistryTimeLock() != BASE_ACTIVE_VAULT_BOOK_MIN_TIMELOCK:
+        raise RuntimeError("BASE_UPGRADE_VAULT_BOOK_FLOOR_DRIFT")
     candidates["StabilityPool"] = migration.deploy(
         "StabilityPool", hq.address,
         label=f"StabilityPool{SUFFIX}",
@@ -162,13 +168,26 @@ def migrate(migration: Migration):
         label=f"CreditEngine{SUFFIX}",
     )
     candidates["HumanResources"] = migration.deploy(
-        "HumanResources", hq.address, min_lock, max_lock,
+        "HumanResources", hq.address,
+        params["MIN_HQ_CHANGE_TIMELOCK"], params["MAX_HQ_CHANGE_TIMELOCK"],
         label=f"HumanResources{SUFFIX}",
     )
+    if (candidates["HumanResources"].minActionTimeLock(),
+            candidates["HumanResources"].maxActionTimeLock()) != (43_200, 302_400):
+        raise RuntimeError("BASE_UPGRADE_HR_TIMELOCK_BOUNDS")
     candidates["Lootbox"] = migration.deploy(
-        "Lootbox", hq.address, 1, send_interval, deposit_rewards, yield_bonus,
+        "Lootbox", hq.address, BASE_MIN_UNDERSCORE_SEND_INTERVAL,
+        send_interval, deposit_rewards, yield_bonus,
         label=f"Lootbox{SUFFIX}",
     )
+    for getter, expected in (
+        ("minUnderscoreSendInterval", BASE_MIN_UNDERSCORE_SEND_INTERVAL),
+        ("underscoreSendInterval", send_interval),
+        ("undyDepositRewardsAmount", deposit_rewards),
+        ("undyYieldBonusAmount", yield_bonus),
+    ):
+        if getattr(candidates["Lootbox"], getter)() != expected:
+            raise RuntimeError(f"BASE_UPGRADE_LOOTBOX_CONFIG:{getter}")
     # Start Teller paused.
     candidates["Teller"] = migration.deploy(
         "Teller", hq.address, True, params["CURVE_PRICES_ID"],

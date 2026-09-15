@@ -65,7 +65,7 @@ MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 UNDERSCORE_APPRAISER_ID: constant(uint256) = 7
 PRICE_SOURCE_PRICE_GAS: public(immutable(uint256))
 PRICE_SOURCE_HAS_FEED_GAS: constant(uint256) = 75_000
-PRICE_SOURCE_SNAPSHOT_GAS: constant(uint256) = 150_000
+PRICE_SOURCE_SNAPSHOT_GAS: public(immutable(uint256))
 MAX_SUPPORTED_TOKEN_DECIMALS: constant(uint256) = 77
 
 # 0 = unset. 1 = valid zero-decimal token (10 ** 0).
@@ -80,11 +80,14 @@ def __init__(
     _minRegistryTimeLock: uint256,
     _maxRegistryTimeLock: uint256,
     _priceSourcePriceGas: uint256,
+    _priceSourceSnapshotGas: uint256,
 ):
     assert _ethAddr != empty(address) # dev: invalid eth addr
     assert _priceSourcePriceGas != 0 # dev: invalid price source gas
+    assert _priceSourceSnapshotGas != 0 # dev: invalid snapshot gas
     ETH = _ethAddr
     PRICE_SOURCE_PRICE_GAS = _priceSourcePriceGas
+    PRICE_SOURCE_SNAPSHOT_GAS = _priceSourceSnapshotGas
 
     # modules
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)

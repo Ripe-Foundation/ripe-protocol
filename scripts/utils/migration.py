@@ -755,7 +755,9 @@ class Migration:
         Deploys contract with given name as blueprint or skips if already deployed
         Returns the deployed contract.
         """
-        label = label or name
+        label = name if label is None else label
+        if not isinstance(label, str) or not label:
+            raise ValueError("MIGRATION_BLUEPRINT_LABEL_EMPTY")
         args = []
         kwargs = {}
 
@@ -763,8 +765,8 @@ class Migration:
             c = boa.load_partial(self._files[name]).deploy_as_blueprint()
             return c
 
-        # ``name`` is also the manifest label needed by ``_run`` when a
-        # durable deployment log is resumed.  The wrapper deliberately
+        # The ``name`` keyword carries the manifest label needed by ``_run``
+        # when a durable deployment log is resumed. The wrapper deliberately
         # accepts and ignores it on a fresh deployment.
         contract = self._run(
             name,

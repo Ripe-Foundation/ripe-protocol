@@ -122,6 +122,7 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources, price_limit=None):
     desk = boa.load(
         str(source_path), ripe_hq, deploy3r, ETH, 1, 2,
         250_000 if price_limit is None else price_limit,
+        150_000,
         name="gas_measurement_price_desk",
     )
     for index, source in enumerate(sources, start=1):

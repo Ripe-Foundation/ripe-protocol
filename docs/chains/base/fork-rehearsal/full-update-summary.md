@@ -1,5 +1,11 @@
 # Base full-update rehearsal
 
+**Historical evidence, not the final candidate:** see the
+[artifact/version index and sanitization disclosure](../review-231.md#evidence-attribution-c19c20).
+The custody/position results below belong to `full-update-final.json`'s old
+17,742-byte PriceDesk generation. The later 1.5M quote test is a narrower rerun;
+neither establishes the current snapshot-budget or full-operation qualification.
+
 Status: **not qualified for live activation**. All writes were confined to a
 local `boa.fork`; no live deployments or governance transactions were submitted.
 
@@ -38,7 +44,7 @@ does not supersede the full-run balance evidence below. No live writes occurred.
   remain at IDs 1–5; candidates are appended at 6–10. Preferred SP/governance IDs
   remain 1/2. No user vault migration occurs in wave one.
 
-## Passed in the diagnostic
+## Passed in the historical diagnostic (not rerun for current candidates)
 
 - All 45 candidates deploy within the runtime-code size limit.
 - The old-vault census reconciles 1,029 registered user/asset position rows,
@@ -76,7 +82,7 @@ the linked diagnostic JSON was refreshed for the new candidate. EURC's separate
 fork-staleness issue remains unchanged. No live contract was replaced.
 
 [Isolated diagnostic evidence](undy-price-diagnosis.json), reproduced by
-`python -m scripts.diagnose_base_undy_prices`, separates these issues at block
+`python -m scripts.diagnose_base_undy_prices --block 51312366 --defaults docs/chains/base/fork-rehearsal/Defaults.wave1-51312366.vy --report /tmp/undy-NEW-RUN.json --diagnose-replacing-pending`, separates these issues at block
 51,312,366 without live writes or protocol-source modifications:
 
 - undyETH registers, has a nonzero share snapshot and underlying WETH price,

@@ -7,7 +7,6 @@ changing state through storage edits or pretending deployment is qualification.
 import argparse
 import hashlib
 import importlib.util
-import json
 import os
 from pathlib import Path
 import sys
@@ -18,11 +17,11 @@ from eth_utils import keccak, to_checksum_address, event_abi_to_log_topic
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from scripts.base_upgrade_fork import Rehearsal, plain, error_text, error_frames, HQ_IDS, ZERO
+from scripts.base_upgrade_fork import Rehearsal, plain, error_text, error_frames, permission_keys, HQ_IDS, ZERO
 from scripts.utils.deploy_args import BluePrint
+from scripts.utils.fork_reports import fingerprint, require_unoptimized
 
 SUFFIX = "BaseUpgradeCandidate20260914"
-MAX = 2**256 - 1
 
 
 def positional(value):
@@ -55,20 +54,26 @@ class DeploymentAdapter:
         path = next((ROOT / "contracts").rglob(name + ".vy"))
         bp = boa.load_partial(str(path)).deploy_as_blueprint()
         self.run.new[name] = bp
-        self.run.report["deployments"][name] = {"address": str(bp.address), "blueprint": True}
+        code = boa.env.get_code(bp.address)
+        self.run.report["deployments"][name] = {"address": str(bp.address), "blueprint": True,
+            "deployed_bytes": len(code), "deployed_sha256": hashlib.sha256(code).hexdigest(),
+            "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "constructor_args": []}
         self.run.save()
         return bp
 
 
 class FullUpdate(Rehearsal):
     def attempt(self, name, fn):
+        previous_failures = len(self.report.get("blockers", []))
         try:
             fn()
+            if len(self.report.get("blockers", [])) > previous_failures:
+                raise RuntimeError("REQUIRED_CHILD_CHECK_FAILED:" + name)
             self.report.setdefault("checks", {})[name] = "passed"
         except Exception as e:
             self.report.setdefault("blockers", []).append(name)
             self.report.setdefault("checks", {})[name] = {
-                "error": error_text(e).replace(self.rpc, "<RPC>")[:3000],
+                "error": self.sanitized(error_text(e))[:3000],
                 "frames": error_frames(e),
             }
             print("BLOCKED", name, self.report["checks"][name]["error"][:400], flush=True)
@@ -81,8 +86,8 @@ class FullUpdate(Rehearsal):
         # including yield shares. No assume-zero shortcut for unknown holdings.
         for name in ("Endaoment", "EndaomentFunds", "EndaomentPSM"):
             target = self.old[name].address
-            logs = self.rpc_read("eth_getLogs", [{"fromBlock": "0x0", "toBlock": hex(self.block),
-                "topics": [transfer, None, "0x" + str(target)[2:].lower().zfill(64)]}])
+            logs = self.filtered_logs({
+                "topics": [transfer, None, "0x" + str(target)[2:].lower().zfill(64)]}, 0, self.block)
             tokens.update(row["address"] for row in logs if len(row["topics"]) == 3)
         self.tokens = {a: boa.loads_abi('[{"type":"function","name":"balanceOf","stateMutability":"view","inputs":[{"name":"account","type":"address"}],"outputs":[{"name":"","type":"uint256"}]},{"type":"function","name":"transfer","stateMutability":"nonpayable","inputs":[{"name":"to","type":"address"},{"name":"amount","type":"uint256"}],"outputs":[{"name":"","type":"bool"}]}]', name="TreasuryToken").at(a) for a in sorted(tokens)}
         self.treasury_before = {n: {} for n in ("Endaoment", "EndaomentFunds", "EndaomentPSM")}
@@ -91,7 +96,7 @@ class FullUpdate(Rehearsal):
             try:
                 balances = {n: token.balanceOf(self.old[n].address) for n in self.treasury_before}
             except Exception as e:
-                unsupported[a] = error_text(e).replace(self.rpc, "<RPC>")[:300]
+                unsupported[a] = self.sanitized(error_text(e))[:300]
                 del self.tokens[a]
                 continue
             for n, amount in balances.items():
@@ -149,7 +154,21 @@ class FullUpdate(Rehearsal):
             if expected:
                 results[a] = {"before": expected, "after": actual, "equal": True}
         self.report["treasury_conservation"] = results
-        self.report["psm_yield_shares_moved_without_redemption"] = True
+        yield_asset = str(self.old["EndaomentPSM"].usdcYieldPosition()[1]).lower()
+        yield_result = next((r for a, r in results.items() if a.lower() == yield_asset), None)
+        yield_entry = next(((a, token) for a, token in transferable.items() if a.lower() == yield_asset), None)
+        psm_yield_before = psm_yield_after = psm_yield_remaining = None
+        if yield_entry:
+            asset, token = yield_entry
+            psm_yield_before = self.treasury_before["EndaomentPSM"][asset]
+            psm_yield_after = token.balanceOf(self.new["EndaomentPSM"].address)
+            psm_yield_remaining = token.balanceOf(self.old["EndaomentPSM"].address)
+        self.report["psm_yield_share_handoff"] = {
+            "before": psm_yield_before, "new_psm": psm_yield_after, "old_psm": psm_yield_remaining}
+        self.report["psm_yield_shares_moved_without_redemption"] = bool(
+            yield_result and yield_result["equal"] and psm_yield_before
+            and psm_yield_after == psm_yield_before and psm_yield_remaining == 0)
+        self.report["psm_underlying_comparison_scope"] = "before/after governance wait; yield accrual may differ, only token-unit conservation asserted"
         self.report["psm_underlying_after"] = self.new["EndaomentPSM"].getUnderlyingYieldAmount()
         assert not any(self.report["treasury_native_before"].values()), "native ETH handoff not yet implemented"
         self.save()
@@ -161,11 +180,11 @@ class FullUpdate(Rehearsal):
             ("StabilityPool", "RipeGov", "SimpleErc20", "RebaseErc20", "UnderscoreVault"), 6)]
         for i, contract, description in entries:
             self.transact(book.startAddNewAddressToRegistry, contract.address, description)
-            assert self.transact(book.confirmNewAddressToRegistry, contract.address) == i
+            self.transact_expect(i, book.confirmNewAddressToRegistry, contract.address)
         for i, suffix in enumerate(("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf"), 1):
             contract = self.new["Switchboard" + suffix]
             self.transact(sb.startAddNewAddressToRegistry, contract.address, suffix)
-            assert self.transact(sb.confirmNewAddressToRegistry, contract.address) == i
+            self.transact_expect(i, sb.confirmNewAddressToRegistry, contract.address)
         self.sources = {}
         old_desk = self.old["PriceDesk"]
         for i in range(1, int(old_desk.numAddrs())):
@@ -173,13 +192,13 @@ class FullUpdate(Rehearsal):
             if i == 3 and str(old_address).lower() == ZERO:
                 candidate = self.new["BlueChipYieldPrices"]
                 self.transact(desk.startAddNewAddressToRegistry, candidate.address, "BlueChip Yield Prices")
-                assert self.transact(desk.confirmNewAddressToRegistry, candidate.address) == 3
+                self.transact_expect(3, desk.confirmNewAddressToRegistry, candidate.address)
                 self.transact(desk.startAddressDisableInRegistry, 3)
                 self.transact(desk.confirmAddressDisableInRegistry, 3)
                 continue
             if i == 6:
                 self.transact(desk.startAddNewAddressToRegistry, old_address, "Retained legacy Aero RIPE pricing")
-                assert self.transact(desk.confirmNewAddressToRegistry, old_address) == 6
+                self.transact_expect(6, desk.confirmNewAddressToRegistry, old_address)
                 self.report["retained_legacy_aero_slot6"] = str(old_address)
                 self.report["aero_ui_only_note"] = "User confirmed Aero is for UI, not collateral. New monitor is deployed separately; retaining legacy RIPE quote during UI handoff is not a collateral migration blocker."
                 continue
@@ -188,7 +207,7 @@ class FullUpdate(Rehearsal):
             name = names[0]
             self.sources[name] = self.at(name, old_address)
             self.transact(desk.startAddNewAddressToRegistry, self.new[name].address, name)
-            assert self.transact(desk.confirmNewAddressToRegistry, self.new[name].address) == i
+            self.transact_expect(i, desk.confirmNewAddressToRegistry, self.new[name].address)
         self.report["staged_registry_ids"] = {"vaults": {i: str(c.address) for i, c, _ in entries},
                                             "sources": {n: int(desk.getRegId(self.new[n].address)) for n in self.sources}}
         self.save()
@@ -213,7 +232,7 @@ class FullUpdate(Rehearsal):
         for i in [8, 5, 6, 7] + [i for i in replacements if i not in (8, 5, 6, 7)]:
             self.transact(self.hq.confirmAddressUpdateToRegistry, i)
         for i, name in enumerate(("VaultMigrator", "RipeReserveEngine", "RipeReserveVesting"), 25):
-            assert self.transact(self.hq.confirmNewAddressToRegistry, self.new[name].address) == i
+            self.transact_expect(i, self.hq.confirmNewAddressToRegistry, self.new[name].address)
         ledger = self.old["Ledger"]
         assert str(self.hq.getAddr(4)).lower() == str(ledger.address).lower()
         assert {n: plain(getattr(ledger, n)()) for n in self.report["ledger_before"]} == self.report["ledger_before"]
@@ -302,6 +321,11 @@ class FullUpdate(Rehearsal):
                 c = old.greenRefPoolConfig()
                 if str(c[0]).lower() != ZERO:
                     act(new, new.setGreenRefPoolConfig, c[0], *c[5:10])
+                    after = new.greenRefPoolConfig()
+                    assert positional([after[0], *after[5:10]]) == positional([c[0], *c[5:10]]), "CURVE_GREEN_REFERENCE_CONFIG_DRIFT"
+            if name == "wsuperOETHbPrices":
+                for binding in ("MCBETH", "SUPER_OETH", "WRAPPED_SUPER_OETH", "VVV"):
+                    assert str(getattr(new, binding)()).lower() == str(getattr(old, binding)()).lower(), ("WRAPPED_BINDING_DRIFT", binding)
             missing = [a for a, row in source_report["assets"].items() if not row["registered"]]
             assert not missing, ("INCOMPLETE_SOURCE_REGISTRATION", name, missing)
         for name in ("ChainlinkPrices", "PythPrices", "StorkPrices", "RedStone",
@@ -309,13 +333,17 @@ class FullUpdate(Rehearsal):
             if name in self.sources:
                 self.attempt("configure_" + name, lambda name=name: copy_source(name))
         prices = {}
+        outcomes = {}
         for i in range(1, int(mc.numAssets())):
             asset = mc.assets(i)
             try:
                 prices[str(asset)] = desk.getPrice(asset)
-            except Exception:
+                outcomes[str(asset)] = {"value": prices[str(asset)], "outcome": "priced" if prices[str(asset)] else "zero_unresolved", "error": None}
+            except Exception as e:
                 prices[str(asset)] = 0
+                outcomes[str(asset)] = {"value": None, "outcome": "error", "error": self.sanitized(error_text(e))}
         self.report["post_activation_asset_prices"] = prices
+        self.report["post_activation_price_outcomes"] = outcomes
         if any(p == 0 for p in prices.values()):
             self.report.setdefault("blockers", []).append("ZERO_POST_ACTIVATION_PRICES")
         self.report.setdefault("blockers", []).append("ORACLE_SNAPSHOT_WARMUP_AND_LIVE_STATE_REPLAY_NOT_QUALIFIED")
@@ -338,20 +366,25 @@ class FullUpdate(Rehearsal):
     def replay_permissions_and_audit_pending(self):
         users = {row["user"] for rows in self.report["positions"].values() for row in rows.values()}
         pairs = set()
-        signatures = (
-            ("UserConfigSet(address,address)", False),
-            ("UserConfigSet(address,bool,bool,bool,address)", False),
-            ("UserDelegationSet(address,address,address)", True),
-            ("UserDelegationSet(address,address,bool,bool,bool,bool,address)", True),
-        )
-        for signature, delegated in signatures:
-            topic = "0x" + keccak(text=signature).hex()
-            logs = self.rpc_read("eth_getLogs", [{"fromBlock": "0x0", "toBlock": hex(self.block), "topics": [topic]}])
-            for row in logs:
-                user = to_checksum_address("0x" + row["topics"][1][-40:])
-                users.add(user)
-                if delegated:
-                    pairs.add((user, to_checksum_address("0x" + row["topics"][2][-40:])))
+        tellers = self.registry_history_addresses(self.hq, "RipeHq", 17)
+        switchboards = self.registry_history_addresses(self.hq, "RipeHq", 6)
+        charlies = set()
+        for address in switchboards:
+            charlies.update(self.registry_history_addresses(self.at("Switchboard", address), "Switchboard", 3))
+        emitter_abis = {}
+        for role, emitters in (("Teller", tellers), ("SwitchboardCharlie", charlies)):
+            events = {("0x" + event_abi_to_log_topic(e).hex()).lower(): e
+                      for e in self.manifest[role]["abi"] if e.get("type") == "event"
+                      and e["name"] in ("UserConfigSet", "UserDelegationSet")}
+            if len(events) != 2:
+                raise RuntimeError("PERMISSION_EVENT_ABI_INCOMPLETE:" + role)
+            emitter_abis.update({address: events for address in emitters})
+        for emitter, events in emitter_abis.items():
+            logs = self.filtered_logs({"address": emitter, "topics": [list(events)]}, 0, self.block)
+            found_users, found_pairs = permission_keys(logs, emitter_abis)
+            users.update(found_users)
+            pairs.update(found_pairs)
+        self.report["permission_emitters"] = sorted(emitter_abis)
         users, pairs = sorted(users), sorted(pairs)
         old, new, charlie = self.old["MissionControl"], self.new["MissionControl"], self.new["SwitchboardCharlie"]
         configs = self.batch_read([(old.userConfig, (user,)) for user in users])
@@ -369,7 +402,7 @@ class FullUpdate(Rehearsal):
             assert tuple(new.userDelegation(user, delegate)) == tuple(config)
         self.report["permissions_replayed"] = {"users_checked": len(users), "nonzero_user_configs": config_count,
             "pairs_checked": len(pairs), "nonzero_delegations": delegation_count,
-            "coverage": "vault census plus historical current-generation Teller/Charlie event signatures"}
+            "coverage": "vault census plus HQ/Switchboard-authenticated emitter history; recorded manifest ABI event layouts"}
         pending = {}
         controllers = {"HumanResources": self.old["HumanResources"]}
         for i, suffix in enumerate(("Alpha", "Bravo", "Charlie", "Delta", "Echo"), 1):
@@ -384,7 +417,7 @@ class FullUpdate(Rehearsal):
         hr = {name: {"old": getattr(self.old["HumanResources"], name)(), "new": getattr(self.new["HumanResources"], name)()}
               for name in ("getTotalCompensation", "getTotalClaimed")}
         assert all(row["old"] == row["new"] for row in hr.values()), "HR totals drift"
-        self.report["hr_totals"] = hr
+        self.report["hr_ledger_backed_totals"] = hr
         self.save()
 
     def replay_boosters(self):
@@ -402,14 +435,18 @@ class FullUpdate(Rehearsal):
             if used:
                 consumed[user] = {"config": positional(config), "units_used": used}
             else:
-                configs.append(tuple(config))
+                configs.append((user, tuple(config)))
         self.report["booster_consumption_blockers"] = consumed
         if consumed:
             self.report.setdefault("blockers", []).append("ACTIVE_BOOSTER_UNITS_USED_CANNOT_BE_SEEDED_BY_EXISTING_GOV_API")
         delta = self.new["SwitchboardDelta"]
         for start in range(0, len(configs), 50):
-            self.action(delta, delta.setManyBondBoosters, configs[start:start + 50])
+            self.action(delta, delta.setManyBondBoosters, [config for _, config in configs[start:start + 50]])
+        for user, config in configs:
+            assert tuple(self.new["BondBooster"].config(user)) == config, ("BOOSTER_CONFIG_DRIFT", user)
+            assert self.new["BondBooster"].unitsUsed(user) == 0, ("BOOSTER_USAGE_DRIFT", user)
         self.report["active_unconsumed_boosters_replayed"] = len(configs)
+        self.report["booster_replay_coverage"] = "nonempty readback" if configs else "zero-case only"
         self.save()
 
     def check_psm(self):
@@ -446,6 +483,8 @@ class FullUpdate(Rehearsal):
         self.save()
 
     def stage_all(self, defaults):
+        self.report["constructor_profile"] = "Base staged migrations; not cutover qualified"
+        self.report["input_fingerprint"] = fingerprint(ROOT, [defaults])
         adapter = DeploymentAdapter(self, defaults)
         for filename in ("2026091400_StageBaseUpgrade.py", "2026091401_StageBaseMissionControl.py",
                          "2026091402_StageBaseOraclesPsmReserves.py"):
@@ -458,16 +497,31 @@ class FullUpdate(Rehearsal):
 
 
 def main():
+    require_unoptimized()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--block", required=True, type=int)
     parser.add_argument("--defaults", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
+    parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--diagnose-replacing-pending", action="store_true",
                         help="Fork-only alternate path: record/cancel conflicting pending HQ updates; remains a production blocker")
     args = parser.parse_args()
     load_dotenv(ROOT / ".env")
-    run = FullUpdate(os.environ["BASE_MAINNET_RPC_URL"], args.block, args.report)
+    run = FullUpdate(os.environ["BASE_MAINNET_RPC_URL"], args.block, args.report, overwrite=args.overwrite)
     run.diagnose_replacing_pending = args.diagnose_replacing_pending
+    try:
+        execute_diagnostic(run, args)
+    except Exception as e:
+        run.report.update(status="incomplete", fatal_error=run.sanitized(error_text(e)))
+        run.save()
+        print("INCOMPLETE", run.report["fatal_error"], flush=True)
+        return 1
+    run.report["status"] = "not_qualified"
+    run.save()
+    return 2
+
+
+def execute_diagnostic(run, args):
     assert int(run.rpc_read("eth_chainId", []), 16) == 8453
     header = run.rpc_read("eth_getBlockByNumber", [hex(args.block), False])
     finalized = run.rpc_read("eth_getBlockByNumber", ["finalized", False])
@@ -495,9 +549,6 @@ def main():
                     run.attempt("psm_state_handoff", run.check_psm)
                     if run.report.get("checks", {}).get("historical_user_census") == "passed":
                         run.attempt("user_positions_unchanged", run.check_user_positions)
-    run.report["status"] = "not_qualified"
-    run.save()
-    return 2
 
 
 if __name__ == "__main__":

@@ -12,9 +12,22 @@ USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 # Constructor-only placeholder. Sales stay PAUSED, with no allocation or mint
 # permission. These are NOT approved launch economics; configure before launch.
 DORMANT_RESERVE_CONFIG = (
-    1_000_000, 1_000_000, 10**18, 10**18,
-    6000, 4000, 1000, 3000, 300, 800, 800, 4,
-    0, 43_200, 1_296_000, 43_200,
+    1_000_000,  # paymentCapPerEpoch: USDC raw units (1 USDC placeholder)
+    1_000_000,  # minPaymentAmount: USDC raw units (1 USDC placeholder)
+    10**18,    # maxAllInPayoutRate: RIPE/payment, 1e18 scale
+    10**18,    # seedBasePayoutRate: RIPE/payment, 1e18 scale
+    6000,      # uHighBps: high utilization threshold, basis points
+    4000,      # uLowBps: low utilization threshold, basis points
+    1000,      # minUpBps: minimum upward adjustment, basis points
+    3000,      # maxUpBps: maximum upward adjustment, basis points
+    300,       # minDownBps: minimum downward adjustment, basis points
+    800,       # maxDownBps: maximum downward adjustment, basis points
+    800,       # decayBps: decay per idle epoch, basis points
+    4,         # maxDecayEpochs: count
+    0,         # maxVestingBonus: basis points, disabled
+    43_200,    # minVestingLength: Base blocks
+    1_296_000, # maxVestingLength: Base blocks
+    43_200,    # epochLength: Base blocks
 )
 
 
@@ -46,6 +59,8 @@ def migrate(migration: Migration):
     assert not eth_config[2] and not eth_config[3]
     assert not btc_config[2] and not btc_config[3]
     blue = old["BlueChipYieldPrices"]
+    assert old["CurvePrices"].minActionTimeLock() == 14_400, "live Curve floor drift"
+    assert blue.minActionTimeLock() == 21_600, "live disabled BlueChip floor drift"
     # The deployed generation exposes indexed array getters; today's source
     # returns whole arrays. Use the legacy ABI for these two reads only.
     blue_arrays = ABIContractFactory("LegacyBlueChipFactories", [
@@ -64,10 +79,12 @@ def migrate(migration: Migration):
     candidates["PriceDesk"] = migration.deploy(
         "PriceDesk", hq.address, ZERO, eth,
         params["PRICE_DESK_MIN_REG_TIMELOCK"], params["PRICE_DESK_MAX_REG_TIMELOCK"],
-        1_500_000,  # immutable per-source price-call budget; Base vault quotes exceed 250k
+        params["PRICE_DESK_PRICE_SOURCE_GAS"],  # staged/unqualified Base budget
+        params["PRICE_DESK_SNAPSHOT_SOURCE_GAS"],
         label=f"PriceDesk{SUFFIX}",
     )
     assert candidates["PriceDesk"].PRICE_SOURCE_PRICE_GAS() == 1_500_000
+    assert candidates["PriceDesk"].PRICE_SOURCE_SNAPSHOT_GAS() == 1_500_000
     candidates["ChainlinkPrices"] = migration.deploy(
         "ChainlinkPrices", hq.address, ZERO, min_lock, max_lock,
         chainlink.WETH(), eth, btc, eth_config[0], btc_config[0], eth_config[4],
@@ -76,16 +93,18 @@ def migrate(migration: Migration):
     candidates["CurvePrices"] = migration.deploy(
         "CurvePrices", hq.address, ZERO,
         migration.blueprint().ADDYS["CURVE_ADDRESS_PROVIDER"],
-        hq.getAddr(1), hq.getAddr(2), min_lock, max_lock,
+        hq.getAddr(1), hq.getAddr(2), 14_400, max_lock,
         label=f"CurvePrices{SUFFIX}",
     )
     candidates["BlueChipYieldPrices"] = migration.deploy(
-        "BlueChipYieldPrices", hq.address, ZERO, min_lock, max_lock,
+        "BlueChipYieldPrices", hq.address, ZERO, 21_600, max_lock,
         morpho_factories, euler_factories, blue.FLUID_ADDR(),
         blue.COMPOUND_V3_ADDR(), blue.MOONWELL_ADDR(), blue.AAVE_V3_ADDR(),
         ZERO,  # no new Morpho V2 factory enabled without an authenticated Base binding
         label=f"BlueChipYieldPrices{SUFFIX}",
     )
+    assert candidates["CurvePrices"].minActionTimeLock() == 14_400
+    assert candidates["BlueChipYieldPrices"].minActionTimeLock() == 21_600
     candidates["PythPrices"] = migration.deploy(
         "PythPrices", hq.address, ZERO, old["PythPrices"].PYTH(), min_lock, max_lock,
         label=f"PythPrices{SUFFIX}",

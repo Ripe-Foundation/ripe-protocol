@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from contextlib import contextmanager
 
 import boa
 from boa.contracts.abi.abi_contract import ABIContractFactory
@@ -21,9 +22,14 @@ from dotenv import load_dotenv
 import requests
 from eth_utils import event_abi_to_log_topic, to_checksum_address
 from eth_utils.abi import collapse_if_tuple
-from eth_abi import decode
+from eth_abi import decode, encode
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.utils.fork_reports import (
+    SANITIZER_VERSION, fingerprint, require_new_report, require_unoptimized, sanitize,
+)
 ZERO = "0x" + "00" * 20
 HQ_IDS = {4: "Ledger", 5: "MissionControl", 6: "Switchboard", 7: "PriceDesk",
           8: "VaultBook", 9: "AuctionHouse", 10: "AuctionHouseNFT", 11: "Boardroom",
@@ -69,8 +75,52 @@ def error_frames(error):
     return frames
 
 
+def decode_event(row, abi):
+    """Reject malformed topic/data layouts rather than indexing blindly."""
+    indexed = [entry for entry in abi["inputs"] if entry.get("indexed")]
+    other = [entry for entry in abi["inputs"] if not entry.get("indexed")]
+    if len(row["topics"]) != len(indexed) + 1:
+        raise RuntimeError("EVENT_TOPIC_SHAPE:" + abi["name"])
+    if row["topics"][0].lower() != ("0x" + event_abi_to_log_topic(abi).hex()).lower():
+        raise RuntimeError("EVENT_SIGNATURE:" + abi["name"])
+    result = {}
+    for entry, topic in zip(indexed, row["topics"][1:]):
+        result[entry["name"]] = decode([entry["type"]], bytes.fromhex(topic[2:]))[0]
+    types = [collapse_if_tuple(entry) for entry in other]
+    raw = bytes.fromhex(row["data"][2:])
+    values = decode(types, raw)
+    if encode(types, values) != raw:
+        raise RuntimeError("EVENT_DATA_SHAPE:" + abi["name"])
+    result.update((entry["name"], value) for entry, value in zip(other, values))
+    return result
+
+
+def permission_keys(logs, emitter_abis):
+    users, pairs = set(), set()
+    for row in logs:
+        abi = emitter_abis.get(row["address"].lower(), {}).get(row["topics"][0].lower())
+        if row["address"].lower() not in emitter_abis:
+            continue  # Foreign same-signature events are not authority.
+        if abi is None:
+            raise RuntimeError("UNSUPPORTED_AUTHENTICATED_PERMISSION_EVENT")
+        values = decode_event(row, abi)
+        user = to_checksum_address(values["user"])
+        users.add(user)
+        if abi["name"] == "UserDelegationSet":
+            pairs.add((user, to_checksum_address(values["delegate"])))
+    return users, pairs
+
+
+def remediation_sets(rows, locked_depositors):
+    debt = [row["user"] for row in rows if not row["healthy"]]
+    checks = [row["user"] for row in rows if not row["healthy"] or row["locked"]]
+    return debt, list(dict.fromkeys(checks + list(locked_depositors)))
+
+
 class Rehearsal:
-    def __init__(self, rpc, block, output):
+    def __init__(self, rpc, block, output, *, overwrite=False):
+        require_unoptimized()
+        require_new_report(output, overwrite)
         self.rpc, self.block, self.output = rpc, block, output
         self.manifest = json.loads((ROOT / "migration_history/base-mainnet/v1/current-manifest.json").read_text())["contracts"]
         self.report = {"status": "incomplete", "live_writes": False, "block": block,
@@ -78,10 +128,32 @@ class Rehearsal:
                        "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                        "deployments": {}, "probes": [], "completed_migrations": []}
         self.old, self.new = {}, {}
+        self.report["sanitizer_version"] = SANITIZER_VERSION
+        self.report["constructor_profile"] = "historical compatibility experiment, not staging qualification"
+
+    def sanitized(self, value):
+        return sanitize(plain(value), self.rpc, ROOT)
+
+    @contextmanager
+    def diagnostic_branch(self, name):
+        start = len(self.report.get("fork_transactions", []))
+        try:
+            with boa.env.anchor():
+                yield
+        finally:
+            for row in self.report.get("fork_transactions", [])[start:]:
+                row.update(branch_id=name, reverted=True)
+            self.save()
+
+    def transact_expect(self, expected, fn, *args):
+        actual = self.transact(fn, *args)
+        if actual != expected:
+            raise RuntimeError(f"UNEXPECTED_TRANSACTION_RESULT:{actual}:{expected}")
+        return actual
 
     def save(self):
         self.output.parent.mkdir(parents=True, exist_ok=True)
-        self.output.write_text(json.dumps(plain(self.report), indent=2) + "\n")
+        self.output.write_text(json.dumps(self.sanitized(self.report), indent=2) + "\n")
 
     def rpc_read(self, method, params):
         assert method in {"eth_chainId", "eth_getBlockByNumber", "eth_getLogs"}
@@ -106,7 +178,8 @@ class Rehearsal:
         assert size <= 24576, (name, size)
         self.new[name] = c
         self.report["deployments"][name] = {"address": str(c.address), "runtime_bytes": size,
-            "source_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+            "source_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+            "constructor_args": plain(args), "constructor_profile": self.report["constructor_profile"]}
         self.save()
         return c
 
@@ -148,15 +221,54 @@ class Rehearsal:
         print("Inventory:", len(self.report["borrowers"]), "borrowers;", len(self.vaults), "vaults", flush=True)
 
     def logs(self, address, topics, start, end):
+        return self.filtered_logs({"address": str(address), "topics": [topics]}, start, end)
+
+    def filtered_logs(self, log_filter, start, end):
+        """Bounded, adaptive retrieval; incomplete discovery always raises."""
+        coverage = {"filter": log_filter, "start": start, "end": end,
+                    "completed_ranges": [], "complete": False}
+        self.report.setdefault("log_discovery", []).append(coverage)
+
+        def fetch(lo, hi):
+            try:
+                rows = self.rpc_read("eth_getLogs", [dict(log_filter, fromBlock=hex(lo), toBlock=hex(hi))])
+                coverage["completed_ranges"].append([lo, hi])
+                return rows
+            except RuntimeError as e:
+                message = str(e).lower()
+                if hi <= lo or not any(x in message for x in ["size", "limit", "range", "too many"]):
+                    raise
+                middle = (lo + hi) // 2
+                return fetch(lo, middle) + fetch(middle + 1, hi)
         try:
-            return self.rpc_read("eth_getLogs", [{"address": str(address), "topics": [topics],
-                "fromBlock": hex(start), "toBlock": hex(end)}])
-        except RuntimeError as e:
-            message = str(e).lower()
-            if end <= start or not any(x in message for x in ["size", "limit", "range", "too many"]):
-                raise
-            middle = (start + end) // 2
-            return self.logs(address, topics, start, middle) + self.logs(address, topics, middle + 1, end)
+            unique = {}
+            for lo in range(start, end + 1, 50_000):
+                for row in fetch(lo, min(end, lo + 49_999)):
+                    unique[(row["blockHash"], row["transactionHash"], row["logIndex"])] = row
+            coverage["complete"] = True
+            return sorted(unique.values(), key=lambda r: (int(r["blockNumber"], 16), int(r["logIndex"], 16)))
+        except Exception as e:
+            coverage["error"] = self.sanitized(error_text(e))
+            raise
+        finally:
+            self.save()
+
+    def registry_history_addresses(self, registry, abi_name, slot):
+        addresses = {str(registry.getAddr(slot)).lower()}
+        events = [e for e in self.manifest[abi_name]["abi"] if e.get("type") == "event"
+                  and e["name"] in ("NewAddressConfirmed", "AddressUpdateConfirmed")]
+        if len(events) != 2:
+            raise RuntimeError("REGISTRY_HISTORY_ABI_INCOMPLETE:" + abi_name)
+        for event in events:
+            rows = self.logs(registry.address, ["0x" + event_abi_to_log_topic(event).hex()], 0, self.block)
+            for row in rows:
+                if row["address"].lower() != str(registry.address).lower():
+                    raise RuntimeError("FOREIGN_REGISTRY_LOG")
+                decoded = decode_event(row, event)
+                if decoded["regId"] == slot:
+                    addresses.update(str(decoded[name]).lower() for name in ("addr", "newAddr", "prevAddr") if name in decoded)
+        addresses.discard(ZERO)
+        return addresses
 
     def batch_read(self, calls):
         """Pinned read-only RPC batches for the historical census, never fork writes."""
@@ -215,14 +327,30 @@ class Rehearsal:
                     row["gov_data"] = g
                 positions[u + ":" + a] = row
             self.report["positions"][vid] = positions
-            totals = {a: sum(r["shares"] for r in positions.values() if r["asset"] == a)
-                      for a in self.report["vaults"][vid]["assets"]}
             self.report["vaults"][vid]["census_users"] = len(users)
-            for a, total in totals.items():
-                expected = self.report["vaults"][vid]["assets"][a]["total_shares_or_balance"]
-                assert total == expected, ("INCOMPLETE_CENSUS", vid, a, total, expected)
+            self.reconcile_positions(vid, positions)
             self.save()
             print("Reconciled vault", vid, len(users), "historical users", len(positions), "registered positions", flush=True)
+
+    def reconcile_positions(self, vid, positions):
+        registered = {a.lower(): a for a in self.report["vaults"][vid]["assets"]}
+        discovered = {r["asset"].lower(): r["asset"] for r in positions.values()}
+        orphaned = set(discovered) - set(registered)
+        checks = {}
+        self.report.setdefault("census_reconciliation", {})[vid] = checks
+        for key, asset in (registered | discovered).items():
+            total = sum(r["shares"] for r in positions.values() if r["asset"].lower() == key)
+            row = {"user_total": total, "orphaned": key in orphaned, "complete": False}
+            checks[asset] = row
+            try:
+                expected = self.vaults[vid].totalBalances(asset)
+                row["authoritative_total"] = expected
+                row["complete"] = total == expected and not row["orphaned"]
+            except Exception as e:
+                row["error"] = self.sanitized(error_text(e))
+        self.save()
+        if not all(row["complete"] for row in checks.values()):
+            raise RuntimeError(f"INCOMPLETE_CENSUS:{vid}")
 
     def transact(self, fn, *args):
         name = fn.name if hasattr(fn, "name") else fn.fn_ast.name
@@ -241,20 +369,25 @@ class Rehearsal:
         book, sb = self.new["VaultBook"], self.new["Switchboard"]
         for vid, v in self.vaults.items():
             self.transact(book.startAddNewAddressToRegistry, v.address, "Retained " + str(vid))
-            assert self.transact(book.confirmNewAddressToRegistry, v.address) == vid
+            self.transact_expect(vid, book.confirmNewAddressToRegistry, v.address)
         for vid, n in [(6, "StabilityPool"), (7, "RipeGov")]:
             self.transact(book.startAddNewAddressToRegistry, self.new[n].address, n)
-            assert self.transact(book.confirmNewAddressToRegistry, self.new[n].address) == vid
+            self.transact_expect(vid, book.confirmNewAddressToRegistry, self.new[n].address)
         for vid, suffix in enumerate(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf"], 1):
             c = self.new["Switchboard" + suffix]
             self.transact(sb.startAddNewAddressToRegistry, c.address, suffix)
-            assert self.transact(sb.confirmNewAddressToRegistry, c.address) == vid
+            self.transact_expect(vid, sb.confirmNewAddressToRegistry, c.address)
         # Core integration diagnostic: stateful treasury departments deliberately
         # remain routed to the originals until their separate custody handoff.
         replacements = [5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20]
         for i in replacements:
             pending = self.hq.pendingAddrUpdate(i)
             if pending[0] != ZERO:
+                self.report.setdefault("existing_pending_hq_updates", {})[i] = plain(pending)
+                self.save()
+                if not getattr(self, "diagnose_replacing_pending", False):
+                    raise RuntimeError(f"PENDING_HQ_UPDATE_REQUIRES_DISPOSITION:{i}")
+                self.report["fork_only_alternate_pending_scenario"] = True
                 self.transact(self.hq.cancelAddressUpdateToRegistry, i)
             self.transact(self.hq.startAddressUpdateToRegistry, i, self.new[HQ_IDS[i]].address)
         self.transact(self.hq.startAddNewAddressToRegistry, self.new["VaultMigrator"].address, "VaultMigrator")
@@ -264,6 +397,8 @@ class Rehearsal:
         if "positions" in self.report:
             sample = list(dict.fromkeys([r["user"] for rows in self.report["positions"].values()
                                         for r in rows.values() if r["shares"]]))[:10] + sample
+        sample = list(dict.fromkeys(sample))
+        self.report["reward_sample"] = {"users": sample, "selection": "up to ten funded-position users plus first three borrowers; deduplicated; not complete continuity"}
         expected = {}
         borrow_expected = {}
         for u in sample:
@@ -276,7 +411,7 @@ class Rehearsal:
         # reads have identical timestamps and stored Ledger balances.
         for i in [8, 5, 6] + [x for x in replacements if x not in [8, 5, 6]]:
             self.transact(self.hq.confirmAddressUpdateToRegistry, i)
-        assert self.transact(self.hq.confirmNewAddressToRegistry, self.new["VaultMigrator"].address) == 25
+        self.transact_expect(25, self.hq.confirmNewAddressToRegistry, self.new["VaultMigrator"].address)
         assert str(self.hq.getAddr(4)).lower() == str(self.old["Ledger"].address).lower()
         ledger = self.old["Ledger"]
         ledger_after = {n: plain(getattr(ledger, n)()) for n in self.report["ledger_before"]}
@@ -292,9 +427,9 @@ class Rehearsal:
             try:
                 row["after"] = self.new["Lootbox"].getClaimableLoot(u)
                 row["borrow_after"] = self.new["Lootbox"].getClaimableBorrowLoot(u)
-                row["equal"] = row["before"] == row["after"]
+                row["equal"] = row["before"] == row["after"] and row["borrow_before"] == row["borrow_after"]
             except Exception as e:
-                row["error"] = str(e).replace(self.rpc, "<RPC>")[:2000]
+                row["error"] = self.sanitized(error_text(e))[:2000]
                 row["equal"] = False
             comparisons.append(row)
         self.report["probes"].append({"name": "retained_ledger_reward_continuity",
@@ -336,7 +471,7 @@ class Rehearsal:
                 audit["users"].append(row)
                 print("Borrower", user, "healthy", row["healthy"], flush=True)
             except Exception as e:
-                row["error"] = error_text(e).replace(self.rpc, "<RPC>")[:1500]
+                row["error"] = self.sanitized(error_text(e))[:1500]
                 audit["errors"].append(row)
             self.save()
         # Cover account locks even for depositors with no current borrowing.
@@ -347,7 +482,7 @@ class Rehearsal:
         audit["locked_depositors"] = [u for u, flag in zip(depositors, locked) if flag]
         audit["borrowers_expected"] = len(self.report["borrowers"])
         audit["complete"] = len(audit["users"]) == audit["borrowers_expected"] and not audit["errors"]
-        self.audit_candidates = [r["user"] for r in audit["users"] if not r["healthy"] or r["locked"]]
+        _, self.audit_candidates = remediation_sets(audit["users"], audit["locked_depositors"])
         self.save()
 
     def remediate_blockers(self):
@@ -355,15 +490,17 @@ class Rehearsal:
         main_user = "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0"
         if "borrower_audit" in self.report:
             assert self.report["borrower_audit"]["complete"]
-            users = [u["user"] for u in self.report["borrower_audit"]["users"] if not u["healthy"]]
+            audit = self.report["borrower_audit"]
+            users, self.audit_candidates = remediation_sets(audit["users"], audit["locked_depositors"])
         else:
             saved = json.loads((ROOT / "docs/chains/base/fork-rehearsal/borrower-blockers.json").read_text())
             assert saved["source_block"] == self.block
-            users = [u["user"] for u in saved["affected_users"]]
+            users, self.audit_candidates = remediation_sets(saved["affected_users"], saved["locked_depositors"])
         assert main_user.lower() in {u.lower() for u in users}, "main borrower status changed; review remediation"
-        self.audit_candidates = users
+        self.report["debt_remediation_users"] = users
+        self.report["migration_check_users"] = self.audit_candidates
         if getattr(self, "audit_only_migrations", False):
-            self.ordinary_candidate_users = {u.lower() for u in users}
+            self.ordinary_candidate_users = {u.lower() for u in self.audit_candidates}
         mc, ce, teller, charlie = [self.new[n] for n in
                                  ["MissionControl", "CreditEngine", "Teller", "SwitchboardCharlie"]]
         green = self.at("GreenToken", self.hq.getAddr(1))
@@ -382,7 +519,7 @@ class Rehearsal:
             repaid = self.transact(teller.deleverageManyUsers, [(main_user, 5 * 10**18)])
             result["deleverage"] = {"repaid": repaid, "healthy_after": ce.hasGoodDebtHealth(main_user)}
         except Exception as e:
-            result["deleverage"] = {"reverted": True, "error": error_text(e).replace(self.rpc, "<RPC>")[:1500],
+            result["deleverage"] = {"reverted": True, "error": self.sanitized(error_text(e))[:1500],
                                     "frames": error_frames(e)}
         result["deleverage"]["debt_before"] = before
         result["deleverage"]["debt_after"] = ce.getUserDebtAmount(main_user)
@@ -411,7 +548,7 @@ class Rehearsal:
                 result["delegated_deleverage"]["ripe_balance_and_lock_unchanged"] = True
             except Exception as e:
                 result["delegated_deleverage"] = {"reverted": True,
-                    "error": error_text(e).replace(self.rpc, "<RPC>")[:1500], "frames": error_frames(e)}
+                    "error": self.sanitized(error_text(e))[:1500], "frames": error_frames(e)}
             self.action(charlie, charlie.setUserDelegation, main_user, self.gov, original)
             assert tuple(mc.userDelegation(main_user, self.gov)) == original
             result["delegated_deleverage"]["delegation_restored"] = True
@@ -499,7 +636,7 @@ class Rehearsal:
                         row["reverted"] = False
                     except Exception as e:
                         row["reverted"] = True
-                        row["error"] = error_text(e).replace(self.rpc, "<RPC>")[:1500]
+                        row["error"] = self.sanitized(error_text(e))[:1500]
                         row["frames"] = error_frames(e)
                     results.append(row)
                     self.save()
@@ -751,11 +888,14 @@ class Rehearsal:
 
 
 def main():
+    require_unoptimized()
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--block", type=int, required=True)
     p.add_argument("--allow-unfinalized-diagnostic", action="store_true")
     p.add_argument("--defaults", type=Path, required=True)
     p.add_argument("--report", type=Path, required=True)
+    p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--diagnose-replacing-pending", action="store_true")
     p.add_argument("--census", action="store_true")
     p.add_argument("--census-input", type=Path)
     p.add_argument("--probe", action="store_true")
@@ -769,7 +909,9 @@ def main():
     p.add_argument("--only-user", help="Isolate a failing user; never full qualification")
     a = p.parse_args()
     load_dotenv(ROOT / ".env")
-    r = Rehearsal(os.environ["BASE_MAINNET_RPC_URL"], a.block, a.report)
+    r = Rehearsal(os.environ["BASE_MAINNET_RPC_URL"], a.block, a.report, overwrite=a.overwrite)
+    r.diagnose_replacing_pending = a.diagnose_replacing_pending
+    r.report["input_fingerprint"] = fingerprint(ROOT, [a.defaults])
     r.only_user = a.only_user
     r.stability_residual = a.stability_residual
     assert not a.stability_residual or a.stability_probe
@@ -798,6 +940,8 @@ def main():
                                     if x["asset"] == asset)
                         assert total == entry["total_shares_or_balance"], "cached census mismatch"
                 r.report["positions"] = {int(k): v for k, v in cached["positions"].items()}
+                for vid, positions in r.report["positions"].items():
+                    r.reconcile_positions(vid, positions)
             if a.census:
                 r.census()
             r.stage(a.defaults)
@@ -823,7 +967,7 @@ def main():
         r.report["error_type"] = type(e).__name__
         r.report["error_frames"] = error_frames(e)
         # URLs and provider credentials are never written into the public report.
-        r.report["error"] = error_text(e).replace(r.rpc, "<RPC>")[:6000]
+        r.report["error"] = r.sanitized(error_text(e))[:6000]
         r.save()
         print("REHEARSAL BLOCKED:", type(e).__name__, r.report["error"][:1500], flush=True)
         return 1

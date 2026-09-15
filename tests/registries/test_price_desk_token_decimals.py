@@ -158,6 +158,7 @@ def test_missing_scale_is_resolved_before_reverting_price_source(
         1,
         2,
         250_000,
+        150_000,
         name="missing_scale_before_price",
     )
     assert desk.startAddNewAddressToRegistry(source, "reverting", sender=deploy3r)
@@ -283,6 +284,7 @@ def test_explicit_set_restores_empty_or_redeployed_desk(
         1,
         2,
         250_000,
+        150_000,
         name="redeployed_price_desk",
     )
     assert desk.tokenScale(token) == 0

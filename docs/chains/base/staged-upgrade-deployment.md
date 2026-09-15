@@ -1,5 +1,11 @@
 # Base: deploy now, migrate later
 
+Current review status and mandatory gates: [PR 231 review checklist](review-231.md).
+**Deployment remains blocked** by authentic CCIP history reconciliation and the
+open staging safety items in that checklist, including Stage 2 preflight/recovery.
+Evidence: [historical summary](fork-rehearsal/full-update-summary.md).
+Prepared cancellation (not executed): [Safe batch](cancel-pending-vaultbook.safe.json).
+
 These scripts stage candidates against the existing Base RipeHq. They do not
 register candidates, modify active canonical manifest entries, move funds,
 repay debt, migrate positions, change vault IDs, enable mint permissions, or
@@ -27,11 +33,12 @@ All labels end in `BaseUpgradeCandidate20260914`. Active canonical labels remain
 untouched. The Underscore vault candidate has its own label and address, despite
 using the same SimpleErc20 source as the ordinary ERC20 vault.
 
-PriceDesk now takes a final `_priceSourcePriceGas` constructor argument and
-exposes `PRICE_SOURCE_PRICE_GAS()` as an immutable getter. Stage 3 supplies
-**1,500,000 gas** for Base's nested vault quotes. There is no governance setter;
-changing this budget later requires another PriceDesk deployment. Has-feed and
-snapshot stipends remain unchanged. The targeted fork replay confirms undyETH
+PriceDesk now takes separate `_priceSourcePriceGas` and `_priceSourceSnapshotGas`
+constructor arguments and exposes both as immutable getters. Stage 3 supplies
+**1,500,000 gas each** for Base's nested quotes and snapshot refreshes. These are
+staged/unqualified budgets. Local/Robinhood retain 250k quote and 150k snapshot
+budgets; has-feed stays 75k. There is no governance setter; changing a budget
+requires another PriceDesk deployment. The earlier targeted quote replay confirms undyETH
 and undyUSDC return matching direct-source and aggregate PriceDesk prices at this
 budget. This is not a full aggregate-operation gas qualification for reopening.
 
@@ -69,7 +76,17 @@ snapshot tools (replace BLOCK with the actual block number):
 
 ```sh
 python scripts/prepare_defaults.py --network base-mainnet --block-number BLOCK
-python scripts/verify_defaults.py --network base-mainnet
+python scripts/verify_defaults.py --network base-mainnet \
+  --defaults contracts/config/DefaultsBaseLive.vy --block-number BLOCK
+```
+
+Review the generated Defaults, ABI, and provenance diff. If regeneration changed
+them, record the reviewed revision before Stage 2; confirm deployment uses that
+same source. If byte-identical, the existing source review still applies. Record
+candidate manifests and receipts after deployment. **The commands below remain
+blocked until the review checklist's preflight/recovery and runner gates close.**
+
+```sh
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091401 --single
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091402 --single
 ```
@@ -83,7 +100,7 @@ manifests and the generated defaults provenance after real deployment.
 
 - Refresh/reconcile MissionControl's entire live configuration, including asset
   configs, governance lock terms, reward routes, signers and migration topology.
-  Stage 2 checks key config/asset equality, not complete state equivalence.
+  Stage 2 checks representable config/asset equality, not complete state equivalence.
   Redeploy its snapshot candidate under a new migration if it has become stale.
 - Populate candidate registries with the reviewed old/new topology. No vault IDs
   are assigned by these scripts; do not assume fresh VaultBook IDs 1/2 can replace
@@ -122,14 +139,16 @@ values across 27 assets** against a reconstructed MissionControl at that block.
 ```sh
 python scripts/base_full_update_fork.py --block 51312366 \
   --defaults docs/chains/base/fork-rehearsal/Defaults.wave1-51312366.vy \
-  --report docs/chains/base/fork-rehearsal/full-update-final.json \
+  --report /tmp/base-full-update-NEW-RUN.json \
   --diagnose-replacing-pending
 ```
 
 This uses actual migration constructor calls inside `boa.fork`, checks custody,
 prepares registries and attempts the department/oracle update. It never signs
-or broadcasts and does not edit live migration history. Exit code 2 means the
-update is **not qualified**, even if all deployments succeeded. The JSON lists
+or broadcasts and does not edit live migration history. At normal completion it
+writes `not_qualified` and exits 2; this does not prove that every check ran or
+passed. Inspect `checks` and `blockers`. A fatal earlier error is incomplete and
+may exit with a different nonzero status. The JSON lists
 actual calls, failures, and preservation checks. No user vault migration runs.
 
 The diagnostic flag records and cancels a conflicting pending HQ slot-8 update
@@ -140,4 +159,5 @@ cancel the live proposal: its disposition must be decided before production.
 Do not interpret successful HQ registration as a usable cutover. The diagnostic
 keeps Teller and PSM entry points closed, and keeps reserve sales disabled. Oracle
 route compatibility, fresh snapshot history, permissions and outstanding actions
-must all be qualified before reopening. No new migration tests were added.
+must all be qualified before reopening. Focused review regressions are offline;
+standard-runner lifecycle coverage remains an explicit open gate.

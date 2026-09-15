@@ -1,5 +1,11 @@
 # Base RH Deferred-Migration Technical Appendix
 
+> **Superseded deployment scope:** use the [current staging guide](../staged-upgrade-deployment.md)
+> and [review gates](../review-231.md). Retain this appendix for historical controls
+> and the still-required preservation/custody checks, not its old PriceDesk,
+> reserve, BondBooster or five-child deployment decisions. Those are replaced by
+> the current staged candidates. No historical evidence qualifies the new budgets.
+
 > **DRAFT — DO NOT EXECUTE**
 
 **Purpose:** normative technical controls, evidence requirements, operation
@@ -872,14 +878,12 @@ transition configuration an exact live snapshot.
   storage footprint, not merely the active assets returned by iteration.
 - [ ] Automated diff reports no non-allowlisted change.
 
-**BLOCKED — TRANSITION-DEFAULTS:** the checked-in `DefaultsBaseLive` snapshot
-hardcodes the legacy Contributor template, while `DefaultsRobinhood` is a
-greenfield launch configuration. Neither is the production transition artifact
-unchanged. Engineering must generate and review a dedicated Base-transition
-Defaults implementation that consumes the new RH blueprint address, preserves
-all exact-live values, and applies only the allowlisted Pool-6 route plus
-Contributor-template differences. MissionControl is not deployable until that
-artifact and its byte-for-byte independent reproduction pass Gate 1.
+**BLOCKED — TRANSITION-DEFAULTS:** `DefaultsBaseLive` now takes the Contributor
+template as a constructor argument and its September 14 review snapshot records
+24,000 GREEN global debt. `DefaultsRobinhood` remains a greenfield configuration.
+Fresh Base artifact verification, source review, complete readbacks and the
+Stage 2 recovery gate remain mandatory. Constructor support alone does not close
+transition qualification or authorize route changes.
 
 **BLOCKED — MC-INACTIVE-STATE:** MissionControl construction cannot reproduce
 an arbitrary dormant live footprint from Defaults. `_setAssetConfig` actively

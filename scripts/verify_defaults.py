@@ -73,6 +73,7 @@ SCALAR_GETTERS = (
     "getPriorityLiqAssetVaults",
     "getPriorityStabVaults",
     "getPriorityPriceSourceIds",
+    "getPriceConfig",
 )
 PER_ASSET_GETTERS = ("assetConfig", "ripeGovVaultConfig", "indexOfAsset")
 
@@ -157,6 +158,30 @@ def _compare_vault_topology(
             )
 
 
+def compare_mission_control_config(replacement, live_call, compare, contributor=None):
+    """Pure readback comparison shared by verifier and staging; never forks."""
+    for name in SCALAR_GETTERS:
+        expected = live_call(name)
+        if name == "hrConfig" and contributor is not None:
+            expected = [contributor, *expected[1:]]
+        compare(name, getattr(replacement, name)(), expected)
+    assets = []
+    for index in range(1, int(live_call("numAssets"))):
+        asset = live_call("assets", index)
+        compare(f"assets({index})", replacement.assets(index), asset)
+        if int(str(asset), 16) == 0:
+            continue
+        assets.append(asset)
+        for name in PER_ASSET_GETTERS:
+            compare(f"{name}({asset})", getattr(replacement, name)(asset), live_call(name, asset))
+    for index in range(1, int(live_call("numLiteSigners"))):
+        signer = live_call("liteSigners", index)
+        compare(f"liteSigners({index})", replacement.liteSigners(index), signer)
+        compare(f"canPerformLiteAction({signer})", replacement.canPerformLiteAction(signer),
+                live_call("canPerformLiteAction", signer))
+    return assets
+
+
 def verify(network: Network, defaults_path: Path, block_number: int | None) -> int:
     import boa
     from web3 import Web3
@@ -213,8 +238,7 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
         if _normalize(got) != _normalize(want):
             mismatches.append((label, _normalize(got), _normalize(want)))
 
-    for name in SCALAR_GETTERS:
-        compare(name, getattr(replacement, name)(), live_call(name))
+    assets = compare_mission_control_config(replacement, live_call, compare)
 
     # Defaults cannot carry these pointers. Compare them whenever the deployed
     # MissionControl ABI makes the live value observable. This keeps the
@@ -223,29 +247,6 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     for name in VAULT_POINTER_GETTERS:
         if name in live_function_names:
             compare(name, getattr(replacement, name)(), live_call(name))
-
-    num_assets = live_call("numAssets")
-    assets = [live_call("assets", i) for i in range(1, num_assets)]
-    assets = [a for a in assets if int(a, 16) != 0]
-    for index, asset in enumerate(assets, start=1):
-        # Index order matters: the replacement rebuilds it from the order the
-        # defaults list the assets in, not from the live indices.
-        compare(f"assets({index})", replacement.assets(index), asset)
-        for name in PER_ASSET_GETTERS:
-            compare(
-                f"{name}({asset})",
-                getattr(replacement, name)(asset),
-                live_call(name, asset),
-            )
-
-    for i in range(1, live_call("numLiteSigners")):
-        signer = live_call("liteSigners", i)
-        compare(f"liteSigners({i})", replacement.liteSigners(i), signer)
-        compare(
-            f"canPerformLiteAction({signer})",
-            replacement.canPerformLiteAction(signer),
-            live_call("canPerformLiteAction", signer),
-        )
 
     # Historical true entries in these mappings survive pointer/config
     # rotations but are not representable in Defaults. Walk the complete
