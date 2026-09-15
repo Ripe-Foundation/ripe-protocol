@@ -8,6 +8,17 @@ from scripts.utils.migration import Migration
 ZERO = "0x" + "00" * 20
 SUFFIX = "BaseUpgradeCandidate20260914"
 USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+REVIEWED_SOURCE_SLOTS = {
+    1: "0xd11b23b6391e294df49961e64231bddde5bb5e89",
+    2: "0x7b2aee8b6a4bdf0885def48ccda8453fdc1bba5d",
+    3: ZERO,  # BlueChip remains disabled.
+    4: "0x16371faf6f603f8d8d6cef8c46253c80adee8b98",
+    5: "0xcee8ed804f72b6ecb6b2d679ca17b545bd654bf6",
+    6: "0x5ce2bbd5ebe9f7d9322a8f56740f95b9576ee0a2",
+    7: "0x064488f53849616eee3ee32c29307922b319bb7c",
+    8: "0x64d0f785c3d4bf4675f4b8432d765175f014a8ac",
+    9: "0x9f20f25f037046721a292b19a486932ef390eaf9",
+}
 
 # Constructor-only placeholder. Sales stay PAUSED, with no allocation or mint
 # permission. These are NOT approved launch economics; configure before launch.
@@ -37,6 +48,11 @@ def migrate(migration: Migration):
         raise RuntimeError("BASE_UPGRADE_WRONG_PROFILE")
     hq = migration.get_contract("RipeHq")
     old_desk = migration.get_contract("PriceDesk", hq.getAddr(7))
+    if int(old_desk.numAddrs()) != 10:
+        raise RuntimeError("BASE_UPGRADE_SOURCE_COUNT_DRIFT")
+    for slot, expected in REVIEWED_SOURCE_SLOTS.items():
+        if str(old_desk.getAddr(slot)).lower() != expected:
+            raise RuntimeError(f"BASE_UPGRADE_SOURCE_SLOT_DRIFT:{slot}")
     psm = migration.get_contract("EndaomentPSM", hq.getAddr(22))
     assert str(psm.USDC()).lower() == USDC.lower()
     params = migration.blueprint().PARAMS
@@ -47,11 +63,17 @@ def migrate(migration: Migration):
                  "PythPrices", "StorkPrices", "wsuperOETHbPrices", "RedStone", "UndyVaultPrices"):
         source = migration.get_contract(name)
         if name == "BlueChipYieldPrices":
+            if str(source.address).lower() != "0x90c70acff302c8a7f00574ec3547b0221f39cd28":
+                raise RuntimeError("BASE_UPGRADE_DISABLED_BLUECHIP_ADDRESS_DRIFT")
             # Slot 3 is intentionally disabled on live Base. Deploy its new
             # code, but do not re-enable the source when preparing PriceDesk.
             assert str(old_desk.getAddr(3)).lower() == ZERO
         else:
-            assert int(old_desk.getRegId(source.address)) != 0, f"inactive source: {name}"
+            slot = {"ChainlinkPrices": 1, "CurvePrices": 2, "PythPrices": 4,
+                    "StorkPrices": 5, "wsuperOETHbPrices": 7,
+                    "UndyVaultPrices": 8, "RedStone": 9}[name]
+            if str(source.address).lower() != REVIEWED_SOURCE_SLOTS[slot]:
+                raise RuntimeError(f"BASE_UPGRADE_SOURCE_MANIFEST_DRIFT:{name}")
         old[name] = source
     chainlink = old["ChainlinkPrices"]
     eth, btc = chainlink.ETH(), chainlink.BTC()

@@ -1,12 +1,13 @@
 """Safety and provenance for diagnostics; never changes the Boa environment."""
 
 import hashlib
+import re
 from importlib.metadata import version
 from pathlib import Path
 import subprocess
 from urllib.parse import parse_qsl, quote, unquote, urlsplit
 
-SANITIZER_VERSION = "fork-report-v2"
+SANITIZER_VERSION = "fork-report-v3"
 
 
 def require_unoptimized():
@@ -19,14 +20,19 @@ def require_new_report(path, overwrite=False):
         raise RuntimeError("REPORT_EXISTS: choose a fresh path or pass --overwrite")
 
 
-def sanitize(value, rpc, root):
+def sanitize(value, rpc, root, credential_query_keys=()):
     """Redact full URLs and split provider errors, including nested trace data."""
     parts = urlsplit(rpc)
-    secrets = {rpc, unquote(rpc), parts.netloc, parts.hostname or "",
-               parts.path, unquote(parts.path), parts.username or "", parts.password or ""}
-    secrets.update(v for _, v in parse_qsl(parts.query) if v)
-    # Providers commonly embed credentials in a path segment, not a query.
-    secrets.update(segment for segment in unquote(parts.path).split("/") if len(segment) >= 8)
+    secrets = {rpc, unquote(rpc), parts.netloc, parts.username or "", parts.password or ""}
+    credential_keys = {"key", "apikey", "api_key", "token", "secret", "auth",
+                       "access_token", "password", *credential_query_keys}
+    secrets.update(v for k, v in parse_qsl(parts.query) if k.lower() in credential_keys and v)
+    # Conventional endpoint segments are not credentials. Other segments may be
+    # short provider keys; do not substitute generic words like rpc or base.
+    public_segments = {"rpc", "v1", "v2", "v3", "api", "eth", "http", "https",
+                       "base", "mainnet", "base-mainnet", "ethereum", "public"}
+    secrets.update(s for s in unquote(parts.path).split("/") if s and s.lower() not in public_segments)
+    secrets |= {unquote(s) for s in tuple(secrets)}
     secrets.discard("")
     secrets.discard("/")
     secrets |= {quote(s, safe="") for s in tuple(secrets)}
@@ -35,6 +41,8 @@ def sanitize(value, rpc, root):
         if isinstance(v, str):
             for secret in sorted(secrets, key=len, reverse=True):
                 v = v.replace(secret, "<RPC>")
+            if parts.hostname:
+                v = re.sub(re.escape(parts.hostname), "<RPC>", v, flags=re.IGNORECASE)
             v = v.replace(str(root) + "/", "")
             v = v.replace(str(Path.home()) + "/", "<user>/")
             return v

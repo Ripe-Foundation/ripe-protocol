@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 from contextlib import contextmanager
 
 import boa
@@ -41,6 +42,8 @@ HQ_IDS = {4: "Ledger", 5: "MissionControl", 6: "Switchboard", 7: "PriceDesk",
 def plain(v):
     if hasattr(v, "_asdict"):
         return {k: plain(x) for k, x in v._asdict().items()}
+    if hasattr(v, "address"):
+        return str(v.address)
     if isinstance(v, dict):
         return {str(k): plain(x) for k, x in v.items()}
     if isinstance(v, (tuple, list)):
@@ -136,14 +139,24 @@ class Rehearsal:
 
     @contextmanager
     def diagnostic_branch(self, name):
+        if getattr(self, "_diagnostic_branch_active", False):
+            raise RuntimeError("NESTED_DIAGNOSTIC_BRANCH_UNSUPPORTED")
+        self._diagnostic_branch_active = True
         start = len(self.report.get("fork_transactions", []))
         try:
             with boa.env.anchor():
                 yield
         finally:
             for row in self.report.get("fork_transactions", [])[start:]:
-                row.update(branch_id=name, reverted=True)
+                row.update(branch_id=name, state_rolled_back=True)
+            self._diagnostic_branch_active = False
             self.save()
+
+    def read_saved_input(self, path, role):
+        content = Path(path).read_bytes()
+        self.report.setdefault("consumed_inputs", []).append({
+            "role": role, "path": str(path), "sha256": hashlib.sha256(content).hexdigest()})
+        return json.loads(content)
 
     def transact_expect(self, expected, fn, *args):
         actual = self.transact(fn, *args)
@@ -157,8 +170,10 @@ class Rehearsal:
 
     def rpc_read(self, method, params):
         assert method in {"eth_chainId", "eth_getBlockByNumber", "eth_getLogs"}
-        result = requests.post(self.rpc, json={"jsonrpc": "2.0", "id": 1,
-            "method": method, "params": params}, timeout=90).json()
+        response = requests.post(self.rpc, json={"jsonrpc": "2.0", "id": 1,
+            "method": method, "params": params}, timeout=90)
+        response.raise_for_status()
+        result = response.json()
         if "error" in result:
             raise RuntimeError(result["error"])
         return result["result"]
@@ -230,8 +245,24 @@ class Rehearsal:
         self.report.setdefault("log_discovery", []).append(coverage)
 
         def fetch(lo, hi):
+            rows = None
+            error = RuntimeError("INVALID_LOG_RESPONSE")
+            for attempt in range(4):
+                try:
+                    rows = self.rpc_read("eth_getLogs", [dict(log_filter, fromBlock=hex(lo), toBlock=hex(hi))])
+                    break
+                except (RuntimeError, requests.HTTPError) as e:
+                    message = str(e).lower()
+                    if "429" not in message and "rate limit" not in message and "throttl" not in message:
+                        # Range errors are handled below; permanent errors propagate.
+                        error = e
+                        break
+                    if attempt == 3:
+                        raise
+                    time.sleep(2 ** attempt)
             try:
-                rows = self.rpc_read("eth_getLogs", [dict(log_filter, fromBlock=hex(lo), toBlock=hex(hi))])
+                if rows is None:
+                    raise error
                 coverage["completed_ranges"].append([lo, hi])
                 return rows
             except RuntimeError as e:
@@ -352,16 +383,27 @@ class Rehearsal:
         if not all(row["complete"] for row in checks.values()):
             raise RuntimeError(f"INCOMPLETE_CENSUS:{vid}")
 
-    def transact(self, fn, *args):
+    def transact(self, fn, *args, sender=None):
         name = fn.name if hasattr(fn, "name") else fn.fn_ast.name
+        sender = self.gov if sender is None else sender
         gas_before = boa.env.get_gas_used()
-        result = fn(*args, sender=self.gov)
-        assert result is not False, ("SOFT_FAILURE", name)
-        self.report.setdefault("fork_transactions", []).append({"target": str(fn.contract.address),
-            "method": name, "args": plain(args), "result": plain(result),
-            "execution_gas": boa.env.get_gas_used() - gas_before,
-            "block": boa.env.evm.patch.block_number})
-        self.save()
+        row = {"target": str(fn.contract.address), "method": name, "args": plain(args),
+               "sender": str(sender), "block": boa.env.evm.patch.block_number,
+               "state_rolled_back": False}
+        self.report.setdefault("fork_transactions", []).append(row)
+        try:
+            result = fn(*args, sender=sender)
+            row.update(call_reverted=False, result=plain(result))
+        except Exception as exc:
+            row.update(call_reverted=True, error=self.sanitized(error_text(exc)))
+            raise
+        finally:
+            row["execution_gas"] = boa.env.get_gas_used() - gas_before
+            self.save()
+        if result is False:
+            row["soft_failure"] = True
+            self.save()
+            raise RuntimeError("SOFT_FAILURE:" + name)
         return result
 
     def compatibility_probe(self):
@@ -493,7 +535,7 @@ class Rehearsal:
             audit = self.report["borrower_audit"]
             users, self.audit_candidates = remediation_sets(audit["users"], audit["locked_depositors"])
         else:
-            saved = json.loads((ROOT / "docs/chains/base/fork-rehearsal/borrower-blockers.json").read_text())
+            saved = self.read_saved_input(ROOT / "docs/chains/base/fork-rehearsal/borrower-blockers.json", "borrower_blockers")
             assert saved["source_block"] == self.block
             users, self.audit_candidates = remediation_sets(saved["affected_users"], saved["locked_depositors"])
         assert main_user.lower() in {u.lower() for u in users}, "main borrower status changed; review remediation"
@@ -628,9 +670,10 @@ class Rehearsal:
             results = []
             self.report["isolated_legacy_blocker_trials"] = results
             for user in selected:
-                with boa.env.anchor():
+                with self.diagnostic_branch("legacy_trial:" + user):
                     boa.env.time_travel(blocks=1, block_delta=2)
-                    row = {"user": user, "block": boa.env.evm.patch.block_number}
+                    row = {"user": user, "block": boa.env.evm.patch.block_number,
+                           "branch_id": "legacy_trial:" + user, "state_rolled_back": True}
                     try:
                         row["positions_moved"] = self.transact(echo.migrateLegacyRipeGovPositions, [user])
                         row["reverted"] = False
@@ -675,7 +718,7 @@ class Rehearsal:
     def stage(self, defaults_path):
         h, g = self.hq.address, ZERO
         defaults = self.deploy("BaseForkDefaults", self.old["MissionControl"].hrConfig()[0], path=defaults_path)
-        mc = self.deploy("MissionControl", h, defaults)
+        mc = self.deploy("MissionControl", h, defaults.address)
         self.report["config_comparison"] = {}
         old = self.old["MissionControl"]
         for n in ["genConfig", "genDebtConfig", "hrConfig", "ripeBondConfig", "rewardsConfig", "totalPointsAllocs"]:
@@ -920,18 +963,18 @@ def main():
         assert (a.borrower_audit or a.remediate_blockers) and a.legacy_probe
     if a.only_user:
         r.report["only_user"] = a.only_user
-    assert int(r.rpc_read("eth_chainId", []), 16) == 8453
-    header = r.rpc_read("eth_getBlockByNumber", [hex(a.block), False])
-    finalized = int(r.rpc_read("eth_getBlockByNumber", ["finalized", False])["number"], 16)
-    r.report["snapshot_finalized"] = a.block <= finalized
-    assert a.block <= finalized or a.allow_unfinalized_diagnostic, "snapshot not finalized"
-    r.report["block_hash"] = header["hash"]
     try:
+        assert int(r.rpc_read("eth_chainId", []), 16) == 8453
+        header = r.rpc_read("eth_getBlockByNumber", [hex(a.block), False])
+        finalized = int(r.rpc_read("eth_getBlockByNumber", ["finalized", False])["number"], 16)
+        r.report["snapshot_finalized"] = a.block <= finalized
+        assert a.block <= finalized or a.allow_unfinalized_diagnostic, "snapshot not finalized"
+        r.report["block_hash"] = header["hash"]
         with boa.fork(r.rpc, block_identifier=a.block):
             assert boa.env.evm.patch.chain_id == 8453
             r.inventory()
             if a.census_input:
-                cached = json.loads(a.census_input.read_text())
+                cached = r.read_saved_input(a.census_input, "census")
                 assert cached["block"] == a.block and cached["block_hash"] == header["hash"]
                 for vid, vault in r.report["vaults"].items():
                     assert cached["vaults"][str(vid)]["address"] == vault["address"]

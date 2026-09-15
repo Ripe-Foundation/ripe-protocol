@@ -113,7 +113,8 @@ def setValue(new_value: uint256):
         run.transact(contract.setValue, 12)
         assert contract.value() == 12
     assert contract.value() == 0
-    assert run.report["fork_transactions"][0]["reverted"] is True
+    assert run.report["fork_transactions"][0]["state_rolled_back"] is True
+    assert run.report["fork_transactions"][0]["call_reverted"] is False
     assert run.report["fork_transactions"][0]["branch_id"] == "alternate"
 
 

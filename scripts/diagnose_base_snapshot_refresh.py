@@ -61,6 +61,7 @@ def diagnose(run):
         assert results["150000"]["snapshot_after"] == before, "OLD_CAP_CHANGED_STATE"
         assert results["1500000"]["updated"] and results["direct"]["updated"], "NEW_CAP_OR_DIRECT_FAILED"
         assert results["1500000"]["snapshot_after"] != before, "NEW_CAP_DID_NOT_ADVANCE"
+        assert results["1500000"]["snapshot_after"] == results["direct"]["snapshot_after"], "CAPPED_DIRECT_SNAPSHOT_MISMATCH"
 
         # Install a full price registry for the unchanged live Teller's actual
         # housekeeping calls. Preserve the disabled slot and all other routes.
@@ -89,12 +90,12 @@ def diagnose(run):
         observations = []
         for _ in range(2):
             prior = tuple(source.priceConfigs(ASSET)[7])
-            teller.withdraw(ASSET, amount, USER, ZERO, 5, sender=USER)
+            run.transact(teller.withdraw, ASSET, amount, USER, ZERO, 5, sender=USER)
             after_withdraw = tuple(source.priceConfigs(ASSET)[7])
             assert after_withdraw != prior, "TELLER_WITHDRAW_SNAPSHOT_DID_NOT_ADVANCE"
             boa.env.time_travel(seconds=int(config[3]) + 1)
-            token.approve(teller.address, amount, sender=USER)
-            teller.deposit(ASSET, amount, USER, ZERO, 5, sender=USER)
+            run.transact(token.approve, teller.address, amount, sender=USER)
+            run.transact(teller.deposit, ASSET, amount, USER, ZERO, 5, sender=USER)
             after_deposit = tuple(source.priceConfigs(ASSET)[7])
             assert after_deposit != after_withdraw, "TELLER_DEPOSIT_SNAPSHOT_DID_NOT_ADVANCE"
             price = desk.getPrice(ASSET, True)
@@ -118,6 +119,7 @@ def main():
     load_dotenv(ROOT / ".env")
     run = Rehearsal(os.environ["BASE_MAINNET_RPC_URL"], BLOCK, args.report, overwrite=args.overwrite)
     run.report["input_fingerprint"] = fingerprint(ROOT)
+    run.report["constructor_profile"] = "isolated Base snapshot regression; retained live Teller; experimental timelocks"
     try:
         header = run.rpc_read("eth_getBlockByNumber", [hex(BLOCK), False])
         finalized = run.rpc_read("eth_getBlockByNumber", ["finalized", False])

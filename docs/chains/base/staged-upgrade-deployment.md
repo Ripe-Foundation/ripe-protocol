@@ -3,6 +3,12 @@
 Current review status and mandatory gates: [PR 231 review checklist](review-231.md).
 **Deployment remains blocked** by authentic CCIP history reconciliation and the
 open staging safety items in that checklist, including Stage 2 recovery.
+**Stage 3 is also blocked** pending the caller-underfunding snapshot policy and
+any necessary immutable PriceDesk enforcement change (D01). No such contract
+change is included in the owner-directed follow-up. Existing rerun support does
+not authorize regenerating Defaults after a partially completed Stage 2.
+Stage 2 must run from a frozen reviewed checkout; changes to any fingerprinted
+input require fresh verification before continuing.
 Evidence: [historical summary](fork-rehearsal/full-update-summary.md).
 Prepared cancellation (not executed): [Safe batch](cancel-pending-vaultbook.safe.json).
 

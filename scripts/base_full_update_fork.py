@@ -74,14 +74,20 @@ class DeploymentAdapter:
 
 
 class FullUpdate(Rehearsal):
+    def qualification_gap(self, reason):
+        self.report.setdefault("qualification_gaps", []).append(reason)
+        # Retain the old aggregate field for readers of historical reports.
+        self.report.setdefault("blockers", []).append(reason)
+
     def attempt(self, name, fn):
-        previous_failures = len(self.report.get("blockers", []))
+        previous_failures = len(self.report.get("execution_failures", []))
         try:
             fn()
-            if len(self.report.get("blockers", [])) > previous_failures:
+            if len(self.report.get("execution_failures", [])) > previous_failures:
                 raise RuntimeError("REQUIRED_CHILD_CHECK_FAILED:" + name)
             self.report.setdefault("checks", {})[name] = "passed"
         except Exception as e:
+            self.report.setdefault("execution_failures", []).append(name)
             self.report.setdefault("blockers", []).append(name)
             self.report.setdefault("checks", {})[name] = {
                 "error": self.sanitized(error_text(e))[:3000],
@@ -116,7 +122,7 @@ class FullUpdate(Rehearsal):
         # labelled zero or included in a claim of complete treasury migration.
         self.report["unresolved_transfer_log_tokens"] = unsupported
         if unsupported:
-            self.report.setdefault("blockers", []).append("UNRESOLVED_UNCALLABLE_TREASURY_LOG_TOKENS")
+            self.qualification_gap("UNRESOLVED_UNCALLABLE_TREASURY_LOG_TOKENS")
         self.report["treasury_before"] = self.treasury_before
         self.report["treasury_native_before"] = {n: boa.env.get_balance(self.old[n].address) for n in self.treasury_before}
         self.save()
@@ -230,7 +236,7 @@ class FullUpdate(Rehearsal):
             pending = self.hq.pendingAddrUpdate(i)
             if str(pending[0]).lower() != ZERO:
                 self.report.setdefault("live_pending_registry_changes", {})[i] = plain(pending)
-                self.report.setdefault("blockers", []).append("LIVE_PENDING_REGISTRY_UPDATE_REQUIRES_DECISION:" + str(i))
+                self.qualification_gap("LIVE_PENDING_REGISTRY_UPDATE_REQUIRES_DECISION:" + str(i))
                 assert self.diagnose_replacing_pending, ("LIVE_PENDING_UPDATE", i)
                 # Explicit fork-only alternate path, never a production plan.
                 self.transact(self.hq.cancelAddressUpdateToRegistry, i)
@@ -356,8 +362,8 @@ class FullUpdate(Rehearsal):
         self.report["post_activation_asset_prices"] = prices
         self.report["post_activation_price_outcomes"] = outcomes
         if any(p == 0 for p in prices.values()):
-            self.report.setdefault("blockers", []).append("ZERO_POST_ACTIVATION_PRICES")
-        self.report.setdefault("blockers", []).append("ORACLE_SNAPSHOT_WARMUP_AND_LIVE_STATE_REPLAY_NOT_QUALIFIED")
+            self.qualification_gap("ZERO_POST_ACTIVATION_PRICES")
+        self.qualification_gap("ORACLE_SNAPSHOT_WARMUP_AND_LIVE_STATE_REPLAY_NOT_QUALIFIED")
         self.save()
 
     def check_user_positions(self):
@@ -383,6 +389,11 @@ class FullUpdate(Rehearsal):
         for address in switchboards:
             charlies.update(self.registry_history_addresses(self.at("Switchboard", address), "Switchboard", 3))
         emitter_abis = {}
+        # Registry membership authenticates addresses, not historical ABI
+        # generations or their active periods. Current-signature replay is
+        # best-effort until that separate provenance has been established.
+        self.report["permission_history_coverage"] = "unknown"
+        self.qualification_gap("HISTORICAL_PERMISSION_ABI_GENERATIONS_NOT_AUTHENTICATED")
         for role, emitters in (("Teller", tellers), ("SwitchboardCharlie", charlies)):
             events = {("0x" + event_abi_to_log_topic(e).hex()).lower(): e
                       for e in self.manifest[role]["abi"] if e.get("type") == "event"
@@ -413,7 +424,7 @@ class FullUpdate(Rehearsal):
             assert tuple(new.userDelegation(user, delegate)) == tuple(config)
         self.report["permissions_replayed"] = {"users_checked": len(users), "nonzero_user_configs": config_count,
             "pairs_checked": len(pairs), "nonzero_delegations": delegation_count,
-            "coverage": "vault census plus HQ/Switchboard-authenticated emitter history; recorded manifest ABI event layouts"}
+            "coverage": "partial: vault census and current-signature events from authenticated emitters; historical generations unknown"}
         pending = {}
         controllers = {"HumanResources": self.old["HumanResources"]}
         for i, suffix in enumerate(("Alpha", "Bravo", "Charlie", "Delta", "Echo"), 1):
@@ -424,7 +435,7 @@ class FullUpdate(Rehearsal):
             pending[name] = {i: positional(row) for i, row in enumerate(rows, 1) if row[0] and row[2] >= self.block}
         self.report["live_pending_controller_actions"] = pending
         if any(pending.values()):
-            self.report.setdefault("blockers", []).append("LIVE_PENDING_CONTROLLER_ACTIONS_REQUIRE_REPROPOSAL_DECISION")
+            self.qualification_gap("LIVE_PENDING_CONTROLLER_ACTIONS_REQUIRE_REPROPOSAL_DECISION")
         hr = {name: {"old": getattr(self.old["HumanResources"], name)(), "new": getattr(self.new["HumanResources"], name)()}
               for name in ("getTotalCompensation", "getTotalClaimed")}
         assert all(row["old"] == row["new"] for row in hr.values()), "HR totals drift"
@@ -449,7 +460,7 @@ class FullUpdate(Rehearsal):
                 configs.append((user, tuple(config)))
         self.report["booster_consumption_blockers"] = consumed
         if consumed:
-            self.report.setdefault("blockers", []).append("ACTIVE_BOOSTER_UNITS_USED_CANNOT_BE_SEEDED_BY_EXISTING_GOV_API")
+            self.qualification_gap("ACTIVE_BOOSTER_UNITS_USED_CANNOT_BE_SEEDED_BY_EXISTING_GOV_API")
         delta = self.new["SwitchboardDelta"]
         for start in range(0, len(configs), 50):
             self.action(delta, delta.setManyBondBoosters, [config for _, config in configs[start:start + 50]])
@@ -495,7 +506,6 @@ class FullUpdate(Rehearsal):
 
     def stage_all(self, defaults):
         self.report["constructor_profile"] = "Base staged migrations; not cutover qualified"
-        self.report["input_fingerprint"] = fingerprint(ROOT, [defaults])
         adapter = DeploymentAdapter(self, defaults)
         for filename in ("2026091400_StageBaseUpgrade.py", "2026091401_StageBaseMissionControl.py",
                          "2026091402_StageBaseOraclesPsmReserves.py"):
@@ -533,6 +543,8 @@ def main():
 
 
 def execute_diagnostic(run, args):
+    run.report["input_fingerprint"] = fingerprint(ROOT, [args.defaults])
+    run.save()
     assert int(run.rpc_read("eth_chainId", []), 16) == 8453
     header = run.rpc_read("eth_getBlockByNumber", [hex(args.block), False])
     finalized = run.rpc_read("eth_getBlockByNumber", ["finalized", False])
