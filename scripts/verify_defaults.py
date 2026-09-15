@@ -211,6 +211,10 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
             f"got {chain_id!r}"
         )
     mission_control_abi = manifest["MissionControl"]["abi"]
+    hq = w3.eth.contract(address=hq_addr, abi=manifest["RipeHq"]["abi"])
+    active_mc = hq.functions.getAddr(5).call(block_identifier=block)
+    if active_mc.lower() != live_addr.lower():
+        raise VerificationError("manifest MissionControl is not the active HQ slot 5 at verification block")
     live = w3.eth.contract(address=live_addr, abi=mission_control_abi)
     live_function_names = _function_names(mission_control_abi)
 

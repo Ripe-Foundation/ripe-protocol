@@ -15,10 +15,15 @@ historical results unless it has actually been rerun with identified inputs.
   snapshots expired. Final replacement-Teller and full
   operation qualification remain separate. Do not call the whole upgrade qualified.
 - **C10/C11:** Complete representable MC readback is shared with the verifier.
-  Production preflight must still bind a fresh-finalized-block verification in a
-  separate process to the exact artifact, and reject any intervening artifact
-  change before the first broadcast. Never call `verify()` in the runner process:
-  it changes Boa's environment. Post-deployment drift recovery remains open.
+  Stage 2 now runs mandatory fresh-finalized-block verification in a separate
+  process, using the deployment RPC and exact selected Defaults path. It binds
+  contract/interface inputs, verifier scripts, configuration, the Stage 2 script
+  and canonical manifest by SHA-256; checks the block hash again; and rejects
+  intervening artifact changes before each deployment. The verifier also checks
+  that manifest MC is still active in HQ slot 5. It never calls `verify()` in the
+  runner process, which would replace Boa's environment. The fork adapter uses
+  its explicit historical pin and labels that evidence historical-only.
+  **Post-deployment drift recovery remains open.**
   Preserve every journal, receipt, source identity and candidate address. An
   interrupted Stage 2 must not be force-replayed, marked complete artificially,
   skipped, or retried against regenerated Defaults. An authenticated, tested
@@ -29,10 +34,23 @@ historical results unless it has actually been rerun with identified inputs.
   decode authenticated old-PriceDesk disable history for BlueChip at ID 3.
   Membership alone is not sufficient. Reconcile all later registry events at
   the selected finalized block; do not treat ID 10 as an existing source.
-- **C18:** Standard-runner scenarios remain required using isolated synthetic
-  histories: refusal with 2026082400/01 unfinished, acceptance with authentic
-  synthetic prerequisites, and interrupted Stage 2 recovery. Do not modify real
-  completion history to make tests or staging advance.
+- **C18:** Four isolated standard-runner ordering regressions now cover refusal
+  with 2026082400/01 unfinished and ordered staging acceptance after the runner
+  itself completes synthetic prerequisites. Their bodies intentionally do no
+  deployments: these prove routing/checkpoint behavior, not actual candidate
+  deployment or interrupted Stage 2 recovery. Those remaining lifecycle scenarios
+  still require coverage. Do not modify real completion history to advance.
+
+### Follow-up preflight validation
+
+- 30 focused preflight, verifier-coverage and review-safety tests passed.
+- 869 deployment tests passed (13 intentionally deselected), followed by four
+  additional standard-runner ordering tests passing.
+- The actual subprocess preflight passed against the existing Defaults artifact
+  at historical Base block **51,318,877**, hash
+  `0xc3fb0c9e51cbeb6472b2476c4576a755effcc9bfb98812d7734e2ba5eefac6a5`.
+  This was a read-only fork check, **not** fresh-finalized deployment clearance
+  or a rerun of the full upgrade rehearsal. No live transactions were sent.
 
 ## Implemented review changes (with scope limits)
 

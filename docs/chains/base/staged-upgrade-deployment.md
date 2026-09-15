@@ -2,7 +2,7 @@
 
 Current review status and mandatory gates: [PR 231 review checklist](review-231.md).
 **Deployment remains blocked** by authentic CCIP history reconciliation and the
-open staging safety items in that checklist, including Stage 2 preflight/recovery.
+open staging safety items in that checklist, including Stage 2 recovery.
 Evidence: [historical summary](fork-rehearsal/full-update-summary.md).
 Prepared cancellation (not executed): [Safe batch](cancel-pending-vaultbook.safe.json).
 
@@ -84,7 +84,7 @@ Review the generated Defaults, ABI, and provenance diff. If regeneration changed
 them, record the reviewed revision before Stage 2; confirm deployment uses that
 same source. If byte-identical, the existing source review still applies. Record
 candidate manifests and receipts after deployment. **The commands below remain
-blocked until the review checklist's preflight/recovery and runner gates close.**
+blocked until the review checklist's recovery and runner gates close.**
 
 ```sh
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091401 --single

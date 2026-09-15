@@ -21,10 +21,14 @@ def migrate(migration: Migration):
         raise RuntimeError("BASE_UPGRADE_MISSING_ACTIVE:MissionControl")
     old = migration.get_contract("MissionControl", active_address)
 
-    log.h1("2. Deploy the freshly generated defaults snapshot")
-    # Run prepare_defaults.py and verify_defaults.py immediately before this
-    # stage. This snapshot is NOT the final cutover configuration.
+    log.h1("2. Verify exact defaults in an isolated fork before any deployment")
+    verified = migration.verify_base_defaults()
+    log.info(f"Defaults preflight block {verified.block}: {verified.block_hash}")
+    # Never invoke the verifier's boa.fork inside this deployment process.
+    # This snapshot is NOT the final cutover configuration.
+    verified.require_unchanged()
     contributor = migration.deploy_bp("Contributor", label=f"Contributor{SUFFIX}")
+    verified.require_unchanged()
     defaults = migration.deploy(
         "DefaultsBaseLive",
         contributor.address,  # template for FUTURE contributors only
@@ -43,6 +47,7 @@ def migrate(migration: Migration):
             raise RuntimeError(f"BASE_UPGRADE_REFRESH_DEFAULTS:{getter}")
 
     log.h1("3. Deploy MissionControl using that snapshot")
+    verified.require_unchanged()
     candidate = migration.deploy(
         "MissionControl", hq.address, defaults.address,
         label=f"MissionControl{SUFFIX}",

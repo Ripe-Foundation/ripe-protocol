@@ -37,6 +37,17 @@ class DeploymentAdapter:
     def chain(self):
         return "base-mainnet"
 
+    def verify_base_defaults(self):
+        from scripts.utils.defaults_preflight import verify_before_deployment
+        verified = verify_before_deployment(
+            self.defaults, self.run.rpc, rehearsal_block=self.run.block)
+        self.run.report["defaults_preflight"] = {
+            "block": verified.block, "block_hash": verified.block_hash,
+            "mode": "historical-fork-only", "source_sha256": verified.hashes[str(verified.path)],
+        }
+        self.run.save()
+        return verified
+
     def blueprint(self):
         return BluePrint("base")
 
