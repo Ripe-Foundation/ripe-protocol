@@ -225,9 +225,6 @@ shouldCheckLastTouch: public(bool)
 isRipeGovVaultId: public(HashMap[uint256, bool])
 rewardVaultId: public(HashMap[address, uint256]) # asset -> vaultId, 0 = no earner
 accrualStartBlock: public(HashMap[address, HashMap[uint256, uint256]]) # asset -> vaultId -> start; max = armed
-initStep: public(uint256)
-
-defaults: immutable(address)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -247,8 +244,6 @@ def __init__(_ripeHq: address, _defaults: address):
     self.coreRipeGovVaultId = 2
     self.isRipeGovVaultId[2] = True
 
-    defaults = _defaults
-
     # defaults
     if _defaults != empty(address):
         self.genConfig = staticcall Defaults(_defaults).genConfig()
@@ -260,55 +255,34 @@ def __init__(_ripeHq: address, _defaults: address):
         self.trainingWheels = staticcall Defaults(_defaults).trainingWheels()
         self.shouldCheckLastTouch = staticcall Defaults(_defaults).shouldCheckLastTouch()
 
-        self.initStep = 1
-
-#################
-# Global Config #
-#################
-
-
-@external
-def initConfig() -> bool:
-    if defaults == empty(address):
-        return True
-
-    if self.initStep == 1:
-        ripeGovVaultConfigs: DynArray[cs.RipeGovVaultConfigEntry, 5] = staticcall Defaults(defaults).ripeGovVaultConfigs()
+        ripeGovVaultConfigs: DynArray[cs.RipeGovVaultConfigEntry, 5] = staticcall Defaults(_defaults).ripeGovVaultConfigs()
         for entry: cs.RipeGovVaultConfigEntry in ripeGovVaultConfigs:
             self.ripeGovVaultConfig[entry.asset] = entry.config
-        self.initStep = 2
-        return True
 
-    if self.initStep == 2:
-         # asset configs
-        assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(defaults).assetConfigs()
+        # asset configs
+        assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()
         for entry: cs.AssetConfigEntry in assetConfigs:
             self._setAssetConfig(entry.asset, entry.config)
             if len(entry.config.vaultIds) != 1:
                 assert entry.config.stakersPointsAlloc == 0 and entry.config.voterPointsAlloc == 0 # dev: multi-vault defaults cannot have allocs
-        self.initStep = 3
-        return True
 
-    if self.initStep == 3:
         # priority lists
-        self.priorityLiqAssetVaults = staticcall Defaults(defaults).priorityLiqAssetVaults()
-        self.priorityStabVaults = staticcall Defaults(defaults).priorityStabVaults()
+        self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
+        self.priorityStabVaults = staticcall Defaults(_defaults).priorityStabVaults()
         for vault: cs.VaultLite in self.priorityStabVaults:
             if vault.vaultId != 0:
                 self.isStabVaultId[vault.vaultId] = True
-        self.priorityPriceSourceIds = staticcall Defaults(defaults).priorityPriceSourceIds()
-        self.initStep = 4
-        return True
+        self.priorityPriceSourceIds = staticcall Defaults(_defaults).priorityPriceSourceIds()
 
-    if self.initStep == 4:
         # lite signers
-        liteSigners: DynArray[address, 10] = staticcall Defaults(defaults).liteSigners()
+        liteSigners: DynArray[address, 10] = staticcall Defaults(_defaults).liteSigners()
         for signer: address in liteSigners:
             self._addLiteSigner(signer)
-        self.initStep = 0 # done
 
-    return True
 
+#################
+# Global Config #
+#################
 
 
 @external

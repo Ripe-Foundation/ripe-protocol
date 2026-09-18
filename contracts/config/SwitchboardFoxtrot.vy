@@ -20,6 +20,8 @@ initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
+import interfaces.ConfigStructs as cs
+from interfaces import Defaults
 
 interface RipeReserveEngine:
     def setRateOverride(_targetBasePayoutRate: uint256, _targetEpoch: uint256) -> uint256: nonpayable
@@ -51,6 +53,23 @@ interface AuctionHouse:
     def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
 
 interface MissionControl:
+    def getRipeHq() -> address: view
+    def numAssets() -> uint256: view
+    def numLiteSigners() -> uint256: view
+    def setGeneralConfig(_config: cs.GenConfig): nonpayable
+    def setGeneralDebtConfig(_config: cs.GenDebtConfig): nonpayable
+    def setHrConfig(_config: cs.HrConfig): nonpayable
+    def setRipeBondConfig(_config: cs.RipeBondConfig): nonpayable
+    def setRipeRewardsConfig(_config: cs.RipeRewardsConfig): nonpayable
+    def setUnderscoreRegistry(_addr: address): nonpayable
+    def setTrainingWheels(_addr: address): nonpayable
+    def setShouldCheckLastTouch(_check: bool): nonpayable
+    def setAssetConfig(_asset: address, _config: cs.AssetConfig): nonpayable
+    def setRipeGovVaultConfig(_asset: address, _weight: uint256, _freeze: bool, _terms: cs.LockTerms): nonpayable
+    def setPriorityLiqAssetVaults(_vaults: DynArray[cs.VaultLite, 20]): nonpayable
+    def setPriorityStabVaults(_vaults: DynArray[cs.VaultLite, 20]): nonpayable
+    def setPriorityPriceSourceIds(_ids: DynArray[uint256, 10]): nonpayable
+    def setCanPerformLiteAction(_signer: address, _can: bool): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
 
 interface PriceDesk:
@@ -60,7 +79,16 @@ interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
 
 interface RipeHq:
+    def governance() -> address: view
     def getAddr(_regId: uint256) -> address: view
+
+# Defaults initialization is bound once per Foxtrot deployment, never retargetable.
+missionControl: public(address)
+defaults: public(address)
+initStep: public(uint256) # 0 unbound, 1 globals, 2 gov, 3 assets, 4 lists, 5 staged
+nextAssetIndex: public(uint256)
+rewardsInitialized: public(bool)
+
 
 flag ActionType:
     RESERVE_ENGINE_CONFIG
@@ -610,3 +638,67 @@ def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
         didUpdate=didUpdate,
     )
     return didUpdate
+
+
+# One-time configuration of an INACTIVE MissionControl candidate.
+@external
+def startDefaultsInitialization(_missionControl: address, _defaults: address):
+    hq: address = gov._getRipeHqFromGov()
+    assert msg.sender == staticcall RipeHq(hq).governance() # dev: HQ governance only
+    assert self.initStep == 0 # dev: already bound
+    assert _missionControl != empty(address) and _defaults != empty(address)
+    assert staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID) != _missionControl
+    assert staticcall MissionControl(_missionControl).getRipeHq() == hq
+    assert staticcall MissionControl(_missionControl).numAssets() == 1
+    assert staticcall MissionControl(_missionControl).numLiteSigners() == 1
+    self.missionControl = _missionControl
+    self.defaults = _defaults
+    self.initStep = 1
+
+
+@external
+def initConfig():
+    assert msg.sender == staticcall RipeHq(gov._getRipeHqFromGov()).governance() # dev: governance only
+    assert staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(5) != self.missionControl # dev: candidate only
+    assert 0 < self.initStep and self.initStep < 5 # dev: already staged
+    if self.initStep == 1:
+        extcall MissionControl(self.missionControl).setGeneralConfig(staticcall Defaults(self.defaults).genConfig())
+        extcall MissionControl(self.missionControl).setGeneralDebtConfig(staticcall Defaults(self.defaults).genDebtConfig())
+        extcall MissionControl(self.missionControl).setHrConfig(staticcall Defaults(self.defaults).hrConfig())
+        extcall MissionControl(self.missionControl).setRipeBondConfig(staticcall Defaults(self.defaults).ripeBondConfig())
+        extcall MissionControl(self.missionControl).setUnderscoreRegistry(staticcall Defaults(self.defaults).underscoreRegistry())
+        extcall MissionControl(self.missionControl).setTrainingWheels(staticcall Defaults(self.defaults).trainingWheels())
+        extcall MissionControl(self.missionControl).setShouldCheckLastTouch(staticcall Defaults(self.defaults).shouldCheckLastTouch())
+        self.initStep = 2
+    elif self.initStep == 2:
+        for entry: cs.RipeGovVaultConfigEntry in staticcall Defaults(self.defaults).ripeGovVaultConfigs():
+            extcall MissionControl(self.missionControl).setRipeGovVaultConfig(entry.asset, entry.config.assetWeight, entry.config.shouldFreezeWhenBadDebt, entry.config.lockTerms)
+        self.initStep = 3
+    elif self.initStep == 3:
+        entries: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(self.defaults).assetConfigs()
+        start: uint256 = self.nextAssetIndex
+        end: uint256 = min(start + 5, len(entries))
+        for i: uint256 in range(start, end, bound=5):
+            entry: cs.AssetConfigEntry = entries[i]
+            if len(entry.config.vaultIds) != 1:
+                assert entry.config.stakersPointsAlloc == 0 and entry.config.voterPointsAlloc == 0
+            extcall MissionControl(self.missionControl).setAssetConfig(entry.asset, entry.config)
+        self.nextAssetIndex = end
+        if end == len(entries):
+            self.initStep = 4
+    else:
+        extcall MissionControl(self.missionControl).setPriorityLiqAssetVaults(staticcall Defaults(self.defaults).priorityLiqAssetVaults())
+        extcall MissionControl(self.missionControl).setPriorityStabVaults(staticcall Defaults(self.defaults).priorityStabVaults())
+        extcall MissionControl(self.missionControl).setPriorityPriceSourceIds(staticcall Defaults(self.defaults).priorityPriceSourceIds())
+        for signer: address in staticcall Defaults(self.defaults).liteSigners():
+            extcall MissionControl(self.missionControl).setCanPerformLiteAction(signer, True)
+        self.initStep = 5
+
+
+@external
+def initRewards():
+    assert msg.sender == staticcall RipeHq(gov._getRipeHqFromGov()).governance() # dev: governance only
+    assert self.initStep == 5 and not self.rewardsInitialized # dev: once, after staging
+    assert staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(5) == self.missionControl # dev: confirm MC first
+    extcall MissionControl(self.missionControl).setRipeRewardsConfig(staticcall Defaults(self.defaults).rewardsConfig())
+    self.rewardsInitialized = True

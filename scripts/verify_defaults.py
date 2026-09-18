@@ -46,8 +46,8 @@ MISSION_CONTROL_SOURCE = "contracts/data/MissionControl.vy"
 LEDGER_SOURCE = "contracts/data/Ledger.vy"
 
 # Ledger is the second consumer of a generated defaults contract. Its
-# constructor copies exactly these three, and nothing else in the repo reads
-# Defaults besides it and MissionControl (`grep 'staticcall Defaults'`).
+# constructor copies exactly these three. The switchboard loader mirrors MC's
+# Defaults reads; the verifier exercises that loader before comparing MC.
 # tests/test_verify_defaults_coverage.py fails if that stops being true.
 LEDGER_GETTERS = (
     "ripeAvailForRewards",
@@ -231,17 +231,38 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     # Reuse the live template here so the verifier compares only snapshotted
     # configuration; the real migration intentionally supplies a fresh one.
     defaults = boa.load(str(defaults_path), live_call("hrConfig")[0])
-    replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, defaults.address)
-
-    # The constructor now leaves configuration loading to four bounded calls.
-    # Complete these on this isolated fork before comparing any live values.
-    for expected_step in (1, 2, 3, 4):
-        if replacement.initStep() != expected_step:
-            raise VerificationError(f"unexpected initialization step; expected {expected_step}")
-        replacement.initConfig()
-        expected_next = 0 if expected_step == 4 else expected_step + 1
-        if replacement.initStep() != expected_next:
-            raise VerificationError(f"initialization did not advance from step {expected_step}")
+    replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, "0x" + "00" * 20)
+    initializer = boa.load(
+        "contracts/config/SwitchboardFoxtrot.vy",
+        hq_addr, "0x" + "00" * 20, 1, 100,
+    )
+    fork_hq = boa.loads_abi(json.dumps(manifest["RipeHq"]["abi"])).at(hq_addr)
+    fork_sb = boa.loads_abi(json.dumps(manifest["Switchboard"]["abi"])).at(fork_hq.getAddr(6))
+    # Only the isolated fork is mutated. Use real registry permissions/delays.
+    with boa.env.prank(fork_hq.governance()):
+        initializer.startDefaultsInitialization(replacement.address, defaults.address)
+        fork_sb.startAddNewAddressToRegistry(initializer.address, "MC defaults initializer")
+        delay = int(fork_sb.registryChangeTimeLock())
+        if delay:
+            boa.env.time_travel(blocks=delay, block_delta=2)
+        fork_sb.confirmNewAddressToRegistry(initializer.address)
+        for _ in range(13):
+            if initializer.initStep() == 5:
+                break
+            initializer.initConfig(gas=16_000_000)
+        if initializer.initStep() != 5:
+            raise VerificationError("defaults initialization incomplete")
+        pending = fork_hq.pendingAddrUpdate(5)
+        if int(str(pending[0]), 16):
+            raise VerificationError("pending MissionControl replacement requires reconciliation")
+        fork_hq.startAddressUpdateToRegistry(5, replacement.address)
+        delay = int(fork_hq.registryChangeTimeLock())
+        if delay:
+            boa.env.time_travel(blocks=delay, block_delta=2)
+        fork_hq.confirmAddressUpdateToRegistry(5)
+        initializer.initRewards(gas=16_000_000)
+        if not initializer.rewardsInitialized():
+            raise VerificationError("rewards initialization incomplete")
 
     mismatches: list[tuple[str, object, object]] = []
     compared = 0

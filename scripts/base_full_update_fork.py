@@ -59,7 +59,27 @@ class DeploymentAdapter:
     def deploy(self, name, *args, label):
         key = label.removesuffix(SUFFIX)
         path = self.defaults if name == "DefaultsBaseLive" else next((ROOT / "contracts").rglob(name + ".vy"))
-        return self.run.deploy(key, *args, path=path)
+        contract = self.run.deploy(key, *args, path=path)
+        if key == "SwitchboardFoxtrotWithDefaults":
+            # Keep the Stage 1 deployment record, but use its updated replacement
+            # when populating the candidate Switchboard's Foxtrot slot.
+            self.run.new["SwitchboardFoxtrot"] = contract
+            self.run.transact(contract.startDefaultsInitialization,
+                              self.run.new["MissionControl"].address,
+                              self.run.new["DefaultsBaseLive"].address)
+            # Fork-only governance rehearsal; the live migration waits for Safe.
+            sb = self.run.at("Switchboard", self.run.hq.getAddr(6))
+            self.run.transact(sb.startAddNewAddressToRegistry, contract.address, "MC defaults initializer")
+            delay = int(sb.registryChangeTimeLock())
+            if delay:
+                boa.env.time_travel(blocks=delay, block_delta=2)
+            self.run.transact(sb.confirmNewAddressToRegistry, contract.address)
+            for _ in range(13): # globals + gov + at most ten asset batches + lists
+                if contract.initStep() == 5:
+                    break
+                self.run.transact(contract.initConfig)
+            assert contract.initStep() == 5
+        return contract
 
     def deploy_bp(self, name, *, label):
         path = next((ROOT / "contracts").rglob(name + ".vy"))
@@ -248,6 +268,13 @@ class FullUpdate(Rehearsal):
             boa.env.time_travel(blocks=delay, block_delta=2)
         for i in [8, 5, 6, 7] + [i for i in replacements if i not in (8, 5, 6, 7)]:
             self.transact(self.hq.confirmAddressUpdateToRegistry, i)
+            if i == 5:
+                # Still authorized in the OLD Switchboard, before slot 6 changes.
+                initializer = self.new["SwitchboardFoxtrotWithDefaults"]
+                self.transact(initializer.initRewards)
+                assert initializer.rewardsInitialized()
+                assert tuple(self.new["MissionControl"].rewardsConfig()) == tuple(
+                    self.new["DefaultsBaseLive"].rewardsConfig())
         for i, name in enumerate(("VaultMigrator", "RipeReserveEngine", "RipeReserveVesting"), 25):
             self.transact_expect(i, self.hq.confirmNewAddressToRegistry, self.new[name].address)
         ledger = self.old["Ledger"]

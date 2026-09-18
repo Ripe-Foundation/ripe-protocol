@@ -26,7 +26,9 @@ unpause contracts. Deployment is not approval for cutover.
    AuctionHouseNFT; Boardroom; CreditRedeem; TellerUtils; EndaomentFunds;
    BondBooster; BondRoom; CreditEngine; HumanResources; Lootbox; Teller; Deleverage; Endaoment.
 2. `2026091401_StageBaseMissionControl.py`: a candidate Contributor blueprint,
-   DefaultsBaseLive and MissionControl. Existing contributor contracts remain.
+   DefaultsBaseLive, empty MissionControl, and a replacement SwitchboardFoxtrot
+   with a one-time defaults loader.
+   Existing contributor contracts remain.
    This is separate because its configuration snapshot can become stale while
    ordinary contract deployment is taking place. Generate and verify the
    snapshot immediately before running this stage. No Ledger is deployed.
@@ -77,7 +79,7 @@ decision is made, run only the selected stage:
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091400 --single
 ```
 
-For the config stage, choose a fresh finalized Base block and use the existing
+For a NEW config stage, choose a fresh finalized Base block and use the existing
 snapshot tools (replace BLOCK with the actual block number):
 
 ```sh
@@ -103,6 +105,58 @@ the same history prerequisite. Preserve and commit the resulting candidate
 manifests and the generated defaults provenance after real deployment.
 
 ## Required later cutover work
+
+### Stage 2 continuation after the partial live deployment
+
+Do not regenerate Defaults or discard the deployment journal. Contributor
+`0x57f64a8FA104c18dE76dEe6817E45Cf43b6B459E` and DefaultsBaseLive
+`0x249c4798C49Fc8Ad86a43dC425D80396971E7AcC` already deployed.
+The resumed migration reuses them, deploys the unchanged MissionControl with a
+zero Defaults argument, and deploys updated Foxtrot under the new label
+`SwitchboardFoxtrotWithDefaultsBaseUpgradeCandidate20260914`.
+The Stage 1 Foxtrot deployment remains recorded but is superseded for cutover;
+populate the replacement Switchboard's Foxtrot slot with this NEW address.
+Golf is unchanged: adding the loader there exceeded the runtime size limit.
+
+Resume only this unfinished stage from the repository root:
+
+```sh
+python -m scripts.migrate --profile base-mainnet --start-timestamp 2026091401 --single
+```
+
+Do not use `--force-replay` / `--is-retry`, restart Stage 1, or delete the
+`2026091401-log.json` / pending manifest. The first two deployment calls stay
+in the same journal slots and are skipped after authenticating their records.
+
+The migration deliberately stops with `BASE_MC_AWAITING_SAFE_INIT` until:
+
+1. Governance registers the printed replacement Foxtrot address in the CURRENT active
+   Switchboard: `startAddNewAddressToRegistry`, wait its registry delay, then
+   `confirmNewAddressToRegistry`.
+2. Governance calls `foxtrot.startDefaultsInitialization(candidateMC, deployedDefaults)`
+   once. Both addresses are then permanently bound for this deployment.
+   Governance calls `foxtrot.initConfig()` until `initStep() == 5`.
+   Each call is independently committed; asset calls copy at most five entries.
+   For the current 27 assets this is nine calls in total. Split Safe batches
+   to respect the transaction gas ceiling; do not put all nine in one batch.
+3. Resume Stage 2 normally (no force-replay). It checks every represented MC
+   config against live, except rewards, which must still be zero. It separately
+   verifies the saved rewards defaults match live. Drift blocks continuation;
+   do not edit the already-deployed Defaults to bypass it.
+
+At the separately approved cutover, confirm HQ slot 5 first, then call
+`foxtrot.initRewards()`, then confirm the replacement Switchboard (slot 6).
+Keep these ordered in the same Safe batch where possible, and do not reopen
+user operations before rewards readback matches Defaults. If slot 6 is changed
+first, the initializer must also be registered there before it can set rewards.
+The reward setter requires MC to be active; the initializer enforces that
+condition and allows the reward copy only once. Loading other defaults is
+disabled once MC is active. Keep updated Foxtrot registered in the new
+Switchboard for its normal reserve/auction governance functions.
+
+No user positions or historical Ledger state are copied by this loader.
+
+### Remaining cutover requirements
 
 - Refresh/reconcile MissionControl's entire live configuration, including asset
   configs, governance lock terms, reward routes, signers and migration topology.
