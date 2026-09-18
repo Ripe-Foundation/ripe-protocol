@@ -1,0 +1,477 @@
+{
+  "kind": "external_completion_reconciliation",
+  "chain_id": 8453,
+  "block": 51478064,
+  "block_hash": "0xf3b636d9074449fddd62a81a5dcb3c6092972103da9f492ccf5a707d861947f3",
+  "finalized": true,
+  "live_writes": false,
+  "verification": "passed",
+  "source_commit": "56d248e774bc44a61c5eb61ddb1a424ff617e99a",
+  "input_sha256": {
+    "migration_history/base-mainnet/v1/current-manifest.json": "90dc26ec5c854e5c7f46429c4020a997864bbfeeff2ba7f766a541839e791e09",
+    "migration_history/robinhood-mainnet/v1/current-manifest.json": "0c693f5cf6255c65412bd39086aefa1a7714b497fe363f4bd82b9069412696cc",
+    "scripts/utils/ccip.py": "14dfefc59381bfff1819c8e03e91ddf3c158981e2d3de96d58de8ca26645c7af",
+    "config/Ccip.py": "efe357cf18f8d0a0075faeb47b4f1522f8e66b6492b2a607d9342b9352317930",
+    "scripts/check_base_ccip_external_completion.py": "7ad44f5d96f05f9c832cfdde773f241256fef2ef3086dc65ea1517b3a4a37d15"
+  },
+  "operator_attestation": "CCIP ran on the old migration system; operator requested recording completion.",
+  "scope": "Current finalized activation state matches existing checker; not a claim these new migration bodies executed. Original transaction receipts are not reconstructed.",
+  "reconciled_steps": [
+    "2026082400",
+    "2026082401"
+  ],
+  "reads": [
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "governance",
+      "args": [],
+      "result": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf"
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "numAddrs",
+      "args": [],
+      "result": 25
+    },
+    {
+      "target": "0x6f6C373d09C07425BaAE72317863d7F6bb731e37",
+      "method": "getTokenConfig",
+      "args": [
+        "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0"
+      ],
+      "result": [
+        "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+        "0x0000000000000000000000000000000000000000",
+        "0x6E3f8465aF365a2C400C361783ea51ad44b3C836"
+      ]
+    },
+    {
+      "target": "0x6f6C373d09C07425BaAE72317863d7F6bb731e37",
+      "method": "getPool",
+      "args": [
+        "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0"
+      ],
+      "result": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836"
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getToken",
+      "args": [],
+      "result": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0"
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getRouter",
+      "args": [],
+      "result": "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD"
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getRmnProxy",
+      "args": [],
+      "result": "0xC842c69d54F83170C42C4d556B4F6B2ca53Dd3E8"
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "owner",
+      "args": [],
+      "result": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf"
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getTokenDecimals",
+      "args": [],
+      "result": 18
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getAllowListEnabled",
+      "args": [],
+      "result": false
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getAllowList",
+      "args": [],
+      "result": []
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "typeAndVersion",
+      "args": [],
+      "result": "BurnMintTokenPool 1.5.1"
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "canMintGreen",
+      "args": [],
+      "result": false
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "canMintRipe",
+      "args": [],
+      "result": true
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getSupportedChains",
+      "args": [],
+      "result": [
+        6180753054346819000
+      ]
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "isSupportedChain",
+      "args": [
+        6180753054346819000
+      ],
+      "result": true
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getRemotePools",
+      "args": [
+        6180753054346819000
+      ],
+      "result": [
+        "0x000000000000000000000000e51af1311832818a6d366081fc535ca56357a6ee"
+      ]
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getRemoteToken",
+      "args": [
+        6180753054346819000
+      ],
+      "result": "0x0000000000000000000000004d3f37a965b21ab4122e92dd41d2693e742c883b"
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getCurrentOutboundRateLimiterState",
+      "args": [
+        6180753054346819000
+      ],
+      "result": [
+        0,
+        1789745475,
+        false,
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getCurrentInboundRateLimiterState",
+      "args": [
+        6180753054346819000
+      ],
+      "result": [
+        0,
+        1789745475,
+        false,
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+      "method": "getRateLimitAdmin",
+      "args": [],
+      "result": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "getRegId",
+      "args": [
+        "0x6E3f8465aF365a2C400C361783ea51ad44b3C836"
+      ],
+      "result": 23
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "getAddr",
+      "args": [
+        23
+      ],
+      "result": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836"
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "hqConfig",
+      "args": [
+        23
+      ],
+      "result": [
+        "RIPE CCIP Pool",
+        false,
+        true,
+        false
+      ]
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "hasPendingHqConfigChange",
+      "args": [
+        23
+      ],
+      "result": false
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "pendingNewAddr",
+      "args": [
+        "0x6E3f8465aF365a2C400C361783ea51ad44b3C836"
+      ],
+      "result": [
+        "",
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "pendingAddrUpdate",
+      "args": [
+        23
+      ],
+      "result": [
+        "0x0000000000000000000000000000000000000000",
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "pendingAddrDisable",
+      "args": [
+        23
+      ],
+      "result": [
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0x6f6C373d09C07425BaAE72317863d7F6bb731e37",
+      "method": "getTokenConfig",
+      "args": [
+        "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707"
+      ],
+      "result": [
+        "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+        "0x0000000000000000000000000000000000000000",
+        "0xEF56E5036728718Baa577257Ff4FA9259E9e895f"
+      ]
+    },
+    {
+      "target": "0x6f6C373d09C07425BaAE72317863d7F6bb731e37",
+      "method": "getPool",
+      "args": [
+        "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707"
+      ],
+      "result": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f"
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getToken",
+      "args": [],
+      "result": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707"
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getRouter",
+      "args": [],
+      "result": "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD"
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getRmnProxy",
+      "args": [],
+      "result": "0xC842c69d54F83170C42C4d556B4F6B2ca53Dd3E8"
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "owner",
+      "args": [],
+      "result": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf"
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getTokenDecimals",
+      "args": [],
+      "result": 18
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getAllowListEnabled",
+      "args": [],
+      "result": false
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getAllowList",
+      "args": [],
+      "result": []
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "typeAndVersion",
+      "args": [],
+      "result": "BurnMintTokenPool 1.5.1"
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "canMintGreen",
+      "args": [],
+      "result": true
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "canMintRipe",
+      "args": [],
+      "result": false
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getSupportedChains",
+      "args": [],
+      "result": [
+        6180753054346819000
+      ]
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "isSupportedChain",
+      "args": [
+        6180753054346819000
+      ],
+      "result": true
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getRemotePools",
+      "args": [
+        6180753054346819000
+      ],
+      "result": [
+        "0x0000000000000000000000004b19f165bb1ce3f19bbe828d150706b9deeeec95"
+      ]
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getRemoteToken",
+      "args": [
+        6180753054346819000
+      ],
+      "result": "0x000000000000000000000000355bb7f0f6c730e4460d620420a300fa08ff82f3"
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getCurrentOutboundRateLimiterState",
+      "args": [
+        6180753054346819000
+      ],
+      "result": [
+        0,
+        1789745475,
+        false,
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getCurrentInboundRateLimiterState",
+      "args": [
+        6180753054346819000
+      ],
+      "result": [
+        0,
+        1789745475,
+        false,
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+      "method": "getRateLimitAdmin",
+      "args": [],
+      "result": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "getRegId",
+      "args": [
+        "0xEF56E5036728718Baa577257Ff4FA9259E9e895f"
+      ],
+      "result": 24
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "getAddr",
+      "args": [
+        24
+      ],
+      "result": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f"
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "hqConfig",
+      "args": [
+        24
+      ],
+      "result": [
+        "GREEN CCIP Pool",
+        true,
+        false,
+        false
+      ]
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "hasPendingHqConfigChange",
+      "args": [
+        24
+      ],
+      "result": false
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "pendingNewAddr",
+      "args": [
+        "0xEF56E5036728718Baa577257Ff4FA9259E9e895f"
+      ],
+      "result": [
+        "",
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "pendingAddrUpdate",
+      "args": [
+        24
+      ],
+      "result": [
+        "0x0000000000000000000000000000000000000000",
+        0,
+        0
+      ]
+    },
+    {
+      "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "method": "pendingAddrDisable",
+      "args": [
+        24
+      ],
+      "result": [
+        0,
+        0
+      ]
+    }
+  ]
+}

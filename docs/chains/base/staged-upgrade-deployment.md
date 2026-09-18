@@ -1,8 +1,9 @@
 # Base: deploy now, migrate later
 
 Current review status and mandatory gates: [PR 231 review checklist](review-231.md).
-**Deployment remains blocked** by authentic CCIP history reconciliation and the
-open staging safety items in that checklist, including Stage 2 recovery.
+**The CCIP history prerequisite is reconciled** as of 2026-09-18; Stage 1 now
+passes the runner's start-point guard. This is not full deployment qualification
+or PR approval. Stage 2 recovery and the other review items remain open.
 **Stage 3 is also blocked** pending the caller-underfunding snapshot policy and
 any necessary immutable PriceDesk enforcement change (D01). No such contract
 change is included in the owner-directed follow-up. Existing rerun support does
@@ -56,22 +57,21 @@ a collateral source. The diagnostic retains legacy slot 6 during the UI handoff;
 requiring a replacement collateral oracle for Aero was an overstatement, not a
 cutover blocker. Coordinate the frontend monitor address separately.
 
-## Current runner prerequisite — do not bypass
+## Runner prerequisite — reconciled from the old system
 
-Live Base CCIP activation was fully revalidated using the existing read-only
-finalization checker at block **51,316,959**: registry routing, pool ownership,
-mint capabilities, Robinhood peer configuration and rate policies all passed.
-This prerequisite is local completion-history reconciliation, **not missing live
-CCIP setup**. Do not redeploy or reconfigure working CCIP to repair bookkeeping.
+On 2026-09-18 the operator confirmed completion under the former migration system
+and authorized history reconciliation. The existing read-only finalization
+checker passed at finalized Base block **51,478,064**, including routing,
+ownership, mint capabilities, Robinhood peer settings and rate policies.
+[Reconciliation record](../../../migration_history/base-mainnet/v1/ccip-external-completion-20260918.md)
+links the detailed readback evidence. The two empty deployment maps for
+`2026082400`/`2026082401` attribute no new contracts to this reconciliation;
+canonical addresses and earlier history are unchanged. Original receipts are not
+reconstructed, and the newer migration bodies were not run.
 
-The checked-in Base history ends at `2026081200`. The standard runner therefore
-requires `2026082400_CcipWirePlan` and `2026082401_CcipActivationFinalized` before
-these new migrations. The first CCIP migration contains live writes; do not
-run it merely to reach this upgrade. Reconcile the actual CCIP deployment
-history or explicitly plan its completion first. Do not fabricate completion
-markers, use force-replay, or remove the runner's history guard.
-
-After that prerequisite is genuinely resolved, run only the selected stage:
+The normal start-point guard now accepts Stage 1. Do not rerun CCIP wiring,
+force-replay it, or remove the history guard. Once the separate Stage 1 readiness
+decision is made, run only the selected stage:
 
 ```sh
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091400 --single
