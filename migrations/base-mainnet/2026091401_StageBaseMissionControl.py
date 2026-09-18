@@ -57,7 +57,11 @@ def migrate(migration: Migration):
         raise RuntimeError(f"BASE_UPGRADE_RUNTIME_SIZE:MissionControl:{size}")
     log.info(f"STAGED ONLY MissionControl: {candidate.address}")
 
+    while candidate.initStep() != 0:
+        candidate.initConfig()
+
     log.h1("4. Compare the staged configuration with the live configuration")
+
     def compare(field, actual, expected):
         if _normalize(actual) != _normalize(expected):
             raise RuntimeError(f"BASE_UPGRADE_CONFIG_DRIFT:{field}")

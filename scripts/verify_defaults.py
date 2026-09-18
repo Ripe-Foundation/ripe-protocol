@@ -233,6 +233,16 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     defaults = boa.load(str(defaults_path), live_call("hrConfig")[0])
     replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, defaults.address)
 
+    # The constructor now leaves configuration loading to four bounded calls.
+    # Complete these on this isolated fork before comparing any live values.
+    for expected_step in (1, 2, 3, 4):
+        if replacement.initStep() != expected_step:
+            raise VerificationError(f"unexpected initialization step; expected {expected_step}")
+        replacement.initConfig()
+        expected_next = 0 if expected_step == 4 else expected_step + 1
+        if replacement.initStep() != expected_next:
+            raise VerificationError(f"initialization did not advance from step {expected_step}")
+
     mismatches: list[tuple[str, object, object]] = []
     compared = 0
 
