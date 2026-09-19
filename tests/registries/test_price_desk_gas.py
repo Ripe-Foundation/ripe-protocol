@@ -6,7 +6,7 @@ import pytest
 from config.robinhood_launch import STALE_WINDOW_GLOBAL
 from conf_utils import advance_timelock_blocks
 from registries.price_desk_gas_helpers import cold_trial
-from test_vault_pointer_runtime_sizes import EXPECTED_RUNTIME_BYTES
+from runtime_sizes import EXPECTED_RUNTIME_BYTES
 from constants import (
     BLUE_CHIP_PROTOCOL_MORPHO,
     BLUE_CHIP_PROTOCOL_MORPHO_V2,
@@ -648,6 +648,7 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
 
     _set_priorities(mission_control, switchboard_alpha, [1, 2, 3])
     boundary_results = {}
+    warm_results = {}
     for price_limit in range(80_000, 250_001, 10_000):
         boundary_desk = _isolated_price_desk(
             ripe_hq,
@@ -655,6 +656,11 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
             [*no_feed_sources, mock_price_source, curve],
             price_limit=price_limit,
         )
+        # Retain a warm comparison to distinguish code cost from the cold
+        # measurement correction. Only the cold result qualifies the allowance.
+        warm_results[price_limit] = boundary_desk.getPrice(
+            curve_system, False, gas=6_000_000,
+        ) == EIGHTEEN_DECIMALS
         with cold_trial(boundary_desk, curve, *no_feed_sources):
             boundary_results[price_limit] = (
                 boundary_desk.getPrice(
@@ -675,11 +681,15 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
         f"four_coin_nested_behind_nine_hostile={hostile_curve_gas}",
         f"four_coin_has_feed_final_position={curve_feed_gas}",
         f"forwarded_boundary_10k_resolution={minimum_success}",
+        f"warm_boundary_10k_resolution={min(limit for limit, ok in warm_results.items() if ok)}",
+        f"cold_margin={250_000 / minimum_success:.4f}",
         f"boundary_results={boundary_results}",
         "source_slots=10",
         "outer_limit=6000000",
     )
     assert minimum_success == 160_000  # cold pre-state, 10k sweep resolution
+    assert min(limit for limit, ok in warm_results.items() if ok) == 120_000
+    assert 3 * minimum_success <= 2 * 250_000  # at least 1.5x cold source margin
     assert all(succeeded == (limit >= minimum_success) for limit, succeeded in boundary_results.items())
     assert curve_gas < 2_000_000
     assert one_hostile_curve_gas < 3_000_000

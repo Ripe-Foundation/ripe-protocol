@@ -1,6 +1,7 @@
 """Source availability, permission checks and cold funding boundary cases."""
 import boa
 import pytest
+from eth_abi import encode
 
 from conf_utils import filter_logs
 from registries.price_desk_gas_helpers import cold_trial, calls_to, CallGasMeter
@@ -652,3 +653,187 @@ def convertToAssets(amount: uint256) -> uint256:
             reply = calls_to(desk._computation, wrapped)[0]
             assert not reply.is_error
             assert (reply.msg.gas < 250_000) == (limit == 150_000)
+
+
+@pytest.mark.parametrize("override", (False, True))
+def test_asset_snapshot_underfunded_feed_check_never_calls_source(
+    ripe_hq, deploy3r, teller, override,
+):
+    source = boa.loads(SNAPSHOT_SOURCE)
+    source.configure(True, 0)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [source])
+    if override:
+        desk.setSourceGasBudgets(source, 0, 0, 200_000, sender=deploy3r)
+    with cold_trial(desk, source):
+        with boa.reverts("insufficient source gas"):
+            desk.addPriceSnapshot(ETH, sender=teller.address, gas=150_000 if override else 50_000)
+        assert not calls_to(desk._computation, source)
+        assert source.count() == 0
+        assert not desk._computation.get_log_entries()
+    with cold_trial(desk, source):
+        assert desk.addPriceSnapshot(ETH, sender=teller.address, gas=1_000_000)
+        source_calls = calls_to(desk._computation, source)
+        assert len(source_calls) == 2
+        assert source_calls[0].msg.is_static
+        assert source_calls[0].msg.gas == (200_000 if override else 75_000)
+        assert source_calls[1].msg.gas == 150_000
+        assert source.count() == 1
+
+
+def test_asset_snapshot_underfunded_later_feed_check_rolls_back_prior_snapshot(
+    ripe_hq, deploy3r, teller,
+):
+    prior, source = boa.loads(SNAPSHOT_SOURCE), boa.loads(SNAPSHOT_SOURCE)
+    for item in (prior, source):
+        item.configure(True, 0)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [prior, source])
+    desk.setSourceGasBudgets(source, 0, 0, 1_000_000, sender=deploy3r)
+    with cold_trial(desk, prior, source):
+        with boa.reverts("insufficient source gas"):
+            desk.addPriceSnapshot(ETH, sender=teller.address, gas=500_000)
+        result = desk._computation
+        assert any(not call.msg.is_static for call in calls_to(result, prior))
+        assert not calls_to(result, source)
+        assert prior.count() == source.count() == 0
+        assert not result.get_log_entries()
+    with cold_trial(desk, prior, source):
+        assert desk.addPriceSnapshot(ETH, sender=teller.address, gas=2_000_000)
+        assert prior.count() == source.count() == 1
+
+
+@pytest.mark.parametrize("override", (False, True))
+def test_permissionless_sync_token_scale_requires_effective_feed_budget(
+    ripe_hq, deploy3r, bob, alpha_token, override,
+):
+    source = _raw_source(10**18, True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [source])
+    if override:
+        desk.setSourceGasBudgets(source, 0, 0, 200_000, sender=deploy3r)
+    with cold_trial(desk, source, alpha_token):
+        with boa.reverts("insufficient source gas"):
+            desk.syncTokenScale(alpha_token, sender=bob, gas=150_000 if override else 50_000)
+        result = desk._computation
+        assert not calls_to(result, source) and not calls_to(result, alpha_token)
+        assert not result.get_log_entries()
+        assert desk.tokenScale(alpha_token) == 0
+    with cold_trial(desk, source, alpha_token):
+        desk.syncTokenScale(alpha_token, sender=bob, gas=1_000_000)
+        assert calls_to(desk._computation, source)[0].msg.gas == (200_000 if override else 75_000)
+        assert len(filter_logs(desk, "TokenScaleSet")) == 1
+        assert desk.tokenScale(alpha_token) == 10 ** alpha_token.decimals()
+        with boa.reverts("already set"):
+            desk.syncTokenScale(alpha_token, sender=bob, gas=1_000_000)
+
+
+@pytest.mark.parametrize("method", ("getUsdValue", "getAssetAmount", "getEthUsdValue", "getEthAmount"))
+@pytest.mark.parametrize("failure", ("zero_with_feed", "invalid_reply", "revert", "out_of_gas"))
+def test_non_strict_conversion_helpers_propagate_stable_funding_error(
+    ripe_hq, deploy3r, mission_control, switchboard_alpha, alpha_token, method, failure,
+):
+    if failure == "out_of_gas":
+        source = _gas_source(price_iterations=1_000_000, exhaust_price=True)
+    elif failure == "revert":
+        source = _raw_source(price_mode=1)
+    else:
+        source = _raw_source(0, True) if failure == "zero_with_feed" else _raw_source(1, False)
+    fallback = _raw_source(10**18, True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [source, fallback])
+    _set_priorities(mission_control, switchboard_alpha, [1, 2])
+    desk.syncTokenScale(alpha_token, sender=deploy3r)
+    token_unit = 10 ** alpha_token.decimals()
+    args, expected = {
+        "getUsdValue": ((alpha_token, token_unit), 10**18),
+        "getAssetAmount": ((alpha_token, 10**18), token_unit),
+        "getEthUsdValue": ((10**18,), 10**18),
+        "getEthAmount": ((10**18,), 10**18),
+    }[method]
+    # The default selector is non-strict. Pin the complete external Error(string)
+    # encoding so callers can depend on this error across every helper path.
+    data = getattr(desk, method).prepare_calldata(*args)
+    for gas in (100_000, 1_000_000):
+        with cold_trial(desk, source, fallback):
+            result = boa.env.execute_code(to_address=desk.address, data=data, gas=gas, is_modifying=False)
+            source_call = calls_to(result, source)[0]
+            if gas == 100_000:
+                assert result.is_error
+                assert result.output == bytes.fromhex("08c379a0") + encode(["string"], [FUNDING_ERROR.decode()])
+                assert source_call.msg.gas < DEFAULTS[0]
+                assert not calls_to(result, fallback)
+            else:
+                assert not result.is_error and int.from_bytes(result.output, "big") == expected
+                assert source_call.msg.gas == DEFAULTS[0]
+                assert len(calls_to(result, fallback)) == 1
+
+
+LEGACY_DESK_WITHOUT_RELAY = '''# @version 0.4.3
+@view
+@external
+def getAddr(id: uint256) -> address:
+    return empty(address)
+@external
+def addPriceSnapshot(asset: address) -> bool:
+    return False
+'''
+
+
+def test_new_teller_requires_price_desk_relay_before_activation(
+    ripe_hq, price_desk, teller, governance, deleverage, alice, ledger,
+):
+    legacy = boa.loads(LEGACY_DESK_WITHOUT_RELAY)
+    ripe_hq.startAddressUpdateToRegistry(7, legacy, sender=governance.address)
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
+    assert ripe_hq.confirmAddressUpdateToRegistry(7, sender=governance.address)
+    before = ledger.lastTouch(alice)
+    with cold_trial(teller, legacy):
+        with boa.reverts():
+            teller.performHousekeeping(False, alice, False, sender=deleverage.address, gas=2_000_000)
+        result = teller._computation
+        relay_calls = calls_to(result, legacy)
+        assert len(relay_calls) == 1 and relay_calls[0].is_error
+        assert relay_calls[0].msg.data[:4] == price_desk.addGreenRefPoolSnapshot.prepare_calldata(2)[:4]
+        assert not result.get_log_entries()
+        assert ledger.lastTouch(alice) == before
+    # Confirm the compatible desk while user operations remain closed. Only
+    # after slot 7 is compatible may the new Teller be activated/opened.
+    ripe_hq.startAddressUpdateToRegistry(7, price_desk, sender=governance.address)
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
+    assert ripe_hq.confirmAddressUpdateToRegistry(7, sender=governance.address)
+    with cold_trial(teller, price_desk):
+        teller.performHousekeeping(False, alice, False, sender=deleverage.address, gas=2_000_000)
+        assert not filter_logs(teller, "CurveSnapshotFailed")
+        assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+
+
+@pytest.mark.gas
+@pytest.mark.parametrize("quote_floor,undy_budget,repeats,expected", (
+    (1_500_000, 0, 1, 42),
+    (1_500_000, 3_000_000, 1, 200),
+    (1_500_000, 3_000_000, 2, 42),
+    (1_500_000, 3_500_000, 2, 200),
+    (1_500_000, 6_000_000, 2, 200),
+    (250_000, 2_000_000, 2, 200),
+))
+def test_base_floor_nested_fault_comparison(
+    ripe_hq, deploy3r, mission_control, switchboard_alpha,
+    quote_floor, undy_budget, repeats, expected,
+):
+    # Preserve the review's configuration experiment separately from acceptance
+    # of any production budget. The route is synthetic; 42 is the outer fallback,
+    # while 200 means the nested Undy route survived repeated Chainlink exhaustion.
+    _, sources, undy, chainlink = nested_desk(
+        ripe_hq, deploy3r, mission_control, switchboard_alpha, repeats=repeats,
+    )
+    desk = _isolated_price_desk(ripe_hq, deploy3r, sources, price_gas=quote_floor)
+    if undy_budget:
+        desk.setSourceGasBudgets(undy, undy_budget, 0, 0, sender=deploy3r)
+    with cold_trial(desk, *sources):
+        result = static_price(desk, ETH, True, 10_000_000)
+        assert not result.is_error and int.from_bytes(result.output, "big") == expected
+        assert calls_to(result, chainlink)[0].msg.gas == quote_floor
+        assert calls_to(result, undy)[0].msg.gas == (undy_budget or quote_floor)
+        if expected == 200:
+            exhausted = calls_to(result, chainlink)
+            assert len(exhausted) == repeats + 1
+            assert all(call.is_error and call.msg.gas == quote_floor for call in exhausted)
+        print(f"BASE_NESTED_FAULT floor={quote_floor} undy={undy_budget or quote_floor} "
+              f"repeats={repeats} price={expected} execution_gas={result.get_gas_used()}")
