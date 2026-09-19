@@ -4,9 +4,11 @@ Current review status and mandatory gates: [PR 231 review checklist](review-231.
 **The CCIP history prerequisite is reconciled** as of 2026-09-18; Stage 1 now
 passes the runner's start-point guard. This is not full deployment qualification
 or PR approval. Stage 2 recovery and the other review items remain open.
-**Stage 3 is also blocked** pending the caller-underfunding snapshot policy and
-any necessary immutable PriceDesk enforcement change (D01). No such contract
-change is included in the owner-directed follow-up. Existing rerun support does
+**Oracle cutover remains blocked** pending final source-budget qualification and
+production D01 checks using the actual RPC estimator. The current PriceDesk
+implements caller-underfunding checks and the Teller relay; local tests do not
+close those release gates. Its constructor is incompatible with the frozen
+`2026091402`/`2026091403` migrations, which must not be rerun from this checkout. Existing rerun support does
 not authorize regenerating Defaults after a partially completed Stage 2.
 Stage 2 must run from a frozen reviewed checkout; changes to any fingerprinted
 input require fresh verification before continuing.
@@ -19,7 +21,7 @@ They do not modify active canonical manifest entries, move funds,
 repay debt, migrate positions, change vault IDs, enable mint permissions, or
 unpause contracts. Deployment is not approval for cutover.
 
-## Stages
+## Historical stages (executed migrations remain frozen)
 
 1. `2026091400_StageBaseUpgrade.py`: 29 deployments. Switchboard and Alpha–Golf;
    VaultBook; StabilityPool; RipeGov; SimpleErc20; RebaseErc20; a separate
@@ -50,16 +52,41 @@ unpause contracts. Deployment is not approval for cutover.
    feeds, stale times and source observations stay in those original contracts.
    It relinquishes temporary governance without proposing any HQ update.
 
-### Bridge PriceDesk staging
+### Current PriceDesk/Teller staging inputs
 
-```sh
-python -m scripts.migrate --profile base-mainnet --start-timestamp 2026091403 --single
-```
+Two new migration bodies compile the current nine-argument PriceDesk constructor:
 
-Use `PriceDeskBridgeBaseUpgradeCandidate20260914` as the proposed HQ slot 7
-candidate, **not** Stage 3's PriceDesk containing unconfigured replacement
-sources. Do not redeploy the other departments. Historical migrations and
-deployment records are retained.
+- `2026091900_StageBaseOraclesPsmReserves.py` stages the full replacement-oracle
+  and treasury set under `BasePriceDeskGasCandidate20260919` labels. The full
+  wave-one fork diagnostic selects this body instead of frozen `2026091402`.
+  It is for that complete rehearsal; it is not a request to redeploy unrelated
+  live departments.
+- `2026091901_StageBasePriceDeskGasBridge.py` stages only a bridge PriceDesk and a
+  paused compatible Teller. Its labels are `PriceDeskBridgeGasCandidate20260919`
+  and `TellerPriceDeskGasCandidate20260919`. The bridge retains current source
+  addresses, the disabled BlueChip slot, and token-scale bootstrap. Neither
+  migration proposes or confirms HQ changes.
+
+These are local staging inputs, not deployment or activation approval. Final
+constructor values and per-address overrides require the separate qualification
+in [the implementation handoff](pricedesk-gas-implementation.md). Do not substitute
+an old candidate's address or journal for either new candidate. The standard
+runner's history/resume rules still apply; do not force-replay or skip a frontier
+just to reach a new timestamp.
+
+At an authorized cutover, confirm the compatible PriceDesk in **HQ slot 7 before
+Teller in slot 17**, or confirm both in one atomic batch with slot 7 first. Check
+that slot 7 implements `addGreenRefPoolSnapshot(uint256) -> bool` and that its
+source overrides are correct before confirming/unpausing Teller. A new Teller
+with an old PriceDesk reverts in housekeeping, including otherwise valid user
+actions. A rollback must remove that dependency in reverse order: move away from
+the relay Teller before restoring a desk without the relay. Keep user entry
+points closed until the complete stack passes the release gates.
+
+### Historical bridge evidence
+
+`PriceDeskBridgeBaseUpgradeCandidate20260914` is the historical candidate below.
+Its evidence does not authenticate either new candidate or the new relay.
 
 At cutover, the bridge allows existing source routes to remain while replacement
 sources are configured and qualified through the new PriceDesk interface. Keep
@@ -80,18 +107,24 @@ The largest migration execution consumed 3,663,675 gas (excluding intrinsic gas)
 No live transactions were sent. This checks the bridge, not the later source
 replacements or the full protocol cutover.
 
-All labels end in `BaseUpgradeCandidate20260914`. Active canonical labels remain
+The historical stage labels end in `BaseUpgradeCandidate20260914`. Active canonical labels remain
 untouched. The Underscore vault candidate has its own label and address, despite
 using the same SimpleErc20 source as the ordinary ERC20 vault.
 
-PriceDesk now takes separate `_priceSourcePriceGas` and `_priceSourceSnapshotGas`
-constructor arguments and exposes both as immutable getters. Stage 3 supplies
-**1,500,000 gas each** for Base's nested quotes and snapshot refreshes. These are
-staged/unqualified budgets. Local/Robinhood retain 250k quote and 150k snapshot
-budgets; has-feed stays 75k. There is no governance setter; changing a budget
-requires another PriceDesk deployment. The earlier targeted quote replay confirms undyETH
-and undyUSDC return matching direct-source and aggregate PriceDesk prices at this
-budget. This is not a full aggregate-operation gas qualification for reopening.
+The current PriceDesk constructor appends `_priceSourceHasFeedGas` and
+`_maxSourceGas` after the existing quote and snapshot arguments. It exposes all
+four immutable getters and governs address-specific quote/snapshot/feed overrides
+through `setSourceGasBudgets`. Defaults are permanent floors; an override can
+increase a budget or reset it to its default, never lower the floor. The
+provisional maximum is 6M. The earlier 1.5M quote replay was historical evidence
+for its exact source tree and inputs, not qualification of the current nested
+fault model or complete user transactions.
+
+`setSourceGasBudgets` replaces all three fields: zero means **reset**, not “keep.”
+Use the read-modify-write and readback procedure in
+[the implementation handoff](pricedesk-gas-implementation.md) whenever changing one
+field. The relay uses Curve's effective snapshot budget, shared with its generic
+asset snapshots. Confirm that configured value and its cold margin before cutover.
 
 Retain RipeHq, tokens, Ledger, pools and CCIP contracts. The separate Underscore
 repository's contracts still need their own deployment. PriceDesk slot 3 is
@@ -138,7 +171,6 @@ blocked until the review checklist's recovery and runner gates close.**
 
 ```sh
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091401 --single
-python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091402 --single
 ```
 
 Use the configured deployment account/environment as usual. Adding `--fork`
