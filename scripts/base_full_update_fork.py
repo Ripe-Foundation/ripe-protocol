@@ -22,6 +22,19 @@ from scripts.utils.deploy_args import BluePrint
 from scripts.utils.fork_reports import fingerprint, require_unoptimized
 
 SUFFIX = "BaseUpgradeCandidate20260914"
+CURRENT_ORACLE_SUFFIX = "BasePriceDeskGasCandidate20260919"
+STAGING_MIGRATIONS = (
+    "2026091400_StageBaseUpgrade.py",
+    "2026091401_StageBaseMissionControl.py",
+    "2026091900_StageBaseOraclesPsmReserves.py",
+)
+
+
+def candidate_key(label):
+    for suffix in (CURRENT_ORACLE_SUFFIX, SUFFIX):
+        if label.endswith(suffix):
+            return label.removesuffix(suffix)
+    return label
 
 
 def positional(value):
@@ -58,12 +71,12 @@ class DeploymentAdapter:
         return BluePrint("base")
 
     def get_contract(self, name, address=None):
-        if name.endswith(SUFFIX):
-            return self.run.new[name.removesuffix(SUFFIX)]
+        if candidate_key(name) != name:
+            return self.run.new[candidate_key(name)]
         return self.run.at(name, address)
 
     def deploy(self, name, *args, label):
-        key = label.removesuffix(SUFFIX)
+        key = candidate_key(label)
         path = self.defaults if name == "DefaultsBaseLive" else next((ROOT / "contracts").rglob(name + ".vy"))
         contract = self.run.deploy(key, *args, path=path)
         if key == "SwitchboardPopulated":
@@ -253,7 +266,11 @@ class FullUpdate(Rehearsal):
         delay = int(self.hq.registryChangeTimeLock())
         if delay:
             boa.env.time_travel(blocks=delay, block_delta=2)
-        for i in [6, 8, 5, 7] + [i for i in replacements if i not in (8, 5, 6, 7)]:
+        # The relay ABI in the new Teller requires the new PriceDesk first.
+        # Keep this dependency explicit even if the remaining slot order changes.
+        confirmation_order = [6, 8, 5, 7] + [i for i in replacements if i not in (8, 5, 6, 7)]
+        assert confirmation_order.index(7) < confirmation_order.index(17)
+        for i in confirmation_order:
             self.transact(self.hq.confirmAddressUpdateToRegistry, i)
             if i == 6:
                 initializer = self.new["SwitchboardFoxtrotSetup"]
@@ -526,8 +543,7 @@ class FullUpdate(Rehearsal):
     def stage_all(self, defaults):
         self.report["constructor_profile"] = "Base staged migrations; not cutover qualified"
         adapter = DeploymentAdapter(self, defaults)
-        for filename in ("2026091400_StageBaseUpgrade.py", "2026091401_StageBaseMissionControl.py",
-                         "2026091402_StageBaseOraclesPsmReserves.py"):
+        for filename in STAGING_MIGRATIONS:
             spec = importlib.util.spec_from_file_location(filename, ROOT / "migrations/base-mainnet" / filename)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
@@ -571,7 +587,7 @@ def execute_diagnostic(run, args):
     run.report.update(block_hash=header["hash"], snapshot_finalized=True, vault_migrations=False)
     run.report["full_update_harness_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     run.report["migration_source_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in sorted((ROOT / "migrations/base-mainnet").glob("20260914*.py"))}
+        for p in (ROOT / "migrations/base-mainnet" / name for name in STAGING_MIGRATIONS)}
     with boa.fork(run.rpc, block_identifier=args.block):
         assert boa.env.evm.patch.chain_id == 8453
         run.inventory()

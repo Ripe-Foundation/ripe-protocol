@@ -1,0 +1,219 @@
+"""Stage current-ABI oracle and treasury candidates; no activation.
+
+Supersedes the frozen 2026091402 body for NEW candidates only. The old migration
+and its deployment journal must never be resumed against this constructor.
+Budgets are provisional until the separate Base qualification is complete.
+"""
+
+import boa
+from boa.contracts.abi.abi_contract import ABIContractFactory
+from scripts.utils import log
+from scripts.utils.migration import Migration
+
+ZERO = "0x" + "00" * 20
+SUFFIX = "BasePriceDeskGasCandidate20260919"
+USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+REVIEWED_SOURCE_SLOTS = {
+    1: "0xd11b23b6391e294df49961e64231bddde5bb5e89",
+    2: "0x7b2aee8b6a4bdf0885def48ccda8453fdc1bba5d",
+    3: ZERO,  # BlueChip remains disabled.
+    4: "0x16371faf6f603f8d8d6cef8c46253c80adee8b98",
+    5: "0xcee8ed804f72b6ecb6b2d679ca17b545bd654bf6",
+    6: "0x5ce2bbd5ebe9f7d9322a8f56740f95b9576ee0a2",
+    7: "0x064488f53849616eee3ee32c29307922b319bb7c",
+    8: "0x64d0f785c3d4bf4675f4b8432d765175f014a8ac",
+    9: "0x9f20f25f037046721a292b19a486932ef390eaf9",
+}
+
+# Constructor-only placeholder. Sales stay PAUSED, with no allocation or mint
+# permission. These are NOT approved launch economics; configure before launch.
+DORMANT_RESERVE_CONFIG = (
+    1_000_000,  # paymentCapPerEpoch: USDC raw units (1 USDC placeholder)
+    1_000_000,  # minPaymentAmount: USDC raw units (1 USDC placeholder)
+    10**18,    # maxAllInPayoutRate: RIPE/payment, 1e18 scale
+    10**18,    # seedBasePayoutRate: RIPE/payment, 1e18 scale
+    6000,      # uHighBps: high utilization threshold, basis points
+    4000,      # uLowBps: low utilization threshold, basis points
+    1000,      # minUpBps: minimum upward adjustment, basis points
+    3000,      # maxUpBps: maximum upward adjustment, basis points
+    300,       # minDownBps: minimum downward adjustment, basis points
+    800,       # maxDownBps: maximum downward adjustment, basis points
+    800,       # decayBps: decay per idle epoch, basis points
+    4,         # maxDecayEpochs: count
+    0,         # maxVestingBonus: basis points, disabled
+    43_200,    # minVestingLength: Base blocks
+    1_296_000, # maxVestingLength: Base blocks
+    43_200,    # epochLength: Base blocks
+)
+
+
+def migrate(migration: Migration):
+    log.h1("1. Read Base's existing price sources and PSM")
+    if migration.chain() != "base-mainnet":
+        raise RuntimeError("BASE_UPGRADE_WRONG_PROFILE")
+    hq = migration.get_contract("RipeHq")
+    old_desk = migration.get_contract("PriceDesk", hq.getAddr(7))
+    if int(old_desk.numAddrs()) != 10:
+        raise RuntimeError("BASE_UPGRADE_SOURCE_COUNT_DRIFT")
+    for slot, expected in REVIEWED_SOURCE_SLOTS.items():
+        if str(old_desk.getAddr(slot)).lower() != expected:
+            raise RuntimeError(f"BASE_UPGRADE_SOURCE_SLOT_DRIFT:{slot}")
+    psm = migration.get_contract("EndaomentPSM", hq.getAddr(22))
+    assert str(psm.USDC()).lower() == USDC.lower()
+    params = migration.blueprint().PARAMS
+    min_lock = params["MIN_SWITCHBOARD_CHANGE_TIMELOCK"]
+    max_lock = params["MAX_SWITCHBOARD_CHANGE_TIMELOCK"]
+    old = {}
+    for name in ("ChainlinkPrices", "CurvePrices", "BlueChipYieldPrices",
+                 "PythPrices", "StorkPrices", "wsuperOETHbPrices", "RedStone", "UndyVaultPrices"):
+        source = migration.get_contract(name)
+        if name == "BlueChipYieldPrices":
+            if str(source.address).lower() != "0x90c70acff302c8a7f00574ec3547b0221f39cd28":
+                raise RuntimeError("BASE_UPGRADE_DISABLED_BLUECHIP_ADDRESS_DRIFT")
+            # Slot 3 is intentionally disabled on live Base. Deploy its new
+            # code, but do not re-enable the source when preparing PriceDesk.
+            assert str(old_desk.getAddr(3)).lower() == ZERO
+        else:
+            slot = {"ChainlinkPrices": 1, "CurvePrices": 2, "PythPrices": 4,
+                    "StorkPrices": 5, "wsuperOETHbPrices": 7,
+                    "UndyVaultPrices": 8, "RedStone": 9}[name]
+            if str(source.address).lower() != REVIEWED_SOURCE_SLOTS[slot]:
+                raise RuntimeError(f"BASE_UPGRADE_SOURCE_MANIFEST_DRIFT:{name}")
+        old[name] = source
+    chainlink = old["ChainlinkPrices"]
+    eth, btc = chainlink.ETH(), chainlink.BTC()
+    eth_config, btc_config = chainlink.feedConfig(eth), chainlink.feedConfig(btc)
+    assert not eth_config[2] and not eth_config[3]
+    assert not btc_config[2] and not btc_config[3]
+    blue = old["BlueChipYieldPrices"]
+    assert old["CurvePrices"].minActionTimeLock() == 14_400, "live Curve floor drift"
+    assert blue.minActionTimeLock() == 21_600, "live disabled BlueChip floor drift"
+    # The deployed generation exposes indexed array getters; today's source
+    # returns whole arrays. Use the legacy ABI for these two reads only.
+    blue_arrays = ABIContractFactory("LegacyBlueChipFactories", [
+        {"type": "function", "name": name, "stateMutability": "view",
+         "inputs": [{"name": "index", "type": "uint256"}],
+         "outputs": [{"name": "", "type": "address"}]}
+        for name in ("MORPHO_ADDRS", "EULER_ADDRS")
+    ]).at(blue.address)
+    morpho_factories = [blue_arrays.MORPHO_ADDRS(0), blue_arrays.MORPHO_ADDRS(1)]
+    euler_factories = [blue_arrays.EULER_ADDRS(0), blue_arrays.EULER_ADDRS(1)]
+    wrapped = old["wsuperOETHbPrices"]
+    yield_position = psm.usdcYieldPosition()
+
+    log.h1("2. Deploy the replacement PriceDesk and all existing source types")
+    candidates = {}
+    candidates["PriceDesk"] = migration.deploy(
+        "PriceDesk", hq.address, migration.account(), eth,
+        params["PRICE_DESK_MIN_REG_TIMELOCK"], params["PRICE_DESK_MAX_REG_TIMELOCK"],
+        params["PRICE_DESK_PRICE_SOURCE_GAS"],  # unqualified constructor floor
+        params["PRICE_DESK_SNAPSHOT_SOURCE_GAS"],
+        params["PRICE_DESK_HAS_FEED_SOURCE_GAS"],
+        params["PRICE_DESK_MAX_SOURCE_GAS"],
+        label=f"PriceDesk{SUFFIX}",
+    )
+    assert candidates["PriceDesk"].PRICE_SOURCE_PRICE_GAS() == params["PRICE_DESK_PRICE_SOURCE_GAS"]
+    assert candidates["PriceDesk"].PRICE_SOURCE_SNAPSHOT_GAS() == params["PRICE_DESK_SNAPSHOT_SOURCE_GAS"]
+    candidates["ChainlinkPrices"] = migration.deploy(
+        "ChainlinkPrices", hq.address, ZERO, min_lock, max_lock,
+        chainlink.WETH(), eth, btc, eth_config[0], btc_config[0], eth_config[4],
+        label=f"ChainlinkPrices{SUFFIX}",
+    )
+    candidates["CurvePrices"] = migration.deploy(
+        "CurvePrices", hq.address, ZERO,
+        migration.blueprint().ADDYS["CURVE_ADDRESS_PROVIDER"],
+        hq.getAddr(1), hq.getAddr(2), 14_400, max_lock,
+        label=f"CurvePrices{SUFFIX}",
+    )
+    candidates["BlueChipYieldPrices"] = migration.deploy(
+        "BlueChipYieldPrices", hq.address, ZERO, 21_600, max_lock,
+        morpho_factories, euler_factories, blue.FLUID_ADDR(),
+        blue.COMPOUND_V3_ADDR(), blue.MOONWELL_ADDR(), blue.AAVE_V3_ADDR(),
+        ZERO,  # no new Morpho V2 factory enabled without an authenticated Base binding
+        label=f"BlueChipYieldPrices{SUFFIX}",
+    )
+    assert candidates["CurvePrices"].minActionTimeLock() == 14_400
+    assert candidates["BlueChipYieldPrices"].minActionTimeLock() == 21_600
+    candidates["PythPrices"] = migration.deploy(
+        "PythPrices", hq.address, ZERO, old["PythPrices"].PYTH(), min_lock, max_lock,
+        label=f"PythPrices{SUFFIX}",
+    )
+    candidates["StorkPrices"] = migration.deploy(
+        "StorkPrices", hq.address, ZERO, old["StorkPrices"].STORK(), min_lock, max_lock,
+        label=f"StorkPrices{SUFFIX}",
+    )
+    candidates["wsuperOETHbPrices"] = migration.deploy(
+        "wsuperOETHbPrices", hq.address, wrapped.MCBETH(), wrapped.SUPER_OETH(),
+        wrapped.WRAPPED_SUPER_OETH(), wrapped.VVV(), min_lock, max_lock,
+        label=f"wsuperOETHbPrices{SUFFIX}",
+    )
+    candidates["RedStone"] = migration.deploy(
+        "RedStone", hq.address, ZERO, eth, min_lock, max_lock,
+        label=f"RedStone{SUFFIX}",
+    )
+    candidates["UndyVaultPrices"] = migration.deploy(
+        "UndyVaultPrices", hq.address, ZERO, min_lock, max_lock,
+        label=f"UndyVaultPrices{SUFFIX}",
+    )
+    # The current Aero contract is monitoring-only, not a collateral oracle.
+    # Never register it as a replacement for the legacy live slot-6 source.
+    candidates["AeroRipePrices"] = migration.deploy(
+        "AeroRipePrices", hq.address, migration.blueprint().ADDYS["RIPE_WETH_POOL"],
+        hq.getAddr(3), chainlink.WETH(), label=f"AeroRipePrices{SUFFIX}",
+    )
+    assert candidates["AeroRipePrices"].isMonitoringOnly()
+
+    log.h1("3. Deploy PSM with the live USDC limits and yield destination")
+    candidates["EndaomentPSM"] = migration.deploy(
+        "EndaomentPSM", hq.address, psm.numBlocksPerInterval(),
+        psm.mintFee(), psm.maxIntervalMint(), psm.redeemFee(), psm.maxIntervalRedeem(),
+        USDC, yield_position[0], yield_position[1], label=f"EndaomentPSM{SUFFIX}",
+    )
+    assert not candidates["EndaomentPSM"].canMint()
+    assert not candidates["EndaomentPSM"].canRedeem()
+
+    log.h1("4. Deploy USDC reserves, paused and with sales disabled")
+    candidates["RipeReserveEngine"] = migration.deploy(
+        "RipeReserveEngine", hq.address, USDC, DORMANT_RESERVE_CONFIG,
+        label=f"RipeReserveEngine{SUFFIX}",
+    )
+    candidates["RipeReserveVesting"] = migration.deploy(
+        "RipeReserveVesting", hq.address, label=f"RipeReserveVesting{SUFFIX}",
+    )
+    assert candidates["RipeReserveEngine"].isPaused()
+    assert not candidates["RipeReserveEngine"].isRunning()
+    assert not candidates["RipeReserveEngine"].canAcquireRipe()
+    assert candidates["RipeReserveVesting"].isPaused()
+
+    log.h1("5. Populate PriceDesk with the existing source IDs")
+    desk = candidates["PriceDesk"]
+    source_names = (
+        "ChainlinkPrices", "CurvePrices", "BlueChipYieldPrices", "PythPrices",
+        "StorkPrices", None, "wsuperOETHbPrices", "UndyVaultPrices", "RedStone",
+    )
+    for reg_id, name in enumerate(source_names, 1):
+        # Retain legacy Aero slot 6; the new monitor is NOT a price source.
+        source = old_desk.getAddr(6) if name is None else candidates[name].address
+        migration.execute(
+            desk.startAddNewAddressToRegistry, source, name or "Retained legacy Aero pricing"
+        )
+        migration.execute(desk.confirmNewAddressToRegistry, source)
+        if str(desk.getAddr(reg_id)).lower() != str(source).lower():
+            # On resume, slot 3 may already have been deliberately disabled.
+            if not (reg_id == 3 and str(desk.getAddr(3)).lower() == ZERO):
+                raise RuntimeError(f"BASE_PRICEDESK_SLOT_MISMATCH:{reg_id}")
+        if reg_id == 3:
+            migration.execute(desk.startAddressDisableInRegistry, 3)
+            migration.execute(desk.confirmAddressDisableInRegistry, 3)
+            if str(desk.getAddr(3)).lower() != ZERO:
+                raise RuntimeError("BASE_PRICEDESK_BLUECHIP_MUST_STAY_DISABLED")
+    migration.execute(desk.relinquishGov)
+    if str(desk.governance()).lower() != ZERO or int(desk.numAddrs()) != 10:
+        raise RuntimeError("BASE_PRICEDESK_SETUP_INCOMPLETE")
+
+    for name, candidate in candidates.items():
+        assert 0 < len(boa.env.get_code(candidate.address)) <= 24576, name
+        log.info(f"STAGED ONLY {name}: {candidate.address}")
+    assert str(hq.getAddr(7)).lower() == str(old_desk.address).lower()
+    assert str(hq.getAddr(22)).lower() == str(psm.address).lower()
+    log.info("No activation, oracle config replay, or custody transfers performed here.")

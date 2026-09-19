@@ -29,7 +29,7 @@ def diagnose(run):
         desks = {}
         for budget in (150_000, 1_500_000):
             desk = run.deploy("Desk" + str(budget), run.hq.address, ZERO,
-                              old_desk.ETH(), 3600, 302400, 1_500_000, budget,
+                              old_desk.ETH(), 3600, 302400, 1_500_000, budget, 75_000, 6_000_000,
                               path=ROOT / "contracts/registries/PriceDesk.vy")
             # Only one source is needed to characterize snapshot forwarding.
             run.transact(desk.startAddNewAddressToRegistry, source.address, "Undy snapshot regression")
@@ -66,7 +66,7 @@ def diagnose(run):
         # Install a full price registry for the unchanged live Teller's actual
         # housekeeping calls. Preserve the disabled slot and all other routes.
         desk = run.deploy("TellerDesk", run.hq.address, ZERO, old_desk.ETH(),
-                          3600, 302400, 1_500_000, 1_500_000,
+                          3600, 302400, 1_500_000, 1_500_000, 75_000, 6_000_000,
                           path=ROOT / "contracts/registries/PriceDesk.vy")
         for slot in range(1, int(old_desk.numAddrs())):
             address = old_desk.getAddr(slot)
