@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "chainId": "8453",
+  "createdAt": 1789419290324,
+  "meta": {
+    "name": "Cancel pending Base VaultBook replacement",
+    "description": "Cancel HQ registry slot 8 pending replacement to 0x09f45F56b218756ab092f7470F8199db56849867. Does not disable or replace the active VaultBook. Recheck pendingAddrUpdate(8) before signing.",
+    "createdFromSafeAddress": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf"
+  },
+  "transactions": [
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": "0x6321dd6a0000000000000000000000000000000000000000000000000000000000000008",
+      "contractMethod": {
+        "name": "cancelAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [{"name": "_regId", "type": "uint256"}]
+      },
+      "contractInputsValues": {"_regId": "8"}
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "contracts": {
+    "SwitchboardBaseUpgradeCandidate20260914": {
+      "address": "0x92d33836588BA7E66182C9DE646d0c926a83FdF1",
+      "file": "contracts/registries/Switchboard.vy"
+    },
+    "SwitchboardAlphaBaseUpgradeCandidate20260914": {
+      "address": "0xA3E32E3C3110A475C20823180BDabaa8439613Af",
+      "file": "contracts/config/SwitchboardAlpha.vy"
+    },
+    "SwitchboardBravoBaseUpgradeCandidate20260914": {
+      "address": "0xfB6CE755D16B74A97e4728274a1eF5CD8f3854e8",
+      "file": "contracts/config/SwitchboardBravo.vy"
+    },
+    "SwitchboardCharlieBaseUpgradeCandidate20260914": {
+      "address": "0x3D4330a3214Ee8Ec02CA678e5B87946a7A3F87C6",
+      "file": "contracts/config/SwitchboardCharlie.vy"
+    },
+    "SwitchboardDeltaBaseUpgradeCandidate20260914": {
+      "address": "0x040458e1fC15AAAa5821Dca857BEB49356b24215",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    },
+    "SwitchboardEchoBaseUpgradeCandidate20260914": {
+      "address": "0xFfe0B592465Fe2196D583b5a2FF341010e217eEe",
+      "file": "contracts/config/SwitchboardEcho.vy"
+    },
+    "SwitchboardFoxtrotBaseUpgradeCandidate20260914": {
+      "address": "0xe48ad5B28C52Ff70f154B759e881a99B7981ab1C",
+      "file": "contracts/config/SwitchboardFoxtrot.vy"
+    },
+    "SwitchboardGolfBaseUpgradeCandidate20260914": {
+      "address": "0x431e9a66B8Bd9EebccC52819b19Fe3F25B48D22a",
+      "file": "contracts/config/SwitchboardGolf.vy"
+    },
+    "VaultBookBaseUpgradeCandidate20260914": {
+      "address": "0x942389A8Aad46D426B3bE801D00d30c504627217",
+      "file": "contracts/registries/VaultBook.vy"
+    },
+    "StabilityPoolBaseUpgradeCandidate20260914": {
+      "address": "0x753cfae3894d4Caa12424E2A4626259e504D3893",
+      "file": "contracts/vaults/StabilityPool.vy"
+    },
+    "RipeGovBaseUpgradeCandidate20260914": {
+      "address": "0xD1f79cFF8517Ad7c0b4bDfd38e7b5B46d61911C3",
+      "file": "contracts/vaults/RipeGov.vy"
+    },
+    "SimpleErc20BaseUpgradeCandidate20260914": {
+      "address": "0x8245049b6EF7E64Ad49782705733144577E15480",
+      "file": "contracts/vaults/SimpleErc20.vy"
+    },
+    "RebaseErc20BaseUpgradeCandidate20260914": {
+      "address": "0x6E85C5E721B08152455bedE6985e22b632b261Ea",
+      "file": "contracts/vaults/RebaseErc20.vy"
+    },
+    "UnderscoreVaultBaseUpgradeCandidate20260914": {
+      "address": "0xeaE25a33d18F1F5a5039D3DAA17c063D645875c2",
+      "file": "contracts/vaults/SimpleErc20.vy"
+    },
+    "VaultMigratorBaseUpgradeCandidate20260914": {
+      "address": "0x8FFEaC17EFD46cDDff975ca8c0718e00630D4848",
+      "file": "contracts/core/VaultMigrator.vy"
+    },
+    "AuctionHouseBaseUpgradeCandidate20260914": {
+      "address": "0x94FaB5E2ABFf9106ab173813C07bf4a4443E74F3",
+      "file": "contracts/core/AuctionHouse.vy"
+    },
+    "AuctionHouseNFTBaseUpgradeCandidate20260914": {
+      "address": "0xB8fB587B4D9a1e903a30dadC16AB8b4528ACB126",
+      "file": "contracts/core/AuctionHouseNFT.vy"
+    },
+    "BoardroomBaseUpgradeCandidate20260914": {
+      "address": "0xFD2F37dec69Eb8Fb4Af9a58E6A735BC87340c36d",
+      "file": "contracts/core/Boardroom.vy"
+    },
+    "CreditRedeemBaseUpgradeCandidate20260914": {
+      "address": "0xFDBBB262cf76c9B6DA6744EF925063672fdf32AB",
+      "file": "contracts/core/CreditRedeem.vy"
+    },
+    "TellerUtilsBaseUpgradeCandidate20260914": {
+      "address": "0xAD0ea1922Ac4bCd27cce3f566c463BcD765D6443",
+      "file": "contracts/core/TellerUtils.vy"
+    },
+    "EndaomentFundsBaseUpgradeCandidate20260914": {
+      "address": "0x455312579A9ccd041B93DC4e5EEb6B96D0D1f8F6",
+      "file": "contracts/core/EndaomentFunds.vy"
+    },
+    "BondBoosterBaseUpgradeCandidate20260914": {
+      "address": "0x7E0E1d7675868a128749D3c6BEf8091F6E42A9aD",
+      "file": "contracts/config/BondBooster.vy"
+    },
+    "BondRoomBaseUpgradeCandidate20260914": {
+      "address": "0xE97Fc0372e9Cb0e419edC5189AFa3714449395a8",
+      "file": "contracts/core/BondRoom.vy"
+    },
+    "CreditEngineBaseUpgradeCandidate20260914": {
+      "address": "0x80a990310F0a7160E7E1Bca5234406F7c68f2B85",
+      "file": "contracts/core/CreditEngine.vy"
+    },
+    "HumanResourcesBaseUpgradeCandidate20260914": {
+      "address": "0xa0B09a7F80aB46AFdaAeB226704EC8eF7e522319",
+      "file": "contracts/core/HumanResources.vy"
+    },
+    "LootboxBaseUpgradeCandidate20260914": {
+      "address": "0x6BD266b3e22edE1Bb274b2c404b615355b9f64f4",
+      "file": "contracts/core/Lootbox.vy"
+    },
+    "TellerBaseUpgradeCandidate20260914": {
+      "address": "0xFDdfdac47B73e32143356078f34Fc905Ab6399b0",
+      "file": "contracts/core/Teller.vy"
+    },
+    "DeleverageBaseUpgradeCandidate20260914": {
+      "address": "0xea53b631DAfc8520007F00C32609E32E75C0a6BF",
+      "file": "contracts/core/Deleverage.vy"
+    },
+    "EndaomentBaseUpgradeCandidate20260914": {
+      "address": "0x45d1e4C1Bf37a8945E70a41758A03E9f029c469D",
+      "file": "contracts/core/Endaoment.vy"
+    }
+  }
+}

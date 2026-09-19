@@ -1,0 +1,5208 @@
+{
+  "live_writes": false,
+  "source_block": 51135337,
+  "source_block_hash": "0x6e981b6f8c318546dcd3ffbec24d277a7156b806c83728afe8c7ed56b56e001e",
+  "evaluation_block": 51156937,
+  "borrowers_checked": 56,
+  "errors": [],
+  "locked_depositors": [],
+  "funded_depositors_checked_for_locks": 405,
+  "affected_users": [
+    {
+      "user": "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad",
+      "stored_debt": {
+        "amount": 406878089211901922,
+        "principal": 387616337112982852,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 501337,
+          "amount": 501337,
+          "deposit_points": [
+            0,
+            0,
+            45416650
+          ],
+          "vault_id": 5,
+          "symbol": "undyUSDC",
+          "decimals": 6,
+          "token_amount": "0.501337"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 406945383565583791,
+      "collateral_value": 508656241270752293,
+      "max_debt": 406924993016601834,
+      "current_terms": {
+        "collateralVal": 508656241270752293,
+        "totalMaxDebt": 406924993016601834,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 20390548981957,
+      "has_funded_positions": true,
+      "legacy_trial": null,
+      "ordinary_trial": {
+        "status": "blocked",
+        "error_frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xa705ed9c",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xa705ed9c",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x4549a368c00f803862d457c4c0c659a293f26c66",
+            "selector": "0xfdda8295",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ],
+        "migration": {
+          "3": {
+            "target_id": 8,
+            "status": "positions_moved_routes_and_rewards_not_finalized",
+            "results": []
+          },
+          "4": {
+            "target_id": 9,
+            "status": "positions_moved_routes_and_rewards_not_finalized",
+            "results": []
+          },
+          "5": {
+            "target_id": 10,
+            "status": "running",
+            "results": [],
+            "attempt": {
+              "user": "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad",
+              "healthy_before": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "user": "0xD7A48E684Da48cc384fD80bb1Fed7D8970bfe91b",
+      "stored_debt": {
+        "amount": 982796745232664627,
+        "principal": 982796745232664627,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 982796745232664627,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 5000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 982796745232664627,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0xE5aB77408c25E7C1562C09067A8Fa3d0C00ac999",
+      "stored_debt": {
+        "amount": 126807288588630824,
+        "principal": 126807288588630824,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 126807288588630824,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 5000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 126807288588630824,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+      "stored_debt": {
+        "amount": 295343126496219026160,
+        "principal": 291843643986682351200,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789002353,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 26901654008247818070271082942,
+          "amount": 268343998732271985495,
+          "deposit_points": [
+            0,
+            269016540082,
+            51106524
+          ],
+          "vault_id": 1,
+          "symbol": "sGREEN",
+          "decimals": 18,
+          "token_amount": "268.343998732271985495"
+        },
+        {
+          "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 47912901888055832395210915095,
+          "amount": 686115358927338975876,
+          "deposit_points": [
+            2344842950950995,
+            54405100093,
+            51106524
+          ],
+          "gov_data": [
+            189570119606889913,
+            47912901888055832395210915095,
+            51106524,
+            54353060,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2,
+          "symbol": "RIPE",
+          "decimals": 18,
+          "token_amount": "686.115358927338975876"
+        },
+        {
+          "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 363201462,
+          "amount": 363201462,
+          "deposit_points": [
+            1364596497,
+            363,
+            51106524
+          ],
+          "vault_id": 5,
+          "symbol": "undyUSDC",
+          "decimals": 6,
+          "token_amount": "363.201462"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 295390359294423333333,
+      "collateral_value": 368504001270526553948,
+      "max_debt": 294803201016421243158,
+      "current_terms": {
+        "collateralVal": 368504001270526553948,
+        "totalMaxDebt": 294803201016421243158,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 587158278002090175,
+      "has_funded_positions": true,
+      "legacy_trial": {
+        "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+        "block": 51156938,
+        "reverted": true,
+        "error": "Revert(\"Revert(b'')\")",
+        "frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xbdb77610",
+            "error": "Revert(\"Revert(b'')\")",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xbdb77610",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ]
+      }
+    },
+    {
+      "user": "0xd060D0C2bbd34AB116bd6c917147B560C66F875b",
+      "stored_debt": {
+        "amount": 68260520361387739,
+        "principal": 68260520361387739,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 68260520361387739,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 68260520361387739,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0x6b34e50bDfC20A0869BF28249bac24d12Cc3fbbd",
+      "stored_debt": {
+        "amount": 22905936042316810,
+        "principal": 22905936042316810,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 22905936042316810,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 22905936042316810,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E",
+      "stored_debt": {
+        "amount": 257547140184901938,
+        "principal": 257547140184901938,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "positions": [
+        {
+          "user": "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 187981067302658495195159419,
+          "amount": 2691899099855195626,
+          "deposit_points": [
+            1563402418262606,
+            1518605051,
+            38167145
+          ],
+          "gov_data": [
+            1456670724682741,
+            187981067302658495195159419,
+            38167145,
+            0,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2,
+          "symbol": "RIPE",
+          "decimals": 18,
+          "token_amount": "2.691899099855195626"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 257547140184901938,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 257547140184901938,
+      "has_funded_positions": true,
+      "legacy_trial": {
+        "user": "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E",
+        "block": 51156938,
+        "reverted": true,
+        "error": "Revert(\"Revert(b'')\")",
+        "frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xbdb77610",
+            "error": "Revert(\"Revert(b'')\")",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xbdb77610",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ]
+      }
+    },
+    {
+      "user": "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738",
+      "stored_debt": {
+        "amount": 13700809940108052,
+        "principal": 13700809940108052,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788998915,
+        "inLiquidation": true
+      },
+      "positions": [
+        {
+          "user": "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 3566690643169015833763581886,
+          "amount": 51075203846727171346,
+          "deposit_points": [
+            289913302544924,
+            5817629107,
+            35295231
+          ],
+          "gov_data": [
+            3719265037371935,
+            3566690643169015833763581886,
+            35295231,
+            50253355,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2,
+          "symbol": "RIPE",
+          "decimals": 18,
+          "token_amount": "51.075203846727171346"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 13700809940108052,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 6000,
+          "redemptionThreshold": 6850,
+          "liqThreshold": 7250,
+          "liqFee": 1000,
+          "borrowRate": 750,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 13700809940108052,
+      "has_funded_positions": true,
+      "legacy_trial": {
+        "user": "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738",
+        "block": 51156938,
+        "reverted": true,
+        "error": "Revert(\"Revert(b'')\")",
+        "frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xbdb77610",
+            "error": "Revert(\"Revert(b'')\")",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xbdb77610",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ]
+      }
+    }
+  ],
+  "all_borrowers": [
+    {
+      "user": "0x2f537C2C1D263e66733DA492414359B6B70e1269",
+      "stored_debt": {
+        "amount": 53053371153824180499,
+        "principal": 50000000000000000000,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x2f537C2C1D263e66733DA492414359B6B70e1269",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 486368209471315585280665418,
+          "amount": 4851522889476372967,
+          "deposit_points": [
+            0,
+            4863682094,
+            33119460
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x2f537C2C1D263e66733DA492414359B6B70e1269",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 101827541,
+          "amount": 101827541,
+          "deposit_points": [
+            0,
+            101,
+            45416487
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 53062145753433012188,
+      "collateral_value": 103314166444733624898,
+      "max_debt": 82651333155786899918,
+      "current_terms": {
+        "collateralVal": 103314166444733624898,
+        "totalMaxDebt": 82651333155786899918,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x64DD1ABDF58f3066095E9240d66986fbE13709cB",
+      "stored_debt": {
+        "amount": 5778667013868151463,
+        "principal": 5495138917266273706,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x64DD1ABDF58f3066095E9240d66986fbE13709cB",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 772929017538259325082308383,
+          "amount": 7709966949944136774,
+          "deposit_points": [
+            0,
+            7729290175,
+            33827182
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x64DD1ABDF58f3066095E9240d66986fbE13709cB",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 10182733,
+          "amount": 10182733,
+          "deposit_points": [
+            0,
+            10,
+            45416562
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 5779622758775905569,
+      "collateral_value": 10331395236425101912,
+      "max_debt": 8265116189140081529,
+      "current_terms": {
+        "collateralVal": 10331395236425101912,
+        "totalMaxDebt": 8265116189140081529,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+      "stored_debt": {
+        "amount": 5430558481239015057361,
+        "principal": 5253725612722796120124,
+        "debtTerms": {
+          "ltv": 7591,
+          "redemptionThreshold": 8240,
+          "liqThreshold": 8705,
+          "liqFee": 620,
+          "borrowRate": 563,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 858411199518274651444194674451,
+          "amount": 8562651715194789655952,
+          "deposit_points": [
+            1789487477693564,
+            8584111995182,
+            51079353
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 4768339002711897609635794869,
+          "amount": 68282873660559584979,
+          "deposit_points": [
+            0,
+            7906382899,
+            51079144
+          ],
+          "gov_data": [
+            0,
+            4768339002711897609635794869,
+            51079144,
+            66675208,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+          "asset": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+          "shares": 969776557131646417402,
+          "amount": 969776557131646417402,
+          "deposit_points": [
+            15877377688213272462,
+            969776557131,
+            51079144
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 6319188350,
+          "amount": 6319188350,
+          "deposit_points": [
+            35786961410,
+            6319,
+            51079144
+          ],
+          "vault_id": 5
+        },
+        {
+          "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+          "asset": "0x02981DB1a99A14912b204437e7a2E02679B57668",
+          "shares": 654678286927430121,
+          "amount": 654678286927430121,
+          "deposit_points": [
+            7869038558269058,
+            654678286,
+            51079144
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 5431569821294798248254,
+      "collateral_value": 8647656052825576606081,
+      "max_debt": 6571090125891416954976,
+      "current_terms": {
+        "collateralVal": 8647656052825576606081,
+        "totalMaxDebt": 6571090125891416954976,
+        "debtTerms": {
+          "ltv": 7598,
+          "redemptionThreshold": 8244,
+          "liqThreshold": 8710,
+          "liqFee": 619,
+          "borrowRate": 562,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+      "stored_debt": {
+        "amount": 48571976260115012460,
+        "principal": 45897749764195345498,
+        "debtTerms": {
+          "ltv": 7117,
+          "redemptionThreshold": 7810,
+          "liqThreshold": 8140,
+          "liqFee": 926,
+          "borrowRate": 672,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 1755457786110778482479089984,
+          "amount": 17510691416455015378,
+          "deposit_points": [
+            32249560795486,
+            36463015875,
+            33832515
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 161906873211518843117232426980,
+          "amount": 2318515223433318055474,
+          "deposit_points": [
+            34945882,
+            183926207967,
+            34023735
+          ],
+          "gov_data": [
+            234291721987418942,
+            161906873211518843117232426980,
+            35112586,
+            37282757,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 16780000217756246,
+          "amount": 16780000217756246,
+          "deposit_points": [
+            9831522426888,
+            16780000,
+            33830278
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 86032,
+          "amount": 86032,
+          "deposit_points": [
+            5140184,
+            8,
+            33830278
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+          "asset": "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
+          "shares": 500000000,
+          "amount": 500000000,
+          "deposit_points": [
+            31019200000,
+            50000,
+            33830278
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+          "asset": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+          "shares": 5000000000000000,
+          "amount": 5000000000000000,
+          "deposit_points": [
+            3101330000000,
+            5000000,
+            33830278
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x7190081341F0e0223E237270b8479159951A5a46",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 16482444,
+          "amount": 16482444,
+          "deposit_points": [
+            0,
+            16,
+            45416562
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 48582773167247082811,
+      "collateral_value": 125066923632405867977,
+      "max_debt": 89036281312559118089,
+      "current_terms": {
+        "collateralVal": 125066923632405867977,
+        "totalMaxDebt": 89036281312559118089,
+        "debtTerms": {
+          "ltv": 7119,
+          "redemptionThreshold": 7811,
+          "liqThreshold": 8142,
+          "liqFee": 925,
+          "borrowRate": 672,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad",
+      "stored_debt": {
+        "amount": 406878089211901922,
+        "principal": 387616337112982852,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 501337,
+          "amount": 501337,
+          "deposit_points": [
+            0,
+            0,
+            45416650
+          ],
+          "vault_id": 5,
+          "symbol": "undyUSDC",
+          "decimals": 6,
+          "token_amount": "0.501337"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 406945383565583791,
+      "collateral_value": 508656241270752293,
+      "max_debt": 406924993016601834,
+      "current_terms": {
+        "collateralVal": 508656241270752293,
+        "totalMaxDebt": 406924993016601834,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 20390548981957,
+      "has_funded_positions": true,
+      "legacy_trial": null,
+      "ordinary_trial": {
+        "status": "blocked",
+        "error_frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xa705ed9c",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xa705ed9c",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x4549a368c00f803862d457c4c0c659a293f26c66",
+            "selector": "0xfdda8295",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ],
+        "migration": {
+          "3": {
+            "target_id": 8,
+            "status": "positions_moved_routes_and_rewards_not_finalized",
+            "results": []
+          },
+          "4": {
+            "target_id": 9,
+            "status": "positions_moved_routes_and_rewards_not_finalized",
+            "results": []
+          },
+          "5": {
+            "target_id": 10,
+            "status": "running",
+            "results": [],
+            "attempt": {
+              "user": "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad",
+              "healthy_before": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "user": "0xbb78B430C2020a8655c32AEF37Bcd1705A82a7b7",
+      "stored_debt": {
+        "amount": 1000746740858851311618,
+        "principal": 999784961028916559730,
+        "debtTerms": {
+          "ltv": 7313,
+          "redemptionThreshold": 7974,
+          "liqThreshold": 8342,
+          "liqFee": 828,
+          "borrowRate": 315,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xbb78B430C2020a8655c32AEF37Bcd1705A82a7b7",
+          "asset": "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493",
+          "shares": 2804551,
+          "amount": 2804551,
+          "deposit_points": [
+            1825708055,
+            280,
+            50759540
+          ],
+          "vault_id": 5
+        },
+        {
+          "user": "0xbb78B430C2020a8655c32AEF37Bcd1705A82a7b7",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 987299375,
+          "amount": 987299375,
+          "deposit_points": [
+            7785362383,
+            987,
+            50731357
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1000851015584755424565,
+      "collateral_value": 3167610917816904262088,
+      "max_debt": 2317498982128882621834,
+      "current_terms": {
+        "collateralVal": 3167610917816904262088,
+        "totalMaxDebt": 2317498982128882621834,
+        "debtTerms": {
+          "ltv": 7316,
+          "redemptionThreshold": 7976,
+          "liqThreshold": 8345,
+          "liqFee": 827,
+          "borrowRate": 315,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x69370c4D1916C8Fd50C8bBD6D166c93dD7dbBDf0",
+      "stored_debt": {
+        "amount": 6385211100856199785365,
+        "principal": 6322416750578753815310,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789002313,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x69370c4D1916C8Fd50C8bBD6D166c93dD7dbBDf0",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 407513981500856484752304153731,
+          "amount": 5835622361981601748331,
+          "deposit_points": [
+            0,
+            518602292856,
+            51106524
+          ],
+          "gov_data": [
+            1793586789247540748,
+            407513981500856484752304153731,
+            51106524,
+            57593501,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x69370c4D1916C8Fd50C8bBD6D166c93dD7dbBDf0",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 16048396938,
+          "amount": 16048396938,
+          "deposit_points": [
+            47028754276,
+            16048,
+            51106524
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 6386232661741799096323,
+      "collateral_value": 16282694604435998823267,
+      "max_debt": 13026155683548799058613,
+      "current_terms": {
+        "collateralVal": 16282694604435998823267,
+        "totalMaxDebt": 13026155683548799058613,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xD7A48E684Da48cc384fD80bb1Fed7D8970bfe91b",
+      "stored_debt": {
+        "amount": 982796745232664627,
+        "principal": 982796745232664627,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 982796745232664627,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 5000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 982796745232664627,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0xE5aB77408c25E7C1562C09067A8Fa3d0C00ac999",
+      "stored_debt": {
+        "amount": 126807288588630824,
+        "principal": 126807288588630824,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 126807288588630824,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 5000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 126807288588630824,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0x0789f1A32872271e1A0a6be09FBc6988B9e68e76",
+      "stored_debt": {
+        "amount": 1015830369591560190,
+        "principal": 1000000000000000000,
+        "debtTerms": {
+          "ltv": 5394,
+          "redemptionThreshold": 6487,
+          "liqThreshold": 6987,
+          "liqFee": 1063,
+          "borrowRate": 741,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789002295,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x0789f1A32872271e1A0a6be09FBc6988B9e68e76",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 14978135846579202956407740,
+          "amount": 214487719329728374,
+          "deposit_points": [
+            7489373190225,
+            21845609,
+            51106474
+          ],
+          "gov_data": [
+            7480608882851,
+            14978135846579202956407740,
+            51106474,
+            61984823,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x0789f1A32872271e1A0a6be09FBc6988B9e68e76",
+          "asset": "0x96F1a7ce331F40afe866F3b707c223e377661087",
+          "shares": 12029553531129772849,
+          "amount": 12029553531129772849,
+          "deposit_points": [
+            32729516035450029,
+            12029553531,
+            50760918
+          ],
+          "vault_id": 5
+        },
+        {
+          "user": "0x0789f1A32872271e1A0a6be09FBc6988B9e68e76",
+          "asset": "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8",
+          "shares": 874302,
+          "amount": 874302,
+          "deposit_points": [
+            0,
+            0,
+            50760918
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1016071269067232804,
+      "collateral_value": 7832031272566693728,
+      "max_debt": 4226114948961505815,
+      "current_terms": {
+        "collateralVal": 7832031272566693728,
+        "totalMaxDebt": 4226114948961505815,
+        "debtTerms": {
+          "ltv": 5395,
+          "redemptionThreshold": 6489,
+          "liqThreshold": 6989,
+          "liqFee": 1063,
+          "borrowRate": 741,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x59b429647fCC0a29166BAF2707Db5D61F0572865",
+      "stored_debt": {
+        "amount": 159838533905,
+        "principal": 148755824443,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x59b429647fCC0a29166BAF2707Db5D61F0572865",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 160331263961878,
+          "amount": 160331263961878,
+          "deposit_points": [
+            13004700212337,
+            160331,
+            34406760
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 159875544310,
+      "collateral_value": 392032931890043843,
+      "max_debt": 274423052323030690,
+      "current_terms": {
+        "collateralVal": 392032931890043843,
+        "totalMaxDebt": 274423052323030690,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 999,
+          "borrowRate": 699,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x39fEdC7c60cB20d58Ed76a77793f9dDC8B70DFDc",
+      "stored_debt": {
+        "amount": 1000592212202159199725,
+        "principal": 999999962449950244953,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 250,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998905,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x39fEdC7c60cB20d58Ed76a77793f9dDC8B70DFDc",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 6006143329,
+          "amount": 6006143329,
+          "deposit_points": [
+            35742873154,
+            6006,
+            50731358
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1000674957142234098601,
+      "collateral_value": 6093829679960871375339,
+      "max_debt": 4875063743968697100271,
+      "current_terms": {
+        "collateralVal": 6093829679960871375339,
+        "totalMaxDebt": 4875063743968697100271,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 250,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567",
+      "stored_debt": {
+        "amount": 52913592333107027127,
+        "principal": 49989681866840573456,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567",
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "shares": 20992742689908565777222519037,
+          "amount": 215696779061837128837,
+          "deposit_points": [
+            0,
+            209927426899,
+            51070834
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 11203932403309669875536463873,
+          "amount": 111759225723013957110,
+          "deposit_points": [
+            4726602962980171,
+            112039324033,
+            51070834
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 1777402230797054808512020863372,
+          "amount": 25452496540302083734858,
+          "deposit_points": [
+            0,
+            1905552931637,
+            51070834
+          ],
+          "gov_data": [
+            42660344712933093182,
+            1777402230797054808512020863372,
+            51070834,
+            52818394,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 458143876975295958300000000,
+          "amount": 4646686661128906708,
+          "deposit_points": [
+            0,
+            458143876,
+            51070834
+          ],
+          "gov_data": [
+            11969807025722170,
+            458143876975295958300000000,
+            51070834,
+            34206108,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 101813169,
+          "amount": 101813169,
+          "deposit_points": [
+            571089047,
+            101,
+            51070834
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 52922343478850702704,
+      "collateral_value": 103299584621529785461,
+      "max_debt": 82639667697223828368,
+      "current_terms": {
+        "collateralVal": 103299584621529785461,
+        "totalMaxDebt": 82639667697223828368,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f",
+      "stored_debt": {
+        "amount": 77326611456409710004,
+        "principal": 74158548261222822869,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f",
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "shares": 595469761104755634749872877,
+          "amount": 6118348202341389187,
+          "deposit_points": [
+            0,
+            5954697611,
+            50750971
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 435104884116865893267884142268,
+          "amount": 6230725586907156306949,
+          "deposit_points": [
+            0,
+            468172855308,
+            50750971
+          ],
+          "gov_data": [
+            7357566730278252589,
+            435104884116865893267884142268,
+            50750971,
+            52591599,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 299764707098622949000000000,
+          "amount": 3040338932713693366,
+          "deposit_points": [
+            0,
+            299764707,
+            50750971
+          ],
+          "gov_data": [
+            7762352080941262,
+            299764707098622949000000000,
+            50750971,
+            0,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f",
+          "asset": "0x02981DB1a99A14912b204437e7a2E02679B57668",
+          "shares": 132941848548147966,
+          "amount": 132941848548147966,
+          "deposit_points": [
+            1554293604147440,
+            132941848,
+            50750971
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 77344515646687388551,
+      "collateral_value": 328790293807439146406,
+      "max_debt": 230153205665207402484,
+      "current_terms": {
+        "collateralVal": 328790293807439146406,
+        "totalMaxDebt": 230153205665207402484,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x41BF39033C732F884A52ddf38F647aD63457CEEC",
+      "stored_debt": {
+        "amount": 7408322122869118647,
+        "principal": 7000000000000000000,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x41BF39033C732F884A52ddf38F647aD63457CEEC",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 122902717702100446184709129804,
+          "amount": 1759973596805738142372,
+          "deposit_points": [
+            0,
+            203784996221,
+            50741562
+          ],
+          "gov_data": [
+            0,
+            122902717702100446184709129804,
+            50741562,
+            66337626,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x41BF39033C732F884A52ddf38F647aD63457CEEC",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 10182733,
+          "amount": 10182733,
+          "deposit_points": [
+            53250000,
+            10,
+            50741562
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 7409547352602250184,
+      "collateral_value": 10331395236425101912,
+      "max_debt": 8265116189140081529,
+      "current_terms": {
+        "collateralVal": 10331395236425101912,
+        "totalMaxDebt": 8265116189140081529,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x19284cD63083583cf5C5e1F945fAE112a39976c6",
+      "stored_debt": {
+        "amount": 2352666839769552342,
+        "principal": 2282508786527996245,
+        "debtTerms": {
+          "ltv": 7910,
+          "redemptionThreshold": 8436,
+          "liqThreshold": 8920,
+          "liqFee": 539,
+          "borrowRate": 515,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x19284cD63083583cf5C5e1F945fAE112a39976c6",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 784,
+          "amount": 784,
+          "deposit_points": [
+            0,
+            8,
+            33416813
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x19284cD63083583cf5C5e1F945fAE112a39976c6",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 6156061,
+          "amount": 6156061,
+          "deposit_points": [
+            0,
+            6,
+            45416562
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 2353067609881316267,
+      "collateral_value": 6851031597170085223,
+      "max_debt": 5420315724573825938,
+      "current_terms": {
+        "collateralVal": 6851031597170085223,
+        "totalMaxDebt": 5420315724573825938,
+        "debtTerms": {
+          "ltv": 7911,
+          "redemptionThreshold": 8437,
+          "liqThreshold": 8921,
+          "liqFee": 539,
+          "borrowRate": 515,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660",
+      "stored_debt": {
+        "amount": 603006697997266848167,
+        "principal": 600835221774277273384,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 63706560528204279918893787314,
+          "amount": 635472941268837692769,
+          "deposit_points": [
+            0,
+            637065605282,
+            50828649
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 32932542604275186699987602869,
+          "amount": 471595799856050289870,
+          "deposit_points": [
+            0,
+            44162539631,
+            50828649
+          ],
+          "gov_data": [
+            227762419162198024,
+            32932542604275186699987602869,
+            50828649,
+            58930178,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 860930890,
+          "amount": 860930890,
+          "deposit_points": [
+            4654568540,
+            860,
+            50828649
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 603106426616434610247,
+      "collateral_value": 873500001997226423223,
+      "max_debt": 698800001597781138578,
+      "current_terms": {
+        "collateralVal": 873500001997226423223,
+        "totalMaxDebt": 698800001597781138578,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xd088BDC872076691aBb10eF128703E089e463047",
+      "stored_debt": {
+        "amount": 18987999807792729,
+        "principal": 18051128648721153,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xd088BDC872076691aBb10eF128703E089e463047",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 7743904927929399099806141,
+          "amount": 110893139420762050,
+          "deposit_points": [
+            0,
+            12736398,
+            34023735
+          ],
+          "gov_data": [
+            0,
+            7743904927929399099806141,
+            33706245,
+            49302309,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xd088BDC872076691aBb10eF128703E089e463047",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 2443856,
+          "amount": 2443856,
+          "deposit_points": [
+            0,
+            2,
+            45416650
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 18991140149364187,
+      "collateral_value": 2479534937909979949,
+      "max_debt": 1983627950327983959,
+      "current_terms": {
+        "collateralVal": 2479534937909979949,
+        "totalMaxDebt": 1983627950327983959,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x3A3af2ea20d59DA1cAAE5408C48a313ae12EEd90",
+      "stored_debt": {
+        "amount": 5041220102,
+        "principal": 5022444088,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x3A3af2ea20d59DA1cAAE5408C48a313ae12EEd90",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 58870741673660229225833029,
+          "amount": 587235648194760787,
+          "deposit_points": [
+            0,
+            1080730942,
+            33986731
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x3A3af2ea20d59DA1cAAE5408C48a313ae12EEd90",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 13956125705532791262135358,
+          "amount": 199852478567443323,
+          "deposit_points": [
+            0,
+            23119716,
+            34023735
+          ],
+          "gov_data": [
+            0,
+            13956125705532791262135358,
+            33986731,
+            49582795,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x3A3af2ea20d59DA1cAAE5408C48a313ae12EEd90",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 495212,
+          "amount": 495212,
+          "deposit_points": [
+            0,
+            0,
+            45416650
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 5042053847,
+      "collateral_value": 502441819678523198,
+      "max_debt": 401953455742818558,
+      "current_terms": {
+        "collateralVal": 502441819678523198,
+        "totalMaxDebt": 401953455742818558,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8499,
+          "liqThreshold": 8999,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+      "stored_debt": {
+        "amount": 1001237027927350738398,
+        "principal": 977219574964082744716,
+        "debtTerms": {
+          "ltv": 7837,
+          "redemptionThreshold": 8396,
+          "liqThreshold": 8878,
+          "liqFee": 552,
+          "borrowRate": 524,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789003321,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "shares": 2838772214634893181450902908,
+          "amount": 29167890648292016331,
+          "deposit_points": [
+            0,
+            28387722146,
+            51106987
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 272224737268980784859991518,
+          "amount": 2715441754258083331,
+          "deposit_points": [
+            8183873218711996,
+            2722247372,
+            51106987
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 1185208068140471150587928080039,
+          "amount": 16972243947480390876149,
+          "deposit_points": [
+            0,
+            3507030673626,
+            51106987
+          ],
+          "gov_data": [
+            53814328052125957627,
+            1185208068140471150587928080039,
+            51106987,
+            97444224,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 36061552168075187700000000,
+          "amount": 365751332409566868,
+          "deposit_points": [
+            3922342887936,
+            36061552,
+            51106987
+          ],
+          "gov_data": [
+            312012607660872,
+            36061552168075187700000000,
+            51106987,
+            45382038,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+          "asset": "0xA88594D404727625A9437C3f886C7643872296AE",
+          "shares": 11967747830000000000000,
+          "amount": 11967747830000000000000,
+          "deposit_points": [
+            197270227742831040000,
+            11967747830000,
+            51106987
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 63401900682941057,
+          "amount": 63401900682941057,
+          "deposit_points": [
+            1028066235906192,
+            63401900,
+            51106987
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x381490fF607bb11de75E730FF0698d72573fAedb",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 1346548727,
+          "amount": 1346548727,
+          "deposit_points": [
+            2717127797,
+            1346,
+            51106987
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1001403226416198816104,
+      "collateral_value": 1544912517317865200089,
+      "max_debt": 1210956064321395278259,
+      "current_terms": {
+        "collateralVal": 1544912517317865200089,
+        "totalMaxDebt": 1210956064321395278259,
+        "debtTerms": {
+          "ltv": 7838,
+          "redemptionThreshold": 8397,
+          "liqThreshold": 8879,
+          "liqFee": 552,
+          "borrowRate": 524,
+          "daowry": 25
+        },
+        "lowestLtv": 4000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F",
+      "stored_debt": {
+        "amount": 3734888517482944464045,
+        "principal": 3678685606611057343991,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 382702078148395403220313171124,
+          "amount": 3817453229530244150598,
+          "deposit_points": [
+            0,
+            3827020781483,
+            50761056
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F",
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "shares": 287586732912778308695514025520,
+          "amount": 2954903649632323783815,
+          "deposit_points": [
+            0,
+            2875867329127,
+            50761056
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 5253510000,
+          "amount": 5253510000,
+          "deposit_points": [
+            28075688088,
+            5253,
+            50761056
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 3735506214227990888612,
+      "collateral_value": 5330208323100648632400,
+      "max_debt": 4264166658480518905920,
+      "current_terms": {
+        "collateralVal": 5330208323100648632400,
+        "totalMaxDebt": 4264166658480518905920,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084",
+      "stored_debt": {
+        "amount": 9265423662808453037,
+        "principal": 8682019093802451253,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1200,
+          "borrowRate": 1100,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 23861127549017004068219306455,
+          "amount": 238014747301444615797,
+          "deposit_points": [
+            611590644234304,
+            238611275490,
+            36073576
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 56003649030014216700000000,
+          "amount": 568012412695289820,
+          "deposit_points": [
+            131484299768,
+            56003649,
+            36073947
+          ],
+          "gov_data": [
+            90905792320092,
+            56003649030014216700000000,
+            36073947,
+            36091267,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 1043581573450805545833457275,
+          "amount": 14944144846644155794,
+          "deposit_points": [
+            671224756550502,
+            1484494787,
+            36070028
+          ],
+          "gov_data": [
+            677042082643458,
+            1043581573450805545833457275,
+            36073947,
+            46098680,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084",
+          "asset": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+          "shares": 84236205661187925974,
+          "amount": 84236205661187925974,
+          "deposit_points": [
+            180671100000000000,
+            144411399654,
+            36074846
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 9268794871460236278,
+      "collateral_value": 53599430273249348346,
+      "max_debt": 26799715136624674173,
+      "current_terms": {
+        "collateralVal": 53599430273249348346,
+        "totalMaxDebt": 26799715136624674173,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1199,
+          "borrowRate": 1099,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xFC7c1D00b2eC6d3653E9De72590684456846c53D",
+      "stored_debt": {
+        "amount": 1748061399360,
+        "principal": 1746562797385,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xFC7c1D00b2eC6d3653E9De72590684456846c53D",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 859124369870583758694273498,
+          "amount": 12302707666803314723,
+          "deposit_points": [
+            0,
+            1424514116,
+            48286300
+          ],
+          "gov_data": [
+            0,
+            859124369870583758694273498,
+            48286300,
+            63882364,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xFC7c1D00b2eC6d3653E9De72590684456846c53D",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 337869,
+          "amount": 337869,
+          "deposit_points": [
+            27088060,
+            0,
+            50834262
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1748350503527,
+      "collateral_value": 342801699419567689,
+      "max_debt": 274241359535654151,
+      "current_terms": {
+        "collateralVal": 342801699419567689,
+        "totalMaxDebt": 274241359535654151,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x3BdFde86869874b101466035B57835A087EadC0f",
+      "stored_debt": {
+        "amount": 1123110807267090082,
+        "principal": 1121802591999553512,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998909,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x3BdFde86869874b101466035B57835A087EadC0f",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 670562085018211049715993880,
+          "amount": 9602485500049170770,
+          "deposit_points": [
+            200742,
+            1104616922,
+            34023735
+          ],
+          "gov_data": [
+            77330713981465,
+            670562085018211049715993880,
+            33837879,
+            49364136,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x3BdFde86869874b101466035B57835A087EadC0f",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 5899,
+          "amount": 5899,
+          "deposit_points": [
+            0,
+            0,
+            33837879
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1123370852149666665,
+      "collateral_value": 4552880792143711400,
+      "max_debt": 3187016554500597980,
+      "current_terms": {
+        "collateralVal": 4552880792143711400,
+        "totalMaxDebt": 3187016554500597980,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 999,
+          "borrowRate": 699,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+      "stored_debt": {
+        "amount": 295343126496219026160,
+        "principal": 291843643986682351200,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789002353,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 26901654008247818070271082942,
+          "amount": 268343998732271985495,
+          "deposit_points": [
+            0,
+            269016540082,
+            51106524
+          ],
+          "vault_id": 1,
+          "symbol": "sGREEN",
+          "decimals": 18,
+          "token_amount": "268.343998732271985495"
+        },
+        {
+          "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 47912901888055832395210915095,
+          "amount": 686115358927338975876,
+          "deposit_points": [
+            2344842950950995,
+            54405100093,
+            51106524
+          ],
+          "gov_data": [
+            189570119606889913,
+            47912901888055832395210915095,
+            51106524,
+            54353060,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2,
+          "symbol": "RIPE",
+          "decimals": 18,
+          "token_amount": "686.115358927338975876"
+        },
+        {
+          "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 363201462,
+          "amount": 363201462,
+          "deposit_points": [
+            1364596497,
+            363,
+            51106524
+          ],
+          "vault_id": 5,
+          "symbol": "undyUSDC",
+          "decimals": 6,
+          "token_amount": "363.201462"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 295390359294423333333,
+      "collateral_value": 368504001270526553948,
+      "max_debt": 294803201016421243158,
+      "current_terms": {
+        "collateralVal": 368504001270526553948,
+        "totalMaxDebt": 294803201016421243158,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 587158278002090175,
+      "has_funded_positions": true,
+      "legacy_trial": {
+        "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+        "block": 51156938,
+        "reverted": true,
+        "error": "Revert(\"Revert(b'')\")",
+        "frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xbdb77610",
+            "error": "Revert(\"Revert(b'')\")",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xbdb77610",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ]
+      }
+    },
+    {
+      "user": "0xf52ebe90C4653B348b4C282A0172026F9c91Ae5d",
+      "stored_debt": {
+        "amount": 1003319180804531926,
+        "principal": 1000001690498006372,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xf52ebe90C4653B348b4C282A0172026F9c91Ae5d",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 1128448595650093491710002013,
+          "amount": 11256274741609682590,
+          "deposit_points": [
+            5948323375070544,
+            11284485956,
+            49717854
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xf52ebe90C4653B348b4C282A0172026F9c91Ae5d",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 419358162407298541346122981517,
+          "amount": 6005231676249616661344,
+          "deposit_points": [
+            0,
+            457393947737,
+            49717854
+          ],
+          "gov_data": [
+            7661687300171948147,
+            419358162407298541346122981517,
+            49945330,
+            51906404,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xf52ebe90C4653B348b4C282A0172026F9c91Ae5d",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 1548379,
+          "amount": 1548379,
+          "deposit_points": [
+            4301204,
+            1,
+            49717854
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1004447269037573936,
+      "collateral_value": 1570984471927199001,
+      "max_debt": 1256787577541759200,
+      "current_terms": {
+        "collateralVal": 1570984471927199001,
+        "totalMaxDebt": 1256787577541759200,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D",
+      "stored_debt": {
+        "amount": 835362155012104234467,
+        "principal": 813456786237628048386,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788973103,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D",
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "shares": 28916633529742631259814322408,
+          "amount": 297113378933344806587,
+          "deposit_points": [
+            0,
+            289166335297,
+            51091878
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 226607275863164946300000000,
+          "amount": 2298345692230882839,
+          "deposit_points": [
+            0,
+            535631615,
+            51091878
+          ],
+          "gov_data": [
+            6764073035107118,
+            226607275863164946300000000,
+            51091878,
+            83360837,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 74227620543381736188314538491,
+          "amount": 1062943560179991020522,
+          "deposit_points": [
+            0,
+            108275830086,
+            51091878
+          ],
+          "gov_data": [
+            746899417603345439,
+            74227620543381736188314538491,
+            51091878,
+            61975590,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 684581,
+          "amount": 684581,
+          "deposit_points": [
+            1142164936,
+            68,
+            51091878
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D",
+          "asset": "0x02981DB1a99A14912b204437e7a2E02679B57668",
+          "shares": 473874693827116587,
+          "amount": 473874693827116587,
+          "deposit_points": [
+            2638414600354587,
+            473874693,
+            51091878
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 835603425170082752621,
+      "collateral_value": 1700344993939138756481,
+      "max_debt": 1190241495757397129536,
+      "current_terms": {
+        "collateralVal": 1700344993939138756481,
+        "totalMaxDebt": 1190241495757397129536,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90",
+      "stored_debt": {
+        "amount": 260859071381229605339,
+        "principal": 260000979480463887249,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788962573,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 36401901318560096166528329904,
+          "amount": 363108965652636959591,
+          "deposit_points": [
+            57647223295405308,
+            364019013185,
+            51086613
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 158019221224649917100000000,
+          "amount": 1602696978761874154,
+          "deposit_points": [
+            0,
+            158019221,
+            50688225
+          ],
+          "gov_data": [
+            4002613673325046,
+            158019221224649917100000000,
+            50688421,
+            33845010,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 19768821516169874071329634749,
+          "amount": 283090598474451329191,
+          "deposit_points": [
+            5567928117528,
+            28405819636,
+            50688421
+          ],
+          "gov_data": [
+            141418380256371696,
+            19768821516169874071329634749,
+            50688421,
+            69183533,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 596527,
+          "amount": 596527,
+          "deposit_points": [
+            267190425,
+            59,
+            51086455
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 260940510101010614430,
+      "collateral_value": 460402834428735672200,
+      "max_debt": 322281984100114970540,
+      "current_terms": {
+        "collateralVal": 460402834428735672200,
+        "totalMaxDebt": 322281984100114970540,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xe0d8293733dCC20BD2aBE0E29bD9Bf4021EA7B4d",
+      "stored_debt": {
+        "amount": 1011288773826356185,
+        "principal": 1000000000000000000,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789002287,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xe0d8293733dCC20BD2aBE0E29bD9Bf4021EA7B4d",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 172854901455461446565821106,
+          "amount": 1724227642018227931,
+          "deposit_points": [
+            465388121643484,
+            1728549014,
+            47821428
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xe0d8293733dCC20BD2aBE0E29bD9Bf4021EA7B4d",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 283511564579075897071332447,
+          "amount": 4059901012585427235,
+          "deposit_points": [
+            1020787637640804,
+            283511564,
+            51106470
+          ],
+          "gov_data": [
+            1009952942989972,
+            283511564579075897071332447,
+            51106470,
+            51107565,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xe0d8293733dCC20BD2aBE0E29bD9Bf4021EA7B4d",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 4986020,
+          "amount": 4986020,
+          "deposit_points": [
+            22458,
+            4,
+            47719951
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1011450610173859656,
+      "collateral_value": 5058813117924263224,
+      "max_debt": 4047050494339410579,
+      "current_terms": {
+        "collateralVal": 5058813117924263224,
+        "totalMaxDebt": 4047050494339410579,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xCA0073964efe7f9422CeB16901018b1DB0cC4785",
+      "stored_debt": {
+        "amount": 1862516423415608918,
+        "principal": 1814200429014661753,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xCA0073964efe7f9422CeB16901018b1DB0cC4785",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 6212023238614902593897604228,
+          "amount": 88956510377630582526,
+          "deposit_points": [
+            0,
+            9812511906,
+            42465713
+          ],
+          "gov_data": [
+            16636594648006522,
+            6212023238614902593897604228,
+            42465713,
+            56206415,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xCA0073964efe7f9422CeB16901018b1DB0cC4785",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 4838707,
+          "amount": 4838707,
+          "deposit_points": [
+            0,
+            4,
+            45416650
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1864610555473781915,
+      "collateral_value": 4909349430084908992,
+      "max_debt": 3927479544067927193,
+      "current_terms": {
+        "collateralVal": 4909349430084908992,
+        "totalMaxDebt": 3927479544067927193,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275",
+      "stored_debt": {
+        "amount": 2810841328260473905,
+        "principal": 2711714019132242829,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 150143970387869982972166427,
+          "amount": 1497686104619003081,
+          "deposit_points": [
+            349412206358420,
+            1501439703,
+            39537138
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275",
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "shares": 98547781100077341039399236,
+          "amount": 1012561306588865435,
+          "deposit_points": [
+            0,
+            985477811,
+            39529128
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 103523074659325721127075175,
+          "amount": 1482456055220727108,
+          "deposit_points": [
+            0,
+            103523074,
+            39576366
+          ],
+          "gov_data": [
+            0,
+            103523074659325721127075175,
+            39576366,
+            39619566,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 5091366,
+          "amount": 5091366,
+          "deposit_points": [
+            0,
+            5,
+            45416650
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 2814001715391532422,
+      "collateral_value": 5165697110912829141,
+      "max_debt": 4132557688730263312,
+      "current_terms": {
+        "collateralVal": 5165697110912829141,
+        "totalMaxDebt": 4132557688730263312,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x37a1621bd89b75FF761AC9d9145Bc34920e75AdE",
+      "stored_debt": {
+        "amount": 15627886171301409637,
+        "principal": 14769348525716101660,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x37a1621bd89b75FF761AC9d9145Bc34920e75AdE",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 881395243432051686178465622,
+          "amount": 8791917553234715577,
+          "deposit_points": [
+            0,
+            38356978073,
+            33827983
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x37a1621bd89b75FF761AC9d9145Bc34920e75AdE",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 15964660449921035,
+          "amount": 15964660449921035,
+          "deposit_points": [
+            0,
+            15964660,
+            33827952
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 15652486008290711247,
+      "collateral_value": 39035884132365449251,
+      "max_debt": 27325118892655814475,
+      "current_terms": {
+        "collateralVal": 39035884132365449251,
+        "totalMaxDebt": 27325118892655814475,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5",
+      "stored_debt": {
+        "amount": 320246023970982928121,
+        "principal": 299999983520264552609,
+        "debtTerms": {
+          "ltv": 7456,
+          "redemptionThreshold": 8091,
+          "liqThreshold": 8489,
+          "liqFee": 755,
+          "borrowRate": 602,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 28763147115512922985801640880,
+          "amount": 286912392477241407044,
+          "deposit_points": [
+            3999061205139,
+            287631471155,
+            33831267
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 250000,
+          "amount": 250000,
+          "deposit_points": [
+            0,
+            25,
+            33831113
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 80000000000000000,
+          "amount": 80000000000000000,
+          "deposit_points": [
+            0,
+            80000000,
+            33831149
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 318514240,
+          "amount": 318514240,
+          "deposit_points": [
+            0,
+            318,
+            45416360
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 320679549011659099142,
+      "collateral_value": 711727223949140220377,
+      "max_debt": 530525493833597176301,
+      "current_terms": {
+        "collateralVal": 711727223949140220377,
+        "totalMaxDebt": 530525493833597176301,
+        "debtTerms": {
+          "ltv": 7454,
+          "redemptionThreshold": 8089,
+          "liqThreshold": 8487,
+          "liqFee": 756,
+          "borrowRate": 602,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xCFFE08BDf20918007f8Ab268C32f8756494fC8D8",
+      "stored_debt": {
+        "amount": 1413445463583,
+        "principal": 1412509061748,
+        "debtTerms": {
+          "ltv": 7019,
+          "redemptionThreshold": 7718,
+          "liqThreshold": 8022,
+          "liqFee": 988,
+          "borrowRate": 695,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xCFFE08BDf20918007f8Ab268C32f8756494fC8D8",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 15924430438026720651776474082,
+          "amount": 228038709306895014674,
+          "deposit_points": [
+            0,
+            26404298109,
+            50651970
+          ],
+          "gov_data": [
+            0,
+            15924430438026720651776474082,
+            50651970,
+            66248034,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xCFFE08BDf20918007f8Ab268C32f8756494fC8D8",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 250000,
+          "amount": 250000,
+          "deposit_points": [
+            420515100,
+            25,
+            50651970
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0xCFFE08BDf20918007f8Ab268C32f8756494fC8D8",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 3877790,
+          "amount": 3877790,
+          "deposit_points": [
+            1664923980,
+            318,
+            50651970
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1415654474238,
+      "collateral_value": 196885784833661030579,
+      "max_debt": 138213489741213824463,
+      "current_terms": {
+        "collateralVal": 196885784833661030579,
+        "totalMaxDebt": 138213489741213824463,
+        "debtTerms": {
+          "ltv": 7019,
+          "redemptionThreshold": 7718,
+          "liqThreshold": 8022,
+          "liqFee": 988,
+          "borrowRate": 695,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x7cb71C594FEBACE6b6bA11126abeB8Cc860cB24A",
+      "stored_debt": {
+        "amount": 23900374784505180921,
+        "principal": 21993459576765601221,
+        "debtTerms": {
+          "ltv": 4999,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1200,
+          "borrowRate": 1100,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x7cb71C594FEBACE6b6bA11126abeB8Cc860cB24A",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 28757761782684101038400510555,
+          "amount": 286858673782273908119,
+          "deposit_points": [
+            0,
+            287577617826,
+            33831755
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x7cb71C594FEBACE6b6bA11126abeB8Cc860cB24A",
+          "asset": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+          "shares": 692731581958835353,
+          "amount": 692731581958835353,
+          "deposit_points": [
+            0,
+            1500000000,
+            33831727
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 23959494365358567798,
+      "collateral_value": 68968378003102110514,
+      "max_debt": 34484189001551055257,
+      "current_terms": {
+        "collateralVal": 68968378003102110514,
+        "totalMaxDebt": 34484189001551055257,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1199,
+          "borrowRate": 1099,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xd060D0C2bbd34AB116bd6c917147B560C66F875b",
+      "stored_debt": {
+        "amount": 68260520361387739,
+        "principal": 68260520361387739,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 68260520361387739,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 68260520361387739,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0xeE6629D668FD86d1D3533c49D1A4dDfe6B8dBB45",
+      "stored_debt": {
+        "amount": 2867519860591,
+        "principal": 2672352267484,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xeE6629D668FD86d1D3533c49D1A4dDfe6B8dBB45",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 1000000000000000,
+          "amount": 1000000000000000,
+          "deposit_points": [
+            34333320000000,
+            1000000,
+            34403567
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 2872033620184,
+      "collateral_value": 2445143400000000000,
+      "max_debt": 1711600380000000000,
+      "current_terms": {
+        "collateralVal": 2445143400000000000,
+        "totalMaxDebt": 1711600380000000000,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x6b34e50bDfC20A0869BF28249bac24d12Cc3fbbd",
+      "stored_debt": {
+        "amount": 22905936042316810,
+        "principal": 22905936042316810,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "positions": [],
+      "healthy": false,
+      "current_debt": 22905936042316810,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 22905936042316810,
+      "has_funded_positions": false,
+      "legacy_trial": null
+    },
+    {
+      "user": "0x3D89d2653636eECDd286b7399C194D885Ac1A159",
+      "stored_debt": {
+        "amount": 2783487151251543630,
+        "principal": 2630596232567259341,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x3D89d2653636eECDd286b7399C194D885Ac1A159",
+          "asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+          "shares": 81674854227139898649215303,
+          "amount": 839194918328029110,
+          "deposit_points": [
+            0,
+            816748542,
+            50730602
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x3D89d2653636eECDd286b7399C194D885Ac1A159",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 14130,
+          "amount": 14130,
+          "deposit_points": [
+            16894969,
+            1,
+            50730602
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 2787868635057609859,
+      "collateral_value": 10905612068654118000,
+      "max_debt": 7633928448057882600,
+      "current_terms": {
+        "collateralVal": 10905612068654118000,
+        "totalMaxDebt": 7633928448057882600,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E",
+      "stored_debt": {
+        "amount": 257547140184901938,
+        "principal": 257547140184901938,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "positions": [
+        {
+          "user": "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 187981067302658495195159419,
+          "amount": 2691899099855195626,
+          "deposit_points": [
+            1563402418262606,
+            1518605051,
+            38167145
+          ],
+          "gov_data": [
+            1456670724682741,
+            187981067302658495195159419,
+            38167145,
+            0,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2,
+          "symbol": "RIPE",
+          "decimals": 18,
+          "token_amount": "2.691899099855195626"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 257547140184901938,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 257547140184901938,
+      "has_funded_positions": true,
+      "legacy_trial": {
+        "user": "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E",
+        "block": 51156938,
+        "reverted": true,
+        "error": "Revert(\"Revert(b'')\")",
+        "frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xbdb77610",
+            "error": "Revert(\"Revert(b'')\")",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xbdb77610",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ]
+      }
+    },
+    {
+      "user": "0xb4f6C55B3E51D1ECEF78F9c149E4aeA7E7ae86a1",
+      "stored_debt": {
+        "amount": 202501711167449861,
+        "principal": 193178802368185108,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xb4f6C55B3E51D1ECEF78F9c149E4aeA7E7ae86a1",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 80799842,
+          "amount": 80799842,
+          "deposit_points": [
+            0,
+            80,
+            45416487
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 202729395240384351,
+      "collateral_value": 81979474738530498580,
+      "max_debt": 65583579790824398864,
+      "current_terms": {
+        "collateralVal": 81979474738530498580,
+        "totalMaxDebt": 65583579790824398864,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d",
+      "stored_debt": {
+        "amount": 999884782496605239433,
+        "principal": 999000000000000000000,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8499,
+          "liqThreshold": 8999,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788855095,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 91587049318544091820466070179,
+          "amount": 913580816952477316741,
+          "deposit_points": [
+            59431761093770,
+            915870493185,
+            51032874
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 565982454254074510114097685,
+          "amount": 8104899503987605957,
+          "deposit_points": [
+            90613862358194,
+            936134978,
+            51032809
+          ],
+          "gov_data": [
+            90401248458751,
+            565982454254074510114097685,
+            51032809,
+            66532212,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 2181886912980841033469068,
+          "amount": 22129608893990506,
+          "deposit_points": [
+            477125325064,
+            2181886,
+            51032809
+          ],
+          "gov_data": [
+            715687987596,
+            2181886912980841033469068,
+            51032809,
+            50872142,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 126,
+          "amount": 126,
+          "deposit_points": [
+            19500,
+            0,
+            51032809
+          ],
+          "vault_id": 3
+        },
+        {
+          "user": "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 1244168816,
+          "amount": 1244168816,
+          "deposit_points": [
+            348067109,
+            1244,
+            51032809
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1000278138362190210056,
+      "collateral_value": 1262430235990603877379,
+      "max_debt": 1009934464042867741543,
+      "current_terms": {
+        "collateralVal": 1262430235990603877379,
+        "totalMaxDebt": 1009934464042867741543,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8499,
+          "liqThreshold": 8999,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xA0ed9aC5878983DA938a99f416AaDB29D98E778d",
+      "stored_debt": {
+        "amount": 95682450655878151773,
+        "principal": 90128983314705720704,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788480513,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xA0ed9aC5878983DA938a99f416AaDB29D98E778d",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 713538173,
+          "amount": 713538173,
+          "deposit_points": [
+            0,
+            713,
+            45416360
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 95776917657848947961,
+      "collateral_value": 723955433334024398978,
+      "max_debt": 579164346667219519182,
+      "current_terms": {
+        "collateralVal": 723955433334024398978,
+        "totalMaxDebt": 579164346667219519182,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8499,
+          "liqThreshold": 8999,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 4000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753",
+      "stored_debt": {
+        "amount": 487639045489279944,
+        "principal": 468669901680211245,
+        "debtTerms": {
+          "ltv": 7945,
+          "redemptionThreshold": 8461,
+          "liqThreshold": 8951,
+          "liqFee": 524,
+          "borrowRate": 509,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 2107352342907082776829608741,
+          "amount": 21020839620498150718,
+          "deposit_points": [
+            0,
+            21073523429,
+            34395634
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 11382934202006127654130608,
+          "amount": 163004236393426778,
+          "deposit_points": [
+            1187146214700,
+            21626436,
+            34395731
+          ],
+          "gov_data": [
+            1180737169518,
+            11382934202006127654130608,
+            34395731,
+            64213235,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753",
+          "asset": "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493",
+          "shares": 454,
+          "amount": 454,
+          "deposit_points": [
+            0,
+            0,
+            39059956
+          ],
+          "vault_id": 5
+        },
+        {
+          "user": "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 5958792,
+          "amount": 5958792,
+          "deposit_points": [
+            0,
+            5,
+            45416562
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 488197194558437213,
+      "collateral_value": 6396401985782215557,
+      "max_debt": 5082060094837787517,
+      "current_terms": {
+        "collateralVal": 6396401985782215557,
+        "totalMaxDebt": 5082060094837787517,
+        "debtTerms": {
+          "ltv": 7945,
+          "redemptionThreshold": 8461,
+          "liqThreshold": 8951,
+          "liqFee": 524,
+          "borrowRate": 509,
+          "daowry": 25
+        },
+        "lowestLtv": 4000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xe09e4C7b1FEB007aAEc6c66282031D6b8F7A6Ee2",
+      "stored_debt": {
+        "amount": 31726848206971272065,
+        "principal": 31339813768544768954,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789002301,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xe09e4C7b1FEB007aAEc6c66282031D6b8F7A6Ee2",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 6770454976270883802949544306,
+          "amount": 67535288388302065995,
+          "deposit_points": [
+            2926799981661498,
+            67704549762,
+            51063364
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xe09e4C7b1FEB007aAEc6c66282031D6b8F7A6Ee2",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 1879790810085206657630276755,
+          "amount": 26918706560151941119,
+          "deposit_points": [
+            947974104660638,
+            2480947911,
+            51106477
+          ],
+          "gov_data": [
+            7963363473182547,
+            1879790810085206657630276755,
+            51106477,
+            58707134,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xe09e4C7b1FEB007aAEc6c66282031D6b8F7A6Ee2",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 80263664,
+          "amount": 80263664,
+          "deposit_points": [
+            297269120,
+            80,
+            51063364
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 31731924744136809134,
+      "collateral_value": 81435468838044259935,
+      "max_debt": 65148375070435407948,
+      "current_terms": {
+        "collateralVal": 81435468838044259935,
+        "totalMaxDebt": 65148375070435407948,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x9e949d2756933b3846816afdCCaa725f17dF86Cf",
+      "stored_debt": {
+        "amount": 545686344333661057156,
+        "principal": 526284678288916877671,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x9e949d2756933b3846816afdCCaa725f17dF86Cf",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 47908596112615579285481546883,
+          "amount": 477888246223340403807,
+          "deposit_points": [
+            0,
+            479085961126,
+            50766008
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x9e949d2756933b3846816afdCCaa725f17dF86Cf",
+          "asset": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+          "shares": 153261805032723119500000000,
+          "amount": 1554445275592965621,
+          "deposit_points": [
+            0,
+            458360080,
+            50766008
+          ],
+          "gov_data": [
+            3973168463233426,
+            153261805032723119500000000,
+            50766008,
+            97852340,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x9e949d2756933b3846816afdCCaa725f17dF86Cf",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 52071787618486801005856087940,
+          "amount": 745670828607286974773,
+          "deposit_points": [
+            0,
+            79242846397,
+            50766008
+          ],
+          "gov_data": [
+            856306788182678126,
+            52071787618486801005856087940,
+            50766008,
+            63139735,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x9e949d2756933b3846816afdCCaa725f17dF86Cf",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 809366357335221294,
+          "amount": 809366357335221294,
+          "deposit_points": [
+            7448872073913967,
+            809366357,
+            50766008
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 546545308557661295459,
+      "collateral_value": 1979016806820257934563,
+      "max_debt": 1385311764774180554194,
+      "current_terms": {
+        "collateralVal": 1979016806820257934563,
+        "totalMaxDebt": 1385311764774180554194,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x5D58EDC7a7C91239Ec2FD56a646679780886323c",
+      "stored_debt": {
+        "amount": 41986104689758895,
+        "principal": 39246369728659901,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x5D58EDC7a7C91239Ec2FD56a646679780886323c",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 92396203189783,
+          "amount": 92396203189783,
+          "deposit_points": [
+            481912786524824,
+            92396,
+            35127380
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 42052194967091508,
+      "collateral_value": 225921966414556849,
+      "max_debt": 158145376490189794,
+      "current_terms": {
+        "collateralVal": 225921966414556849,
+        "totalMaxDebt": 158145376490189794,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x2c1e54f815529467be8F3B78E46C14168852322A",
+      "stored_debt": {
+        "amount": 74774494739449816,
+        "principal": 69101601151134692,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x2c1e54f815529467be8F3B78E46C14168852322A",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 726234,
+          "amount": 726234,
+          "deposit_points": [
+            0,
+            0,
+            45416650
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 74858567913033117,
+      "collateral_value": 736836612344637482,
+      "max_debt": 589469289875709985,
+      "current_terms": {
+        "collateralVal": 736836612344637482,
+        "totalMaxDebt": 589469289875709985,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8499,
+          "liqThreshold": 8999,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 4000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x66212a3c4eB5c934A5cB998C8F5D74138022767c",
+      "stored_debt": {
+        "amount": 105443299200996024586,
+        "principal": 99651509335480145193,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x66212a3c4eB5c934A5cB998C8F5D74138022767c",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 21079517165524288544218700141,
+          "amount": 210268183726104778420,
+          "deposit_points": [
+            0,
+            402396351150,
+            33937149
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0x66212a3c4eB5c934A5cB998C8F5D74138022767c",
+          "asset": "0x4200000000000000000000000000000000000006",
+          "shares": 108610674101157985,
+          "amount": 108610674101157985,
+          "deposit_points": [
+            0,
+            152414872,
+            33937113
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 105609277372549513279,
+      "collateral_value": 265568672947997379380,
+      "max_debt": 185898071063598165566,
+      "current_terms": {
+        "collateralVal": 265568672947997379380,
+        "totalMaxDebt": 185898071063598165566,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x8d804669c3E1DEc71Ba8d460CAAeD5bf9Fa415e2",
+      "stored_debt": {
+        "amount": 1301115363357,
+        "principal": 1274138174583,
+        "debtTerms": {
+          "ltv": 7662,
+          "redemptionThreshold": 8253,
+          "liqThreshold": 8691,
+          "liqFee": 654,
+          "borrowRate": 561,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789002281,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x8d804669c3E1DEc71Ba8d460CAAeD5bf9Fa415e2",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 4869640810613381914908180,
+          "amount": 69733521055090326,
+          "deposit_points": [
+            19380972898167,
+            5803149,
+            51106467
+          ],
+          "gov_data": [
+            19347456085034,
+            4869640810613381914908180,
+            51106467,
+            55680619,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0x8d804669c3E1DEc71Ba8d460CAAeD5bf9Fa415e2",
+          "asset": "0x02981DB1a99A14912b204437e7a2E02679B57668",
+          "shares": 207280995527510,
+          "amount": 207280995527510,
+          "deposit_points": [
+            0,
+            207280,
+            45256412
+          ],
+          "vault_id": 5
+        },
+        {
+          "user": "0x8d804669c3E1DEc71Ba8d460CAAeD5bf9Fa415e2",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 1000883,
+          "amount": 1000883,
+          "deposit_points": [
+            0,
+            1,
+            45416650
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1301348996988,
+      "collateral_value": 1528140376092975160,
+      "max_debt": 1171247796758879073,
+      "current_terms": {
+        "collateralVal": 1528140376092975160,
+        "totalMaxDebt": 1171247796758879073,
+        "debtTerms": {
+          "ltv": 7664,
+          "redemptionThreshold": 8254,
+          "liqThreshold": 8693,
+          "liqFee": 653,
+          "borrowRate": 561,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0x902768128C224FEbFF1147aDd4fc9dCbF39d0C56",
+      "stored_debt": {
+        "amount": 10108178481724624,
+        "principal": 9351916316255251,
+        "debtTerms": {
+          "ltv": 4999,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998915,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0x902768128C224FEbFF1147aDd4fc9dCbF39d0C56",
+          "asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+          "shares": 3547403763549683008,
+          "amount": 3547403763549683008,
+          "deposit_points": [
+            5035835017448795,
+            3547403763,
+            35481400
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 10110853123187624,
+      "collateral_value": 1969405229972538593,
+      "max_debt": 984702614986269296,
+      "current_terms": {
+        "collateralVal": 1969405229972538593,
+        "totalMaxDebt": 984702614986269296,
+        "debtTerms": {
+          "ltv": 4999,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 5000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xdd2ba66B25DCC26d0850787f79678dE906bD6B98",
+      "stored_debt": {
+        "amount": 889153833736199674,
+        "principal": 848669456514386979,
+        "debtTerms": {
+          "ltv": 4999,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998915,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xdd2ba66B25DCC26d0850787f79678dE906bD6B98",
+          "asset": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+          "shares": 53245009396106442852117172941,
+          "amount": 531118968726161767933,
+          "deposit_points": [
+            494995595352394,
+            532450093961,
+            33994964
+          ],
+          "vault_id": 1
+        },
+        {
+          "user": "0xdd2ba66B25DCC26d0850787f79678dE906bD6B98",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 83906948893776289467629027,
+          "amount": 1201552068193614174,
+          "deposit_points": [
+            0,
+            83906948,
+            34023735
+          ],
+          "gov_data": [
+            3478723244859,
+            83906948893776289467629027,
+            33995017,
+            33999846,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xdd2ba66B25DCC26d0850787f79678dE906bD6B98",
+          "asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+          "shares": 12286348357584762925,
+          "amount": 12286348357584762925,
+          "deposit_points": [
+            0,
+            47968157115,
+            33948181
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 889389105374407913,
+      "collateral_value": 6820988059301035542,
+      "max_debt": 3410494029650517771,
+      "current_terms": {
+        "collateralVal": 6820988059301035542,
+        "totalMaxDebt": 3410494029650517771,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 5000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xE87a10d5B212D169CCBC9a50Cf5E23DD3da27cb6",
+      "stored_debt": {
+        "amount": 885028795074578279,
+        "principal": 835449453393048496,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998915,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xE87a10d5B212D169CCBC9a50Cf5E23DD3da27cb6",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 697364990019979846819570441,
+          "amount": 9986304556314021355,
+          "deposit_points": [
+            0,
+            994512212,
+            40331834
+          ],
+          "gov_data": [
+            5559116420156149,
+            697364990019979846819570441,
+            40331834,
+            50445716,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xE87a10d5B212D169CCBC9a50Cf5E23DD3da27cb6",
+          "asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+          "shares": 8593637048753095821,
+          "amount": 8593637048753095821,
+          "deposit_points": [
+            644303866859904448,
+            8593637048,
+            40331834
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 885262975220440909,
+      "collateral_value": 4770912722764011138,
+      "max_debt": 2385456361382005569,
+      "current_terms": {
+        "collateralVal": 4770912722764011138,
+        "totalMaxDebt": 2385456361382005569,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 5000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xb53009E4dC25a494F3Bee03Ab121517e74b59F75",
+      "stored_debt": {
+        "amount": 4635938518554405538,
+        "principal": 4383067466263352528,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998915,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xb53009E4dC25a494F3Bee03Ab121517e74b59F75",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 1190680399643060785324159845,
+          "amount": 17050608031998608404,
+          "deposit_points": [
+            0,
+            1974267169,
+            50792853
+          ],
+          "gov_data": [
+            0,
+            1190680399643060785324159845,
+            50792853,
+            66388917,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xb53009E4dC25a494F3Bee03Ab121517e74b59F75",
+          "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "shares": 11222,
+          "amount": 11222,
+          "deposit_points": [
+            100485078,
+            1,
+            50792853
+          ],
+          "vault_id": 3
+        }
+      ],
+      "healthy": true,
+      "current_debt": 4637011861217334999,
+      "collateral_value": 8661201601870949200,
+      "max_debt": 6062841121309664440,
+      "current_terms": {
+        "collateralVal": 8661201601870949200,
+        "totalMaxDebt": 6062841121309664440,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lowestLtv": 7000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xc6E4Ad3ccdfC65687D2d60a454a8bdDc1F4d6c06",
+      "stored_debt": {
+        "amount": 1838542101410,
+        "principal": 1819102603072,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788998915,
+        "inLiquidation": false
+      },
+      "positions": [
+        {
+          "user": "0xc6E4Ad3ccdfC65687D2d60a454a8bdDc1F4d6c06",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 12818759638645602061239538504,
+          "amount": 183565334677947119969,
+          "deposit_points": [
+            0,
+            18201356809,
+            47745032
+          ],
+          "gov_data": [
+            86868019393507808,
+            12818759638645602061239538504,
+            47745032,
+            57711134,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2
+        },
+        {
+          "user": "0xc6E4Ad3ccdfC65687D2d60a454a8bdDc1F4d6c06",
+          "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+          "shares": 6552559,
+          "amount": 6552559,
+          "deposit_points": [
+            76839375,
+            6,
+            47745032
+          ],
+          "vault_id": 5
+        }
+      ],
+      "healthy": true,
+      "current_debt": 1838846152292,
+      "collateral_value": 6648222715747769225,
+      "max_debt": 5318578172598215380,
+      "current_terms": {
+        "collateralVal": 6648222715747769225,
+        "totalMaxDebt": 5318578172598215380,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lowestLtv": 8000,
+        "highestLtv": 8000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 0
+    },
+    {
+      "user": "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738",
+      "stored_debt": {
+        "amount": 13700809940108052,
+        "principal": 13700809940108052,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788998915,
+        "inLiquidation": true
+      },
+      "positions": [
+        {
+          "user": "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738",
+          "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "shares": 3566690643169015833763581886,
+          "amount": 51075203846727171346,
+          "deposit_points": [
+            289913302544924,
+            5817629107,
+            35295231
+          ],
+          "gov_data": [
+            3719265037371935,
+            3566690643169015833763581886,
+            35295231,
+            50253355,
+            [
+              43200,
+              47304000,
+              20000,
+              true,
+              8000
+            ]
+          ],
+          "vault_id": 2,
+          "symbol": "RIPE",
+          "decimals": 18,
+          "token_amount": "51.075203846727171346"
+        }
+      ],
+      "healthy": false,
+      "current_debt": 13700809940108052,
+      "collateral_value": 0,
+      "max_debt": 0,
+      "current_terms": {
+        "collateralVal": 0,
+        "totalMaxDebt": 0,
+        "debtTerms": {
+          "ltv": 6000,
+          "redemptionThreshold": 6850,
+          "liqThreshold": 7250,
+          "liqFee": 1000,
+          "borrowRate": 750,
+          "daowry": 25
+        },
+        "lowestLtv": 5000,
+        "highestLtv": 7000,
+        "hasQuarantinedAsset": false
+      },
+      "locked": false,
+      "debt_above_limit": 13700809940108052,
+      "has_funded_positions": true,
+      "legacy_trial": {
+        "user": "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738",
+        "block": 51156938,
+        "reverted": true,
+        "error": "Revert(\"Revert(b'')\")",
+        "frames": [
+          {
+            "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+            "selector": "0xbdb77610",
+            "error": "Revert(\"Revert(b'')\")",
+            "output": "0x"
+          },
+          {
+            "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+            "selector": "0xbdb77610",
+            "error": "Revert(b'')",
+            "output": "0x"
+          },
+          {
+            "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+            "selector": "0xefc5b8cf",
+            "error": "Revert(b'')",
+            "output": "0x"
+          }
+        ]
+      }
+    }
+  ]
+}

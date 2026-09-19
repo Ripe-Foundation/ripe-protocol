@@ -36,7 +36,7 @@ CONTRACTS = ROOT / "contracts"
 VERIFY_DEFAULTS = ROOT / "scripts" / "verify_defaults.py"
 
 DEFAULTS_READ_RE = re.compile(
-    r"staticcall\s+Defaults\(\s*_defaults\s*\)\s*\.\s*(\w+)\s*\("
+    r"staticcall\s+Defaults\(\s*(?:self\.)?_?defaults\s*\)\s*\.\s*(\w+)\s*\("
 )
 
 
@@ -78,7 +78,9 @@ def test_no_third_consumer_of_defaults_goes_unverified():
     # The verifier rebuilds MissionControl and Ledger. A new consumer would be
     # unverified by construction, and the script has no way to notice.
     consumers = _consumers()
-    expected = {"contracts/data/Ledger.vy", "contracts/data/MissionControl.vy"}
+    expected = {"contracts/data/Ledger.vy", "contracts/data/MissionControl.vy",
+                "contracts/config/SwitchboardFoxtrot.vy",
+                "contracts/config/SwitchboardFoxtrotSetup.vy"}
 
     assert set(consumers) == expected, (
         f"the set of contracts reading Defaults at construction changed to "
@@ -86,6 +88,10 @@ def test_no_third_consumer_of_defaults_goes_unverified():
         f"{sorted(expected)}, so anything new here is unverified -- extend the "
         "script and this test together."
     )
+    assert consumers["contracts/config/SwitchboardFoxtrot.vy"] == consumers[
+        "contracts/data/MissionControl.vy"]
+    assert consumers["contracts/config/SwitchboardFoxtrotSetup.vy"] == consumers[
+        "contracts/data/MissionControl.vy"]
 
 
 def test_mission_control_fields_are_all_reachable_from_the_verifier():

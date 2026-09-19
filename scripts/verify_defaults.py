@@ -46,8 +46,8 @@ MISSION_CONTROL_SOURCE = "contracts/data/MissionControl.vy"
 LEDGER_SOURCE = "contracts/data/Ledger.vy"
 
 # Ledger is the second consumer of a generated defaults contract. Its
-# constructor copies exactly these three, and nothing else in the repo reads
-# Defaults besides it and MissionControl (`grep 'staticcall Defaults'`).
+# constructor copies exactly these three. The switchboard loader mirrors MC's
+# Defaults reads; the verifier exercises that loader before comparing MC.
 # tests/test_verify_defaults_coverage.py fails if that stops being true.
 LEDGER_GETTERS = (
     "ripeAvailForRewards",
@@ -73,6 +73,7 @@ SCALAR_GETTERS = (
     "getPriorityLiqAssetVaults",
     "getPriorityStabVaults",
     "getPriorityPriceSourceIds",
+    "getPriceConfig",
 )
 PER_ASSET_GETTERS = ("assetConfig", "ripeGovVaultConfig", "indexOfAsset")
 
@@ -157,6 +158,30 @@ def _compare_vault_topology(
             )
 
 
+def compare_mission_control_config(replacement, live_call, compare, contributor=None):
+    """Pure readback comparison shared by verifier and staging; never forks."""
+    for name in SCALAR_GETTERS:
+        expected = live_call(name)
+        if name == "hrConfig" and contributor is not None:
+            expected = [contributor, *expected[1:]]
+        compare(name, getattr(replacement, name)(), expected)
+    assets = []
+    for index in range(1, int(live_call("numAssets"))):
+        asset = live_call("assets", index)
+        compare(f"assets({index})", replacement.assets(index), asset)
+        if int(str(asset), 16) == 0:
+            continue
+        assets.append(asset)
+        for name in PER_ASSET_GETTERS:
+            compare(f"{name}({asset})", getattr(replacement, name)(asset), live_call(name, asset))
+    for index in range(1, int(live_call("numLiteSigners"))):
+        signer = live_call("liteSigners", index)
+        compare(f"liteSigners({index})", replacement.liteSigners(index), signer)
+        compare(f"canPerformLiteAction({signer})", replacement.canPerformLiteAction(signer),
+                live_call("canPerformLiteAction", signer))
+    return assets
+
+
 def verify(network: Network, defaults_path: Path, block_number: int | None) -> int:
     import boa
     from web3 import Web3
@@ -186,6 +211,10 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
             f"got {chain_id!r}"
         )
     mission_control_abi = manifest["MissionControl"]["abi"]
+    hq = w3.eth.contract(address=hq_addr, abi=manifest["RipeHq"]["abi"])
+    active_mc = hq.functions.getAddr(5).call(block_identifier=block)
+    if active_mc.lower() != live_addr.lower():
+        raise VerificationError("manifest MissionControl is not the active HQ slot 5 at verification block")
     live = w3.eth.contract(address=live_addr, abi=mission_control_abi)
     live_function_names = _function_names(mission_control_abi)
 
@@ -202,7 +231,38 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     # Reuse the live template here so the verifier compares only snapshotted
     # configuration; the real migration intentionally supplies a fresh one.
     defaults = boa.load(str(defaults_path), live_call("hrConfig")[0])
-    replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, defaults.address)
+    replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, "0x" + "00" * 20)
+    initializer = boa.load(
+        "contracts/config/SwitchboardFoxtrotSetup.vy",
+        hq_addr, "0x" + "00" * 20, 1, 100,
+    )
+    fork_hq = boa.loads_abi(json.dumps(manifest["RipeHq"]["abi"])).at(hq_addr)
+    fork_sb = boa.loads_abi(json.dumps(manifest["Switchboard"]["abi"])).at(fork_hq.getAddr(6))
+    # Only the isolated fork is mutated. Use real registry permissions/delays.
+    with boa.env.prank(fork_hq.governance()):
+        initializer.startDefaultsInitialization(replacement.address, defaults.address)
+        fork_sb.startAddNewAddressToRegistry(initializer.address, "MC defaults initializer")
+        delay = int(fork_sb.registryChangeTimeLock())
+        if delay:
+            boa.env.time_travel(blocks=delay, block_delta=2)
+        fork_sb.confirmNewAddressToRegistry(initializer.address)
+        for _ in range(13):
+            if initializer.initStep() == 5:
+                break
+            initializer.initConfig(gas=16_000_000)
+        if initializer.initStep() != 5:
+            raise VerificationError("defaults initialization incomplete")
+        pending = fork_hq.pendingAddrUpdate(5)
+        if int(str(pending[0]), 16):
+            raise VerificationError("pending MissionControl replacement requires reconciliation")
+        fork_hq.startAddressUpdateToRegistry(5, replacement.address)
+        delay = int(fork_hq.registryChangeTimeLock())
+        if delay:
+            boa.env.time_travel(blocks=delay, block_delta=2)
+        fork_hq.confirmAddressUpdateToRegistry(5)
+        initializer.initRewards(gas=16_000_000)
+        if not initializer.rewardsInitialized():
+            raise VerificationError("rewards initialization incomplete")
 
     mismatches: list[tuple[str, object, object]] = []
     compared = 0
@@ -213,8 +273,7 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
         if _normalize(got) != _normalize(want):
             mismatches.append((label, _normalize(got), _normalize(want)))
 
-    for name in SCALAR_GETTERS:
-        compare(name, getattr(replacement, name)(), live_call(name))
+    assets = compare_mission_control_config(replacement, live_call, compare)
 
     # Defaults cannot carry these pointers. Compare them whenever the deployed
     # MissionControl ABI makes the live value observable. This keeps the
@@ -223,29 +282,6 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     for name in VAULT_POINTER_GETTERS:
         if name in live_function_names:
             compare(name, getattr(replacement, name)(), live_call(name))
-
-    num_assets = live_call("numAssets")
-    assets = [live_call("assets", i) for i in range(1, num_assets)]
-    assets = [a for a in assets if int(a, 16) != 0]
-    for index, asset in enumerate(assets, start=1):
-        # Index order matters: the replacement rebuilds it from the order the
-        # defaults list the assets in, not from the live indices.
-        compare(f"assets({index})", replacement.assets(index), asset)
-        for name in PER_ASSET_GETTERS:
-            compare(
-                f"{name}({asset})",
-                getattr(replacement, name)(asset),
-                live_call(name, asset),
-            )
-
-    for i in range(1, live_call("numLiteSigners")):
-        signer = live_call("liteSigners", i)
-        compare(f"liteSigners({i})", replacement.liteSigners(i), signer)
-        compare(
-            f"canPerformLiteAction({signer})",
-            replacement.canPerformLiteAction(signer),
-            live_call("canPerformLiteAction", signer),
-        )
 
     # Historical true entries in these mappings survive pointer/config
     # rotations but are not representable in Defaults. Walk the complete

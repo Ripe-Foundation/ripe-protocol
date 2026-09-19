@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import boa
 import pytest
+from config.BluePrint import PARAMS
 
 from conf_utils import advance_timelock_blocks, clear_transient_storage, filter_logs
 from constants import (
@@ -260,6 +261,8 @@ def _install_price_desk(
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         1,
         2,
+        PARAMS["robinhood"]["PRICE_DESK_PRICE_SOURCE_GAS"],
+        PARAMS["robinhood"]["PRICE_DESK_SNAPSHOT_SOURCE_GAS"],
         name="aggregate_protocol_price_desk",
     )
     for index, (name, source) in enumerate(sources, start=1):

@@ -923,6 +923,8 @@ def price_desk_deploy(ripe_hq_deploy, fork):
         ETH,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_PRICE_SOURCE_GAS"],
+        PARAMS[fork]["PRICE_DESK_SNAPSHOT_SOURCE_GAS"],
         name="price_desk",
     )
 
