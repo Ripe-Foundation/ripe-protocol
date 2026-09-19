@@ -1,15 +1,14 @@
-"""Resume the partial Base config deployment, then await Safe initialization.
+"""Finish staging Base config; defer initialization to governance cutover.
 
 Keep deployment slots 1 and 2 unchanged: Contributor and DefaultsBaseLive
 already exist on Base and are authenticated/reused by the migration journal.
-Only the not-yet-deployed MC constructor and subsequent steps are changed.
+Recorded slots 1 through 44 are retained. MC remains uninitialized.
 """
 
 import boa
 
 from scripts.utils import log
 from scripts.utils.migration import Migration
-from scripts.verify_defaults import compare_mission_control_config, _normalize
 
 
 ZERO = "0x" + "00" * 20
@@ -69,46 +68,97 @@ def migrate(migration: Migration):
     params = migration.blueprint().PARAMS
     # Stage 1 Foxtrot is already deployed. Preserve that historical record and
     # deploy its replacement under a NEW label, never overwrite/replay Stage 1.
-    initializer = migration.deploy(
+    migration.deploy(
         "SwitchboardFoxtrot", hq.address, ZERO,
         params["MIN_SWITCHBOARD_CHANGE_TIMELOCK"],
         params["MAX_SWITCHBOARD_CHANGE_TIMELOCK"],
         label=f"SwitchboardFoxtrotWithDefaults{SUFFIX}",
     )
+    # Journal slot 4 above is already deployed: keep its source/args unchanged.
+    # New setup-enabled Foxtrot accepts temporary governance for inactive MC init.
+    initializer = migration.deploy(
+        "SwitchboardFoxtrotSetup", hq.address, migration.account(),
+        params["MIN_SWITCHBOARD_CHANGE_TIMELOCK"],
+        params["MAX_SWITCHBOARD_CHANGE_TIMELOCK"],
+        label=f"SwitchboardFoxtrotSetup{SUFFIX}",
+    )
     log.info(f"REPLACEMENT FOXTROT: {initializer.address}")
-    # Deployment journal remains resumable while governance registers and runs
-    # the initializer. Never impersonate governance or switch RPCs here.
-    if initializer.initStep() != 5:
-        raise RuntimeError(
-            f"BASE_MC_AWAITING_SAFE_INIT:{initializer.address}: "
-            f"register Foxtrot in active Switchboard, call startDefaultsInitialization("
-            f"{candidate.address}, {defaults.address}) ONCE, then initConfig until initStep=5, "
-            "then resume this migration. Do not activate MC yet."
+    log.h1("4. Deploy and populate the replacement Switchboard")
+    # The Stage 1 registry had no temporary governor and remains untouched.
+    # Follow 2025071502: deployer configures this NEW registry, then relinquishes.
+    verified.require_unchanged()
+    switchboard = migration.deploy(
+        "Switchboard", hq.address, migration.account(),
+        params["MIN_SWITCHBOARD_CHANGE_TIMELOCK"],
+        params["MAX_SWITCHBOARD_CHANGE_TIMELOCK"],
+        label=f"SwitchboardPopulated{SUFFIX}",
+    )
+    for reg_id, suffix in enumerate(
+        ("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf"), 1
+    ):
+        board = initializer if suffix == "Foxtrot" else migration.get_contract(
+            f"Switchboard{suffix}{SUFFIX}"
         )
+        # Keep every journalled call in the same order on resume.
+        migration.execute(
+            switchboard.startAddNewAddressToRegistry, board.address, f"Switchboard {suffix}"
+        )
+        migration.execute(switchboard.confirmNewAddressToRegistry, board.address)
+        if address(switchboard.getAddr(reg_id)) != address(board.address):
+            raise RuntimeError(f"BASE_SWITCHBOARD_SLOT_MISMATCH:{reg_id}")
+    migration.execute(switchboard.relinquishGov)
+    if address(switchboard.governance()) != ZERO or int(switchboard.numAddrs()) != 8:
+        raise RuntimeError("BASE_SWITCHBOARD_SETUP_INCOMPLETE")
+    log.info(f"POPULATED SWITCHBOARD (HQ slot 6 candidate): {switchboard.address}")
+
+    log.h1("5. Deploy and populate the replacement VaultBook")
+    old_book = migration.get_contract("VaultBook", hq.getAddr(8))
+    if int(old_book.numAddrs()) != 6 or int(old_book.minRegistryTimeLock()) != 21_600:
+        raise RuntimeError("BASE_VAULTBOOK_TOPOLOGY_DRIFT")
+    book = migration.deploy(
+        "VaultBook", hq.address, migration.account(), 21_600,
+        params["VAULT_BOOK_MAX_REG_TIMELOCK"],
+        label=f"VaultBookPopulated{SUFFIX}",
+    )
+    vaults = [(i, old_book.getAddr(i), f"Retained vault {i}") for i in range(1, 6)]
+    vaults += [
+        (i, migration.get_contract(f"{name}{SUFFIX}").address, name)
+        for i, name in enumerate(
+            ("StabilityPool", "RipeGov", "SimpleErc20", "RebaseErc20", "UnderscoreVault"), 6
+        )
+    ]
+    for reg_id, vault, description in vaults:
+        if address(vault) == ZERO:
+            raise RuntimeError(f"BASE_VAULTBOOK_EMPTY_RETAINED_SLOT:{reg_id}")
+        migration.execute(book.startAddNewAddressToRegistry, vault, description)
+        migration.execute(book.confirmNewAddressToRegistry, vault)
+        if address(book.getAddr(reg_id)) != address(vault):
+            raise RuntimeError(f"BASE_VAULTBOOK_SLOT_MISMATCH:{reg_id}")
+    migration.execute(book.relinquishGov)
+    if address(book.governance()) != ZERO or int(book.numAddrs()) != 11:
+        raise RuntimeError("BASE_VAULTBOOK_SETUP_INCOMPLETE")
+    log.info(f"POPULATED VAULTBOOK (HQ slot 8 candidate): {book.address}")
+    migration.execute(
+        initializer.startDefaultsInitialization, candidate.address, defaults.address
+    )
     if (address(initializer.missionControl()) != address(candidate.address)
             or address(initializer.defaults()) != address(defaults.address)):
         raise RuntimeError("BASE_MC_FOXTROT_DEFAULTS_BINDING_MISMATCH")
+    if initializer.initStep() != 1 or candidate.numAssets() != 1:
+        raise RuntimeError("BASE_MC_EXPECTED_UNINITIALIZED_CANDIDATE")
 
-    log.h1("4. Compare the staged configuration with the live configuration")
-
-    def compare(field, actual, expected):
-        if field == "rewardsConfig":
-            # MC's existing setter requires the candidate to be active.
-            # The fixed snapshot was checked above; load it after confirmation.
-            if any(actual):
-                raise RuntimeError("BASE_UPGRADE_REWARDS_SET_BEFORE_ACTIVATION")
-            return
-        if _normalize(actual) != _normalize(expected):
-            raise RuntimeError(f"BASE_UPGRADE_CONFIG_DRIFT:{field}")
-    compare_mission_control_config(candidate, lambda name, *args: getattr(old, name)(*args),
-                                   compare, contributor.address)
+    # Slot 45: no initialization or HQ activation during staging. The Safe can
+    # use the bound loader at cutover; deployer authority is no longer needed.
+    migration.execute(initializer.relinquishGov)
+    if address(initializer.governance()) != ZERO:
+        raise RuntimeError("BASE_MC_FOXTROT_GOVERNANCE_NOT_RELINQUISHED")
     if address(hq.getAddr(5)) != address(active_address):
         raise RuntimeError("BASE_UPGRADE_ACTIVE_ADDRESS_CHANGED:MissionControl")
 
-    log.info("MissionControl staged only. Reconcile all live state again at cutover.")
-    log.info("After HQ confirms this MC, call initializer.initRewards() before reopening. "
-             "The initializer must still be registered in the then-active Switchboard.")
-
+    log.info("Staging complete. MC is UNINITIALIZED and must not be activated yet.")
+    log.info("No HQ updates were proposed. At cutover: activate Switchboard, "
+             "initialize inactive MC via governance, verify configuration, "
+             "then confirm MC and initialize rewards.")
 
 def address(value):
     return str(getattr(value, "address", value)).lower()

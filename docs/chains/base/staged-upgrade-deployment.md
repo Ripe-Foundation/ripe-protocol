@@ -13,8 +13,9 @@ input require fresh verification before continuing.
 Evidence: [historical summary](fork-rehearsal/full-update-summary.md).
 Prepared cancellation (not executed): [Safe batch](cancel-pending-vaultbook.safe.json).
 
-These scripts stage candidates against the existing Base RipeHq. They do not
-register candidates, modify active canonical manifest entries, move funds,
+These scripts stage candidates against the existing Base RipeHq and populate
+replacement registries using temporary deployer governance, then relinquish it.
+They do not modify active canonical manifest entries, move funds,
 repay debt, migrate positions, change vault IDs, enable mint permissions, or
 unpause contracts. Deployment is not approval for cutover.
 
@@ -26,8 +27,10 @@ unpause contracts. Deployment is not approval for cutover.
    AuctionHouseNFT; Boardroom; CreditRedeem; TellerUtils; EndaomentFunds;
    BondBooster; BondRoom; CreditEngine; HumanResources; Lootbox; Teller; Deleverage; Endaoment.
 2. `2026091401_StageBaseMissionControl.py`: a candidate Contributor blueprint,
-   DefaultsBaseLive, empty MissionControl, and a replacement SwitchboardFoxtrot
-   with a one-time defaults loader.
+   DefaultsBaseLive, empty MissionControl, and replacement SwitchboardFoxtrotSetup
+   with temporary deployer governance for the one-time defaults loader; populated replacement Switchboard and
+   VaultBook under new labels. Vault IDs 1–5 retain live vaults; 6–10 register
+   the staged vaults without moving positions.
    Existing contributor contracts remain.
    This is separate because its configuration snapshot can become stale while
    ordinary contract deployment is taking place. Generate and verify the
@@ -37,6 +40,45 @@ unpause contracts. Deployment is not approval for cutover.
    UndyVault price sources; the standalone Aero monitor; EndaomentPSM;
    RipeReserveEngine and RipeReserveVesting. Reserves use Base USDC and remain
    paused, with no allocation or approved sale economics.
+   PriceDesk is populated at source IDs 1–9, with slot 3 disabled and the legacy
+   Aero source retained at 6. Deployer governance is relinquished afterward.
+   Registry membership is not asset-feed configuration or oracle qualification.
+4. `2026091403_StageBaseBridgePriceDesk.py`: deploys **only a bridge PriceDesk**,
+   registers the CURRENT live sources in their existing slots, retains disabled
+   BlueChip slot 3 and the legacy Aero source at slot 6, and caches token scales
+   for current collateral plus assets enumerated by the live sources. Existing
+   feeds, stale times and source observations stay in those original contracts.
+   It relinquishes temporary governance without proposing any HQ update.
+
+### Bridge PriceDesk staging
+
+```sh
+python -m scripts.migrate --profile base-mainnet --start-timestamp 2026091403 --single
+```
+
+Use `PriceDeskBridgeBaseUpgradeCandidate20260914` as the proposed HQ slot 7
+candidate, **not** Stage 3's PriceDesk containing unconfigured replacement
+sources. Do not redeploy the other departments. Historical migrations and
+deployment records are retained.
+
+At cutover, the bridge allows existing source routes to remain while replacement
+sources are configured and qualified through the new PriceDesk interface. Keep
+each old source registered until its replacement is configured and validated;
+then propose/confirm that source slot update. Price parity, snapshot handling and
+treasury/user-state handoffs still require cutover checks. Merely adding a source
+to the registry does not configure its feeds.
+
+Bridge fork evidence (Base block **51,491,284**): the real migration completed
+all 54 journal entries, and replay skipped all of them without additional writes.
+All source slots matched the current desk, temporary governance was relinquished,
+and staging left HQ unchanged. After proposing HQ slot 7, advancing 21,600 blocks
+(12 hours at 2 seconds/block), and confirming, all **27 MC asset prices matched**
+the old desk exactly. They also matched before activation. The RIPE/WETH pool
+`0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9` returned zero on both desks;
+this is retained behavior, not a claim that every asset is priceable.
+The largest migration execution consumed 3,663,675 gas (excluding intrinsic gas).
+No live transactions were sent. This checks the bridge, not the later source
+replacements or the full protocol cutover.
 
 All labels end in `BaseUpgradeCandidate20260914`. Active canonical labels remain
 untouched. The Underscore vault candidate has its own label and address, despite
@@ -111,11 +153,19 @@ manifests and the generated defaults provenance after real deployment.
 Do not regenerate Defaults or discard the deployment journal. Contributor
 `0x57f64a8FA104c18dE76dEe6817E45Cf43b6B459E` and DefaultsBaseLive
 `0x249c4798C49Fc8Ad86a43dC425D80396971E7AcC` already deployed.
-The resumed migration reuses them, deploys the unchanged MissionControl with a
-zero Defaults argument, and deploys updated Foxtrot under the new label
-`SwitchboardFoxtrotWithDefaultsBaseUpgradeCandidate20260914`.
+MC `0xD2c97549F4D44ca8Eb000d2AB2f3c5da8623D1D7` and updated Foxtrot
+`0x49eE0bD53cbE59Fee1fbE7161CB6e794Ad096Dc0` are also now deployed.
+The resumed migration reuses all four deployment slots, then deploys a new
+`SwitchboardFoxtrotSetupBaseUpgradeCandidate20260914` with temporary deployer
+governance. The prior HQ-only Foxtrot is retained in history but not registered
+in the populated replacement registry. Its source stays frozen for resume
+authentication; the setup variant changes only inactive-MC initialization permissions.
 The Stage 1 Foxtrot deployment remains recorded but is superseded for cutover;
-populate the replacement Switchboard's Foxtrot slot with this NEW address.
+the migration populates the replacement Switchboard's Foxtrot slot with this
+NEW address. It deploys `SwitchboardPopulatedBaseUpgradeCandidate20260914`
+and `VaultBookPopulatedBaseUpgradeCandidate20260914` with deployer governance,
+registers entries in order, validates their IDs, and relinquishes local governance.
+The empty Stage 1 registries remain in history but are not the cutover candidates.
 Golf is unchanged: adding the loader there exceeded the runtime size limit.
 
 Resume only this unfinished stage from the repository root:
@@ -125,38 +175,80 @@ python -m scripts.migrate --profile base-mainnet --start-timestamp 2026091401 --
 ```
 
 Do not use `--force-replay` / `--is-retry`, restart Stage 1, or delete the
-`2026091401-log.json` / pending manifest. The first two deployment calls stay
+`2026091401-log.json` / pending manifest. The first four deployment calls stay
 in the same journal slots and are skipped after authenticating their records.
 
-The migration deliberately stops with `BASE_MC_AWAITING_SAFE_INIT` until:
+The migration preserves completed slots 1–44, binds setup Foxtrot to the
+candidate MC and deployed Defaults, then relinquishes Foxtrot's temporary
+governance in slot 45. It finishes staging without changing any HQ pointers.
+**MC remains uninitialized. Do not activate it after staging.**
 
-1. Governance registers the printed replacement Foxtrot address in the CURRENT active
-   Switchboard: `startAddNewAddressToRegistry`, wait its registry delay, then
-   `confirmNewAddressToRegistry`.
-2. Governance calls `foxtrot.startDefaultsInitialization(candidateMC, deployedDefaults)`
-   once. Both addresses are then permanently bound for this deployment.
-   Governance calls `foxtrot.initConfig()` until `initStep() == 5`.
-   Each call is independently committed; asset calls copy at most five entries.
-   For the current 27 assets this is nine calls in total. Split Safe batches
-   to respect the transaction gas ceiling; do not put all nine in one batch.
-3. Resume Stage 2 normally (no force-replay). It checks every represented MC
-   config against live, except rewards, which must still be zero. It separately
-   verifies the saved rewards defaults match live. Drift blocks continuation;
-   do not edit the already-deployed Defaults to bypass it.
+At the separately approved governance cutover:
 
-At the separately approved cutover, confirm HQ slot 5 first, then call
-`foxtrot.initRewards()`, then confirm the replacement Switchboard (slot 6).
-Keep these ordered in the same Safe batch where possible, and do not reopen
-user operations before rewards readback matches Defaults. If slot 6 is changed
-first, the initializer must also be registered there before it can set rewards.
-The reward setter requires MC to be active; the initializer enforces that
-condition and allows the reward copy only once. Loading other defaults is
-disabled once MC is active. Keep updated Foxtrot registered in the new
-Switchboard for its normal reserve/auction governance functions.
+1. Reconcile the saved Defaults against live configuration again; staging
+   preflight is not a cutover parity guarantee.
+2. Confirm the populated replacement Switchboard in HQ slot 6, respecting HQ's
+   proposal delay. Keep the old MC active.
+3. From the governance Safe, call the bound Foxtrot's `initConfig()` until
+   `initStep() == 5` (nine calls for this 27-asset snapshot). On interruption,
+   read progress before preparing remaining calls.
+4. Compare all staged MC configuration against live, excluding rewards which
+   must still be zero; separately compare saved rewards defaults against live.
+   Resolve drift before activation.
+5. Confirm HQ slot 5 and call `foxtrot.initRewards()` in the same Safe batch.
+   Verify rewards before reopening operations.
+
+No migration rerun is needed for initialization after Stage 2 completes.
+HQ governance remains authorized after temporary governance is relinquished.
+Keep updated Foxtrot registered for its normal governance functions.
 
 No user positions or historical Ledger state are copied by this loader.
 
 ### Remaining cutover requirements
+
+#### Temporary-governance Foxtrot rehearsal — 2026-09-18 (superseded activation-during-staging flow)
+
+Rehearsed migration `2026091401` against Base fork block **51,486,661**,
+using an isolated copy of the four recorded live deployment entries:
+
+- Reused the recorded deployments, deployed the setup Foxtrot and populated
+  registries, then stopped before HQ Switchboard activation.
+- Re-running before activation skipped all 44 completed journal entries.
+- After switching HQ slot 6 on the fork, the deployer executed all nine MC
+  initialization calls and relinquished Foxtrot governance (54 total entries).
+- A further resume repeated no writes. Deployer initialization calls reverted
+  after relinquishment; HQ governance could initialize rewards after confirming MC.
+- The staged configuration comparison passed. No live transactions were sent,
+  and the live deployment journal and pending manifest were unchanged.
+
+This qualifies the setup/resume sequence, not the remaining oracle and funds cutover.
+
+#### Registry/resume rehearsal — 2026-09-18 (prior HQ-only Foxtrot version)
+
+The actual Stage 2 and Stage 3 migration bodies passed on a local Base fork at
+block **51486661**, starting from a COPY of the operator's four-entry Stage 2
+journal and pending manifest. Defaults preflight passed at finalized block
+**51485935**. The fork uses a later, then-unfinalized block because
+the newly deployed MC/Foxtrot did not yet exist at the finalized block.
+
+- All four recorded deployments were authenticated and reused.
+- Switchboard IDs 1–7 and VaultBook IDs 1–10 matched; live vaults remain at 1–5.
+- A second Stage 2 run skipped all 42 recorded entries without new transactions.
+- The registry-first HQ slot-6 switch authorized Foxtrot; MC defaults loaded and
+  the normal Stage 2 readback comparison passed before completing its journal.
+- Stage 3's 13 deployments and 21 registration/handoff calls succeeded, then a
+  second run skipped all 34 entries, including the already-disabled slot 3.
+- All three populated registries relinquished deployer governance and retained
+  HQ Safe governance. PriceDesk kept legacy Aero at 6 and disabled BlueChip at 3.
+- MC confirmation followed by rewards initialization succeeded.
+- Largest measured deployment/setup execution gas: **4,784,235** (intrinsic gas
+  excluded); all checked calls were below the 16M rehearsal threshold.
+- Eleven existing Defaults/preflight checks passed; no new migration test suite.
+
+The live journal and pending manifest remained byte-identical. No live writes.
+This validates deployment, registration and resume mechanics, NOT complete
+oracle configuration, user-state/vault migration, or resolution of the existing
+Stage 3 review gates.
 
 - Refresh/reconcile MissionControl's entire live configuration, including asset
   configs, governance lock terms, reward routes, signers and migration topology.

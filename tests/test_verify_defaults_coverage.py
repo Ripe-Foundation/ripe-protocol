@@ -79,7 +79,8 @@ def test_no_third_consumer_of_defaults_goes_unverified():
     # unverified by construction, and the script has no way to notice.
     consumers = _consumers()
     expected = {"contracts/data/Ledger.vy", "contracts/data/MissionControl.vy",
-                "contracts/config/SwitchboardFoxtrot.vy"}
+                "contracts/config/SwitchboardFoxtrot.vy",
+                "contracts/config/SwitchboardFoxtrotSetup.vy"}
 
     assert set(consumers) == expected, (
         f"the set of contracts reading Defaults at construction changed to "
@@ -88,6 +89,8 @@ def test_no_third_consumer_of_defaults_goes_unverified():
         "script and this test together."
     )
     assert consumers["contracts/config/SwitchboardFoxtrot.vy"] == consumers[
+        "contracts/data/MissionControl.vy"]
+    assert consumers["contracts/config/SwitchboardFoxtrotSetup.vy"] == consumers[
         "contracts/data/MissionControl.vy"]
 
 

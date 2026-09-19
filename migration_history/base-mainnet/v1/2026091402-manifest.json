@@ -1,0 +1,56 @@
+{
+  "contracts": {
+    "PriceDeskBaseUpgradeCandidate20260914": {
+      "address": "0xF9606Bec30872d5Bfd1aC814577990ec983F080e",
+      "file": "contracts/registries/PriceDesk.vy"
+    },
+    "ChainlinkPricesBaseUpgradeCandidate20260914": {
+      "address": "0x6116084ee9Faac56208290919E9204E2A55e61bB",
+      "file": "contracts/priceSources/ChainlinkPrices.vy"
+    },
+    "CurvePricesBaseUpgradeCandidate20260914": {
+      "address": "0x227343278dcdaB295E24d9FDDDDA1A62A076bbB1",
+      "file": "contracts/priceSources/CurvePrices.vy"
+    },
+    "BlueChipYieldPricesBaseUpgradeCandidate20260914": {
+      "address": "0x1451D9F9518763F6d07B43D2426c9EeA35A454e5",
+      "file": "contracts/priceSources/BlueChipYieldPrices.vy"
+    },
+    "PythPricesBaseUpgradeCandidate20260914": {
+      "address": "0xCb676A814cf1e835d2f2EE7dF897DD777bcEfcaf",
+      "file": "contracts/priceSources/PythPrices.vy"
+    },
+    "StorkPricesBaseUpgradeCandidate20260914": {
+      "address": "0x210eb08CC46EA220fb594Eb2F9c30321026fD399",
+      "file": "contracts/priceSources/StorkPrices.vy"
+    },
+    "wsuperOETHbPricesBaseUpgradeCandidate20260914": {
+      "address": "0x8Aff40c628F71863954dCc52f8b6bdE8BA3fbd49",
+      "file": "contracts/priceSources/wsuperOETHbPrices.vy"
+    },
+    "RedStoneBaseUpgradeCandidate20260914": {
+      "address": "0xAE2F9b4A5781Ca8f39643Ea00f7F654FB3a67A73",
+      "file": "contracts/priceSources/RedStone.vy"
+    },
+    "UndyVaultPricesBaseUpgradeCandidate20260914": {
+      "address": "0x81912e1504C3867ecC27c9c96264c87257dd96Ae",
+      "file": "contracts/priceSources/UndyVaultPrices.vy"
+    },
+    "AeroRipePricesBaseUpgradeCandidate20260914": {
+      "address": "0xD8295E4f98e8611CCd6B360AbF8E03e3EC8132Ac",
+      "file": "contracts/priceSources/AeroRipePrices.vy"
+    },
+    "EndaomentPSMBaseUpgradeCandidate20260914": {
+      "address": "0xFb9f4356ec48B7786e67182F46f1711Cd74484c2",
+      "file": "contracts/core/EndaomentPSM.vy"
+    },
+    "RipeReserveEngineBaseUpgradeCandidate20260914": {
+      "address": "0x74EB2b8a240186FC6e95942b5697f3EAE646B769",
+      "file": "contracts/core/RipeReserveEngine.vy"
+    },
+    "RipeReserveVestingBaseUpgradeCandidate20260914": {
+      "address": "0xbBc1D9520B4cF3947E35ae012807995bD94be473",
+      "file": "contracts/core/RipeReserveVesting.vy"
+    }
+  }
+}

@@ -179,7 +179,7 @@ def test_submission_pending_and_success_paths_are_deterministic():
     assert pending.guid == "GUID-1"
     submission = pending_session.calls[1][2]["data"]
     assert submission["compilerversion"] == "vyper:0.4.3"
-    assert "optimizationUsed" not in submission
+    assert submission["optimizationUsed"] == "1"
     assert "runs" not in submission
     assert "evmversion" not in submission
 

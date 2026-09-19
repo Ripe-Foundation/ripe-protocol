@@ -99,7 +99,7 @@ def migrate(migration: Migration):
     log.h1("2. Deploy the replacement PriceDesk and all existing source types")
     candidates = {}
     candidates["PriceDesk"] = migration.deploy(
-        "PriceDesk", hq.address, ZERO, eth,
+        "PriceDesk", hq.address, migration.account(), eth,
         params["PRICE_DESK_MIN_REG_TIMELOCK"], params["PRICE_DESK_MAX_REG_TIMELOCK"],
         params["PRICE_DESK_PRICE_SOURCE_GAS"],  # staged/unqualified Base budget
         params["PRICE_DESK_SNAPSHOT_SOURCE_GAS"],
@@ -177,6 +177,32 @@ def migrate(migration: Migration):
     assert not candidates["RipeReserveEngine"].isRunning()
     assert not candidates["RipeReserveEngine"].canAcquireRipe()
     assert candidates["RipeReserveVesting"].isPaused()
+
+    log.h1("5. Populate PriceDesk with the existing source IDs")
+    desk = candidates["PriceDesk"]
+    source_names = (
+        "ChainlinkPrices", "CurvePrices", "BlueChipYieldPrices", "PythPrices",
+        "StorkPrices", None, "wsuperOETHbPrices", "UndyVaultPrices", "RedStone",
+    )
+    for reg_id, name in enumerate(source_names, 1):
+        # Retain legacy Aero slot 6; the new monitor is NOT a price source.
+        source = old_desk.getAddr(6) if name is None else candidates[name].address
+        migration.execute(
+            desk.startAddNewAddressToRegistry, source, name or "Retained legacy Aero pricing"
+        )
+        migration.execute(desk.confirmNewAddressToRegistry, source)
+        if str(desk.getAddr(reg_id)).lower() != str(source).lower():
+            # On resume, slot 3 may already have been deliberately disabled.
+            if not (reg_id == 3 and str(desk.getAddr(3)).lower() == ZERO):
+                raise RuntimeError(f"BASE_PRICEDESK_SLOT_MISMATCH:{reg_id}")
+        if reg_id == 3:
+            migration.execute(desk.startAddressDisableInRegistry, 3)
+            migration.execute(desk.confirmAddressDisableInRegistry, 3)
+            if str(desk.getAddr(3)).lower() != ZERO:
+                raise RuntimeError("BASE_PRICEDESK_BLUECHIP_MUST_STAY_DISABLED")
+    migration.execute(desk.relinquishGov)
+    if str(desk.governance()).lower() != ZERO or int(desk.numAddrs()) != 10:
+        raise RuntimeError("BASE_PRICEDESK_SETUP_INCOMPLETE")
 
     for name, candidate in candidates.items():
         assert 0 < len(boa.env.get_code(candidate.address)) <= 24576, name

@@ -37,6 +37,12 @@ class DeploymentAdapter:
     def chain(self):
         return "base-mainnet"
 
+    def account(self):
+        return boa.env.eoa
+
+    def execute(self, fn, *args):
+        return self.run.transact(fn, *args, sender=self.account())
+
     def verify_base_defaults(self):
         from scripts.utils.defaults_preflight import verify_before_deployment
         verified = verify_before_deployment(
@@ -60,25 +66,14 @@ class DeploymentAdapter:
         key = label.removesuffix(SUFFIX)
         path = self.defaults if name == "DefaultsBaseLive" else next((ROOT / "contracts").rglob(name + ".vy"))
         contract = self.run.deploy(key, *args, path=path)
-        if key == "SwitchboardFoxtrotWithDefaults":
+        if key == "SwitchboardPopulated":
+            self.run.new["Switchboard"] = contract
+        if key == "VaultBookPopulated":
+            self.run.new["VaultBook"] = contract
+        if key == "SwitchboardFoxtrotSetup":
             # Keep the Stage 1 deployment record, but use its updated replacement
             # when populating the candidate Switchboard's Foxtrot slot.
             self.run.new["SwitchboardFoxtrot"] = contract
-            self.run.transact(contract.startDefaultsInitialization,
-                              self.run.new["MissionControl"].address,
-                              self.run.new["DefaultsBaseLive"].address)
-            # Fork-only governance rehearsal; the live migration waits for Safe.
-            sb = self.run.at("Switchboard", self.run.hq.getAddr(6))
-            self.run.transact(sb.startAddNewAddressToRegistry, contract.address, "MC defaults initializer")
-            delay = int(sb.registryChangeTimeLock())
-            if delay:
-                boa.env.time_travel(blocks=delay, block_delta=2)
-            self.run.transact(sb.confirmNewAddressToRegistry, contract.address)
-            for _ in range(13): # globals + gov + at most ten asset batches + lists
-                if contract.initStep() == 5:
-                    break
-                self.run.transact(contract.initConfig)
-            assert contract.initStep() == 5
         return contract
 
     def deploy_bp(self, name, *, label):
@@ -216,26 +211,19 @@ class FullUpdate(Rehearsal):
         entries += [(i, self.new[n], n) for i, n in enumerate(
             ("StabilityPool", "RipeGov", "SimpleErc20", "RebaseErc20", "UnderscoreVault"), 6)]
         for i, contract, description in entries:
-            self.transact(book.startAddNewAddressToRegistry, contract.address, description)
-            self.transact_expect(i, book.confirmNewAddressToRegistry, contract.address)
+            assert str(book.getAddr(i)).lower() == str(contract.address).lower()
         for i, suffix in enumerate(("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf"), 1):
             contract = self.new["Switchboard" + suffix]
-            self.transact(sb.startAddNewAddressToRegistry, contract.address, suffix)
-            self.transact_expect(i, sb.confirmNewAddressToRegistry, contract.address)
+            assert str(sb.getAddr(i)).lower() == str(contract.address).lower()
         self.sources = {}
         old_desk = self.old["PriceDesk"]
         for i in range(1, int(old_desk.numAddrs())):
             old_address = old_desk.getAddr(i)
             if i == 3 and str(old_address).lower() == ZERO:
-                candidate = self.new["BlueChipYieldPrices"]
-                self.transact(desk.startAddNewAddressToRegistry, candidate.address, "BlueChip Yield Prices")
-                self.transact_expect(3, desk.confirmNewAddressToRegistry, candidate.address)
-                self.transact(desk.startAddressDisableInRegistry, 3)
-                self.transact(desk.confirmAddressDisableInRegistry, 3)
+                assert str(desk.getAddr(3)).lower() == ZERO
                 continue
             if i == 6:
-                self.transact(desk.startAddNewAddressToRegistry, old_address, "Retained legacy Aero RIPE pricing")
-                self.transact_expect(6, desk.confirmNewAddressToRegistry, old_address)
+                assert str(desk.getAddr(6)).lower() == str(old_address).lower()
                 self.report["retained_legacy_aero_slot6"] = str(old_address)
                 self.report["aero_ui_only_note"] = "User confirmed Aero is for UI, not collateral. New monitor is deployed separately; retaining legacy RIPE quote during UI handoff is not a collateral migration blocker."
                 continue
@@ -243,8 +231,7 @@ class FullUpdate(Rehearsal):
             assert len(names) == 1, ("UNKNOWN_PRICE_SOURCE", i, old_address)
             name = names[0]
             self.sources[name] = self.at(name, old_address)
-            self.transact(desk.startAddNewAddressToRegistry, self.new[name].address, name)
-            self.transact_expect(i, desk.confirmNewAddressToRegistry, self.new[name].address)
+            assert str(desk.getAddr(i)).lower() == str(self.new[name].address).lower()
         self.report["staged_registry_ids"] = {"vaults": {i: str(c.address) for i, c, _ in entries},
                                             "sources": {n: int(desk.getRegId(self.new[n].address)) for n in self.sources}}
         self.save()
@@ -266,11 +253,16 @@ class FullUpdate(Rehearsal):
         delay = int(self.hq.registryChangeTimeLock())
         if delay:
             boa.env.time_travel(blocks=delay, block_delta=2)
-        for i in [8, 5, 6, 7] + [i for i in replacements if i not in (8, 5, 6, 7)]:
+        for i in [6, 8, 5, 7] + [i for i in replacements if i not in (8, 5, 6, 7)]:
             self.transact(self.hq.confirmAddressUpdateToRegistry, i)
+            if i == 6:
+                initializer = self.new["SwitchboardFoxtrotSetup"]
+                for _ in range(3 + (len(self.new["DefaultsBaseLive"].assetConfigs()) + 4) // 5):
+                    self.transact(initializer.initConfig)
+                assert initializer.initStep() == 5
             if i == 5:
-                # Still authorized in the OLD Switchboard, before slot 6 changes.
-                initializer = self.new["SwitchboardFoxtrotWithDefaults"]
+                # Authorized by the new Switchboard; non-reward init is complete.
+                initializer = self.new["SwitchboardFoxtrotSetup"]
                 self.transact(initializer.initRewards)
                 assert initializer.rewardsInitialized()
                 assert tuple(self.new["MissionControl"].rewardsConfig()) == tuple(
