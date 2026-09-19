@@ -810,6 +810,7 @@ def vault_book_deploy(ripe_hq_deploy, fork):
         ZERO_ADDRESS,
         PARAMS[fork]["VAULT_BOOK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["VAULT_BOOK_MAX_REG_TIMELOCK"],
+        ZERO_ADDRESS,
         name="vault_book",
     )
 

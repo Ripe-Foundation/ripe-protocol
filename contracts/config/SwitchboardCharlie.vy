@@ -23,6 +23,7 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import contracts.modules.Addys as addys
 import interfaces.ConfigStructs as cs
+from interfaces import VaultBookCompatibility
 
 struct AssetRetirementConfig:
     isSupported: bool
@@ -71,7 +72,6 @@ interface MissionControl:
     def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
 
 interface StabilityPool:
-    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
     def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def totalClaimableBalances(_asset: address) -> uint256: view
     def vaultAssets(_index: uint256) -> address: view
@@ -632,7 +632,7 @@ def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -
     # verify has correct interface
     naStabAsset: address = staticcall StabilityPool(vaultAddr).vaultAssets(1)
     naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(savingsGreen, savingsGreen)
-    naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(savingsGreen, savingsGreen)
+    assert staticcall VaultBookCompatibility(vaultBook).hasStabilityPoolInterface(vaultAddr, savingsGreen, savingsGreen) # dev: invalid vault
     assert staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen) == 0 # dev: asset reserved for claims
     assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
 

@@ -39,6 +39,8 @@ import contracts.modules.DeptBasics as deptBasics
 
 from interfaces import Vault
 from interfaces import Department
+from ethereum.ercs import IERC20
+from ethereum.ercs import IERC4626
 
 interface Ledger:
     def didGetRewardsFromStabClaims(_amount: uint256): nonpayable
@@ -61,23 +63,135 @@ interface StabilityPool:
     def totalClaimableBalances(_claimAsset: address) -> uint256: view
     def isPaused() -> bool: view
 
+interface LegacyStabilityPool:
+    def getRipeHq() -> address: view
+    def indexOfAsset(_asset: address) -> uint256: view
+
+interface PriceDesk:
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
+
+LEGACY_POOL: immutable(address)
+
+
 @deploy
 def __init__(
     _ripeHq: address,
     _tempGov: address,
     _minRegistryTimeLock: uint256,
     _maxRegistryTimeLock: uint256,
+    _legacyPool: address,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "VaultBook.vy")
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, True) # can mint ripe only
+    LEGACY_POOL = _legacyPool
+    if _legacyPool != empty(address):
+        assert chain.id == 8453 # dev: legacy pool only on Base
+        assert _legacyPool.is_contract # dev: invalid legacy pool
+        assert staticcall LegacyStabilityPool(_legacyPool).getRipeHq() == _ripeHq # dev: invalid legacy hq
+        assert self._hasLegacyStabilityPoolInterface(_legacyPool, empty(address), empty(address))
+        naAsset: address = staticcall StabilityPool(_legacyPool).vaultAssets(1)
+        naBalance: bool = False
+        naAsset, naBalance = staticcall Vault(_legacyPool).getUserAssetAtIndexAndHasBalance(empty(address), 0)
 
 
 @view
 @external
 def isVaultBookAddr(_addr: address) -> bool:
     return registry._isValidAddr(_addr)
+
+
+#######################
+# Vault Compatibility #
+#######################
+
+
+@view
+@internal
+def _isRegisteredLegacyPool() -> bool:
+    return registry._getRegId(LEGACY_POOL) == 1 and registry._getAddr(1) == LEGACY_POOL and registry._isValidRegId(1)
+
+
+@view
+@external
+def canAcceptLiquidationAsset(_vaultAddr: address, _stabAsset: address, _claimAsset: address) -> bool:
+    # Only the explicitly bound address gets legacy handling, even if its row
+    # becomes invalid. Never fall through to its missing modern selector.
+    if LEGACY_POOL == empty(address) or _vaultAddr != LEGACY_POOL:
+        return staticcall StabilityPool(_vaultAddr).canAcceptLiquidationAsset(_stabAsset, _claimAsset)
+    if not self._isRegisteredLegacyPool() or staticcall StabilityPool(_vaultAddr).isPaused():
+        return False
+    if staticcall LegacyStabilityPool(_vaultAddr).indexOfAsset(_stabAsset) == 0 or _claimAsset == empty(address):
+        return False
+    if staticcall LegacyStabilityPool(_vaultAddr).indexOfAsset(_claimAsset) != 0:
+        return False
+    if staticcall StabilityPool(_vaultAddr).totalClaimableBalances(_stabAsset) != 0:
+        return False
+
+    greenToken: address = addys._getGreenToken()
+    greenClaim: uint256 = staticcall StabilityPool(_vaultAddr).claimableBalances(_stabAsset, greenToken)
+    if greenClaim != 0:
+        if staticcall IERC20(greenToken).balanceOf(_vaultAddr) < staticcall StabilityPool(_vaultAddr).totalClaimableBalances(greenToken):
+            return False
+
+    # Both payment paths may run in one swap. Price actual spendable custody
+    # even when GREEN claims are available; unrelated claims need no scan.
+    amount: uint256 = staticcall IERC20(_stabAsset).balanceOf(_vaultAddr)
+    if amount == 0:
+        return greenClaim != 0
+    if _stabAsset == greenToken:
+        return True
+    savingsGreen: address = addys._getSavingsGreen()
+    if _stabAsset == savingsGreen:
+        return staticcall IERC4626(savingsGreen).convertToAssets(amount) != 0
+    return staticcall PriceDesk(addys._getPriceDeskAddr()).getUsdValue(_stabAsset, amount) != 0
+
+
+@view
+@external
+def getDeleverageTraversalAsset(_user: address, _vaultAddr: address, _index: uint256, _isStabVault: bool) -> (address, uint256):
+    asset: address = empty(address)
+    hasBalance: bool = False
+    if LEGACY_POOL != empty(address) and _vaultAddr == LEGACY_POOL:
+        if not self._isRegisteredLegacyPool():
+            return empty(address), 0
+        asset, hasBalance = staticcall Vault(_vaultAddr).getUserAssetAtIndexAndHasBalance(_user, _index)
+        if asset == empty(address) or not hasBalance:
+            return asset, 0
+        if staticcall StabilityPool(_vaultAddr).isPaused():
+            return asset, 0
+        if staticcall IERC20(asset).balanceOf(_vaultAddr) <= staticcall StabilityPool(_vaultAddr).totalClaimableBalances(asset):
+            return asset, 0
+        # Preserve strict legacy NAV, including claims, rounding and failures.
+        return asset, staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, asset)
+
+    if _isStabVault:
+        return staticcall Vault(_vaultAddr).getUserAssetAndAmountAtIndex(_user, _index)
+    asset, hasBalance = staticcall Vault(_vaultAddr).getUserAssetAtIndexAndHasBalance(_user, _index)
+    return asset, 1 if hasBalance else 0
+
+
+@view
+@external
+def hasStabilityPoolInterface(_vaultAddr: address, _stabAsset: address, _probeClaimAsset: address) -> bool:
+    if LEGACY_POOL != empty(address) and _vaultAddr == LEGACY_POOL:
+        if not self._isRegisteredLegacyPool():
+            return False
+        return self._hasLegacyStabilityPoolInterface(_vaultAddr, _stabAsset, _probeClaimAsset)
+    # Decoding False still proves structural support, including an empty pool.
+    naCanAccept: bool = staticcall StabilityPool(_vaultAddr).canAcceptLiquidationAsset(_stabAsset, _probeClaimAsset)
+    return True
+
+
+@view
+@internal
+def _hasLegacyStabilityPoolInterface(_vaultAddr: address, _stabAsset: address, _probeClaimAsset: address) -> bool:
+    naIndex: uint256 = staticcall LegacyStabilityPool(_vaultAddr).indexOfAsset(_stabAsset)
+    naPair: uint256 = staticcall StabilityPool(_vaultAddr).claimableBalances(_stabAsset, _probeClaimAsset)
+    naTotal: uint256 = staticcall StabilityPool(_vaultAddr).totalClaimableBalances(_stabAsset)
+    naPaused: bool = staticcall StabilityPool(_vaultAddr).isPaused()
+    return True
 
 
 ############

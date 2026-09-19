@@ -36,6 +36,7 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+from interfaces import VaultBookCompatibility
 import interfaces.ConfigStructs as cs
 
 from ethereum.ercs import IERC4626
@@ -948,7 +949,7 @@ def _iterateThruAssetsWithinVault(
 
         asset: address = empty(address)
         availableAmount: uint256 = 0
-        asset, availableAmount = self._getBroadTraversalAsset(_user, _vaultAddr, y, _isStabVault)
+        asset, availableAmount = staticcall VaultBookCompatibility(_a.vaultBook).getDeleverageTraversalAsset(_user, _vaultAddr, y, _isStabVault)
         if asset == empty(address) or availableAmount == 0:
             continue
 
@@ -956,19 +957,6 @@ def _iterateThruAssetsWithinVault(
         remainingToRepay = self._handleSpecificAsset(_user, _vaultId, _vaultAddr, asset, remainingToRepay, False, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
 
     return remainingToRepay
-
-
-@view
-@internal
-def _getBroadTraversalAsset(_user: address, _vaultAddr: address, _index: uint256, _isStabVault: bool) -> (address, uint256):
-    if _isStabVault:
-        # Stability Pool cohorts expose their fail-soft liquidation amount.
-        return staticcall Vault(_vaultAddr).getUserAssetAndAmountAtIndex(_user, _index)
-
-    asset: address = empty(address)
-    hasBalance: bool = False
-    asset, hasBalance = staticcall Vault(_vaultAddr).getUserAssetAtIndexAndHasBalance(_user, _index)
-    return asset, 1 if hasBalance else 0
 
 
 # specific asset
@@ -1133,7 +1121,7 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = empty(address)
             amount: uint256 = 0
-            asset, amount = self._getBroadTraversalAsset(_user, vaultAddr, y, isStabVault)
+            asset, amount = staticcall VaultBookCompatibility(_a.vaultBook).getDeleverageTraversalAsset(_user, vaultAddr, y, isStabVault)
             if asset == empty(address) or amount == 0:
                 continue
 

@@ -734,7 +734,7 @@ class Rehearsal:
             if name == "Alpha":
                 args = [h, g, 1, 31536000, 1, 1000000, 4]
             self.deploy("Switchboard" + name, *args)
-        self.deploy("VaultBook", h, g, 1, 1000000)
+        self.deploy("VaultBook", h, g, 1, 1000000, self.vaults[1].address)
         self.deploy("StabilityPool", h)
         self.deploy("RipeGov", h)
         self.deploy("VaultMigrator", h, True, self.vaults[2].address)

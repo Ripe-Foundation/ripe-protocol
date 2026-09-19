@@ -7,9 +7,9 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# Tight EIP-170 headrooms vs 24,576: AuctionHouse 12, Deleverage 17,
-# Teller 24, CreditEngine 33, Lootbox 165, Alpha 614, Golf 3,644.
-# Charlie is 22,317 / 2,259 free. MissionControl is 18,948. Ledger is
+# Tight EIP-170 headrooms vs 24,576: AuctionHouse 11, Deleverage 146,
+# Teller 24, CreditEngine 33, Lootbox 165, Alpha 594, Golf 3,644.
+# Charlie is 22,326 / 2,250 free. MissionControl is 18,948. Ledger is
 # 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
 # Deleverage without remeasuring.
 # Lootbox `# pragma optimize codesize` (no CLI -O override) is load-bearing.
@@ -19,14 +19,14 @@ EIP170_LIMIT = 24_576
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 18948,
     "DefaultsLocal": 1200,
-    "SwitchboardAlpha": 23962,
+    "SwitchboardAlpha": 23982,
     "SwitchboardBravo": 16423,
-    "SwitchboardCharlie": 22317,
+    "SwitchboardCharlie": 22326,
     "SwitchboardEcho": 23930,
     "SwitchboardFoxtrot": 12061,
     "SwitchboardGolf": 20932,
     "VaultMigrator": 15626,
-    "VaultBook": 14410,
+    "VaultBook": 17465,
     "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,
@@ -38,12 +38,12 @@ EXPECTED_RUNTIME_BYTES = {
     "RebaseErc20": 11602,
     "RipeGov": 24116,
     "HumanResources": 14932,
-    "AuctionHouse": 24564,
+    "AuctionHouse": 24565,
     "CreditEngine": 24543,
     "CreditRedeem": 8504,
     "Endaoment": 23386,
     "PriceDesk": 17898,
-    "Deleverage": 24559,
+    "Deleverage": 24430,
     "StabilityPool": 24332,
     "BlueChipYieldPrices": 20857,
     "ChainlinkPrices": 16988,

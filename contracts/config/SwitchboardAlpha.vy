@@ -22,6 +22,7 @@ initializes: timeLock[gov := gov]
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import interfaces.ConfigStructs as cs
+from interfaces import VaultBookCompatibility
 
 interface MissionControl:
     def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _shouldFreezeWhenBadDebt: bool, _lockTerms: cs.LockTerms): nonpayable
@@ -44,7 +45,6 @@ interface MissionControl:
     def getRipeHq() -> address: view
 
 interface StabilityPool:
-    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
     def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def isPaused() -> bool: view
 
@@ -1269,7 +1269,8 @@ def _validatePriorityVaults(
 
             # capability probes only
             naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(vault.asset, empty(address))
-            naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(vault.asset, empty(address))
+            if not staticcall VaultBookCompatibility(vaultBook).hasStabilityPoolInterface(vaultAddr, vault.asset, empty(address)):
+                return 2
             if staticcall StabilityPool(vaultAddr).isPaused():
                 return 2
         if isProposal:

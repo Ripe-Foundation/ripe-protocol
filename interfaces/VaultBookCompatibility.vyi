@@ -1,0 +1,18 @@
+# @version 0.4.3
+
+@view
+@external
+def canAcceptLiquidationAsset(_vaultAddr: address, _stabAsset: address, _claimAsset: address) -> bool:
+    ...
+
+
+@view
+@external
+def getDeleverageTraversalAsset(_user: address, _vaultAddr: address, _index: uint256, _isStabVault: bool) -> (address, uint256):
+    ...
+
+
+@view
+@external
+def hasStabilityPoolInterface(_vaultAddr: address, _stabAsset: address, _probeClaimAsset: address) -> bool:
+    ...
