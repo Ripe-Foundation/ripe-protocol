@@ -309,6 +309,8 @@ def test_final_curve_worst_case_honest_nested_price_desk_gas(
         2,
         250_000,
         150_000,
+        75_000,
+        6_000_000,
         name="final_curve_gas_price_desk",
     )
     for index, source in enumerate(sources, start=1):
@@ -488,3 +490,24 @@ def test_pause_disable_repair_and_reenable_order_preserves_safe_green_failure(
     )
     assert route.price_desk.getAddr(2) == route.curve.address
     assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
+
+
+def test_current_price_desk_relay_uses_existing_curve_authorization(
+    robinhood_curve_launch_route, ripe_hq, deploy3r, teller, governance, bob,
+):
+    from registries.test_price_desk_isolation import _isolated_price_desk
+    from registries.price_desk_gas_helpers import calls_to, cold_trial
+
+    route = robinhood_curve_launch_route
+    assert ripe_hq.getAddr(7) == route.price_desk.address
+    assert ripe_hq.isValidAddr(route.price_desk.address)
+    # Unconfigured reference pool is a successful Curve False/no-op.
+    with cold_trial(route.price_desk, route.curve):
+        assert route.price_desk.addGreenRefPoolSnapshot(2, sender=teller.address)
+        call = calls_to(route.price_desk._computation, route.curve)[0]
+        assert not call.is_error and int.from_bytes(call.output, "big") == 0
+    rogue = _isolated_price_desk(ripe_hq, deploy3r, [route.curve])
+    assert not ripe_hq.isValidAddr(rogue.address)
+    assert not rogue.addGreenRefPoolSnapshot(1, sender=teller.address)
+    with boa.reverts("no perms"):
+        route.curve.addGreenRefPoolSnapshot(sender=bob)

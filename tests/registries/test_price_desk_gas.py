@@ -5,6 +5,8 @@ import pytest
 
 from config.robinhood_launch import STALE_WINDOW_GLOBAL
 from conf_utils import advance_timelock_blocks
+from registries.price_desk_gas_helpers import cold_trial
+from test_vault_pointer_runtime_sizes import EXPECTED_RUNTIME_BYTES
 from constants import (
     BLUE_CHIP_PROTOCOL_MORPHO,
     BLUE_CHIP_PROTOCOL_MORPHO_V2,
@@ -123,6 +125,8 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources, price_limit=None):
         str(source_path), ripe_hq, deploy3r, ETH, 1, 2,
         250_000 if price_limit is None else price_limit,
         150_000,
+        75_000,
+        6_000_000,
         name="gas_measurement_price_desk",
     )
     for index, source in enumerate(sources, start=1):
@@ -173,6 +177,7 @@ def _configure_max_bluechip_feed(
 def test_price_desk_complete_deployed_runtime_is_below_eip170(price_desk):
     deployed_runtime = bytes(boa.env.get_code(price_desk.address))
     assert len(deployed_runtime) < EIP_170_LIMIT
+    assert len(deployed_runtime) == EXPECTED_RUNTIME_BYTES["PriceDesk"]
     print(
         "PRICEDESK_DEPLOYED_RUNTIME",
         f"size={len(deployed_runtime)}",
@@ -643,26 +648,26 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
 
     _set_priorities(mission_control, switchboard_alpha, [1, 2, 3])
     boundary_results = {}
-    for price_limit in range(80_000, 150_001, 10_000):
+    for price_limit in range(80_000, 250_001, 10_000):
         boundary_desk = _isolated_price_desk(
             ripe_hq,
             deploy3r,
             [*no_feed_sources, mock_price_source, curve],
             price_limit=price_limit,
         )
-        boundary_results[price_limit] = (
-            boundary_desk.getPrice(
-                curve_system,
-                False,
-                gas=6_000_000,
+        with cold_trial(boundary_desk, curve, *no_feed_sources):
+            boundary_results[price_limit] = (
+                boundary_desk.getPrice(
+                    curve_system,
+                    False,
+                    gas=6_000_000,
+                )
+                == EIGHTEEN_DECIMALS
             )
-            == EIGHTEEN_DECIMALS
-        )
     minimum_success = min(
         limit for limit, succeeded in boundary_results.items() if succeeded
     )
     assert not boundary_results[90_000]
-    assert minimum_success == 110_000
     print(
         "PRICEDESK_CURVE_GAS",
         f"four_coin_nested_final_position={curve_gas}",
@@ -674,6 +679,8 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
         "source_slots=10",
         "outer_limit=6000000",
     )
+    assert minimum_success == 160_000  # cold pre-state, 10k sweep resolution
+    assert all(succeeded == (limit >= minimum_success) for limit, succeeded in boundary_results.items())
     assert curve_gas < 2_000_000
     assert one_hostile_curve_gas < 3_000_000
     assert hostile_curve_gas < 6_000_000
@@ -752,6 +759,8 @@ def test_four_coin_curve_over_max_snapshot_bluechip_is_rejected_at_confirmation(
 
     # First activate a cheap exact route so the update path can prove atomic
     # rollback against a real previous configuration.
+    for vault in vaults:
+        mock_price_source.setPrice(vault, EIGHTEEN_DECIMALS)
     _set_priorities(mission_control, switchboard_alpha, [6])
     assert curve.addNewPriceFeed(
         curve_system,
@@ -760,6 +769,8 @@ def test_four_coin_curve_over_max_snapshot_bluechip_is_rejected_at_confirmation(
     )
     assert curve.confirmNewPriceFeed(curve_system, sender=governance.address)
     previous = curve.curveConfig(curve_system)
+    for vault in vaults:
+        mock_price_source.disablePriceFeed(vault)
 
     # Exercise the expensive but governance-reachable canonical topology: each
     # Curve underlying traverses the other registered sources before reaching
@@ -857,3 +868,11 @@ def test_wsuper_oethb_nested_price_gas(
     )
     assert nested_gas < 250_000
     assert feed_gas < 75_000
+
+
+@pytest.mark.gas
+def test_teller_complete_deployed_runtime_is_below_eip170(teller):
+    size = len(boa.env.get_code(teller.address))
+    print(f"TELLER_COMPLETE_DEPLOYED_RUNTIME={size}")
+    assert size <= EIP_170_LIMIT
+    assert size == EXPECTED_RUNTIME_BYTES["Teller"]

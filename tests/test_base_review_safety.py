@@ -222,3 +222,24 @@ def test_full_config_comparison_identifies_drift(drift):
     compare_mission_control_config(new, lambda name, *args: getattr(old, name)(*args),
                                   lambda field, got, want: differences.append(field) if got != want else None)
     assert any(field.startswith(drift) for field in differences)
+
+
+def test_price_desk_current_constructor_bindings(price_desk):
+    tree = ast.parse((ROOT / "tests/conf_core.py").read_text())
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and isinstance(node.func, ast.Attribute) and node.func.attr == "load"
+             and node.args and isinstance(node.args[0], ast.Constant)
+             and node.args[0].value == "contracts/registries/PriceDesk.vy"]
+    assert len(calls) == 1
+    assert len(calls[0].args) == 10
+    keys = ("PRICE_DESK_PRICE_SOURCE_GAS", "PRICE_DESK_SNAPSHOT_SOURCE_GAS",
+            "PRICE_DESK_HAS_FEED_SOURCE_GAS", "PRICE_DESK_MAX_SOURCE_GAS")
+    for index, key in enumerate(keys, 6):
+        assert ast.unparse(calls[0].args[index]) == f"PARAMS[fork]['{key}']"
+    for profile, budgets in (("base", (1_500_000, 1_500_000, 75_000, 6_000_000)),
+                             ("local", (250_000, 150_000, 75_000, 6_000_000)),
+                             ("robinhood", (250_000, 150_000, 75_000, 6_000_000))):
+        assert tuple(PARAMS[profile][key] for key in keys) == budgets
+    assert (price_desk.PRICE_SOURCE_PRICE_GAS(), price_desk.PRICE_SOURCE_SNAPSHOT_GAS(),
+            price_desk.PRICE_SOURCE_HAS_FEED_GAS(), price_desk.MAX_SOURCE_GAS()) == (
+                250_000, 150_000, 75_000, 6_000_000)

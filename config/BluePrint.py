@@ -55,6 +55,8 @@ PARAMS = {
     "base": {
         "PRICE_DESK_PRICE_SOURCE_GAS": 1_500_000,  # staged, NOT operation-qualified
         "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 1_500_000,  # staged; prior cold undyUSDC ~924k, margin ~62%
+        "PRICE_DESK_HAS_FEED_SOURCE_GAS": 75_000,
+        "PRICE_DESK_MAX_SOURCE_GAS": 6_000_000,  # provisional, NOT operation-qualified
         # ripe hq - gov changes (blocks)
         "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,  # 1 day on Base
         "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,  # 7 days on Base
@@ -83,6 +85,8 @@ PARAMS = {
     "local": {
         "PRICE_DESK_PRICE_SOURCE_GAS": 250_000,
         "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 150_000,
+        "PRICE_DESK_HAS_FEED_SOURCE_GAS": 75_000,
+        "PRICE_DESK_MAX_SOURCE_GAS": 6_000_000,  # provisional, NOT operation-qualified
         # ripe hq - gov changes (blocks)
         "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,
         "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,
@@ -1391,6 +1395,8 @@ ADDYS["robinhood"] = ROBINHOOD_ADDRESSES
 PARAMS["robinhood"] = {
     "PRICE_DESK_PRICE_SOURCE_GAS": 250_000,
     "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 150_000,
+    "PRICE_DESK_HAS_FEED_SOURCE_GAS": 75_000,
+    "PRICE_DESK_MAX_SOURCE_GAS": 6_000_000,  # provisional, NOT operation-qualified
     "DEPLOYMENT_INPUTS": ROBINHOOD_DEPLOYMENT_INPUTS,
     "CHAIN": ROBINHOOD_CHAIN,
     "COMPONENTS": ROBINHOOD_COMPONENTS,

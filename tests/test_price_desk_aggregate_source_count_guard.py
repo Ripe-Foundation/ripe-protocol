@@ -139,8 +139,13 @@ def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
             if fixture_path == "tests/conf_core.py" else
             "PARAMS['robinhood']['PRICE_DESK_PRICE_SOURCE_GAS']"
         )
-        assert ast.unparse(calls[0].args[-2]) == expected_expr
-        assert ast.unparse(calls[0].args[-1]) == expected_expr.replace("PRICE_DESK_PRICE_SOURCE_GAS", "PRICE_DESK_SNAPSHOT_SOURCE_GAS")
+        assert ast.unparse(calls[0].args[6]) == expected_expr
+        assert ast.unparse(calls[0].args[7]) == expected_expr.replace("PRICE_DESK_PRICE_SOURCE_GAS", "PRICE_DESK_SNAPSHOT_SOURCE_GAS")
+        assert len(calls[0].args) == 10
+        assert ast.unparse(calls[0].args[8]) == expected_expr.replace("PRICE_DESK_PRICE_SOURCE_GAS", "PRICE_DESK_HAS_FEED_SOURCE_GAS")
+        assert ast.unparse(calls[0].args[9]) == expected_expr.replace("PRICE_DESK_PRICE_SOURCE_GAS", "PRICE_DESK_MAX_SOURCE_GAS")
+        assert all(PARAMS[profile]["PRICE_DESK_HAS_FEED_SOURCE_GAS"] == 75_000 for profile in ("local", "robinhood"))
+        assert all(PARAMS[profile]["PRICE_DESK_MAX_SOURCE_GAS"] == 6_000_000 for profile in ("local", "robinhood"))
         assert all(PARAMS[profile]["PRICE_DESK_SNAPSHOT_SOURCE_GAS"] == 150_000 for profile in ("local", "robinhood"))
         assert all(PARAMS[profile]["PRICE_DESK_PRICE_SOURCE_GAS"] ==
                    QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND for profile in ("local", "robinhood")), (

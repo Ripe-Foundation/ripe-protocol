@@ -263,6 +263,8 @@ def _install_price_desk(
         2,
         PARAMS["robinhood"]["PRICE_DESK_PRICE_SOURCE_GAS"],
         PARAMS["robinhood"]["PRICE_DESK_SNAPSHOT_SOURCE_GAS"],
+        PARAMS["robinhood"]["PRICE_DESK_HAS_FEED_SOURCE_GAS"],
+        PARAMS["robinhood"]["PRICE_DESK_MAX_SOURCE_GAS"],
         name="aggregate_protocol_price_desk",
     )
     for index, (name, source) in enumerate(sources, start=1):
@@ -1085,8 +1087,15 @@ def test_nested_bluechip_is_starved_by_preceding_all_asset_stipend_exhaustion(
     assert len(bluechip_computations) == 1
     assert bluechip_computations[0].is_error
     assert nested_calls == 1
-    assert healthy_underlying_calls == 1
-    assert healthy_underlying_successes == 1
+    # The inner desk must stop at its underfunded failed call before fallback.
+    # The outer desk can isolate this only because BlueChip received its full cap.
+    assert healthy_underlying_calls == 0
+    assert healthy_underlying_successes == 0
+    assert bluechip_computations[0].msg.gas == QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND
+    inner = _matching_calls(computation, desk.address, NESTED_PRICE_SELECTOR)[0]
+    assert inner.is_error and b"insufficient source gas" in inner.output
+    inner_source = _matching_calls(inner, preceding_source.address, PRICE_SOURCE_SELECTOR)[0]
+    assert inner_source.is_error and inner_source.msg.gas < QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND
     # If this exact fail-closed reason changes, the nested stop condition moved
     # or was resolved and aggregate-gas qualification must be rerun.
     with boa.reverts("has price config, no price"):

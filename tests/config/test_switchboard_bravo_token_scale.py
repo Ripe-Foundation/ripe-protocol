@@ -268,6 +268,8 @@ def test_replacement_mission_control_updates_only_its_price_desk(
         2,
         250_000,
         150_000,
+        75_000,
+        6_000_000,
         name="replacement_price_desk",
     )
     mock_hq = boa.loads(MOCK_HQ, governance.address, switchboard.address, other_desk.address)

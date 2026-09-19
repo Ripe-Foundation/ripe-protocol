@@ -925,6 +925,8 @@ def price_desk_deploy(ripe_hq_deploy, fork):
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_PRICE_SOURCE_GAS"],
         PARAMS[fork]["PRICE_DESK_SNAPSHOT_SOURCE_GAS"],
+        PARAMS[fork]["PRICE_DESK_HAS_FEED_SOURCE_GAS"],
+        PARAMS[fork]["PRICE_DESK_MAX_SOURCE_GAS"],
         name="price_desk",
     )
 

@@ -2231,6 +2231,9 @@ def test_teller_housekeeping_is_the_production_green_ring_writer(
         stale_blocks=10,
     )
     registry.setValidRipeAddr(teller, True)
+    # The real HQ already recognizes canonical PriceDesk; mirror that here.
+    registry.setPriceDesk(price_desk)
+    registry.setValidRipeAddr(price_desk, True)
 
     assert price_desk.startAddressUpdateToRegistry(
         2,
@@ -3150,6 +3153,9 @@ def test_teller_housekeeping_repeated_robinhood_number_writes_once_per_number(
         stale_blocks=10,
     )
     registry.setValidRipeAddr(teller, True)
+    # The real HQ already recognizes canonical PriceDesk; mirror that here.
+    registry.setPriceDesk(price_desk)
+    registry.setValidRipeAddr(price_desk, True)
     assert price_desk.startAddressUpdateToRegistry(
         2,
         curve,

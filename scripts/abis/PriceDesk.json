@@ -1,5 +1,47 @@
 [
   {
+    "name": "SourceGasBudgetsUpdated",
+    "inputs": [
+      {
+        "name": "source",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "oldQuoteGas",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "oldSnapshotGas",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "oldHasFeedGas",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newQuoteGas",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newSnapshotGas",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newHasFeedGas",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "TokenScaleSet",
     "inputs": [
       {
@@ -1611,6 +1653,60 @@
     ]
   },
   {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setSourceGasBudgets",
+    "inputs": [
+      {
+        "name": "_source",
+        "type": "address"
+      },
+      {
+        "name": "_quoteGas",
+        "type": "uint256"
+      },
+      {
+        "name": "_snapshotGas",
+        "type": "uint256"
+      },
+      {
+        "name": "_hasFeedGas",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getSourceGasBudgets",
+    "inputs": [
+      {
+        "name": "_source",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "view",
     "type": "function",
     "name": "getEthUsdValue",
@@ -1879,6 +1975,23 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "addGreenRefPoolSnapshot",
+    "inputs": [
+      {
+        "name": "_curveSourceId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "addPriceSnapshot",
     "inputs": [
       {
@@ -1909,6 +2022,30 @@
     "stateMutability": "view",
     "type": "function",
     "name": "PRICE_SOURCE_PRICE_GAS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "PRICE_SOURCE_HAS_FEED_GAS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "MAX_SOURCE_GAS",
     "inputs": [],
     "outputs": [
       {
@@ -1976,6 +2113,14 @@
       },
       {
         "name": "_priceSourceSnapshotGas",
+        "type": "uint256"
+      },
+      {
+        "name": "_priceSourceHasFeedGas",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxSourceGas",
         "type": "uint256"
       }
     ],

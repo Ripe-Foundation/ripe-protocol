@@ -75,6 +75,8 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources, price_gas=250_000, snapshot
         2,
         price_gas,
         snapshot_gas,
+        75_000,
+        6_000_000,
         name="isolated_price_desk",
     )
     for index, source in enumerate(sources, start=1):

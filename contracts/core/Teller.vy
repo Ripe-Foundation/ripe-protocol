@@ -104,9 +104,7 @@ interface BondRoom:
 
 interface PriceDesk:
     def addPriceSnapshot(_asset: address) -> bool: nonpayable
-
-interface CurvePrices:
-    def addGreenRefPoolSnapshot() -> bool: nonpayable
+    def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool: nonpayable
 
 struct RipeGovMigrationData:
     amount: uint256
@@ -1026,14 +1024,8 @@ def _performHousekeeping(
         assert not staticcall Ledger(_a.ledger).isPaused() # dev: not activated
         assert not staticcall Ledger(_a.ledger).isLockedAccount(_user) # dev: account locked
 
-    # update green ref pool snapshot
-    # a call to the zero address succeeds as a no-op when curve prices is not configured. a broken or expensive configured route remains fail-open.
-    if not raw_call(
-            staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID),
-            method_id("addGreenRefPoolSnapshot()"),
-            gas=500_000,
-            revert_on_failure=False,
-        ):
+    # PriceDesk proves funding before isolating a genuine Curve failure.
+    if not extcall PriceDesk(_a.priceDesk).addGreenRefPoolSnapshot(CURVE_PRICES_ID):
         log CurveSnapshotFailed()
 
     # update debt

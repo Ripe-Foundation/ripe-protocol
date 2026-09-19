@@ -55,6 +55,20 @@ struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
+struct SourceGasBudgets:
+    quoteGas: uint256
+    snapshotGas: uint256
+    hasFeedGas: uint256
+
+event SourceGasBudgetsUpdated:
+    source: indexed(address)
+    oldQuoteGas: uint256
+    oldSnapshotGas: uint256
+    oldHasFeedGas: uint256
+    newQuoteGas: uint256
+    newSnapshotGas: uint256
+    newHasFeedGas: uint256
+
 event TokenScaleSet:
     asset: indexed(address)
     decimals: indexed(uint256)
@@ -64,12 +78,17 @@ ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 UNDERSCORE_APPRAISER_ID: constant(uint256) = 7
 PRICE_SOURCE_PRICE_GAS: public(immutable(uint256))
-PRICE_SOURCE_HAS_FEED_GAS: constant(uint256) = 75_000
+PRICE_SOURCE_HAS_FEED_GAS: public(immutable(uint256))
+MAX_SOURCE_GAS: public(immutable(uint256))
 PRICE_SOURCE_SNAPSHOT_GAS: public(immutable(uint256))
 MAX_SUPPORTED_TOKEN_DECIMALS: constant(uint256) = 77
+# Covers compiled instructions, memory expansion and cold CALL access between
+# the gas sample and forwarding. Checked against the installed compiler in tests.
+SOURCE_CALL_GAS_OVERHEAD: constant(uint256) = 5_000
 
 # 0 = unset. 1 = valid zero-decimal token (10 ** 0).
 tokenScale: public(HashMap[address, uint256])
+sourceGasBudgets: HashMap[address, SourceGasBudgets]
 
 
 @deploy
@@ -81,13 +100,21 @@ def __init__(
     _maxRegistryTimeLock: uint256,
     _priceSourcePriceGas: uint256,
     _priceSourceSnapshotGas: uint256,
+    _priceSourceHasFeedGas: uint256,
+    _maxSourceGas: uint256,
 ):
     assert _ethAddr != empty(address) # dev: invalid eth addr
     assert _priceSourcePriceGas != 0 # dev: invalid price source gas
     assert _priceSourceSnapshotGas != 0 # dev: invalid snapshot gas
+    assert _priceSourceHasFeedGas != 0 # dev: invalid feed gas
+    # Bound all additions in the forwarding proof, including ceil(budget / 63).
+    assert _maxSourceGas != 0 and _maxSourceGas <= (max_value(uint256) - SOURCE_CALL_GAS_OVERHEAD) // 64 * 63 # dev: invalid maximum source gas
+    assert max(_priceSourcePriceGas, max(_priceSourceSnapshotGas, _priceSourceHasFeedGas)) <= _maxSourceGas # dev: source gas exceeds maximum
     ETH = _ethAddr
     PRICE_SOURCE_PRICE_GAS = _priceSourcePriceGas
     PRICE_SOURCE_SNAPSHOT_GAS = _priceSourceSnapshotGas
+    PRICE_SOURCE_HAS_FEED_GAS = _priceSourceHasFeedGas
+    MAX_SOURCE_GAS = _maxSourceGas
 
     # modules
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
@@ -220,7 +247,7 @@ def _getPriceFromPriceSource(_pid: uint256, _asset: address, _globalStaleTime: u
     if priceSource == empty(address):
         return 0, 0
 
-    return self._getPriceFromSource(priceSource, _asset, _globalStaleTime)
+    return self._getPriceFromSource(priceSource, _asset, _globalStaleTime, False)
 
 
 @view
@@ -231,40 +258,89 @@ def qualifyCallerPriceSource(_asset: address, _staleTime: uint256 = 0) -> (uint2
     # admission checks call from the candidate source itself, so no aggregate
     # fallback can mask a source that is not executable under the live stipend.
     globalStaleTime: uint256 = staticcall MissionControl(addys._getMissionControlAddr()).getPriceStaleTime()
-    return self._getPriceFromSource(msg.sender, _asset, globalStaleTime)
+    return self._getPriceFromSource(msg.sender, _asset, globalStaleTime, True)
 
 
 @view
 @internal
-def _getPriceFromSource(_priceSource: address, _asset: address, _globalStaleTime: uint256) -> (uint256, uint256):
+def _getPriceFromSource(_priceSource: address, _asset: address, _globalStaleTime: uint256, _eagerFunding: bool) -> (uint256, uint256):
     # status: 0 = valid/no feed, 1 = valid/feed, 2 = failed or malformed
-
+    budget: uint256 = self.sourceGasBudgets[_priceSource].quoteGas
+    if budget == 0:
+        budget = PRICE_SOURCE_PRICE_GAS
+    data: Bytes[100] = abi_encode(
+        _asset, _globalStaleTime, self,
+        method_id=method_id("getPriceAndHasFeed(address,uint256,address)"),
+    )
     success: bool = False
     response: Bytes[65] = b""
+    gasBefore: uint256 = msg.gas
+    if _eagerFunding:
+        self._requireSourceCallGas(gasBefore, budget)
     success, response = raw_call(
-        _priceSource,
-        abi_encode(
-            _asset,
-            _globalStaleTime,
-            self,
-            method_id=method_id("getPriceAndHasFeed(address,uint256,address)"),
-        ),
+        _priceSource, data,
         max_outsize=65,
-        gas=PRICE_SOURCE_PRICE_GAS,
+        gas=budget,
         is_static_call=True,
         revert_on_failure=False,
     )
-    if not success or len(response) != 64:
-        return 0, 2
+    if success and len(response) == 64:
+        price: uint256 = 0
+        hasFeedWord: uint256 = 0
+        price, hasFeedWord = abi_decode(response, (uint256, uint256))
+        # Canonical usable/no-feed replies need no full-budget proof. This
+        # permits cheap no-feed revisits inside a more expensive nested source.
+        if (price != 0 and hasFeedWord == 1) or (price == 0 and hasFeedWord == 0):
+            return price, hasFeedWord
+        if price == 0 and hasFeedWord == 1:
+            self._requireSourceCallGas(gasBefore, budget)
+            return 0, 1
 
-    price: uint256 = 0
-    hasFeedWord: uint256 = 0
-    price, hasFeedWord = abi_decode(response, (uint256, uint256))
-    if hasFeedWord > 1:
-        return 0, 2
-    if price != 0 and hasFeedWord == 0:
-        return 0, 2
-    return price, hasFeedWord
+    # Only our saved gas sample establishes caller funding. Revert bytes from
+    # a source (including a nested PriceDesk) are never trusted as a classifier.
+    self._requireSourceCallGas(gasBefore, budget)
+    return 0, 2
+
+
+######################
+# Source Gas Budgets #
+######################
+
+
+@external
+def setSourceGasBudgets(_source: address, _quoteGas: uint256, _snapshotGas: uint256, _hasFeedGas: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _source != empty(address) and _source.is_contract # dev: invalid source
+    assert _quoteGas == 0 or (PRICE_SOURCE_PRICE_GAS <= _quoteGas and _quoteGas <= MAX_SOURCE_GAS) # dev: invalid quote gas
+    assert _snapshotGas == 0 or (PRICE_SOURCE_SNAPSHOT_GAS <= _snapshotGas and _snapshotGas <= MAX_SOURCE_GAS) # dev: invalid snapshot gas
+    assert _hasFeedGas == 0 or (PRICE_SOURCE_HAS_FEED_GAS <= _hasFeedGas and _hasFeedGas <= MAX_SOURCE_GAS) # dev: invalid feed gas
+
+    old: SourceGasBudgets = self.sourceGasBudgets[_source]
+    self.sourceGasBudgets[_source] = SourceGasBudgets(quoteGas=_quoteGas, snapshotGas=_snapshotGas, hasFeedGas=_hasFeedGas)
+    log SourceGasBudgetsUpdated(
+        source=_source,
+        oldQuoteGas=old.quoteGas, oldSnapshotGas=old.snapshotGas, oldHasFeedGas=old.hasFeedGas,
+        newQuoteGas=_quoteGas, newSnapshotGas=_snapshotGas, newHasFeedGas=_hasFeedGas,
+    )
+    return True
+
+
+@view
+@external
+def getSourceGasBudgets(_source: address) -> (uint256, uint256, uint256):
+    budgets: SourceGasBudgets = self.sourceGasBudgets[_source]
+    return (
+        budgets.quoteGas if budgets.quoteGas != 0 else PRICE_SOURCE_PRICE_GAS,
+        budgets.snapshotGas if budgets.snapshotGas != 0 else PRICE_SOURCE_SNAPSHOT_GAS,
+        budgets.hasFeedGas if budgets.hasFeedGas != 0 else PRICE_SOURCE_HAS_FEED_GAS,
+    )
+
+
+@view
+@internal
+def _getSnapshotGas(_source: address) -> uint256:
+    budget: uint256 = self.sourceGasBudgets[_source].snapshotGas
+    return budget if budget != 0 else PRICE_SOURCE_SNAPSHOT_GAS
 
 
 ###############
@@ -324,13 +400,18 @@ def _hasPriceFeed(_asset: address) -> bool:
 @view
 @internal
 def _safeHasPriceFeed(_priceSource: address, _asset: address) -> (bool, bool):
+    budget: uint256 = self.sourceGasBudgets[_priceSource].hasFeedGas
+    if budget == 0:
+        budget = PRICE_SOURCE_HAS_FEED_GAS
+    data: Bytes[36] = abi_encode(_asset, method_id=method_id("hasPriceFeed(address)"))
     success: bool = False
     response: Bytes[33] = b""
+    gasBefore: uint256 = msg.gas
+    self._requireSourceCallGas(gasBefore, budget)
     success, response = raw_call(
-        _priceSource,
-        abi_encode(_asset, method_id=method_id("hasPriceFeed(address)")),
+        _priceSource, data,
         max_outsize=33,
-        gas=PRICE_SOURCE_HAS_FEED_GAS,
+        gas=budget,
         is_static_call=True,
         revert_on_failure=False,
     )
@@ -451,6 +532,28 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 ###################
 
 
+@external
+def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool:
+    assert msg.sender == addys._getTellerAddr() # dev: no perms
+    priceSource: address = registry._getAddr(_curveSourceId)
+    if priceSource == empty(address):
+        return True
+
+    budget: uint256 = self._getSnapshotGas(priceSource)
+    data: Bytes[4] = method_id("addGreenRefPoolSnapshot()")
+    gasBefore: uint256 = msg.gas
+    self._requireSourceCallGas(gasBefore, budget)
+    # Success is the low-level outcome, including a successful False/no-op.
+    return raw_call(priceSource, data, gas=budget, revert_on_failure=False)
+
+
+@pure
+@internal
+def _requireSourceCallGas(_available: uint256, _budget: uint256):
+    # ceil(budget / 63) provides EIP-150 headroom without multiplying budget.
+    assert _available >= _budget + (_budget + 62) // 63 + SOURCE_CALL_GAS_OVERHEAD, "insufficient source gas"
+
+
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
     if not addys._isValidRipeAddr(msg.sender):
@@ -479,13 +582,16 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 @internal
 def _safeAddPriceSnapshot(_priceSource: address, _asset: address) -> bool:
+    budget: uint256 = self._getSnapshotGas(_priceSource)
+    data: Bytes[36] = abi_encode(_asset, method_id=method_id("addPriceSnapshot(address)"))
     success: bool = False
     response: Bytes[33] = b""
+    gasBefore: uint256 = msg.gas
+    self._requireSourceCallGas(gasBefore, budget)
     success, response = raw_call(
-        _priceSource,
-        abi_encode(_asset, method_id=method_id("addPriceSnapshot(address)")),
+        _priceSource, data,
         max_outsize=33,
-        gas=PRICE_SOURCE_SNAPSHOT_GAS,
+        gas=budget,
         revert_on_failure=False,
     )
     if not success or len(response) != 32:
