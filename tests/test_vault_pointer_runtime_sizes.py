@@ -26,7 +26,7 @@ EXPECTED_RUNTIME_BYTES = {
     "SwitchboardFoxtrot": 18278,
     "SwitchboardGolf": 21035,
     "VaultMigrator": 15626,
-    "VaultBook": 18187,
+    "VaultBook": 18253,
     "Teller": 24552,
     "TellerUtils": 9113,
     "BondRoom": 10927,

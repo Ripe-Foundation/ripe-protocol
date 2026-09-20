@@ -1,4 +1,6 @@
 """Local Base fixture using the authenticated historical Pool-1 and RipeGov-2 sources."""
+from contextlib import contextmanager
+from importlib.metadata import version
 import hashlib
 import json
 from pathlib import Path
@@ -55,17 +57,27 @@ def base_chain():
         boa.env.evm.patch.chain_id = previous
 
 
+@contextmanager
+def legacy_search_path():
+    """Boa 0.2.7 has no public getter for its raw override.
+
+    get_search_paths() includes sys.path and is not the setter's inverse. Keep
+    this private read contained and restore the identical object, including None.
+    """
+    assert version("titanoboa") == "0.2.7"
+    previous = boa.interpret._search_path
+    try:
+        boa.interpret.set_search_path([str(FIXTURE_ROOT.resolve())])
+        yield
+    finally:
+        boa.interpret.set_search_path(previous)
+
+
 def _legacy_deployer(record):
     for path, expected in PROVENANCE["sources"].items():
         assert hashlib.sha256((FIXTURE_ROOT / path).read_bytes()).hexdigest() == expected
-    # The public resolver includes optional sys.path entries (e.g. python.zip).
-    # set_search_path treats them as explicit paths and requires them to exist.
-    previous = [str(path) for path in boa.interpret.get_search_paths() if path.exists()]
-    try:
-        boa.interpret.set_search_path([str(FIXTURE_ROOT.resolve())])
+    with legacy_search_path():
         deployer = boa.load_partial(str(FIXTURE_ROOT / record["source_file"]))
-    finally:
-        boa.interpret.set_search_path(previous)
     runtime = deployer.compiler_data.bytecode_runtime
     assert len(runtime) == record["compiled_runtime_bytes"]
     assert hashlib.sha256(runtime).hexdigest() == record["compiled_runtime_sha256"]

@@ -74,6 +74,8 @@ interface PriceDesk:
 
 LEGACY_POOL: public(immutable(address))
 LEGACY_POOL_REG_ID: constant(uint256) = 1
+# Per optional read; qualified against pinned Base routes and claim inventories.
+LEGACY_READ_GAS: constant(uint256) = 8_000_000
 
 
 @deploy
@@ -180,7 +182,7 @@ def getDeleverageTraversalAsset(_user: address, _vaultAddr: address, _index: uin
 def _optionalUint(_target: address, _data: Bytes[68]) -> uint256:
     success: bool = False
     response: Bytes[33] = b""
-    success, response = raw_call(_target, _data, max_outsize=33, is_static_call=True, revert_on_failure=False)
+    success, response = raw_call(_target, _data, gas=LEGACY_READ_GAS, max_outsize=33, is_static_call=True, revert_on_failure=False)
     if not success or len(response) != 32:
         return 0
     return abi_decode(response, uint256)
@@ -203,7 +205,11 @@ def _getExecutableLegacyNav(_user: address, _vaultAddr: address, _asset: address
         custodyValue = self._optionalUint(_asset, abi_encode(_custody, method_id=method_id("convertToAssets(uint256)")))
     elif _asset != addys._getGreenToken():
         custodyValue = self._optionalUint(addys._getPriceDeskAddr(), abi_encode(_asset, _custody, method_id=method_id("getUsdValue(address,uint256)")))
-    if custodyValue == 0 or userValue * _custody // custodyValue == 0:
+    if custodyValue == 0:
+        return 0
+    executable: uint256 = userValue * _custody // custodyValue
+    # This product is bounded by the already checked userValue * custody.
+    if executable == 0 or executable * custodyValue // _custody == 0:
         return 0
     # Eligibility is executable, but sizing must retain the full, uncapped NAV.
     return nav

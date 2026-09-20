@@ -280,19 +280,47 @@ def legacy_compat_staging(legacy_env, switchboard, monkeypatch):
     e.book = old_book
     e.deposit(e.bob, 100 * 10**18)
 
+    from scripts.utils import legacy_vault_compat as checks
+    from scripts.utils.migration_helpers import encode_constructor_args
+    from conf_legacy_pool import storage_write
+    monkeypatch.setattr(checks, "SETUP_DEPLOYER", str(e.bob))
+    minimum, maximum = PARAMS["base"]["MIN_SWITCHBOARD_CHANGE_TIMELOCK"], PARAMS["base"]["MAX_SWITCHBOARD_CHANGE_TIMELOCK"]
+    records, controllers = {}, {}
+    for row, name in checks.REUSED_CONTROLLERS.items():
+        args = (e.hq.address, e.bob if row == 6 else ZERO, minimum, maximum)
+        controller = boa.load(f"contracts/config/{name}.vy", *args)
+        if row == 6:
+            controller.relinquishGov(sender=e.bob)
+        controllers[row] = controller
+        records[name + module.PREVIOUS_SUFFIX] = dict(address=str(controller.address), abi=controller.abi,
+            solc_json=controller.deployer.solc_json, args=encode_constructor_args(controller.abi, args),
+            file=f"contracts/config/{name}.vy")
+        storage_write(switchboard, "registry", "addrInfo", [row], controller.address)
+        storage_write(switchboard, "registry", "addrToRegId", [controller.address], row)
+    # Distinct, drifted staged storage: copying it must fail the expectation.
+    old_dl = boa.load("contracts/core/Deleverage.vy", e.hq, 100, 200, 300, 400, 10**16, 200, 30, 40)
+
     class LocalMigration:
         def __init__(self):
             self.deployed = {}
             self.calls = []
+            self.records = records
+            self.controllers = controllers
+            self.old_dl = old_dl
         def chain(self):
             return "base-mainnet"
         def account(self):
             return e.bob
         def blueprint(self):
             return SimpleNamespace(PARAMS=PARAMS["base"])
+        def get_record(self, name):
+            return self.records[name]
         def get_contract(self, name, address=None):
+            if name == "Deleverage":
+                assert str(address).lower() == str(e.dl.address).lower()
+                return e.dl
             return {"RipeHq": e.hq, "VaultBook": e.book, "StabilityPool": e.pool,
-                    "Deleverage" + module.PREVIOUS_SUFFIX: e.dl,
+                    "Deleverage" + module.PREVIOUS_SUFFIX: old_dl,
                     "SwitchboardPopulated" + module.PREVIOUS_SUFFIX: switchboard}[name]
         def deploy(self, name, *args, label):
             directory = "registries" if name in ("VaultBook", "Switchboard") else "config" if name.startswith("Switchboard") else "core"
@@ -322,6 +350,9 @@ def test_legacy_compat_staging_executes_retained_only_without_activating(legacy_
     assert {call[0] for call in migration.calls} == {candidate.address, migration.deployed["Switchboard"].address}
     assert all(call[1] in {"startAddNewAddressToRegistry", "confirmNewAddressToRegistry", "setRegistryTimeLockAfterSetup", "relinquishGov"} for call in migration.calls)
     assert len(migration.calls) == 28
+    expected = tuple(getattr(e.dl, name)() for name in module.DELEVERAGE_PARAMS[:4]) + (10**15, 100, 0, 0)
+    assert tuple(getattr(migration.old_dl, name)() for name in module.DELEVERAGE_PARAMS) != expected
+    assert tuple(getattr(migration.deployed["Deleverage"], name)() for name in module.DELEVERAGE_PARAMS) == expected
 
 
 @pytest.mark.parametrize("fault", ["profile", "hq", "pool", "future_row", "invalid_row"])
@@ -355,3 +386,82 @@ def test_legacy_compat_migration_is_the_next_recorded_base_step():
     # Honor the normal runner guard; the fresh step must not skip an unfinished
     # historical migration or require force-replaying a frozen constructor.
     runner._require_start_point(SimpleNamespace(), "2026091900")
+
+
+@pytest.mark.parametrize("row", [2, 4, 5, 6])
+@pytest.mark.parametrize("fault", ["wrong_row", "wrong_contract", "wrong_hq", "runtime", "manifest", "temporary_gov", "pending_gov"])
+def test_legacy_staging_authenticates_reused_controllers_before_any_deployment(legacy_compat_staging, fault, row):
+    from conf_legacy_pool import storage_write
+    from scripts.utils.legacy_vault_compat import REUSED_CONTROLLERS
+    module, migration, e = legacy_compat_staging
+    controller = migration.controllers[row]
+    old_board = migration.get_contract("SwitchboardPopulated" + module.PREVIOUS_SUFFIX)
+    record = migration.records[REUSED_CONTROLLERS[row] + module.PREVIOUS_SUFFIX]
+    if fault in ("wrong_row", "wrong_contract"):
+        replacement = e.bob if fault == "wrong_row" else e.dl.address
+        storage_write(old_board, "registry", "addrInfo", [row], replacement)
+        storage_write(old_board, "registry", "addrToRegId", [replacement], row)
+    elif fault == "wrong_hq":
+        code = boa.env.get_code(controller.address)
+        old = int(str(e.hq.address), 16).to_bytes(32, "big")
+        new = int(str(e.bob), 16).to_bytes(32, "big")
+        assert old in code
+        boa.env.set_code(controller.address, code.replace(old, new))
+    elif fault == "runtime":
+        boa.env.set_code(controller.address, b"\x00")
+    elif fault == "manifest":
+        record["file"] = "contracts/config/SwitchboardGolf.vy"
+    elif fault == "temporary_gov":
+        storage_write(controller, "gov", "governance", [], e.bob)
+    else:
+        controller.startGovernanceChange(e.dl, sender=e.gov.address)
+    with pytest.raises(RuntimeError, match="(?:BASE_LEGACY_COMPAT_|MIGRATION_CANDIDATE_)"):
+        module.migrate(migration)
+    assert not migration.deployed and not migration.calls
+
+
+@pytest.mark.parametrize("method", ["eth_sendRawTransaction", "eth_sendTransaction", "evm_setAccountStorageAt", "anvil_setCode"])
+def test_legacy_fork_transport_rejects_all_write_requests_before_network(monkeypatch, method):
+    from scripts.utils.readonly_fork import ReadOnlyRPC
+    from boa.rpc import EthereumRPC
+    calls = []
+    monkeypatch.setattr(EthereumRPC, "fetch", lambda *args: calls.append(args))
+    monkeypatch.setattr(EthereumRPC, "fetch_multi", lambda *args: calls.append(args))
+    rpc = ReadOnlyRPC("https://unused.invalid")
+    with pytest.raises(RuntimeError, match="FORK_UPSTREAM_WRITE_FORBIDDEN"):
+        rpc.fetch(method, [])
+    with pytest.raises(RuntimeError, match="FORK_UPSTREAM_WRITE_FORBIDDEN"):
+        rpc.fetch_multi([("eth_getCode", []), (method, [])])
+    assert calls == []
+    rpc.fetch("eth_getCode", [])
+    assert len(calls) == 1  # positive read control
+
+
+@pytest.mark.parametrize("fault", ["binding", "reverse", "forward", "valid", "future", "delay", "pending_gov"])
+def test_exposed_cutover_book_checks_fail_closed(legacy_compat_staging, fault):
+    from conf_legacy_pool import storage_write
+    from scripts.utils.legacy_vault_compat import verify_book
+    module, migration, e = legacy_compat_staging
+    module.migrate(migration)
+    book = migration.deployed["VaultBook"]
+    retained = tuple(e.book.getAddr(i) for i in range(1, 6))
+    verify_book(book, e.pool, retained)
+    if fault == "binding":
+        code = boa.env.get_code(book.address)
+        word = int(str(e.pool.address), 16).to_bytes(32, "big")
+        assert word in code
+        boa.env.set_code(book.address, code.replace(word, bytes(32)))
+    elif fault == "reverse":
+        storage_write(book, "registry", "addrToRegId", [e.pool.address], 2)
+    elif fault == "forward":
+        storage_write(book, "registry", "addrInfo", [1], e.dl.address)
+    elif fault == "valid":
+        storage_write(book, "registry", "numAddrs", [], 1)
+    elif fault == "future":
+        storage_write(book, "registry", "addrInfo", [6], e.dl.address)
+    elif fault == "delay":
+        storage_write(book, "registry", "registryChangeTimeLock", [], 1)
+    else:
+        book.startGovernanceChange(e.dl, sender=e.gov.address)
+    with pytest.raises(RuntimeError, match="BASE_LEGACY_COMPAT_"):
+        verify_book(book, e.pool, retained)

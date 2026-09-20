@@ -971,7 +971,9 @@ def test_unpriceable_legacy_position_preserves_healthy_batch_repayment(legacy_en
         e.pool.withdrawTokensFromVault(e.bob, e.lp, WAD, e.bob, sender=e.ah.address)
 
 
-def test_owner_specific_deleverage_rounding_residual_is_skipped_by_next_batch(legacy_env):
+@pytest.mark.parametrize("quote", [1007, 999, 400])
+@pytest.mark.parametrize("healthy_first", [False, True])
+def test_owner_specific_deleverage_rounding_residual_is_skipped_by_next_batch(legacy_env, quote, healthy_first):
     e = legacy_env
     e.borrower(e.bob)
     payment = fund_healthy_batch_user(e)
@@ -981,26 +983,35 @@ def test_owner_specific_deleverage_rounding_residual_is_skipped_by_next_batch(le
                     _shouldTransferToEndaoment=token == e.lp,
                     _shouldBurnAsPayment=token == e.sg,
                     _shouldSwapInStabPools=False, _shouldAuctionInstantly=False)
-    e.prices.setPrice(e.lp, 1_007 * WAD // 1000)
+    e.prices.setPrice(e.lp, quote * WAD // 1000)
     e.deposit(e.sally, 600 * WAD)
     e.deposit(e.bob, 100 * WAD)
     clear_transient_storage()
-    # The inverse quote floors this partial target to 100 LP minus one raw unit.
-    target = 100_700 * WAD // 1000 - 1
+    # The inverse/forward conversions leave a small partial-payment residue.
+    target = 100 * WAD * quote // 1000 - 1
     paid = e.teller.deleverageWithSpecificAssets([(1, e.lp.address, target)], e.bob, sender=e.bob)
-    assert paid == target and e.lp.balanceOf(e.pool) == 600 * WAD + 1
-    assert e.pool.getTotalAmountForUser(e.bob, e.lp) == 1
+    assert paid == target
+    residual = e.pool.getTotalAmountForUser(e.bob, e.lp)
+    assert residual == {1007: 1, 999: 2, 400: 4}[quote]
+    assert e.lp.balanceOf(e.pool) == 600 * WAD + {1007: 1, 999: 2, 400: 3}[quote]
     assert e.pool.getTotalUserValue(e.bob, e.lp) == 1
     custody = e.lp.balanceOf(e.pool)
-    assert e.pool.getTotalUserValue(e.bob, e.lp) * custody // e.pd.getUsdValue(e.lp, custody, True) == 0
+    custody_value = e.pd.getUsdValue(e.lp, custody, True)
+    executable = e.pool.getTotalUserValue(e.bob, e.lp) * custody // custody_value
+    assert executable == {1007: 0, 999: 1, 400: 2}[quote]
+    assert executable * custody_value // custody == 0
     clear_transient_storage()
-    with boa.reverts("max withdraw stab amount is 0"):
-        e.pool.withdrawTokensFromVault(e.bob, e.lp, 1, e.bob, sender=e.ah.address)
+    with boa.env.anchor():
+        with boa.reverts():
+            e.teller.deleverageWithSpecificAssets([(1, e.lp.address, WAD)], e.bob, sender=e.bob)
     assert e.nav() == (e.lp.address, 0)
     assert e.dl.getDeleverageInfo(e.bob) == (0, 0)
     before = pool_state(e), debt(e), e.lp.balanceOf(e.funds)
     clear_transient_storage()
-    assert e.teller.deleverageManyUsers([(e.alice, 100 * WAD), (e.bob, WAD)], sender=e.alpha.address) == 100 * WAD
+    users = [(e.alice, 100 * WAD), (e.bob, WAD)]
+    if not healthy_first:
+        users.reverse()
+    assert e.teller.deleverageManyUsers(users, sender=e.alpha.address) == 100 * WAD
     assert (pool_state(e), debt(e), e.lp.balanceOf(e.funds)) == before
     assert debt(e, e.alice) == 200 * WAD and payment.balanceOf(e.funds) == 100 * WAD
     clear_transient_storage()
@@ -1009,6 +1020,9 @@ def test_owner_specific_deleverage_rounding_residual_is_skipped_by_next_batch(le
 @pytest.mark.parametrize("stage", ["proposal", "execution"])
 def test_golf_rejects_retained_pool_as_special_pool_before_modern_probe(legacy_env, switchboard_golf, stability_pool, stage):
     e = legacy_env
+    e.configure(e.collateral, _vaultIds=[3], _debtTerms=e.terms(50_00, 60_00, 80_00, 500, 500, 0),
+                _stakersPointsAlloc=0, _voterPointsAlloc=0,
+                _perUserDepositLimit=10**30, _globalDepositLimit=10**31)
     action = None
     if stage == "execution":
         # A valid modern row at proposal time cannot authorize a legacy row
@@ -1016,6 +1030,8 @@ def test_golf_rejects_retained_pool_as_special_pool_before_modern_probe(legacy_e
         storage_write(e.book, "registry", "addrInfo", [1], stability_pool.address)
         action = switchboard_golf.setAssetLiqConfig(e.collateral, False, False, True, True, 1, sender=e.gov.address)
         mature(switchboard_golf, action)
+        with boa.env.anchor():
+            assert switchboard_golf.executePendingAction(action, sender=e.gov.address)
         storage_write(e.book, "registry", "addrInfo", [1], e.pool.address)
     before = e.mc.assetConfig(e.collateral)
     with boa.reverts("invalid asset liq config" if stage == "proposal" else "invalid asset"):
@@ -1023,6 +1039,7 @@ def test_golf_rejects_retained_pool_as_special_pool_before_modern_probe(legacy_e
             switchboard_golf.setAssetLiqConfig(e.collateral, False, False, True, True, 1, sender=e.gov.address)
         else:
             switchboard_golf.executePendingAction(action, sender=e.gov.address)
+    assert calls_to(switchboard_golf._computation, e.book.address, "LEGACY_POOL()")
     assert not calls_to(switchboard_golf._computation, e.pool.address, "getNumActiveClaimAssets(address)")
     assert e.mc.assetConfig(e.collateral) == before
     if action is not None:
@@ -1066,3 +1083,87 @@ def test_legacy_traversal_and_batch_gas_for_retained_claim_inventories(legacy_en
             assert measurements[count][i] < budgets[count][i], measurements
     for count, gas in measurements.items():
         record_property(f"legacy_{count}_claims_traversal_info_batch_gas", str(gas))
+
+
+@pytest.mark.parametrize("chain", [8453, 46630])
+@pytest.mark.parametrize("stage", ["proposal", "execution"])
+def test_golf_old_vault_book_missing_binding_fails_before_pool_probe(legacy_env, switchboard_golf, stability_pool, chain, stage):
+    e = legacy_env
+    e.configure(e.collateral, _vaultIds=[3], _debtTerms=e.terms(50_00, 60_00, 80_00, 500, 500, 0),
+                _stakersPointsAlloc=0, _voterPointsAlloc=0,
+                _perUserDepositLimit=10**30, _globalDepositLimit=10**31)
+    boa.env.evm.patch.chain_id = chain
+    storage_write(e.book, "registry", "addrInfo", [1], stability_pool.address)
+    # The compatible book succeeds first, including on a modern-only chain.
+    action = switchboard_golf.setAssetLiqConfig(e.collateral, False, False, True, True, 1, sender=e.gov.address)
+    mature(switchboard_golf, action)
+    with boa.env.anchor():
+        assert switchboard_golf.executePendingAction(action, sender=e.gov.address)
+        assert calls_to(switchboard_golf._computation, stability_pool.address, "getNumActiveClaimAssets(address)")
+    old_book = boa.loads(f"""
+@external
+@view
+def getAddr(i: uint256) -> address:
+    return {stability_pool.address}
+@external
+@view
+def isValidRegId(i: uint256) -> bool:
+    return i > 0 and i < 5
+""")
+    boa.env.set_code(e.book.address, boa.env.get_code(old_book.address))
+    before = e.mc.assetConfig(e.collateral)
+    with boa.reverts():
+        if stage == "proposal":
+            switchboard_golf.setAssetLiqConfig(e.collateral, False, False, True, True, 1, sender=e.gov.address)
+        else:
+            switchboard_golf.executePendingAction(action, sender=e.gov.address)
+    trace = switchboard_golf._computation
+    assert len(calls_to(trace, e.book.address, "LEGACY_POOL()")) == 1
+    assert not any(c.msg.code_address == bytes.fromhex(str(stability_pool.address)[2:]) for c in call_tree(trace))
+    assert e.mc.assetConfig(e.collateral) == before
+    assert switchboard_golf.hasPendingAction(action)
+
+
+@pytest.mark.parametrize("getter", ["getTotalAmountForUser", "getTotalUserValue"])
+@pytest.mark.parametrize("healthy_first", [False, True])
+def test_gas_exhausting_optional_legacy_getter_preserves_healthy_batch(legacy_env, getter, healthy_first):
+    e = legacy_env
+    e.borrower(e.bob)
+    e.deposit(e.bob, 100 * WAD)
+    payment = fund_healthy_batch_user(e)
+    source = f"""
+@external
+@view
+def numUserAssets(u: address) -> uint256:
+    return 2 if u == {e.bob} else 0
+@external
+@view
+def getUserAssetAtIndexAndHasBalance(u: address, i: uint256) -> (address, bool):
+    return {e.lp.address}, True
+@external
+@view
+def isPaused() -> bool:
+    return False
+@external
+@view
+def totalClaimableBalances(a: address) -> uint256:
+    return 0
+"""
+    for name in ("getTotalAmountForUser", "getTotalUserValue"):
+        body = f"    return {100 * WAD}" if name != getter else "    x: bytes32 = empty(bytes32)\n    for i: uint256 in range(1_000_000):\n        x = keccak256(x)\n    assert x == empty(bytes32)\n    return 1"
+        source += f"@external\n@view\ndef {name}(u: address, a: address) -> uint256:\n{body}\n"
+    probe = boa.loads(source)
+    boa.env.set_code(e.pool.address, boa.env.get_code(probe.address))
+    before = debt(e), e.lp.balanceOf(e.pool)
+    clear_transient_storage()
+    users = [(e.alice, 100 * WAD), (e.bob, WAD)]
+    if not healthy_first:
+        users.reverse()
+    assert e.teller.deleverageManyUsers(users, sender=e.alpha.address, gas=16_000_000) == 100 * WAD
+    trace = e.teller._computation
+    failed = calls_to(trace, e.pool.address, getter + "(address,address)")
+    assert len(failed) == 1 and failed[0].is_error
+    assert failed[0].msg.gas == 8_000_000 and failed[0].get_gas_remaining() == 0
+    assert trace.get_gas_used() < 9_500_000
+    assert before == (debt(e), e.lp.balanceOf(e.pool))
+    assert debt(e, e.alice) == 200 * WAD and payment.balanceOf(e.funds) == 100 * WAD

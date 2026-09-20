@@ -5,6 +5,7 @@
 def LEGACY_POOL() -> address:
     ...
 
+
 @view
 @external
 def canAcceptLiquidationAsset(_vaultAddr: address, _stabAsset: address, _claimAsset: address) -> bool:

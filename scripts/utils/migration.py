@@ -505,6 +505,30 @@ def _slim_step_manifest(manifest, contract_names):
     }
 
 
+def authenticate_deployed_record(record, *, expected_source_path, expected_constructor_args):
+    """Read-only use of the same source/ABI/constructor/runtime checks as resume.
+
+    Immutable semantics (HQ, timelocks, bindings) must also be read back by the
+    caller, just as the promotion path checks its independent activation intent.
+    """
+    validated = _validated_promotable_record(
+        record, expected_source_path=expected_source_path,
+        expected_constructor_args=expected_constructor_args,
+    )
+    _validate_runtime_bytes(validated, bytes(boa.env.get_code(validated.address)))
+    return boa.loads_abi(json.dumps(record["abi"]), name=Path(expected_source_path).stem).at(validated.address)
+
+
+def _validate_runtime_bytes(record, deployed_code, *, activation=False):
+    kind = "ACTIVATION_CANDIDATE" if activation else "CANDIDATE"
+    if not deployed_code:
+        raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_MISSING")
+    if len(deployed_code) != record.deployed_runtime_size:
+        raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_LENGTH_MISMATCH")
+    if not deployed_code.startswith(record.runtime_template):
+        raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_PREFIX_MISMATCH")
+
+
 class Migration:
     def __init__(
         self,
@@ -904,6 +928,10 @@ class Migration:
         )
         return self._register_contract(name, name, contract, args)
 
+    def get_record(self, name):
+        """Copy a manifest record for independent read-only authentication."""
+        return copy.deepcopy(self._previous_manifest["contracts"][name])
+
     def get_address(self, name):
         return self._previous_manifest["contracts"][name]["address"]
 
@@ -1023,14 +1051,7 @@ class Migration:
             raise RuntimeError("MIGRATION_CANDIDATE_CODE_READ_FAILED") from None
 
     def _validate_deployed_code(self, record, *, activation=False):
-        kind = "ACTIVATION_CANDIDATE" if activation else "CANDIDATE"
-        deployed_code = self._get_deployed_code(record.address)
-        if not deployed_code:
-            raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_MISSING")
-        if len(deployed_code) != record.deployed_runtime_size:
-            raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_LENGTH_MISMATCH")
-        if not deployed_code.startswith(record.runtime_template):
-            raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_PREFIX_MISMATCH")
+        _validate_runtime_bytes(record, self._get_deployed_code(record.address), activation=activation)
 
     @staticmethod
     def _validate_registry_identity(contracts, spec):

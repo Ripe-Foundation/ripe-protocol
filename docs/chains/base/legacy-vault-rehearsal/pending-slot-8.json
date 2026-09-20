@@ -1,0 +1,16 @@
+{
+  "mode": "read-only finalized RPC calls",
+  "block": 51549300,
+  "block_hash": "0x8ad2988dbb51bcb7be3f53a71314454a25ad619ae684553679c0ae28907df9a5",
+  "block_timestamp": 1789887947,
+  "chain_id": 8453,
+  "hq": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+  "active_slot_8": "0xB758e30C14825519b895Fd9928d5d8748A71a944",
+  "confirmation_block_reached": true,
+  "live_transactions_sent": 0,
+  "pending_slot_8": {
+    "newAddr": "0x09f45F56b218756ab092f7470F8199db56849867",
+    "initiatedBlock": 49890175,
+    "confirmBlock": 49911775
+  }
+}

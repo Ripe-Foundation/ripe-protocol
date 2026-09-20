@@ -266,7 +266,7 @@ def test_constructor_structural_probes_do_not_require_nav_pricing(legacy_env, po
 
 
 @pytest.mark.parametrize("getter", ["getTotalAmountForUser", "getTotalUserValue"])
-@pytest.mark.parametrize("response", ["revert", "empty", "overlong", "zero"])
+@pytest.mark.parametrize("response", ["valid", "revert", "empty", "overlong", "zero"])
 def test_optional_legacy_reads_reject_failed_or_malformed_uints(legacy_env, getter, response):
     e = legacy_env
     e.deposit(e.bob, WAD)
@@ -284,7 +284,7 @@ def totalClaimableBalances(a: address) -> uint256:
     return 0
 '''
     for name in ("getTotalAmountForUser", "getTotalUserValue"):
-        if name != getter:
+        if name != getter or response == "valid":
             body = f" -> uint256:\n    return {WAD}"
         else:
             body = {"revert": " -> uint256:\n    raise", "empty": ":\n    pass",
@@ -294,4 +294,26 @@ def totalClaimableBalances(a: address) -> uint256:
     # Synthetic ABI corruption at the already bound address; authenticated
     # historical fixture files and the real behavior tests stay unchanged.
     boa.env.set_code(e.pool.address, boa.env.get_code(probe.address))
-    assert e.nav() == (e.lp.address, 0)
+    assert e.nav() == (e.lp.address, WAD if response == "valid" else 0)
+
+
+@pytest.mark.parametrize("override", [None, ["."]])
+@pytest.mark.parametrize("fail", [False, True])
+def test_legacy_compilation_restores_exact_search_path_override(monkeypatch, override, fail):
+    from conf_legacy_pool import _legacy_deployer
+    # This version-pinned regression intentionally inspects the raw state that
+    # the contained helper promises to restore, including identity and None.
+    previous = boa.interpret._search_path
+    try:
+        boa.interpret.set_search_path(override)
+        if fail:
+            def broken(*args, **kwargs):
+                raise RuntimeError("synthetic compile failure")
+            monkeypatch.setattr(boa, "load_partial", broken)
+            with pytest.raises(RuntimeError, match="synthetic compile failure"):
+                _legacy_deployer(PROVENANCE["pool"])
+        else:
+            _legacy_deployer(PROVENANCE["pool"])
+        assert boa.interpret._search_path is override
+    finally:
+        boa.interpret.set_search_path(previous)

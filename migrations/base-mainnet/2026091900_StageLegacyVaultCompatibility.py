@@ -9,6 +9,10 @@ import boa
 
 from scripts.utils import log
 from scripts.utils.migration import Migration
+from scripts.utils.legacy_vault_compat import (
+    address, require, verify_book, verify_local_governance, authenticate_reused_controllers,
+    REUSED_CONTROLLERS,
+)
 
 ZERO = "0x" + "00" * 20
 EXPECTED_HQ = "0x6162df1b329e157479f8f1407e888260e0ec3d2b"
@@ -22,36 +26,6 @@ DELEVERAGE_PARAMS = (
     "deleverageFullPayoffBuffer", "deleverageOverageBps", "deleverageDustThreshold", "deleverageDustBps",
 )
 
-
-def address(value):
-    return str(getattr(value, "address", value)).lower()
-
-
-def require(ok, reason):
-    if not ok:
-        raise RuntimeError("BASE_LEGACY_COMPAT_" + reason)
-
-
-def verify_book(book, pool, retained):
-    """Public readbacks required again against the final candidate at cutover."""
-    require(address(book.LEGACY_POOL()) == address(pool), "BINDING_MISMATCH")
-    require(book.getRegId(pool) == 1, "POOL_REVERSE_ROW")
-    require(address(book.getAddr(1)) == address(pool), "POOL_FORWARD_ROW")
-    require(book.isValidRegId(1), "POOL_INVALID_ROW")
-    require(book.numAddrs() == 6 and book.getNumAddrs() == 5, "NOT_RETAINED_ONLY")
-    for reg_id, vault in enumerate(retained, 1):
-        require(address(book.getAddr(reg_id)) == address(vault), f"RETAINED_ROW:{reg_id}")
-        require(book.getRegId(vault) == reg_id and book.isValidRegId(reg_id), f"RETAINED_IDENTITY:{reg_id}")
-    for reg_id in range(6, 11):
-        require(address(book.getAddr(reg_id)) == ZERO and not book.isValidRegId(reg_id), f"FUTURE_ROW:{reg_id}")
-    probe_asset = pool.vaultAssets(1)
-    require(address(probe_asset) != ZERO, "MISSING_PROBE_ASSET")
-    require(book.hasStabilityPoolInterface(pool, probe_asset, ZERO), "MISSING_INTERFACE")
-    require(not book.canAcceptLiquidationAsset(pool, probe_asset, ZERO), "READINESS_ABI")
-    require(tuple(book.getDeleverageTraversalAsset(ZERO, pool, 0, True)) == (ZERO, 0), "TRAVERSAL_ABI")
-    require(book.minRegistryTimeLock() == VAULT_BOOK_MIN_TIMELOCK, "REGISTRY_FLOOR")
-    require(book.registryChangeTimeLock() == VAULT_BOOK_MIN_TIMELOCK, "REGISTRY_DELAY")
-    require(address(book.governance()) == ZERO, "TEMP_GOV_RETAINED")
 
 
 def migrate(migration: Migration):
@@ -72,10 +46,9 @@ def migrate(migration: Migration):
     require(address(pool.getRipeHq()) == address(hq), "POOL_HQ")
     require(address(pool.vaultAssets(1)) != ZERO, "MISSING_PROBE_ASSET")
 
-    # Retain the staged economic parameters and the four unchanged controller
-    # addresses. All dependencies are read before sending any deployment.
-    old_dl = migration.get_contract("Deleverage" + PREVIOUS_SUFFIX)
-    dl_params = tuple(getattr(old_dl, name)() for name in DELEVERAGE_PARAMS)
+    # Read inherited mutable policy from active HQ, never an old candidate.
+    active_dl = migration.get_contract("Deleverage", hq.getAddr(18))
+    dl_params = tuple(getattr(active_dl, name)() for name in DELEVERAGE_PARAMS[:4]) + (10**15, 100, 0, 0)
     old_switchboard = migration.get_contract("SwitchboardPopulated" + PREVIOUS_SUFFIX)
     require(old_switchboard.numAddrs() == 8, "STAGED_SWITCHBOARD_TOPOLOGY")
     old_boards = tuple(old_switchboard.getAddr(i) for i in range(1, 8))
@@ -83,6 +56,7 @@ def migrate(migration: Migration):
                 for i, v in enumerate(old_boards, 1)), "STAGED_SWITCHBOARD_ROWS")
     params = migration.blueprint().PARAMS
     min_lock, max_lock = params["MIN_SWITCHBOARD_CHANGE_TIMELOCK"], params["MAX_SWITCHBOARD_CHANGE_TIMELOCK"]
+    reused = authenticate_reused_controllers(migration.get_record, old_switchboard, hq.address, min_lock, max_lock)
     candidates = {}
 
     log.h1("1. Deploy the compatible VaultBook and callers under fresh labels")
@@ -110,11 +84,9 @@ def migrate(migration: Migration):
         migration.execute(book.startAddNewAddressToRegistry, vault, f"Retained vault {reg_id}")
         migration.execute(book.confirmNewAddressToRegistry, vault)
     board = candidates["Switchboard"]
-    final_boards = []
     for reg_id, suffix in enumerate(BOARD_NAMES, 1):
-        candidate = candidates.get("Switchboard" + suffix, old_boards[reg_id - 1])
+        candidate = candidates["Switchboard" + suffix] if reg_id not in reused else reused[reg_id]
         candidate_address = getattr(candidate, "address", candidate)
-        final_boards.append(candidate_address)
         migration.execute(board.startAddNewAddressToRegistry, candidate_address, "Switchboard " + suffix)
         migration.execute(board.confirmNewAddressToRegistry, candidate_address)
     for registry in (book, board):
@@ -125,7 +97,12 @@ def migrate(migration: Migration):
     verify_book(book, pool, retained)
     require(board.numAddrs() == 8 and address(board.governance()) == ZERO, "SWITCHBOARD_SETUP")
     require(board.registryChangeTimeLock() == min_lock, "SWITCHBOARD_DELAY")
-    for reg_id, candidate in enumerate(final_boards, 1):
+    verify_local_governance(board)
+    require(tuple(getattr(candidates["Deleverage"], name)() for name in DELEVERAGE_PARAMS) == dl_params, "DELEVERAGE_PARAMS")
+    for reg_id, suffix in enumerate(BOARD_NAMES, 1):
+        # Resolve readback expectations independently of the population list.
+        candidate = (migration.get_record(REUSED_CONTROLLERS[reg_id] + PREVIOUS_SUFFIX)["address"]
+                     if reg_id in REUSED_CONTROLLERS else candidates["Switchboard" + suffix].address)
         require(address(board.getAddr(reg_id)) == address(candidate)
                 and board.getRegId(candidate) == reg_id and board.isValidRegId(reg_id), f"SWITCHBOARD_ROW:{reg_id}")
     for name, candidate in candidates.items():

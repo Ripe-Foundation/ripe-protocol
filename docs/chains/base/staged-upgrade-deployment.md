@@ -25,6 +25,17 @@ addresses and constructor inputs in the normal journal and completed
 `migration_history/base-mainnet/v1/2026091900-manifest.json`. It sends no HQ
 proposal or activation and leaves the pending slot-8 proposal untouched.
 
+Before deploying, it authenticates each reused controller against its recorded
+label/source/runtime, HQ and local/pending governance. Deleverage inherits four
+parameters from **active HQ slot 18** and fixes the four newer policy values to
+`10**15`, `100`, `0`, `0`; the previous staged candidate is not authoritative.
+Repeat `python -m scripts.verify_legacy_vault_cutover` after staging and before
+activation with the final full manifest, stager and pinned block. See the
+[read-only command and production-runner evidence](legacy-vault-compatibility.md#repeatable-read-only-cutover-verification).
+The same release notes define classified silent-skip monitoring and link the
+[modern rounding tracker #234](https://github.com/Ripe-Foundation/ripe-protocol/issues/234)
+and [historical Contributor tracker #235](https://github.com/Ripe-Foundation/ripe-protocol/issues/235).
+
 The staged **VaultBook, AuctionHouse, Deleverage, SwitchboardAlpha and
 SwitchboardCharlie** from `BaseUpgradeCandidate20260914` are all superseded,
 including the populated VaultBook. **SwitchboardGolf** is also superseded by its
