@@ -1411,12 +1411,70 @@ def test_symbolic_authority_class_mutations_fail_closed():
     assert_code("H03_SYMBOLIC_FIELD", incorrect_blueprint)
 
 
-def test_teller_source_references_stay_within_current_contract():
-    source = (ROOT / "contracts/core/Teller.vy").read_text().splitlines()
-    pointers = re.findall(r"contracts/core/Teller\.vy:(\d+)(?:-(\d+))?", MODULE.read_text())
-    assert pointers, "Teller relation pointers must remain present"
-    for start, end in pointers:
-        first, last = int(start), int(end or start)
-        assert 1 <= first <= last <= len(source), (first, last, len(source))
-        assert any(line.strip() and not line.lstrip().startswith("#")
-                   for line in source[first - 1:last]), (first, last)
+def _source_excerpt(reference):
+    match = re.fullmatch(r"(.+):(\d+)(?:-(\d+))?", reference)
+    assert match, reference
+    path, start, end = match.groups()
+    lines = (ROOT / path).read_text().splitlines()
+    first, last = int(start), int(end or start)
+    assert 1 <= first <= last <= len(lines), (reference, len(lines))
+    return "\n".join(lines[first - 1:last])
+
+
+def test_all_source_references_resolve_within_current_files():
+    references = re.findall(
+        r"[\w/.-]+\.(?:vy|vyi|py|md|json):\d+(?:-\d+)?", MODULE.read_text(),
+    )
+    assert references, "Source proof pointers must remain present"
+    for reference in references:
+        excerpt = _source_excerpt(reference)
+        # Preserve the existing Teller content check. Other historical graph
+        # semantics are outside this scoped follow-up; bounds apply to all files.
+        if reference.startswith("contracts/core/Teller.vy:"):
+            assert any(line.strip() and not line.lstrip().startswith("#")
+                       for line in excerpt.splitlines()), reference
+    for _, relation in all_relations():
+        assert len(set(relation.source_proof_refs)) == len(relation.source_proof_refs), relation.relation_id
+
+
+def test_reviewed_relations_prove_current_calls_and_authority():
+    relations = [relation for _, relation in all_relations()
+                 if "pause" in relation.basis.lower()
+                 and any(ref.startswith("contracts/modules/Addys.vy:")
+                         for ref in relation.source_proof_refs)]
+    assert len(relations) == 21
+    for relation in relations:
+        excerpts = [_source_excerpt(ref) for ref in relation.source_proof_refs]
+        helper = excerpts[-1]
+        assert "def _isSwitchboardAddr(" in helper, relation.relation_id
+        assert "getAddr(SWITCHBOARD_ID)" in helper, relation.relation_id
+        assert "return staticcall Switchboard(switchboard).isSwitchboardAddr(_addr)" in helper
+        # Endaoment defines guarded wrappers instead of exporting DeptBasics.
+        caller = excerpts[0] if relation.relation_id == "R-200" else excerpts[1]
+        assert "def pause(" in caller and "assert addys._isSwitchboardAddr(msg.sender)" in caller
+        if relation.relation_id == "R-142":
+            assert "vaultData.pause," in excerpts[0]
+            assert "vaultData.recoverFunds" not in excerpts[0]
+            assert excerpts[2].count("raise # dev: recovery disabled") == 2
+        else:
+            if relation.relation_id != "R-200":
+                module = "vaultData" if "VaultData.vy" in relation.source_proof_refs[1] else "deptBasics"
+                assert f"exports: {module}.__interface__" in excerpts[0]
+                assert f"initializes: {module}[addys := addys]" in excerpts[0]
+            assert "def recoverFunds(" in caller and "def recoverFundsMany(" in caller
+            assert caller.count("assert addys._isSwitchboardAddr(msg.sender)") == 3
+
+    by_id = {relation.relation_id: relation for _, relation in all_relations()}
+    calls = {
+        "R-099": ("extcall MissionControl(_mc).setAssetConfig(",
+                  "extcall MissionControl(mc).setAccrualStartBlock("),
+        "R-238": ("extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(",
+                  "extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets("),
+        "R-271": ("staticcall MissionControl(a.missionControl).getTellerDepositConfig(",
+                  "staticcall MissionControl(missionControl).doesUndyLegoHaveAccess("),
+        "R-279": ("extcall Endaoment(self._getEndaomentAddr()).depositForYield(",
+                  "extcall Endaoment(self._getEndaomentAddr()).repayPoolDebt("),
+    }
+    for relation_id, expected_calls in calls.items():
+        evidence = "\n".join(_source_excerpt(ref) for ref in by_id[relation_id].source_proof_refs)
+        assert all(call in evidence for call in expected_calls), relation_id
