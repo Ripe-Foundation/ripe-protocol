@@ -12,6 +12,7 @@ from scripts.qualify_ripe_reserve_engine_activation import (
     ENGINE_MUTATORS,
     EXPECTED_ENGINE_REACHABILITY,
     EXPECTED_SWITCHBOARDS,
+    EXPECTED_SWITCHBOARD_SOURCES,
     EXPECTED_VESTING_REACHABILITY,
     READY_STATUS,
     VESTING_MUTATORS,
@@ -21,6 +22,7 @@ from scripts.qualify_ripe_reserve_engine_activation import (
     main,
     readiness_errors,
     selector_inventory_sha256,
+    static_switchboard_errors,
 )
 
 
@@ -301,7 +303,7 @@ def test_draft_schema_rejects_missing_binding_fields(section, key):
 def test_switchboard_source_inventory_and_mutators_are_pinned():
     data = manifest()
     assert tuple(data["switchboard_authority"]["source_inventory"]) == (
-        EXPECTED_SWITCHBOARDS
+        EXPECTED_SWITCHBOARD_SOURCES
     )
     assert ENGINE_MUTATORS == (
         "setConfig",
@@ -534,3 +536,24 @@ def test_manifest_is_canonical_json_with_one_trailing_newline():
         json.dumps(data, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
     ).encode()
     assert MANIFEST.read_bytes() == expected
+
+
+@pytest.mark.parametrize("name", ("SwitchboardFoxtrot", "SwitchboardFoxtrotSetup"))
+def test_both_foxtrot_sources_pin_reserve_reachability(tmp_path, name):
+    import shutil
+
+    shutil.copytree(ROOT / "contracts", tmp_path / "contracts")
+    source = tmp_path / "contracts/config" / f"{name}.vy"
+    source.write_text(source.read_text().replace(".setPaymentToken(", ".unreviewedPaymentToken("))
+    assert any(f"{name} Engine mutator calls changed:" in error
+               for error in static_switchboard_errors(tmp_path, manifest()))
+
+
+def test_reviewing_setup_source_does_not_authorize_a_registered_variant():
+    data = _ready_manifest()
+    inventory = data["switchboard_authority"]["registered_deployment_inventory"]
+    entry = next(item for item in inventory if item["name"] == "SwitchboardFoxtrot")
+    entry["name"] = "SwitchboardFoxtrotSetup"
+    assert "registered switchboard inventory is incomplete or unknown" in readiness_errors(
+        data, current_block=CURRENT_BLOCK
+    )

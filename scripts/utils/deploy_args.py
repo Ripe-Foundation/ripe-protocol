@@ -3,6 +3,7 @@ from config.BluePrint import (
     CORE_TOKENS,
     CURVE_PARAMS,
     PARAMS,
+    PRICE_DESK_SOURCE_GAS_OVERRIDES,
     ROBINHOOD_ADDRESS_STATUS,
     ROBINHOOD_DEFAULTS_CONSTRUCTOR,
     SymbolicBinding,
@@ -14,6 +15,7 @@ class BluePrint:
     def __init__(self, blueprint):
         self.blueprint = blueprint
         self.PARAMS = PARAMS[blueprint]
+        self.PRICE_DESK_SOURCE_GAS_OVERRIDES = PRICE_DESK_SOURCE_GAS_OVERRIDES[blueprint]
         self.ADDYS = ADDYS[blueprint]
         self.CURVE_PARAMS = CURVE_PARAMS[blueprint]
         self.CORE_TOKENS = CORE_TOKENS[blueprint]

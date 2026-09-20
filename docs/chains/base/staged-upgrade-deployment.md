@@ -54,25 +54,32 @@ unpause contracts. Deployment is not approval for cutover.
 
 ### Current PriceDesk/Teller staging inputs
 
-Two new migration bodies compile the current nine-argument PriceDesk constructor:
+Two fork-rehearsal scripts compile the current nine-argument PriceDesk constructor.
+They live outside `migrations/base-mainnet/` and are **not in the live runner queue**:
 
-- `2026091900_StageBaseOraclesPsmReserves.py` stages the full replacement-oracle
-  and treasury set under `BasePriceDeskGasCandidate20260919` labels. The full
-  wave-one fork diagnostic selects this body instead of frozen `2026091402`.
-  It is for that complete rehearsal; it is not a request to redeploy unrelated
-  live departments.
-- `2026091901_StageBasePriceDeskGasBridge.py` stages only a bridge PriceDesk and a
-  paused compatible Teller. Its labels are `PriceDeskBridgeGasCandidate20260919`
-  and `TellerPriceDeskGasCandidate20260919`. The bridge retains current source
-  addresses, the disabled BlueChip slot, and token-scale bootstrap. Neither
-  migration proposes or confirms HQ changes.
+- [`oracles_psm_reserves.py`](../../../scripts/rehearsal/base_candidates/oracles_psm_reserves.py)
+  stages the full replacement-oracle and treasury set under
+  `BasePriceDeskGasCandidate20260919` labels. The full wave-one fork diagnostic
+  loads this path instead of frozen `2026091402`.
+- [`price_desk_gas_bridge.py`](../../../scripts/rehearsal/base_candidates/price_desk_gas_bridge.py)
+  stages a bridge PriceDesk and paused compatible Teller under
+  `PriceDeskBridgeGasCandidate20260919` and `TellerPriceDeskGasCandidate20260919`.
+  The bridge retains current source addresses, the disabled BlueChip slot, and
+  token-scale bootstrap. Neither script proposes or confirms HQ changes.
 
-These are local staging inputs, not deployment or activation approval. Final
-constructor values and per-address overrides require the separate qualification
-in [the implementation handoff](pricedesk-gas-implementation.md). Do not substitute
-an old candidate's address or journal for either new candidate. The standard
-runner's history/resume rules still apply; do not force-replay or skip a frontier
-just to reach a new timestamp.
+Both drafts apply the profile table in `config/BluePrint.py` to the exact Curve
+and Undy source addresses and read back all four constructor values and all
+three effective source budgets before relinquishing setup governance. Missing
+entries, wrong address bindings, invalid budgets and readback mismatches stop
+that handoff. The table is independently pinned in the focused tests.
+
+These drafts are local rehearsal inputs. Final constructor values and per-address
+budgets require the separate qualification in
+[the implementation handoff](pricedesk-gas-implementation.md). Only after that
+qualification and explicit deployment authorization may a reviewed body be added
+to the live migration directory with a fresh timestamp and fresh candidate labels.
+Do not substitute an old candidate's address or journal. No migration-history
+change or runner bypass is needed to use these drafts in the fork diagnostic.
 
 At an authorized cutover, confirm the compatible PriceDesk in **HQ slot 7 before
 Teller in slot 17**, or confirm both in one atomic batch with slot 7 first. Check
@@ -327,7 +334,7 @@ python scripts/base_full_update_fork.py --block 51312366 \
   --diagnose-replacing-pending
 ```
 
-This uses actual migration constructor calls inside `boa.fork`, checks custody,
+This uses historical staging bodies and current rehearsal drafts inside `boa.fork`, checks custody,
 prepares registries and attempts the department/oracle update. It never signs
 or broadcasts and does not edit live migration history. At normal completion it
 writes `not_qualified` and exits 2; this does not prove that every check ran or

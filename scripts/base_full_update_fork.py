@@ -23,11 +23,34 @@ from scripts.utils.fork_reports import fingerprint, require_unoptimized
 
 SUFFIX = "BaseUpgradeCandidate20260914"
 CURRENT_ORACLE_SUFFIX = "BasePriceDeskGasCandidate20260919"
-STAGING_MIGRATIONS = (
-    "2026091400_StageBaseUpgrade.py",
-    "2026091401_StageBaseMissionControl.py",
-    "2026091900_StageBaseOraclesPsmReserves.py",
+CANDIDATE_DIR = Path("scripts/rehearsal/base_candidates")
+STAGING_SCRIPTS = (
+    Path("migrations/base-mainnet/2026091400_StageBaseUpgrade.py"),
+    Path("migrations/base-mainnet/2026091401_StageBaseMissionControl.py"),
+    CANDIDATE_DIR / "oracles_psm_reserves.py",
 )
+
+
+def staging_source_hashes(root=ROOT):
+    """Bind every historical staging body and current draft, including the bridge."""
+    paths = set((root / "migrations/base-mainnet").glob("20260914*.py"))
+    paths.update(root / path for path in STAGING_SCRIPTS)
+    paths.add(root / CANDIDATE_DIR / "price_desk_gas_bridge.py")
+    paths.update((root / CANDIDATE_DIR).rglob("*.py"))
+    return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(paths)}
+
+
+def department_confirmation_order(replacements):
+    """Validate dependencies before proposing any department changes."""
+    if len(replacements) != len(set(replacements)):
+        raise RuntimeError("BASE_ACTIVATION_DUPLICATE_SLOT")
+    required = (6, 8, 5, 7, 17)
+    for slot in required:
+        if slot not in replacements:
+            raise RuntimeError(f"BASE_ACTIVATION_REQUIRED_SLOT_MISSING:{slot}")
+    # The relay Teller needs the compatible PriceDesk already active.
+    return [6, 8, 5, 7] + [slot for slot in replacements if slot not in (6, 8, 5, 7)]
 
 
 def candidate_key(label):
@@ -251,6 +274,7 @@ class FullUpdate(Rehearsal):
 
     def activate_departments(self):
         replacements = [i for i in HQ_IDS if i != 4]
+        confirmation_order = department_confirmation_order(replacements)
         # PriceDesk is now included. Vaults at IDs 1-5 are deliberately retained.
         for i in replacements:
             pending = self.hq.pendingAddrUpdate(i)
@@ -266,10 +290,6 @@ class FullUpdate(Rehearsal):
         delay = int(self.hq.registryChangeTimeLock())
         if delay:
             boa.env.time_travel(blocks=delay, block_delta=2)
-        # The relay ABI in the new Teller requires the new PriceDesk first.
-        # Keep this dependency explicit even if the remaining slot order changes.
-        confirmation_order = [6, 8, 5, 7] + [i for i in replacements if i not in (8, 5, 6, 7)]
-        assert confirmation_order.index(7) < confirmation_order.index(17)
         for i in confirmation_order:
             self.transact(self.hq.confirmAddressUpdateToRegistry, i)
             if i == 6:
@@ -541,10 +561,10 @@ class FullUpdate(Rehearsal):
         self.save()
 
     def stage_all(self, defaults):
-        self.report["constructor_profile"] = "Base staged migrations; not cutover qualified"
+        self.report["constructor_profile"] = "Base fork rehearsal drafts; not cutover qualified"
         adapter = DeploymentAdapter(self, defaults)
-        for filename in STAGING_MIGRATIONS:
-            spec = importlib.util.spec_from_file_location(filename, ROOT / "migrations/base-mainnet" / filename)
+        for path in STAGING_SCRIPTS:
+            spec = importlib.util.spec_from_file_location(path.stem, ROOT / path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             module.migrate(adapter)
@@ -586,8 +606,7 @@ def execute_diagnostic(run, args):
     assert args.block <= int(finalized["number"], 16)
     run.report.update(block_hash=header["hash"], snapshot_finalized=True, vault_migrations=False)
     run.report["full_update_harness_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-    run.report["migration_source_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in (ROOT / "migrations/base-mainnet" / name for name in STAGING_MIGRATIONS)}
+    run.report["migration_source_sha256"] = staging_source_hashes()
     with boa.fork(run.rpc, block_identifier=args.block):
         assert boa.env.evm.patch.chain_id == 8453
         run.inventory()

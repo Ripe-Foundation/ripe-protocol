@@ -457,9 +457,10 @@ def test_complete_inventory_and_cardinality_reconciliation():
         RelationKind.BOOTSTRAP_DEPENDENCY: 3,
         RelationKind.SETUP_DEPENDENCY: 3,
         RelationKind.REGISTRATION_ORDER_DEPENDENCY: 32,
-        RelationKind.DIRECT_EXECUTION: 167,
+        # Teller reaches Curve through PriceDesk (R-228).
+        RelationKind.DIRECT_EXECUTION: 166,
         RelationKind.AUTHORITY_DEPENDENCY: 40,
-        RelationKind.INDIRECT_SECURITY_DEPENDENCY: 11,
+        RelationKind.INDIRECT_SECURITY_DEPENDENCY: 12,
     }
     assert (
         len(

@@ -1,6 +1,7 @@
 """Stage current-ABI oracle and treasury candidates; no activation.
 
-Supersedes the frozen 2026091402 body for NEW candidates only. The old migration
+Fork-only draft outside the live migration queue. Based on frozen 2026091402;
+its independent historical body stays unchanged. The old migration
 and its deployment journal must never be resumed against this constructor.
 Budgets are provisional until the separate Base qualification is complete.
 """
@@ -9,6 +10,9 @@ import boa
 from boa.contracts.abi.abi_contract import ABIContractFactory
 from scripts.utils import log
 from scripts.utils.migration import Migration
+from scripts.rehearsal.base_candidates.price_desk_budgets import (
+    apply_source_gas_budgets, verify_price_desk_defaults,
+)
 
 ZERO = "0x" + "00" * 20
 SUFFIX = "BasePriceDeskGasCandidate20260919"
@@ -112,8 +116,7 @@ def migrate(migration: Migration):
         params["PRICE_DESK_MAX_SOURCE_GAS"],
         label=f"PriceDesk{SUFFIX}",
     )
-    assert candidates["PriceDesk"].PRICE_SOURCE_PRICE_GAS() == params["PRICE_DESK_PRICE_SOURCE_GAS"]
-    assert candidates["PriceDesk"].PRICE_SOURCE_SNAPSHOT_GAS() == params["PRICE_DESK_SNAPSHOT_SOURCE_GAS"]
+    verify_price_desk_defaults(candidates["PriceDesk"], params)
     candidates["ChainlinkPrices"] = migration.deploy(
         "ChainlinkPrices", hq.address, ZERO, min_lock, max_lock,
         chainlink.WETH(), eth, btc, eth_config[0], btc_config[0], eth_config[4],
@@ -207,6 +210,10 @@ def migrate(migration: Migration):
             migration.execute(desk.confirmAddressDisableInRegistry, 3)
             if str(desk.getAddr(3)).lower() != ZERO:
                 raise RuntimeError("BASE_PRICEDESK_BLUECHIP_MUST_STAY_DISABLED")
+    apply_source_gas_budgets(migration, desk, {
+        "CurvePrices": (2, candidates["CurvePrices"].address),
+        "UndyVaultPrices": (8, candidates["UndyVaultPrices"].address),
+    })
     migration.execute(desk.relinquishGov)
     if str(desk.governance()).lower() != ZERO or int(desk.numAddrs()) != 10:
         raise RuntimeError("BASE_PRICEDESK_SETUP_INCOMPLETE")

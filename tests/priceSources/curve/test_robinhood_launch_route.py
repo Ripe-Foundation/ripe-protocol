@@ -511,3 +511,41 @@ def test_current_price_desk_relay_uses_existing_curve_authorization(
     assert not rogue.addGreenRefPoolSnapshot(1, sender=teller.address)
     with boa.reverts("no perms"):
         route.curve.addGreenRefPoolSnapshot(sender=bob)
+
+
+@pytest.mark.gas
+@pytest.mark.parametrize("profile", ("base", "local", "robinhood"))
+@pytest.mark.parametrize("mature", (False, True), ids=("first_due", "full_ring_due"))
+def test_profile_curve_snapshot_override_has_cold_margin(
+    robinhood_curve_launch_route, teller, profile, mature, request,
+):
+    from config.BluePrint import PARAMS, PRICE_DESK_SOURCE_GAS_OVERRIDES
+    from registries.price_desk_gas_helpers import calls_to, cold_trial
+
+    route = robinhood_curve_launch_route
+    route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
+    action = route.curve.setGreenRefPoolConfig(
+        route.curve_system, 10, 60_00, 100, 10_00,
+        100_000 * EIGHTEEN_DECIMALS, sender=route.governance.address,
+    )
+    boa.env.time_travel(blocks=route.curve.actionTimeLock() + 1)
+    assert route.curve.confirmGreenRefPoolConfig(action, sender=route.governance.address)
+    if mature:
+        for _ in range(9):
+            boa.env.time_travel(blocks=1)
+            assert route.curve.addGreenRefPoolSnapshot(sender=teller.address)
+    boa.env.time_travel(blocks=1)
+    budget = (PRICE_DESK_SOURCE_GAS_OVERRIDES[profile]["CurvePrices"][1]
+              or PARAMS[profile]["PRICE_DESK_SNAPSHOT_SOURCE_GAS"])
+    route.price_desk.setSourceGasBudgets(route.curve, 0, budget, 0, sender=route.governance.address)
+    before = tuple(route.curve.greenRefPoolData())
+    with cold_trial(route.price_desk, route.curve, route.curve_system):
+        assert route.price_desk.addGreenRefPoolSnapshot(2, sender=teller.address, gas=3_000_000)
+        call, = calls_to(route.price_desk._computation, route.curve)
+        assert not call.is_error and int.from_bytes(call.output, "big") == 1
+        assert call.msg.gas == budget
+        used = call.get_gas_used()
+        assert 3 * used <= 2 * budget
+        assert tuple(route.curve.greenRefPoolData()) != before
+    request.node.user_properties.extend((("source_execution_gas", used), ("snapshot_budget", budget)))
+    print(f"CURVE_COLD_DUE profile={profile} mature={mature} source_gas={used} budget={budget} margin={budget / used:.4f}")

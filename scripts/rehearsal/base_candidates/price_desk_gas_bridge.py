@@ -1,12 +1,16 @@
 """Stage a current-ABI bridge PriceDesk and paused Teller; no activation.
 
-New candidate labels and journal preserve the executed 2026091403 migration.
+Fork-only draft outside the live migration queue. New labels and journal
+preserve the executed 2026091403 migration.
 Confirm HQ slot 7 before slot 17, or both atomically with 7 first, only after
 separate release qualification and cutover authorization.
 """
 
 from scripts.utils import log
 from scripts.utils.migration import Migration
+from scripts.rehearsal.base_candidates.price_desk_budgets import (
+    apply_source_gas_budgets, verify_price_desk_defaults,
+)
 
 ZERO = "0x" + "00" * 20
 LABEL = "PriceDeskBridgeGasCandidate20260919"
@@ -37,6 +41,7 @@ def migrate(migration: Migration):
         params["PRICE_DESK_HAS_FEED_SOURCE_GAS"], params["PRICE_DESK_MAX_SOURCE_GAS"],
         label=LABEL,
     )
+    verify_price_desk_defaults(desk, params)
 
     log.h1("2. Register CURRENT sources, retaining IDs and disabled BlueChip slot")
     assets = {str(mc.assets(i)).lower() for i in range(1, int(mc.numAssets()))
@@ -82,6 +87,10 @@ def migrate(migration: Migration):
         raise RuntimeError("BASE_GAS_TELLER_MUST_STAY_PAUSED")
 
     log.h1("5. Relinquish setup governance; leave HQ unchanged")
+    apply_source_gas_budgets(migration, desk, {
+        "CurvePrices": (2, old.getAddr(2)),
+        "UndyVaultPrices": (8, old.getAddr(8)),
+    })
     migration.execute(desk.relinquishGov)
     if str(desk.governance()).lower() != ZERO or int(desk.numAddrs()) != 10:
         raise RuntimeError("BASE_BRIDGE_SETUP_INCOMPLETE")

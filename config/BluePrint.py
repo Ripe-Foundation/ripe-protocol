@@ -51,6 +51,24 @@ ADDYS = {
 }
 
 
+# Provisional rehearsal inputs, not qualified production budgets. Raw tuples are
+# (quote, snapshot, feed); zero resets a field to its immutable default. The Base
+# entries respect the currently approved 1.5M floors. Lowering those floors is a
+# separate owner decision; the 3.5M Undy quote covers the measured two-lookup mock.
+# Curve's 500k local/Robinhood allowance retains the former Teller cap; cold
+# due snapshots used 122,801 gas in the local fresh-slot fixture (4.07x at
+# 500k). Complete-transaction qualification remains required for each deployment.
+# Base cannot use 500k under its current floor.
+PRICE_DESK_SOURCE_GAS_OVERRIDES = {
+    "base": {
+        "CurvePrices": (0, 1_500_000, 0),
+        "UndyVaultPrices": (3_500_000, 1_500_000, 0),
+    },
+    "local": {"CurvePrices": (0, 500_000, 0)},
+    "robinhood": {"CurvePrices": (0, 500_000, 0)},
+}
+
+
 PARAMS = {
     "base": {
         "PRICE_DESK_PRICE_SOURCE_GAS": 1_500_000,  # staged, NOT operation-qualified
