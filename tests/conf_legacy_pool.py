@@ -58,7 +58,9 @@ def base_chain():
 def _legacy_deployer(record):
     for path, expected in PROVENANCE["sources"].items():
         assert hashlib.sha256((FIXTURE_ROOT / path).read_bytes()).hexdigest() == expected
-    previous = boa.interpret._search_path
+    # The public resolver includes optional sys.path entries (e.g. python.zip).
+    # set_search_path treats them as explicit paths and requires them to exist.
+    previous = [str(path) for path in boa.interpret.get_search_paths() if path.exists()]
     try:
         boa.interpret.set_search_path([str(FIXTURE_ROOT.resolve())])
         deployer = boa.load_partial(str(FIXTURE_ROOT / record["source_file"]))

@@ -251,3 +251,107 @@ def test_full_update_adapter_binds_fresh_vault_book_to_retained_pool(tmp_path, l
     with pytest.raises(ValueError, match="UNEXPECTED_HISTORICAL_VAULTBOOK_CONSTRUCTOR"):
         adapter.deploy("VaultBook", e.hq.address, e.gov.address, 21_600, 100_000,
                        e.pool.address, label=key + SUFFIX)
+
+
+@pytest.fixture
+def legacy_compat_staging(legacy_env, switchboard, monkeypatch):
+    """Exercise the production migration on real contracts, with local HQ/pool pins."""
+    import importlib.util
+    from types import SimpleNamespace
+    e = legacy_env
+    path = ROOT / "migrations/base-mainnet/2026091900_StageLegacyVaultCompatibility.py"
+    spec = importlib.util.spec_from_file_location("legacy_compat_migration", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "EXPECTED_HQ", str(e.hq.address).lower())
+    monkeypatch.setattr(module, "EXPECTED_POOL", str(e.pool.address).lower())
+    # The shared composition fixture has four rows. Add retained vault 5 and
+    # use the production timelock floor before invoking the migration.
+    fifth = boa.load("contracts/vaults/SimpleErc20.vy", e.hq)
+    retained = [e.book.getAddr(i) for i in range(1, 5)] + [fifth.address]
+    old_book = boa.load("contracts/registries/VaultBook.vy", e.hq, ZERO, 21_600, 302_400, e.pool)
+    for reg_id, vault in enumerate(retained, 1):
+        old_book.startAddNewAddressToRegistry(vault, f"Retained local vault {reg_id}", sender=e.gov.address)
+        assert old_book.confirmNewAddressToRegistry(vault, sender=e.gov.address) == reg_id
+    old_book.setRegistryTimeLockAfterSetup(sender=e.gov.address)
+    e.hq.startAddressUpdateToRegistry(8, old_book, sender=e.gov.address)
+    boa.env.time_travel(blocks=e.hq.registryChangeTimeLock())
+    assert e.hq.confirmAddressUpdateToRegistry(8, sender=e.gov.address)
+    e.book = old_book
+    e.deposit(e.bob, 100 * 10**18)
+
+    class LocalMigration:
+        def __init__(self):
+            self.deployed = {}
+            self.calls = []
+        def chain(self):
+            return "base-mainnet"
+        def account(self):
+            return e.bob
+        def blueprint(self):
+            return SimpleNamespace(PARAMS=PARAMS["base"])
+        def get_contract(self, name, address=None):
+            return {"RipeHq": e.hq, "VaultBook": e.book, "StabilityPool": e.pool,
+                    "Deleverage" + module.PREVIOUS_SUFFIX: e.dl,
+                    "SwitchboardPopulated" + module.PREVIOUS_SUFFIX: switchboard}[name]
+        def deploy(self, name, *args, label):
+            directory = "registries" if name in ("VaultBook", "Switchboard") else "config" if name.startswith("Switchboard") else "core"
+            contract = boa.load(f"contracts/{directory}/{name}.vy", *args)
+            self.deployed[name] = contract
+            assert label == name + module.SUFFIX
+            return contract
+        def execute(self, function, *args):
+            self.calls.append((function.contract.address, function.fn_ast.name, args))
+            return function(*args, sender=e.bob)
+    return module, LocalMigration(), e
+
+
+def test_legacy_compat_staging_executes_retained_only_without_activating(legacy_compat_staging):
+    module, migration, e = legacy_compat_staging
+    active = tuple(e.hq.getAddr(i) for i in range(1, e.hq.numAddrs()))
+    pending = tuple(e.hq.pendingAddrUpdate(8))
+    before = (e.lp.balanceOf(e.pool), e.pool.userBalances(e.bob, e.lp))
+    module.migrate(migration)
+    assert set(migration.deployed) == {"VaultBook", "AuctionHouse", "Deleverage", "SwitchboardAlpha", "SwitchboardCharlie", "SwitchboardGolf", "Switchboard"}
+    candidate = migration.deployed["VaultBook"]
+    assert candidate.numAddrs() == 6 and candidate.LEGACY_POOL() == e.pool.address
+    assert candidate.getDeleverageTraversalAsset(e.bob, e.pool, 1, True) == (e.lp.address, 100 * 10**18)
+    assert tuple(e.hq.getAddr(i) for i in range(1, e.hq.numAddrs())) == active
+    assert tuple(e.hq.pendingAddrUpdate(8)) == pending
+    assert (e.lp.balanceOf(e.pool), e.pool.userBalances(e.bob, e.lp)) == before
+    assert {call[0] for call in migration.calls} == {candidate.address, migration.deployed["Switchboard"].address}
+    assert all(call[1] in {"startAddNewAddressToRegistry", "confirmNewAddressToRegistry", "setRegistryTimeLockAfterSetup", "relinquishGov"} for call in migration.calls)
+    assert len(migration.calls) == 28
+
+
+@pytest.mark.parametrize("fault", ["profile", "hq", "pool", "future_row", "invalid_row"])
+def test_legacy_compat_staging_rejects_drift_before_deployments(legacy_compat_staging, monkeypatch, fault):
+    from conf_legacy_pool import storage_write
+    module, migration, e = legacy_compat_staging
+    if fault == "profile":
+        monkeypatch.setattr(migration, "chain", lambda: "robinhood-mainnet")
+        reason = "WRONG_PROFILE"
+    elif fault == "hq":
+        monkeypatch.setattr(module, "EXPECTED_HQ", str(e.bob).lower())
+        reason = "WRONG_HQ"
+    elif fault == "pool":
+        monkeypatch.setattr(module, "EXPECTED_POOL", str(e.bob).lower())
+        reason = "WRONG_POOL"
+    elif fault == "future_row":
+        storage_write(e.book, "registry", "numAddrs", [], 7)
+        reason = "ACTIVE_TOPOLOGY_DRIFT"
+    else:
+        storage_write(e.book, "registry", "addrToRegId", [e.pool], 0)
+        reason = "ACTIVE_IDENTITY:1"
+    with pytest.raises(RuntimeError, match="BASE_LEGACY_COMPAT_" + reason):
+        module.migrate(migration)
+    assert not migration.deployed and not migration.calls
+
+
+def test_legacy_compat_migration_is_the_next_recorded_base_step():
+    from types import SimpleNamespace
+    from scripts.utils.migration_runner import MigrationRunner
+    runner = MigrationRunner(ROOT / "migrations/base-mainnet", ROOT / "migration_history/base-mainnet/v1", {})
+    # Honor the normal runner guard; the fresh step must not skip an unfinished
+    # historical migration or require force-replaying a frozen constructor.
+    runner._require_start_point(SimpleNamespace(), "2026091900")

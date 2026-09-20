@@ -29,7 +29,8 @@ def test_constructor_chain_and_binding(base_chain, legacy_pool, ripe_hq, chain, 
         with boa.reverts("legacy pool only on Base"):
             deploy_book(ripe_hq, legacy_pool)
     else:
-        deploy_book(ripe_hq, legacy_pool if bound else ZERO_ADDRESS)
+        binding = legacy_pool.address if bound else ZERO_ADDRESS
+        assert deploy_book(ripe_hq, binding).LEGACY_POOL() == binding
 
 
 def test_constructor_rejects_wrong_hq_and_noncontract(base_chain, legacy_pool_deployer, ripe_hq, bob):
@@ -193,17 +194,19 @@ def test_traversal_skips_before_strict_nav(legacy_env, condition):
         e.pool.getTotalAmountForUser(e.bob, e.lp)
 
 
-def test_positive_custody_nav_keeps_strict_price_failures(legacy_env):
+def test_optional_traversal_skips_unpriceable_nav_while_direct_pool_stays_strict(legacy_env):
     e = legacy_env
     e.deposit(e.bob, 100 * WAD)
     claim = e.token()
     e.claim(claim, WAD)
     e.prices.setShouldRevert(claim, True)
     assert e.ready()
+    assert e.nav() == (e.lp.address, 0)
+    assert e.dl.getDeleverageInfo(e.bob) == (0, 0)
     with boa.reverts("has price config, no price"):
-        e.nav()
+        e.pool.getTotalAmountForUser(e.bob, e.lp)
     with boa.reverts("has price config, no price"):
-        e.dl.getDeleverageInfo(e.bob)
+        e.pool.withdrawTokensFromVault(e.bob, e.lp, WAD, e.bob, sender=e.ah.address)
 
 
 def test_real_modern_empty_and_paused_pool_support(vault_book, stability_pool, savings_green, switchboard_alpha):
@@ -260,3 +263,35 @@ def test_constructor_structural_probes_do_not_require_nav_pricing(legacy_env, po
         assert not calls_to(trace, e.pool.address, "getTotalAmountForUser(address,address)")
         for signature in ("getUsdValue(address,uint256)", "getUsdValue(address,uint256,bool)"):
             assert not calls_to(trace, e.pd.address, signature)
+
+
+@pytest.mark.parametrize("getter", ["getTotalAmountForUser", "getTotalUserValue"])
+@pytest.mark.parametrize("response", ["revert", "empty", "overlong", "zero"])
+def test_optional_legacy_reads_reject_failed_or_malformed_uints(legacy_env, getter, response):
+    e = legacy_env
+    e.deposit(e.bob, WAD)
+    source = f'''@external
+@view
+def getUserAssetAtIndexAndHasBalance(u: address, i: uint256) -> (address, bool):
+    return {e.lp.address}, True
+@external
+@view
+def isPaused() -> bool:
+    return False
+@external
+@view
+def totalClaimableBalances(a: address) -> uint256:
+    return 0
+'''
+    for name in ("getTotalAmountForUser", "getTotalUserValue"):
+        if name != getter:
+            body = f" -> uint256:\n    return {WAD}"
+        else:
+            body = {"revert": " -> uint256:\n    raise", "empty": ":\n    pass",
+                    "overlong": " -> Bytes[32]:\n    return b'bad'", "zero": " -> uint256:\n    return 0"}[response]
+        source += f"@external\n@view\ndef {name}(u: address, a: address){body}\n"
+    probe = boa.loads(source)
+    # Synthetic ABI corruption at the already bound address; authenticated
+    # historical fixture files and the real behavior tests stay unchanged.
+    boa.env.set_code(e.pool.address, boa.env.get_code(probe.address))
+    assert e.nav() == (e.lp.address, 0)

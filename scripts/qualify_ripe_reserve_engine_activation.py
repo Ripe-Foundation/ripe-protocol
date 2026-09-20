@@ -28,6 +28,10 @@ EXPECTED_SWITCHBOARDS = tuple(
         "Golf",
     )
 )
+# Source audit includes the alternate setup-capable Foxtrot. The registered
+# authority inventory still has seven roles and binds the deployed Foxtrot.
+EXPECTED_SWITCHBOARD_SOURCES = tuple(sorted((*EXPECTED_SWITCHBOARDS, "SwitchboardFoxtrotSetup")))
+FOXTROT_SOURCES = ("SwitchboardFoxtrot", "SwitchboardFoxtrotSetup")
 ENGINE_MUTATORS = (
     "setConfig",
     "setCanAcquireRipe",
@@ -284,13 +288,13 @@ def static_switchboard_errors(root: Path, manifest: dict[str, Any]) -> list[str]
     errors: list[str] = []
     paths = sorted((root / "contracts" / "config").glob("Switchboard*.vy"))
     discovered = tuple(path.stem for path in paths)
-    if discovered != EXPECTED_SWITCHBOARDS:
+    if discovered != EXPECTED_SWITCHBOARD_SOURCES:
         errors.append(
             "switchboard source inventory changed: "
-            f"expected {EXPECTED_SWITCHBOARDS}, got {discovered}"
+            f"expected {EXPECTED_SWITCHBOARD_SOURCES}, got {discovered}"
         )
     configured = tuple(manifest["switchboard_authority"]["source_inventory"])
-    if configured != EXPECTED_SWITCHBOARDS:
+    if configured != EXPECTED_SWITCHBOARD_SOURCES:
         errors.append("manifest switchboard source inventory is not canonical")
 
     for path in paths:
@@ -301,34 +305,35 @@ def static_switchboard_errors(root: Path, manifest: dict[str, Any]) -> list[str]
                 f"{path.relative_to(root)}"
             )
 
-    foxtrot = (
-        root / "contracts" / "config" / "SwitchboardFoxtrot.vy"
-    ).read_text()
-    for method in FOXTROT_SEMANTIC_METHODS:
-        if f"def {method}(" not in foxtrot:
-            errors.append(f"Foxtrot semantic method missing: {method}")
-    engine_calls = set(
-        re.findall(
-            r"extcall\s+RipeReserveEngine\([^)]*\)\.([A-Za-z0-9_]+)\(",
-            foxtrot,
+    for foxtrot_name in FOXTROT_SOURCES:
+        foxtrot = (
+            root / "contracts" / "config" / f"{foxtrot_name}.vy"
+        ).read_text()
+        for method in FOXTROT_SEMANTIC_METHODS:
+            if f"def {method}(" not in foxtrot:
+                errors.append(f"{foxtrot_name} semantic method missing: {method}")
+        engine_calls = set(
+            re.findall(
+                r"extcall\s+RipeReserveEngine\([^)]*\)\.([A-Za-z0-9_]+)\(",
+                foxtrot,
+            )
         )
-    )
-    if engine_calls != set(ENGINE_MUTATORS):
-        errors.append(
-            "Foxtrot Engine mutator calls changed: "
-            f"expected {sorted(ENGINE_MUTATORS)}, got {sorted(engine_calls)}"
+        if engine_calls != set(ENGINE_MUTATORS):
+            errors.append(
+                f"{foxtrot_name} Engine mutator calls changed: "
+                f"expected {sorted(ENGINE_MUTATORS)}, got {sorted(engine_calls)}"
+            )
+        vesting_calls = set(
+            re.findall(
+                r"extcall\s+RipeReserveVesting\([^)]*\)\.([A-Za-z0-9_]+)\(",
+                foxtrot,
+            )
         )
-    vesting_calls = set(
-        re.findall(
-            r"extcall\s+RipeReserveVesting\([^)]*\)\.([A-Za-z0-9_]+)\(",
-            foxtrot,
-        )
-    )
-    if vesting_calls != set(VESTING_MUTATORS):
-        errors.append(
-            "Foxtrot Vesting mutator calls changed: "
-            f"expected {sorted(VESTING_MUTATORS)}, got {sorted(vesting_calls)}"
-        )
+        if vesting_calls != set(VESTING_MUTATORS):
+            errors.append(
+                f"{foxtrot_name} Vesting mutator calls changed: "
+                f"expected {sorted(VESTING_MUTATORS)}, got {sorted(vesting_calls)}"
+            )
 
     engine = (
         root / "contracts" / "core" / "RipeReserveEngine.vy"

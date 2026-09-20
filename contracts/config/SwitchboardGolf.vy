@@ -22,6 +22,7 @@ initializes: timeLock[gov := gov]
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import interfaces.ConfigStructs as cs
+from interfaces import VaultBookCompatibility
 
 interface StabilityPool:
     def indexOfClaimableAsset(_stabAsset: address, _claimAsset: address) -> uint256: view
@@ -462,6 +463,10 @@ def _isValidAssetLiqConfig(
             return False
         stabPool: address = staticcall VaultBook(vaultBook).getAddr(_specialStabPoolId)
         if stabPool == empty(address) or not stabPool.is_contract:
+            return False
+        # Retained Pool 1 lacks the bounded active-claim interface required by
+        # special pools. Keep its ordinary priority-pool liquidation route.
+        if stabPool == staticcall VaultBookCompatibility(vaultBook).LEGACY_POOL():
             return False
         numStabAssets: uint256 = staticcall StabilityPool(stabPool).getNumVaultAssets()
         hasStabAsset: bool = numStabAssets != 0

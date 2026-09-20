@@ -21,6 +21,7 @@
 # @version 0.4.3
 
 implements: Department
+implements: VaultBookCompatibility
 
 exports: gov.__interface__
 exports: registry.__interface__
@@ -39,6 +40,7 @@ import contracts.modules.DeptBasics as deptBasics
 
 from interfaces import Vault
 from interfaces import Department
+from interfaces import VaultBookCompatibility
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
@@ -70,7 +72,8 @@ interface LegacyStabilityPool:
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
-LEGACY_POOL: immutable(address)
+LEGACY_POOL: public(immutable(address))
+LEGACY_POOL_REG_ID: constant(uint256) = 1
 
 
 @deploy
@@ -90,7 +93,7 @@ def __init__(
         assert chain.id == 8453 # dev: legacy pool only on Base
         assert _legacyPool.is_contract # dev: invalid legacy pool
         assert staticcall LegacyStabilityPool(_legacyPool).getRipeHq() == _ripeHq # dev: invalid legacy hq
-        assert self._hasLegacyStabilityPoolInterface(_legacyPool, empty(address), empty(address))
+        assert self._hasLegacyStabilityPoolInterface(_legacyPool, empty(address), empty(address)) # dev: invalid legacy interface
         naAsset: address = staticcall StabilityPool(_legacyPool).vaultAssets(1)
         naBalance: bool = False
         naAsset, naBalance = staticcall Vault(_legacyPool).getUserAssetAtIndexAndHasBalance(empty(address), 0)
@@ -110,7 +113,7 @@ def isVaultBookAddr(_addr: address) -> bool:
 @view
 @internal
 def _isRegisteredLegacyPool() -> bool:
-    return registry._getRegId(LEGACY_POOL) == 1 and registry._getAddr(1) == LEGACY_POOL and registry._isValidRegId(1)
+    return registry._getRegId(LEGACY_POOL) == LEGACY_POOL_REG_ID and registry._getAddr(LEGACY_POOL_REG_ID) == LEGACY_POOL and registry._isValidRegId(LEGACY_POOL_REG_ID)
 
 
 @view
@@ -161,15 +164,49 @@ def getDeleverageTraversalAsset(_user: address, _vaultAddr: address, _index: uin
             return asset, 0
         if staticcall StabilityPool(_vaultAddr).isPaused():
             return asset, 0
-        if staticcall IERC20(asset).balanceOf(_vaultAddr) <= staticcall StabilityPool(_vaultAddr).totalClaimableBalances(asset):
+        custody: uint256 = staticcall IERC20(asset).balanceOf(_vaultAddr)
+        if custody <= staticcall StabilityPool(_vaultAddr).totalClaimableBalances(asset):
             return asset, 0
-        # Preserve strict legacy NAV, including claims, rounding and failures.
-        return asset, staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, asset)
+        return asset, self._getExecutableLegacyNav(_user, _vaultAddr, asset, custody)
 
     if _isStabVault:
         return staticcall Vault(_vaultAddr).getUserAssetAndAmountAtIndex(_user, _index)
     asset, hasBalance = staticcall Vault(_vaultAddr).getUserAssetAtIndexAndHasBalance(_user, _index)
     return asset, 1 if hasBalance else 0
+
+
+@view
+@internal
+def _optionalUint(_target: address, _data: Bytes[68]) -> uint256:
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(_target, _data, max_outsize=33, is_static_call=True, revert_on_failure=False)
+    if not success or len(response) != 32:
+        return 0
+    return abi_decode(response, uint256)
+
+
+@view
+@internal
+def _getExecutableLegacyNav(_user: address, _vaultAddr: address, _asset: address, _custody: uint256) -> uint256:
+    # Broad traversal is optional. Direct legacy withdrawals/claims stay strict.
+    nav: uint256 = self._optionalUint(_vaultAddr, abi_encode(_user, _asset, method_id=method_id("getTotalAmountForUser(address,address)")))
+    if nav == 0:
+        return 0
+    # getTotalUserValue includes the historical virtual shares and rounding;
+    # the NAV getter does not. Mirror StabVault._calcWithdrawalSharesAndAmount.
+    userValue: uint256 = self._optionalUint(_vaultAddr, abi_encode(_user, _asset, method_id=method_id("getTotalUserValue(address,address)")))
+    if userValue == 0 or userValue > max_value(uint256) // _custody:
+        return 0
+    custodyValue: uint256 = _custody
+    if _asset == addys._getSavingsGreen():
+        custodyValue = self._optionalUint(_asset, abi_encode(_custody, method_id=method_id("convertToAssets(uint256)")))
+    elif _asset != addys._getGreenToken():
+        custodyValue = self._optionalUint(addys._getPriceDeskAddr(), abi_encode(_asset, _custody, method_id=method_id("getUsdValue(address,uint256)")))
+    if custodyValue == 0 or userValue * _custody // custodyValue == 0:
+        return 0
+    # Eligibility is executable, but sizing must retain the full, uncapped NAV.
+    return nav
 
 
 @view
@@ -187,6 +224,7 @@ def hasStabilityPoolInterface(_vaultAddr: address, _stabAsset: address, _probeCl
 @view
 @internal
 def _hasLegacyStabilityPoolInterface(_vaultAddr: address, _stabAsset: address, _probeClaimAsset: address) -> bool:
+    # A selector/decoding probe: successful reads prove support regardless of values.
     naIndex: uint256 = staticcall LegacyStabilityPool(_vaultAddr).indexOfAsset(_stabAsset)
     naPair: uint256 = staticcall StabilityPool(_vaultAddr).claimableBalances(_stabAsset, _probeClaimAsset)
     naTotal: uint256 = staticcall StabilityPool(_vaultAddr).totalClaimableBalances(_stabAsset)

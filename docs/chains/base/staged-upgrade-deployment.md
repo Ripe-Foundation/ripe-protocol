@@ -1,7 +1,50 @@
 # Base: deploy now, migrate later
 
+## Current phase-1 compatibility staging
+
+The current source uses a five-argument VaultBook constructor. **Do not resume
+Stage 1 or Stage 2 from this checkout**: their frozen migrations pass four
+arguments and their recorded candidates predate retained-pool compatibility.
+The Stage 1/2 commands and recovery evidence below are historical instructions
+for their frozen reviewed source revision, not the current production path.
+
+For the compatibility release, use the new step after the normal runner has
+verified the recorded history frontier:
+
+```sh
+python -m scripts.migrate --profile base-mainnet --start-timestamp 2026091900 --single
+```
+
+[StageLegacyVaultCompatibility](../../../migrations/base-mainnet/2026091900_StageLegacyVaultCompatibility.py)
+stages VaultBook, AuctionHouse, Deleverage, SwitchboardAlpha, SwitchboardCharlie,
+SwitchboardGolf and Switchboard under fresh
+`<Contract>BaseLegacyCompatCandidate20260919` labels. It preserves retained vault
+rows **1–5 only**, supplies the Pool-1 binding, populates the compatible controller
+set, restores registry delays and relinquishes temporary governance. It records
+addresses and constructor inputs in the normal journal and completed
+`migration_history/base-mainnet/v1/2026091900-manifest.json`. It sends no HQ
+proposal or activation and leaves the pending slot-8 proposal untouched.
+
+The staged **VaultBook, AuctionHouse, Deleverage, SwitchboardAlpha and
+SwitchboardCharlie** from `BaseUpgradeCandidate20260914` are all superseded,
+including the populated VaultBook. **SwitchboardGolf** is also superseded by its
+explicit retained-Pool-1 special-pool restriction. Replace the old populated
+Switchboard with the new registry containing these controller addresses.
+Existing staging and Safe material cannot serve as the final compatibility
+candidate set. Preserve historical migration files, journals and manifests.
+
+Follow the [compatibility release checks](legacy-vault-compatibility.md) for the
+public `LEGACY_POOL()` binding, forward/reverse/valid row-1 identities, structural
+helper, exact retained-only topology, claim pricing and gas, and historical
+Contributor qualification. Re-read and resolve `pendingAddrUpdate(8)` before
+activation. The existing full-update diagnostic uses rows **1–10** and does not
+qualify the required phase-1 topology. These are staging instructions; release
+qualification and production activation remain separate owner decisions.
+
+## Historical staging record
+
 Current review status and mandatory gates: [PR 231 review checklist](review-231.md).
-**The CCIP history prerequisite is reconciled** as of 2026-09-18; Stage 1 now
+**The historical CCIP history prerequisite is reconciled** as of 2026-09-18; Stage 1 now
 passes the runner's start-point guard. This is not full deployment qualification
 or PR approval. Stage 2 recovery and the other review items remain open.
 **Stage 3 is also blocked** pending the caller-underfunding snapshot policy and
@@ -58,8 +101,9 @@ python -m scripts.migrate --profile base-mainnet --start-timestamp 2026091403 --
 
 Use `PriceDeskBridgeBaseUpgradeCandidate20260914` as the proposed HQ slot 7
 candidate, **not** Stage 3's PriceDesk containing unconfigured replacement
-sources. Do not redeploy the other departments. Historical migrations and
-deployment records are retained.
+sources. That bridge-only instruction applies to its historical step. The compatibility
+release additionally requires the seven fresh candidates listed above. Historical
+migrations and deployment records are retained.
 
 At cutover, the bridge allows existing source routes to remain while replacement
 sources are configured and qualified through the new PriceDesk interface. Keep
@@ -80,7 +124,8 @@ The largest migration execution consumed 3,663,675 gas (excluding intrinsic gas)
 No live transactions were sent. This checks the bridge, not the later source
 replacements or the full protocol cutover.
 
-All labels end in `BaseUpgradeCandidate20260914`. Active canonical labels remain
+All historical Stage 1–4 labels end in `BaseUpgradeCandidate20260914`; the new
+compatibility step uses `BaseLegacyCompatCandidate20260919`. Active canonical labels remain
 untouched. The Underscore vault candidate has its own label and address, despite
 using the same SimpleErc20 source as the ordinary ERC20 vault.
 
@@ -113,9 +158,9 @@ links the detailed readback evidence. The two empty deployment maps for
 canonical addresses and earlier history are unchanged. Original receipts are not
 reconstructed, and the newer migration bodies were not run.
 
-The normal start-point guard now accepts Stage 1. Do not rerun CCIP wiring,
+At reconciliation, the normal start-point guard accepted Stage 1. Do not rerun CCIP wiring,
 force-replay it, or remove the history guard. Once the separate Stage 1 readiness
-decision is made, run only the selected stage:
+decision was made, the frozen-source command was:
 
 ```sh
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091400 --single
@@ -133,8 +178,8 @@ python scripts/verify_defaults.py --network base-mainnet \
 Review the generated Defaults, ABI, and provenance diff. If regeneration changed
 them, record the reviewed revision before Stage 2; confirm deployment uses that
 same source. If byte-identical, the existing source review still applies. Record
-candidate manifests and receipts after deployment. **The commands below remain
-blocked until the review checklist's recovery and runner gates close.**
+candidate manifests and receipts after deployment. **These historical commands require their frozen reviewed source and recovery
+and runner gates; they must not be resumed from the compatibility checkout.**
 
 ```sh
 python scripts/migrate.py --profile base-mainnet --start-timestamp 2026091401 --single
@@ -148,7 +193,7 @@ manifests and the generated defaults provenance after real deployment.
 
 ## Required later cutover work
 
-### Stage 2 continuation after the partial live deployment
+### Historical Stage 2 continuation after the partial live deployment
 
 Do not regenerate Defaults or discard the deployment journal. Contributor
 `0x57f64a8FA104c18dE76dEe6817E45Cf43b6B459E` and DefaultsBaseLive
@@ -166,9 +211,12 @@ NEW address. It deploys `SwitchboardPopulatedBaseUpgradeCandidate20260914`
 and `VaultBookPopulatedBaseUpgradeCandidate20260914` with deployer governance,
 registers entries in order, validates their IDs, and relinquishes local governance.
 The empty Stage 1 registries remain in history but are not the cutover candidates.
-Golf is unchanged: adding the loader there exceeded the runtime size limit.
+Golf was unchanged in that historical loader change: adding the loader there
+exceeded the runtime size limit. The compatibility step now replaces Golf to
+enforce its retained-Pool-1 special-pool restriction.
 
-Resume only this unfinished stage from the repository root:
+Historical resume command, from the frozen Stage-2 reviewed checkout only
+(never from the compatibility checkout):
 
 ```sh
 python -m scripts.migrate --profile base-mainnet --start-timestamp 2026091401 --single
@@ -187,7 +235,8 @@ At the separately approved governance cutover:
 
 1. Reconcile the saved Defaults against live configuration again; staging
    preflight is not a cutover parity guarantee.
-2. Confirm the populated replacement Switchboard in HQ slot 6, respecting HQ's
+2. For the compatibility release, select the new compatible Switchboard described
+   above, not the old populated candidate. Confirm it in HQ slot 6, respecting HQ's
    proposal delay. Keep the old MC active.
 3. From the governance Safe, call the bound Foxtrot's `initConfig()` until
    `initStep() == 5` (nine calls for this 27-asset snapshot). On interruption,
@@ -254,9 +303,9 @@ Stage 3 review gates.
   configs, governance lock terms, reward routes, signers and migration topology.
   Stage 2 checks representable config/asset equality, not complete state equivalence.
   Redeploy its snapshot candidate under a new migration if it has become stale.
-- Populate candidate registries with the reviewed old/new topology. No vault IDs
-  are assigned by these scripts; do not assume fresh VaultBook IDs 1/2 can replace
-  live position IDs. The rehearsal used SP 6, governance 7, and ordinary 8–10.
+- Populate the phase-1 VaultBook with retained rows 1–5 only, preserving every
+  live address and excluding rows 6–10. The historical diagnostic used SP 6,
+  governance 7, and ordinary 8–10; that topology is not the phase-1 release.
   Wave one must leave MissionControl's preferred SP/core governance IDs at 1/2;
   changing them belongs to wave two, with the associated position transfers.
 - Set registry/action delays and permissions before activation. New switchboards

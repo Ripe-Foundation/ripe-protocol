@@ -2,10 +2,18 @@
 
 @view
 @external
+def LEGACY_POOL() -> address:
+    ...
+
+@view
+@external
 def canAcceptLiquidationAsset(_vaultAddr: address, _stabAsset: address, _claimAsset: address) -> bool:
     ...
 
 
+# Stability vaults return a token/NAV amount; ordinary vaults return a 0/1
+# balance-presence sentinel. Consumers must distinguish these via _isStabVault.
+# The bound legacy pool is recognized first and skips unusable NAV/withdrawals.
 @view
 @external
 def getDeleverageTraversalAsset(_user: address, _vaultAddr: address, _index: uint256, _isStabVault: bool) -> (address, uint256):

@@ -12,6 +12,7 @@ from scripts.qualify_ripe_reserve_engine_activation import (
     ENGINE_MUTATORS,
     EXPECTED_ENGINE_REACHABILITY,
     EXPECTED_SWITCHBOARDS,
+    EXPECTED_SWITCHBOARD_SOURCES,
     EXPECTED_VESTING_REACHABILITY,
     READY_STATUS,
     VESTING_MUTATORS,
@@ -21,6 +22,7 @@ from scripts.qualify_ripe_reserve_engine_activation import (
     main,
     readiness_errors,
     selector_inventory_sha256,
+    static_switchboard_errors,
 )
 
 
@@ -301,8 +303,10 @@ def test_draft_schema_rejects_missing_binding_fields(section, key):
 def test_switchboard_source_inventory_and_mutators_are_pinned():
     data = manifest()
     assert tuple(data["switchboard_authority"]["source_inventory"]) == (
-        EXPECTED_SWITCHBOARDS
+        EXPECTED_SWITCHBOARD_SOURCES
     )
+    assert len(EXPECTED_SWITCHBOARDS) == 7
+    assert "SwitchboardFoxtrotSetup" in EXPECTED_SWITCHBOARD_SOURCES
     assert ENGINE_MUTATORS == (
         "setConfig",
         "setCanAcquireRipe",
@@ -534,3 +538,14 @@ def test_manifest_is_canonical_json_with_one_trailing_newline():
         json.dumps(data, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
     ).encode()
     assert MANIFEST.read_bytes() == expected
+
+
+@pytest.mark.parametrize("variant", ["SwitchboardFoxtrot", "SwitchboardFoxtrotSetup"])
+def test_both_foxtrot_sources_are_checked_for_semantic_mutator_drift(tmp_path, variant):
+    import shutil
+    shutil.copytree(ROOT / "contracts", tmp_path / "contracts")
+    path = tmp_path / "contracts" / "config" / f"{variant}.vy"
+    text = path.read_text().replace("extcall RipeReserveEngine(engine).stop()", "extcall RipeReserveEngine(engine).unexpectedStop()")
+    path.write_text(text)
+    assert any(f"{variant} Engine mutator calls changed" in error
+               for error in static_switchboard_errors(tmp_path, manifest()))

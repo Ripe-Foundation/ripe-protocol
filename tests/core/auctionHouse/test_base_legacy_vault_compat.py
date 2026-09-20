@@ -3,7 +3,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS as WAD, MAX_UINT256, ZERO_ADDRESS
-from conf_utils import claim_from_stability_pool, filter_logs, redeem_from_stability_pool
+from conf_utils import claim_from_stability_pool, clear_transient_storage, filter_logs, redeem_from_stability_pool
 from conf_legacy_pool import PROVENANCE, call_tree, calls_to, storage_write
 
 
@@ -441,8 +441,7 @@ def test_readiness_cost_does_not_grow_with_unrelated_claim_count(legacy_env):
             computation = e.book._computation
             calls = [(c.msg.code_address.hex(), bytes(c.msg.data).hex()) for c in call_tree(computation)][1:]
             measurements.append((count, computation.get_gas_used(), calls))
-    assert measurements[0][1:] == measurements[1][1:] == measurements[2][1:]
-    print("LOCAL_READINESS_COST", [(n, gas, len(calls)) for n, gas, calls in measurements])
+    assert measurements[0][1:] == measurements[1][1:] == measurements[2][1:], measurements
     # This is a deterministic local comparison, not live oracle gas qualification.
     liquidatable(e)
     e.teller.liquidateUser(e.bob, False, sender=e.sally)
@@ -510,7 +509,12 @@ def test_structural_probe_preserves_caller_policy(legacy_env, board, stage, cond
         storage_write(e.book, "registry", "numAddrs", [], 1)
     else:
         storage_write(e.book, "registry", "addrInfo", [1], e.bob)
-    with boa.reverts():
+    if board == "alpha":
+        reason = "invalid priority stab vaults" if stage == "execution" or condition in ("paused", "no_contract") else "invalid priority vaults"
+    else:
+        reason = {"paused": "vault paused", "unsupported": "unsupported asset",
+                  "invalid_row": "invalid vault id", "no_contract": "invalid vault"}[condition]
+    with boa.reverts(reason):
         if stage == "proposal":
             setter(value, sender=e.gov.address)
         else:
@@ -788,7 +792,11 @@ def test_legacy_lock_adjustment_and_release_redistributes_fee_between_holders(le
 
 
 @pytest.fixture
-def legacy_contributor_env(legacy_gov_env, human_resources, contributor_template, switchboard_delta):
+def current_contributor_legacy_gov_env(legacy_gov_env, human_resources, contributor_template, switchboard_delta):
+    """Current Contributor blueprint against authenticated historical RipeGov 2.
+
+    This does not authenticate already-deployed historical Contributor bytecode.
+    """
     e = legacy_gov_env
     e.hr, e.delta = human_resources, switchboard_delta
     compensation = 1000 * WAD
@@ -831,8 +839,8 @@ def cash_legacy_contributor(e, timestamp):
 
 
 @pytest.mark.parametrize("paused_ledger", [False, True])
-def test_legacy_hr_callback_transfers_contributor_position(legacy_contributor_env, paused_ledger):
-    e = legacy_contributor_env
+def test_legacy_hr_callback_transfers_contributor_position(current_contributor_legacy_gov_env, paused_ledger):
+    e = current_contributor_legacy_gov_env
     c = e.contributor
     claimed = cash_legacy_contributor(e, c.unlockTime() + 1)
     shares = e.ripe_gov.userBalances(c, e.ripe)
@@ -876,8 +884,8 @@ def test_legacy_hr_callback_transfers_contributor_position(legacy_contributor_en
 
 
 @pytest.mark.parametrize("paused_ledger", [False, True])
-def test_legacy_hr_callback_cancels_burns_and_restores_budget(legacy_contributor_env, paused_ledger):
-    e = legacy_contributor_env
+def test_legacy_hr_callback_cancels_burns_and_restores_budget(current_contributor_legacy_gov_env, paused_ledger):
+    e = current_contributor_legacy_gov_env
     c = e.contributor
     compensation = c.compensation()
     claimed = cash_legacy_contributor(e, c.startTime() + (c.cliffTime() - c.startTime()) // 2)
@@ -915,3 +923,146 @@ def test_legacy_hr_callback_cancels_burns_and_restores_budget(legacy_contributor
     assert e.ledger.ripeAvailForHr() == budget + compensation == 2 * compensation
     assert c.compensation() == 0 and c.totalClaimed() == claimed and c.getClaimable() == 0
     assert not e.delta.hasPendingAction(aid)
+
+
+def fund_healthy_batch_user(e):
+    e.borrower(e.alice)
+    payment = e.token("Healthy batch payment")
+    e.configure(payment, _vaultIds=[3], _debtTerms=e.terms(0, 0, 0, 0, 0, 0),
+                _shouldTransferToEndaoment=True)
+    e.prices.setPrice(payment, WAD)
+    payment.mint(e.alice, 300 * WAD, sender=e.gov.address)
+    payment.approve(e.teller, 300 * WAD, sender=e.alice)
+    e.teller.deposit(payment, 300 * WAD, e.alice, e.ordinary, sender=e.alice)
+    return payment
+
+
+@pytest.mark.parametrize("eligible", [True, False])
+@pytest.mark.parametrize("healthy_first", [True, False])
+def test_unpriceable_legacy_position_preserves_healthy_batch_repayment(legacy_env, eligible, healthy_first):
+    e = legacy_env
+    e.borrower(e.bob)
+    e.deposit(e.bob, 100 * WAD)
+    payment = fund_healthy_batch_user(e)
+    claim = e.token()
+    e.claim(claim, 1)
+    e.prices.setShouldRevert(claim, True)
+    e.configure(e.lp, _vaultIds=[1], _debtTerms=e.terms(0, 0, 0, 0, 0, 0),
+                _shouldTransferToEndaoment=eligible, _shouldBurnAsPayment=False,
+                _shouldSwapInStabPools=False, _shouldAuctionInstantly=False)
+    assert e.dl.getDeleverageInfo(e.bob) == (0, 0)
+    before = pool_state(e), e.pool.claimableBalances(e.lp, claim)
+    users = [e.alice, e.bob] if healthy_first else [e.bob, e.alice]
+    # Repeat as distinct EVM transactions: Boa 0.2.7 does not reset transient
+    # caches itself. The second scenario must not reuse didHandleVaultId/Asset.
+    for i in (1, 2):
+        clear_transient_storage()
+        assert e.teller.deleverageManyUsers([(u, 50 * WAD) for u in users], sender=e.alpha.address) == 50 * WAD
+        trace = e.teller._computation
+        assert debt(e, e.alice) == (300 - 50 * i) * WAD
+        assert payment.balanceOf(e.funds) == 50 * i * WAD
+        assert debt(e) == 300 * WAD
+        assert (pool_state(e), e.pool.claimableBalances(e.lp, claim)) == before
+        assert not calls_to(trace, e.pool.address, f"withdrawTokensFromVault(address,address,uint256,address,{ADDYS_ABI})")
+    clear_transient_storage()
+    with boa.reverts("has price config, no price"):
+        e.pool.getTotalAmountForUser(e.bob, e.lp)
+    with boa.reverts("has price config, no price"):
+        e.pool.withdrawTokensFromVault(e.bob, e.lp, WAD, e.bob, sender=e.ah.address)
+
+
+def test_owner_specific_deleverage_rounding_residual_is_skipped_by_next_batch(legacy_env):
+    e = legacy_env
+    e.borrower(e.bob)
+    payment = fund_healthy_batch_user(e)
+    for token in (e.lp, e.sg):
+        e.configure(token, _vaultIds=[1], _minDepositBalance=10**16,
+                    _debtTerms=e.terms(0, 0, 0, 0, 0, 0),
+                    _shouldTransferToEndaoment=token == e.lp,
+                    _shouldBurnAsPayment=token == e.sg,
+                    _shouldSwapInStabPools=False, _shouldAuctionInstantly=False)
+    e.prices.setPrice(e.lp, 1_007 * WAD // 1000)
+    e.deposit(e.sally, 600 * WAD)
+    e.deposit(e.bob, 100 * WAD)
+    clear_transient_storage()
+    # The inverse quote floors this partial target to 100 LP minus one raw unit.
+    target = 100_700 * WAD // 1000 - 1
+    paid = e.teller.deleverageWithSpecificAssets([(1, e.lp.address, target)], e.bob, sender=e.bob)
+    assert paid == target and e.lp.balanceOf(e.pool) == 600 * WAD + 1
+    assert e.pool.getTotalAmountForUser(e.bob, e.lp) == 1
+    assert e.pool.getTotalUserValue(e.bob, e.lp) == 1
+    custody = e.lp.balanceOf(e.pool)
+    assert e.pool.getTotalUserValue(e.bob, e.lp) * custody // e.pd.getUsdValue(e.lp, custody, True) == 0
+    clear_transient_storage()
+    with boa.reverts("max withdraw stab amount is 0"):
+        e.pool.withdrawTokensFromVault(e.bob, e.lp, 1, e.bob, sender=e.ah.address)
+    assert e.nav() == (e.lp.address, 0)
+    assert e.dl.getDeleverageInfo(e.bob) == (0, 0)
+    before = pool_state(e), debt(e), e.lp.balanceOf(e.funds)
+    clear_transient_storage()
+    assert e.teller.deleverageManyUsers([(e.alice, 100 * WAD), (e.bob, WAD)], sender=e.alpha.address) == 100 * WAD
+    assert (pool_state(e), debt(e), e.lp.balanceOf(e.funds)) == before
+    assert debt(e, e.alice) == 200 * WAD and payment.balanceOf(e.funds) == 100 * WAD
+    clear_transient_storage()
+
+
+@pytest.mark.parametrize("stage", ["proposal", "execution"])
+def test_golf_rejects_retained_pool_as_special_pool_before_modern_probe(legacy_env, switchboard_golf, stability_pool, stage):
+    e = legacy_env
+    action = None
+    if stage == "execution":
+        # A valid modern row at proposal time cannot authorize a legacy row
+        # substituted before execution. Only the row address is varied here.
+        storage_write(e.book, "registry", "addrInfo", [1], stability_pool.address)
+        action = switchboard_golf.setAssetLiqConfig(e.collateral, False, False, True, True, 1, sender=e.gov.address)
+        mature(switchboard_golf, action)
+        storage_write(e.book, "registry", "addrInfo", [1], e.pool.address)
+    before = e.mc.assetConfig(e.collateral)
+    with boa.reverts("invalid asset liq config" if stage == "proposal" else "invalid asset"):
+        if stage == "proposal":
+            switchboard_golf.setAssetLiqConfig(e.collateral, False, False, True, True, 1, sender=e.gov.address)
+        else:
+            switchboard_golf.executePendingAction(action, sender=e.gov.address)
+    assert not calls_to(switchboard_golf._computation, e.pool.address, "getNumActiveClaimAssets(address)")
+    assert e.mc.assetConfig(e.collateral) == before
+    if action is not None:
+        assert switchboard_golf.hasPendingAction(action)
+
+
+def test_legacy_traversal_and_batch_gas_for_retained_claim_inventories(legacy_env, record_property):
+    e = legacy_env
+    e.borrower(e.bob)
+    e.deposit(e.bob, 200 * WAD)
+    seed_dust(e)
+    measurements = {}
+    for count in (11, 26):
+        if count == 26:
+            for i in range(15):
+                asset = e.token(f"Additional priced claim {i}")
+                e.prices.setPrice(asset, WAD)
+                e.claim(asset, 1)
+                e.lp.mint(e.pool, 1, sender=e.gov.address)
+        assert e.pool.numClaimableAssets(e.lp) == count + 1
+        with boa.env.anchor():
+            clear_transient_storage()
+            expected_nav = e.pool.getTotalAmountForUser(e.bob, e.lp)
+            clear_transient_storage()
+            assert e.nav() == (e.lp.address, expected_nav)
+            traversal_gas = e.book._computation.get_gas_used()
+            clear_transient_storage()
+            assert e.dl.getDeleverageInfo(e.bob)[0] >= 200 * WAD
+            info_gas = e.dl._computation.get_gas_used()
+            clear_transient_storage()
+            assert e.teller.deleverageManyUsers([(e.bob, 100 * WAD)], sender=e.alpha.address) == 100 * WAD
+            batch_gas = e.teller._computation.get_gas_used()
+            assert debt(e) == 200 * WAD and e.lp.balanceOf(e.funds) == 100 * WAD
+            measurements[count] = (traversal_gas, info_gas, batch_gas)
+        clear_transient_storage()
+    # Local stubs: approximately 25% margin above the measured execution costs.
+    budgets = {11: (660_000, 730_000, 1_670_000), 26: (1_400_000, 1_500_000, 3_200_000)}
+    for i in range(3):
+        assert 0 < measurements[11][i] < measurements[26][i], measurements
+        for count in (11, 26):
+            assert measurements[count][i] < budgets[count][i], measurements
+    for count, gas in measurements.items():
+        record_property(f"legacy_{count}_claims_traversal_info_batch_gas", str(gas))

@@ -1674,6 +1674,18 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "LEGACY_POOL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "constructor",
     "inputs": [
