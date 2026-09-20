@@ -1,0 +1,264 @@
+{
+  "checked_at": "2026-09-19T17:19:41.925046+00:00",
+  "chain_id": 8453,
+  "block": 51524517,
+  "block_hash": "37ebbf61930e433ee35894adda51ab9054cff823e5febe9c6ef32c589606f10b",
+  "block_timestamp": 1789838381,
+  "hq": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+  "hq_runtime_bytes": 12876,
+  "governance": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+  "active_pricedesk": "0x2F7901BE53cC94AEF174f1a0764430840360Ef53",
+  "active_missioncontrol": "0x559E53F42b68b4995732Dba4aF300796761DBC19",
+  "pending_pricedesk": [
+    "0x0000000000000000000000000000000000000000",
+    0,
+    0
+  ],
+  "registry_timelock": 21600,
+  "candidate_runtime_bytes": 17898,
+  "manifest_missioncontrol_runtime_bytes": 15712,
+  "PRICE_SOURCE_PRICE_GAS": 1500000,
+  "PRICE_SOURCE_SNAPSHOT_GAS": 1500000,
+  "safe_nonce": 477,
+  "confirm_simulation_governance": {
+    "error": "('execution reverted', 'no data')"
+  },
+  "confirm_simulation_unprivileged": {
+    "error": "('execution reverted', 'no data')"
+  },
+  "safe_service_status": 200,
+  "safe_nonce477_count": 1,
+  "safe_nonce477_transactions": [
+    {
+      "safeTxHash": "0x6422e6d187b9f0abfe3b11a51fadb828f57207c0b9e53f260e0992df5746636e",
+      "nonce": 477,
+      "isExecuted": false,
+      "isSuccessful": null,
+      "transactionHash": null,
+      "executionDate": null,
+      "to": "0x9641d764fc13c8B624c04430C7356C1C7C8102e2",
+      "operation": 1,
+      "calls": [
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 5,
+            "_newAddr": "0xD2c97549F4D44ca8Eb000d2AB2f3c5da8623D1D7"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 6,
+            "_newAddr": "0x7d82079971817134C02f789abb956cC307Cf6D17"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 7,
+            "_newAddr": "0xad70893E2F51076b0e9bA18fC593e924593a073F"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "cancelAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 8
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 8,
+            "_newAddr": "0xBd58bc13F05794ae8B90EBd08Cd39575e9D081AE"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 9,
+            "_newAddr": "0x94FaB5E2ABFf9106ab173813C07bf4a4443E74F3"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 10,
+            "_newAddr": "0xB8fB587B4D9a1e903a30dadC16AB8b4528ACB126"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 11,
+            "_newAddr": "0xFD2F37dec69Eb8Fb4Af9a58E6A735BC87340c36d"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 12,
+            "_newAddr": "0xE97Fc0372e9Cb0e419edC5189AFa3714449395a8"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 13,
+            "_newAddr": "0x80a990310F0a7160E7E1Bca5234406F7c68f2B85"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 14,
+            "_newAddr": "0x45d1e4C1Bf37a8945E70a41758A03E9f029c469D"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 15,
+            "_newAddr": "0xa0B09a7F80aB46AFdaAeB226704EC8eF7e522319"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 16,
+            "_newAddr": "0x6BD266b3e22edE1Bb274b2c404b615355b9f64f4"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 17,
+            "_newAddr": "0xFDdfdac47B73e32143356078f34Fc905Ab6399b0"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 18,
+            "_newAddr": "0xea53b631DAfc8520007F00C32609E32E75C0a6BF"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 19,
+            "_newAddr": "0xFDBBB262cf76c9B6DA6744EF925063672fdf32AB"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 20,
+            "_newAddr": "0xAD0ea1922Ac4bCd27cce3f566c463BcD765D6443"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 21,
+            "_newAddr": "0x455312579A9ccd041B93DC4e5EEb6B96D0D1f8F6"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddressUpdateToRegistry",
+          "arguments": {
+            "_regId": 22,
+            "_newAddr": "0xFb9f4356ec48B7786e67182F46f1711Cd74484c2"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddNewAddressToRegistry",
+          "arguments": {
+            "_addr": "0x8FFEaC17EFD46cDDff975ca8c0718e00630D4848",
+            "_description": "VaultMigrator"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddNewAddressToRegistry",
+          "arguments": {
+            "_addr": "0x74EB2b8a240186FC6e95942b5697f3EAE646B769",
+            "_description": "RipeReserveEngine"
+          }
+        },
+        {
+          "target": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+          "operation": 0,
+          "value": "0",
+          "function": "startAddNewAddressToRegistry",
+          "arguments": {
+            "_addr": "0xbBc1D9520B4cF3947E35ae012807995bD94be473",
+            "_description": "RipeReserveVesting"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+# Final review dispositions — revision 7
+
+All owner choices are settled: conditional quote checks with eager feed/snapshot/admission; immutable defaults with plain per-source overrides and constructor floors; configurable feed budgets; one combined branch stacked on PR #231; both snapshot paths protected; and **Teller’s Curve call moved into PriceDesk**. The approved fault model and margins remain release requirements. There are no unanswered planning decisions.
+
+| Reviewer item | Resolution |
+| --- | --- |
+| Teller has only 24 bytes of headroom | Independently confirmed by a synthetic local deployment of unchanged pinned Teller: **24,552 bytes** including immutables. The prompt makes minimal relay wiring and complete runtime measurement the first implementation step. It does not claim the unimplemented relay already fits. |
+| Choose a Teller approach | Owner selected the PriceDesk relay. Teller retains its constructor, passes its Curve source ID, and retains its failure event. The relay uses Curve’s effective configurable snapshot budget and returns raw call success, preserving valid `False` no-ops. Funding failures propagate through a typed call. Existing Curve authority must be tested without broadening it. |
+| Teller change affects slot 17 too | Deferred integration instructions now name **both HQ slots 7 and 17**, with final candidate/build and whole-stack reconciliation. No Safe action is part of this task. |
+| Remove process bloat | Current prompt is contracts/tests only. Fork sweeps, RPC estimation, other-repository caller tables, monitoring, recovery, deployment/Safe work and multiple mandatory reports moved to one clearly deferred follow-up document. One concise implementation report remains. |
+| Mock actual topology | Retained `[1,8,2,9,4,5]` and the nested Undy no-feed revisit under Chainlink failure, without requiring a fresh live census for implementation. |
+| Replace Anvil with Boa bisection | Accepted for focused contract tests, with a qualification: success/state boundaries do **not** prove a real RPC estimator’s chosen limit. Restore identical cold state, inspect neighboring limits and non-monotonic behavior. Actual Base estimator/state equivalence remains a release check. |
+| Keep Base numbers unchanged | Keep existing Base 1.5M/1.5M; preserve Robinhood/local 250k/150k and feed 75k. Label these unqualified configuration inputs. No sweep or release-safe claim is required now. |
+| Explicit focused lanes/no full suite | Exact interpreter and lane commands are in the shortened reference, including the three isolation/gas/aggregate modules, source-count guard, Base safety, Curve green-ref and relevant conversion tests. Full suite and broad deployment/fork lanes are expressly excluded. |
+| Exact persistent worktree command | Added the sibling checkout command, frozen SHA, branch and eventual PR target; require unused-path checks and preserve existing worktrees. |
+| Sandbox guidance | Request the specific permissions needed for Git metadata and sibling checkout if blocked. Blanket “sandbox off” is unnecessary; no bypass of a denied permission is prescribed. A permitted persistent clone remains the fallback. |
+| Python environment | Use the original repository’s absolute `.venv` interpreter from the implementation worktree; confirm import origins once and use task-local caches. |
+| Remove pending/recommended language | Approved choices are execution instructions. Historical archived pending language is explicitly superseded. |
+| Executed migrations and constructor assertions | Freeze `2026091402`/`2026091403` and deployed-candidate manifests. Preserve historical positional assertions; add current-constructor checks separately. Append new parameters, update current fixture/config builders and affected ABIs with the existing exporter. |
+| Maximum before qualification | Use immutable constructor `MAX_SOURCE_GAS`, with provisional 6M profile input and overflow-safe validation. This is a bounded implementation input, not an already-qualified maximum. |
+| Drop continuation reserve | Removed. One compiler-checked pre-call overhead constant plus EIP-150 rounding proves forwarding; subsequent OOG reverts atomically. No extra adjustable control. |
+| Name API/event, simplify reset | Named `setSourceGasBudgets`, `getSourceGasBudgets` and `SourceGasBudgetsUpdated`; zero resets each field. Defined address lifecycle, effective getter order and old/new raw event values. |
+| Snapshot gas consequence | Explicitly require/test roughly 1.5M availability at Base snapshot steps even for no-ops. Relay replaces Teller’s separate 500k cap with Curve’s snapshot budget; no fourth control. |
+| Registry-delay and floor corrections | Retained: historical source-registry delay zero differs from HQ’s 21,600 blocks; floors do not guarantee future liveness. |
+| Retained Pool-1 supplement | Preserved byte-for-byte with its evidence. Arithmetic/local regressions stay in scope; full claim/fork qualification remains a mandatory later release gate, not hidden work added back to this task. |
+
+The reviewer’s proposed 10–15-byte bare Teller guard was an uncompiled estimate, not a verified alternative. It is unnecessary after the owner selected the relay. No other substantive recommendation was rejected.
+
+Verification during revision 6: inspected pinned constructor/test bindings and relay authorization/return semantics; locally deployed unchanged Teller and measured complete runtime; checked packet links and hashes. **No relay or funding guard has been implemented or tested yet.** No fresh live-state claim is made. [Full feedback](evidence/reviewer-v6.txt) and [runtime evidence](evidence/teller-runtime-size-v6.json) are retained; revision-5 documents are archived unchanged.
+
+## Final owner-requested review
+
+- **Scope:** only contracts, necessary API/constructor wiring and directly affected tests. No CI, operational tooling, full-suite runs or multi-report deliverables. Base review selection is narrowed to historical and current PriceDesk constructor-binding tests.
+- **Isolation:** created `/Users/wigglez/dev/ripe-protocol-pricedesk-gas` on `codex/pricedesk-configurable-gas` at the frozen PR #231 head. Final edits and the copied packet are in that worktree only; the original checkout and its older packet remain unchanged. New instructions reuse the prepared worktree and verify ancestry rather than recreating/resetting it.
+- **Continuous execution:** steps are sequencing, not owner-review checkpoints. Implement, repair and test through completion. Size difficulties or relevant source mismatches require reasonable local resolution attempts and continued independent work; only genuine unresolved issues belong in the end report. No instruction authorizes bypassing permissions or claiming an unsuccessful check passed.
+- **Plain terminology:** use boundary cases, source availability, permission checks and state consistency. Actual EVM behavior and coverage remain explicit; the wording does not promise or attempt to disable any tool safeguards.
+- **Fresh-agent precision:** named struct fields, exact setter/getter/event shape, explicit admission mode for the shared quote helper, the new constructor test name and Teller runtime test name. The prompt/reference are the only mandatory execution reads; archived release material does not enlarge this task.
+
+Revision 7 checks: read the complete active prompt/reference, verified the relevant pinned source paths and admission/relay behavior, checked the prepared worktree/branch/pin, test selectors, packet links and hashes, and confirmed original-packet preservation. No contract source changes or contract test runs were needed for this wording/scope review. All technical implementation and focused test acceptance remain the implementation agent’s task.

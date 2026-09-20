@@ -1,0 +1,24 @@
+{
+  "scope": "Synthetic local deployment of unchanged Teller; no live transaction.",
+  "source_sha256": "82ebba3a26168d78445a6dbcf4aaff8083b028b1497cbe29868ac3f04daf2c26",
+  "source_matches_pinned_PR": true,
+  "deployed_runtime_bytes": 24552,
+  "eip170_limit": 24576,
+  "headroom_bytes": 24,
+  "constructor": [
+    "0x0000000000000000000000000000000000000001",
+    true,
+    2
+  ],
+  "source_pin": "bdf7f3da7113aabde60ab8eceab6a960a841bb88",
+  "compiler_version": "0.4.3",
+  "titanoboa_version": "0.2.7",
+  "measurement": "boa.load contracts/core/Teller.vy with the recorded constructor; len(boa.env.get_code(contract.address)); default repository build settings.",
+  "source_files": {
+    "contracts/core/Teller.vy": "82ebba3a26168d78445a6dbcf4aaff8083b028b1497cbe29868ac3f04daf2c26",
+    "contracts/modules/Addys.vy": "db23f14c93f6897fae890575d24fe9766e726df65b3f8b63343bb430060ccdf4",
+    "contracts/modules/DeptBasics.vy": "41c6d1b6fe6ca13f8721fb819406115192b745cf51e5036254f933d7963649c2",
+    "interfaces/Department.vyi": "4022e08f4321cf2a061b4e6b15820958c96ff499d4fa72fcf789ed97dc234ed8",
+    "interfaces/ConfigStructs.vyi": "def6208cd81de43d0d33656f9d05b5394d3a74c695fdc27ffe3c9711ccd67c2c"
+  }
+}

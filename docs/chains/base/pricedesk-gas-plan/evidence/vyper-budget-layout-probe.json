@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-09-19T21:25:25.655672+00:00",
+  "vyper": "0.4.3",
+  "scope": "Standalone compiler layout probe, not implementation or gas qualification.",
+  "source": "# pragma version 0.4.3\nstruct Budgets:\n    quote: uint64\n    snapshot: uint64\n    feed: uint64\nbudgets: Budgets\npacked: uint256\n",
+  "output": {
+    "layout": {
+      "storage_layout": {
+        "budgets": {
+          "type": "Budgets",
+          "n_slots": 3,
+          "slot": 0
+        },
+        "packed": {
+          "type": "uint256",
+          "n_slots": 1,
+          "slot": 3
+        }
+      }
+    }
+  }
+}

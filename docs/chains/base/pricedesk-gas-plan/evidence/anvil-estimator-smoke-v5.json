@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-09-19T21:41:27.381247+00:00",
+  "scope": "Local Anvil synthetic estimator/state smoke only; no Base fork or production qualification.",
+  "chain_id": 31337,
+  "client_version": "anvil/v1.3.5",
+  "status": "passed",
+  "estimate": 43106,
+  "trials": [
+    {
+      "gas_limit": 43106,
+      "status": "0x1",
+      "gas_used": 43106,
+      "storage_slot_0": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "gas_limit": 100000,
+      "status": "0x1",
+      "gas_used": 43106,
+      "storage_slot_0": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    }
+  ]
+}

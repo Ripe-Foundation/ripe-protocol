@@ -1,0 +1,74 @@
+I'll read the prompt packet and the relevant memory first, then check its claims against the actual code.
+
+Now let me ground the prompt's claims against the actual code — PriceDesk on master vs. the PR #231 head, and how sources call back into it.
+
+The PR diff is tiny (constants → immutables). Now let me check how sources call back into the desk, since the prompt's hardest section (B, root vs. nested) hinges on that.
+
+I didn't find the standard retained-gas check or an explicit fault model in the packet. Now I'll examine the Undy path costing 1.72M and the assumptions behind the existing aggregate-gas test.
+
+I'll verify whether the PR's constructor change also carried over to the Robinhood side, since the owner directives call for minimal contract changes and blast-radius-scoped verification, but the prompt only addresses Base.
+
+The PR head already has per-chain values in `config/BluePrint.py`, a diagnostic script, and a source-count guard test — none of which the prompt mentions. Let me look at those.
+
+Let me get a few quick numbers to back the process-weight point, and sanity-check the prompt's own arithmetic against its own floors.
+
+The prompt is careful and the facts I spot-checked are accurate, but it is aimed at a different goal than the one you described. You want the gas values made configurable, and the prompt treats that as optional last-phase work. I did not run the agent or any tests; I read the packet and checked the code and arithmetic.
+
+What I checked: the pinned SHA still matches the remote PR head. The PR diff is exactly the change from constants to immutables, and the eight-source count is right.
+
+## The main problems
+
+**1. Configurability is sequenced last.**
+- The prompt opens with "reproduce the failure" and pushes storage-backed budgets into Phase 5 "hardening".
+- That phase runs only after five phases of measurement, has a four-hour cap, and stops at the first contradiction.
+- The most likely outcome is a pile of evidence files and a NO-GO with no contract change.
+- PR #231 already made the two values per-chain at deploy time, through immutables plus `config/BluePrint.py`. The undyUSDC failure shows deploy-time values are not enough, because the Undy cost keeps drifting.
+- The prompt should say the real task plainly: governance-settable budgets with a per-source override.
+
+**2. The "narrow" workstream is empty by the prompt's own rules.**
+- Option 1, keeping the active desk, is declared not a qualified fix.
+- Option 2, a config-only change, names only two levers, snapshot count and source order. Both are banned as pricing policy.
+- Option 3 with one uniform cap fails the prompt's own floors. 1.5 × 1,719,201 is 2.58M per source, and eight sources come to 20.6M against the 13.4M gate. Eight sources at the bare measured need, 13.75M, also fail.
+- So the uniform sweeps at 2M, 3M and 6M are known rejects before they run, and the only survivor is per-source budgets, which is the same thing as the "hardening" design.
+- I'd state that conclusion at the top and merge the two streams into one PriceDesk redeploy. The redeploy, with its 12-hour timelock and scale re-bootstrap, is the expensive part.
+
+**3. Section B makes the root-versus-nested problem harder than it needs to be.**
+- It sets this up as an open research problem and says neither default qualifies for production.
+- I think per-source budgets plus a pre-call minimum-gas check (the Optimism `SafeCall` pattern), applied the same way in every frame, remove the dilemma.
+- A starved inner desk reverts, and the outer `raw_call` contains that as an ordinary source failure, which the desk can isolate because it just proved it gave the source its full budget. No classifier or state writes are needed.
+- Budgets then have to nest by dependency depth: Curve at least Undy, Undy at least Chainlink. The prompt already asks for that dependency graph.
+- The prompt should warn off the post-call check (the OpenZeppelin forwarder style). A source that survives an inner out-of-gas and reverts with leftover gas slips past it.
+- This is my reading of [PriceDesk.vy](../../../../contracts/registries/PriceDesk.vy) and the source callbacks, not something I tested. Make it approach one, and say it counts as production-qualified if the matrix passes.
+
+**4. The envelope gate has no fault model.**
+- "Required worst-case behavior" is never defined.
+- If every source may burn its full budget on every quote, the per-source design allows 3 quotes per transaction, and even master's 250k design allows only 6.
+- That would reject any realistic multi-asset transaction.
+- The agent will either reject everything or make up its own assumption, so this needs your decision (below).
+
+**5. The cross-chain angle you described is missing.**
+- Robinhood appears once, as "don't use its 32M".
+- The prompt says nothing about keeping one canonical PriceDesk source for both chains, preserving the 250k/150k Robinhood defaults, or keeping the Robinhood qualification tests green.
+- It also freezes the 75k feed-check value. Since you are redeploying anyway, making that third value configurable costs almost nothing and avoids another redeploy later.
+- A starved feed check also silently skips snapshots, which is the same failure class as D01.
+
+**6. The process weight pushes the agent toward NO-GO.**
+- The prompt is 5,548 words, with 54 prohibitions and 15 sanctioned NO-GO, blocked or partial exits.
+- That conflicts with your "no process bloat" direction.
+- I'd split it into three runs: contract design and focused tests, Base fork measurement to pick values, and the activation/Safe handoff.
+- Drop the four-hour bound. An agent can't track hours, and the "two approaches" limit already does the job.
+
+## Smaller items
+- **Existing tooling is not named.** The PR head already has `scripts/diagnose_base_undy_prices.py`, the `FullUpdate` fork harness and the source-count guard test, and the agent may rebuild them from scratch.
+- **Undy-wide evidence is left out.** The prompt treats the 1,719,201 figure as unattributed, but I measured it last session. undyAERO and undyUSD are also within about 20% of the 1.5M cap, so this is not a one-asset problem.
+- **Storage layout.** Pack the three budgets into one storage slot per source so each source costs one read instead of three.
+- **Monitoring.** Add a script that alerts when a source reaches about 70% of its budget, so the setter is used before a price goes to zero.
+- **Gas estimation test.** Add a D01 test that a gas limit derived from `eth_estimateGas` produces the same state change as a generous limit. The estimator picking the lowest limit at which the transaction still succeeds is a plausible way for snapshots to be skipped silently.
+- **Safe nonce 477.** Removing the slot-7 call from the queued batch is a separate owner action and should not wait on this run.
+
+## Decisions I need from you
+1. **Fault model.** I'd suggest measured-normal gas × 1.5, plus tolerating one exhausting source per transaction.
+2. **Feed-check value.** Should it become configurable too? I'd say yes.
+3. **Branching.** One combined redeploy, or the stacked narrow and hardening branches?
+
+With those three answers I can rewrite the prompt at roughly a third of its current length.

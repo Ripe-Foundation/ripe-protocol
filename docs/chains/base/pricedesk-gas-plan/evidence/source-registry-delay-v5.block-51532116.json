@@ -1,0 +1,7 @@
+{
+  "scope": "Read-only PriceDesk source-registry delay at reviewer block",
+  "block": 51532116,
+  "address": "0x2F7901BE53cC94AEF174f1a0764430840360Ef53",
+  "registryChangeTimeLock": 0,
+  "status": "passed"
+}

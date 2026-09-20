@@ -1,0 +1,52 @@
+{
+  "scope": "Documentation-only planning packet; uncommitted. Inventory excludes itself.",
+  "implementation_source_pin": "bdf7f3da7113aabde60ab8eceab6a960a841bb88",
+  "owner_decision": "Stack narrow fix on PR #231; hardening on narrow fix.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 1974,
+      "sha256": "3b896222273fa9bf6e2b1e5cf34a41e949991706b3584b305038df78ed6ab05d"
+    },
+    {
+      "path": "evidence/README.md",
+      "bytes": 3343,
+      "sha256": "2cc3227822de97a81e33f09223b3eb45104dc6dc03d2943ddd5fc073a4f595e0"
+    },
+    {
+      "path": "evidence/candidate-runtime.block-51524517.json",
+      "bytes": 36221,
+      "sha256": "b6e1efe80813e6c5d8e685eb1512568708df06364b2ab4ce3fb5a9c16becddc3"
+    },
+    {
+      "path": "evidence/live-readback.block-51524517.json",
+      "bytes": 17061,
+      "sha256": "2afb89b2e8272c4f2ae2aa072f7dbae0fe5516c5b5fb1963412cf02a44925194"
+    },
+    {
+      "path": "evidence/live-summary.block-51524517.json",
+      "bytes": 8516,
+      "sha256": "e714bd82ddb97ccc33fded3467ed98388a21135d9e99a27ef24ff8e346e471ef"
+    },
+    {
+      "path": "evidence/planning-v2-prompt.md",
+      "bytes": 26371,
+      "sha256": "c17bf4138738236ee1eb67266b47f4481253227f37112a7e1ce0c0f2b6d94e68"
+    },
+    {
+      "path": "evidence/planning-v2-resolutions.md",
+      "bytes": 13450,
+      "sha256": "cb98ea39ddc3cd8dd836400f86ef686c6f94fa0dc77c52628fae3769434c8265"
+    },
+    {
+      "path": "review-resolutions.md",
+      "bytes": 10999,
+      "sha256": "ebdd72820ef434afd4f33196fa74edd770e43820587c838e2015a366504d0005"
+    },
+    {
+      "path": "updated-prompt.md",
+      "bytes": 42782,
+      "sha256": "595859373c8c9aa30636e5d5c4023ec1d20d13e8db98aaa9fe87df2b8f19a7af"
+    }
+  ]
+}

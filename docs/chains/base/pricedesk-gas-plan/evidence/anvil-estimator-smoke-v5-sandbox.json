@@ -1,0 +1,6 @@
+{
+  "checked_at": "2026-09-19T21:39:59.709417+00:00",
+  "scope": "Local Anvil synthetic estimator/state smoke only; no Base fork or production qualification.",
+  "status": "blocked",
+  "error": "Anvil exited: Error: Operation not permitted (os error 1)\n"
+}

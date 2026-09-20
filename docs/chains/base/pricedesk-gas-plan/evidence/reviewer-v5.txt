@@ -1,0 +1,149 @@
+I'll read the updated packet in full first, then verify its technical claims against the code rather than taking the resolution record's word for it.
+
+Since my pre-call-check suggestion was adopted as the plan's first approach, I'll now run several independent checks to stress-test it against the actual code and live topology.
+
+Hash inventory checks out clean. Next I'll examine the live Base source order and priority list, since the safety of the pre-call-check idea hinges on which slots a nested traversal passes through.
+
+PublicNode 403s on block-pinned calls (same thing the planner hit). Retrying against the official endpoint.
+
+Undy actually ranks as priority #2 in the fallback order (after Chainlink), meaning most non-Chainlink quotes route through it — this shifts my assessment. I'll verify the remaining pieces before writing this up.
+
+I still need to verify the Vyper struct-read probe with a sandbox-writable cache dir, plus double-check gate D01's scope since I just spotted a second bounded, failure-swallowing snapshot call in Teller that isn't covered in the plan.
+
+I've finished the verification work and I'm saving the key live facts to memory before writing up the findings.
+
+The revised plan is not ready to hand to an implementer yet. The revision itself is a real improvement, but the most serious problem I found is in a design I recommended last round and the planner adopted faithfully.
+
+What I confirmed:
+- Configurability now leads, and the fault model is explicit.
+- The planner's caveats about the existing diagnostic tool are correct.
+- The hash inventory matches all 17 files.
+
+## Must fix before implementation
+
+**1. "Approach one", a gas check before every source call, does not fit the live Base setup.**
+
+I read the live Base chain at block 51,532,116. The source priority order is `[1, 8, 2, 9, 4, 5]`, so Undy is second, right after Chainlink. Almost every quote Chainlink can't answer passes the Undy slot before reaching Curve, Redstone, Pyth or Stork. Checking eagerly, with Undy's budget near 3M, causes three problems:
+
+- **Every non-Chainlink quote needs far more gas.**
+  - Each one needs roughly 3.05M gas in hand just to pass Undy's slot, even though Undy answers "no feed" in a few thousand gas.
+  - Robinhood clients have been seen submitting canned gas limits near 422k. If Base clients do the same, those transactions would revert.
+- **Budgets cascade upward.**
+  - Curve and wsuperOETHb look up their inner assets through the desk. Any inner asset Chainlink can't answer passes the Undy slot inside their envelope.
+  - They would each need a budget larger than Undy's. That removes most of the benefit of per-source budgets and inflates the fault-case bound.
+- **One fallback case is impossible.**
+  - Under your approved fault model, take Chainlink as the faulty source. The Undy path asks the desk for USDC, Chainlink fails, and the next source in order is Undy itself.
+  - The check would need more gas than Undy's own envelope contains, so it always fails.
+  - All six Undy assets then lose pricing even though healthy USDC fallbacks exist at Redstone, Pyth and Stork. That contradicts the plan's own "healthy fallback is required" rule. Today's desk handles this case.
+
+**Proposed fix: evaluate the same gas inequality only when it matters.**
+
+- **How the check would work:**
+  - Record the available gas, then make the bounded call.
+  - Accept a clean answer without proof: a positive price with a feed, or zero with no feed.
+  - Demand proof that the caller supplied the full budget only when the result is a failure, is malformed, or is zero with a feed.
+  - If that proof is missing, revert.
+- **Feed-check and snapshot calls can stay eager.** The snapshot path already skips sources with no feed.
+- **Risk I checked:** a source turning gas starvation into a clean wrong answer. The two places sources swallow failures (Chainlink line 374, RedStone line 292) are admission-time `decimals()` reads, not price paths. The agent must repeat this audit on the older source builds that are live on Base.
+- This is untested analysis.
+- The live order and dependency read should move to the start of Stage 1, because the design depends on it.
+
+**2. The prompt labels itself non-final.** It says to resolve the pending answers before treating the draft as final instructions. It needs to be reissued with every decision written in, or the implementer will stop or guess.
+
+## High
+
+**3. The plan misses a second silently skipped snapshot in Teller.**
+- The plan's scope is PriceDesk only.
+- `Teller.vy` line 1034 calls `addGreenRefPoolSnapshot` with a hard-coded 500,000 gas and ignores failure. This exists on master too.
+- This is the same class of problem gate D01 describes, and it is a fourth chain-sensitive gas constant, which bears on your original goal.
+- The code comment says the fail-open behavior is deliberate, so I am not saying it must change.
+- You need to rule on whether D01 covers it. If it does, PriceDesk-only work cannot unblock Stage 3.
+
+**4. D01's exit wording is not reflected.**
+- The gate requires the underfunding policy and a "four-case regression" to be *agreed*.
+- The plan never names the four cases or who agrees.
+- Add them as named tests and an exit criterion:
+  - due and funded: the snapshot is written;
+  - due and underfunded: the transaction reverts and rolls back;
+  - not due: a valid no-op;
+  - genuine source failure: isolated.
+
+**5. Off-chain and outside callers are not covered.**
+- The previous version mentioned wallet and keeper buffers; this one dropped it.
+- The change adds a new revert in non-strict price views and raises minimum gas.
+- The plan needs an inventory of:
+  - the frontend gas-limit policy;
+  - keepers;
+  - the Underscore appraiser, which is authorized to call `addPriceSnapshot`;
+  - any on-chain integrator that assumes `getPrice` never reverts.
+- It also needs a minimum-gas table per endpoint.
+
+**6. There is no recovery playbook.**
+- After activation the old desk is probably not a fallback, since the new departments need the new desk.
+- Re-proposing a desk takes about 12 hours, so the setters are the only fast recovery. The handoff needs a symptom-to-action list.
+- The plan should also name the requalification triggers:
+  - a source added, replaced or changed;
+  - a change to the priority order, which is new and matters because nested budget fit depends on order;
+  - Underscore vault changes;
+  - Base gas repricing or a change to the transaction cap;
+  - a compiler change.
+
+**7. Setter power is broader than it looks.**
+- Lowering a budget immediately is an instant de-facto disable of a source. That bypasses Base's 21,600-block delay on source changes.
+- The previous version said to flag this; the new one dropped it.
+- I'd suggest a floor at the constructor defaults, so governance can only raise budgets above the Robinhood-qualified values.
+
+## Medium
+
+**8. My earlier packing advice was overstated; simplify the storage design.**
+- I compiled a probe on Vyper 0.4.3. Reading one struct member costs one storage read (2,330 gas). Two members cost 4,533, and the whole struct costs 6,595.
+- The quote path and the feed path each read one field. Bit-packing therefore saves about 2,100 gas, and only in the snapshot path, while adding mask and width bugs.
+- I recommend a plain struct of three values with member access.
+- I also recommend keeping PR #231's immutable defaults and storing only per-source overrides. That drops the default setter, the inheritance rules and one read per quote, and it keeps the existing getters.
+
+**9. The margins stack.** Budgets get 1.5×, the transaction bound gets 1.5×, and the result must also fit 80% of the cap. A normal transaction therefore has to measure at or under roughly 8.95M gas. Large keeper batches will probably fail this gate. Confirm that stacking is what you approved.
+
+**10. Run the paper arithmetic before any fork sweeps.** Take Undy as the faulty source at 3M per quote plus 1.5M per snapshot. A position with three Undy assets already reaches 13.5M against the 13.42M limit.
+
+**11. The monitor threshold is too tight.**
+- At exactly 1.5× headroom, usage is 66.7% on day one, so the 70% warning fires on about 5% drift.
+- Use two tiers, a warning at 70% and critical at 85%, or size Undy at 2× or more.
+- Under the lazy check a larger Undy budget costs nothing on healthy paths.
+- The monitor should also re-check the nested-budget fit on every run.
+
+**12. The gas-estimation test has no named tool.**
+- The repository's fork harness (titanoboa) has no estimator. Anvil is installed, but I have not tested whether it runs in the sandbox.
+- Public Base RPCs rejected me today: PublicNode returned 403 on block-pinned calls and the official endpoint returned 429.
+- The plan should name the backend, check it at the start of Stage 1, and pass `BASE_MAINNET_RPC_URL` explicitly. The existing tools load the whole `.env`, which conflicts with the no-signer rule.
+
+**13. Robinhood scope should be stated plainly.**
+- Robinhood's live desk is not redeployed, so the canonical source will now differ from its live bytecode.
+- Any Robinhood bytecode-verification test should be pinned to the historical commit.
+- PR #231 left the Robinhood manifest untouched, which is correct.
+
+## Low
+- The rule that a parent never classifies a child's failure from its revert data was dropped from the test matrix. Restore it.
+- The explicit "never repoint live HQ" and "no third-party messages" lines were dropped. Restore them.
+- Define "faulty" as a source that exhausts its budget and fails. Wrong prices are out of scope for that model.
+- Say explicitly that the setters are governance only, not Switchboard, so the agent doesn't copy `syncTokenScale`'s pattern.
+- Give the reason for an upper bound on budgets: an override larger than the transaction cap would brick every quote passing that slot.
+- State what gets delivered if an RPC is unavailable during Stage 2.
+- The Safe nonce 477 guidance is missing two points:
+  - Executing the batch as-is only proposes, and a later re-proposal overwrites it. The real risk is a later "confirm everything" batch.
+  - "Omit slot 7 and proceed" may not be viable if the new departments need the new desk.
+- There is an empty `.claude/.cc-writes` folder in the packet, probably created by my session. Exclude it when copying.
+
+## Decisions for you
+
+The two pending items (I'd say yes to both):
+- a configurable feed-check budget;
+- one combined branch.
+
+New items from this review:
+- lazy gas check on quotes, eager on feed-check and snapshot calls (I recommend this);
+- whether the Teller 500,000-gas snapshot falls under D01;
+- a budget floor at the constructor defaults;
+- immutable defaults plus an unpacked override struct;
+- confirmation of the stacked margins.
+
+Once you answer these, the planner can issue a final prompt. After that revision I'd want one more look at the gas-check section only.

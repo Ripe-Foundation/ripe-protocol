@@ -1,0 +1,97 @@
+{
+  "scope": "Revision-4 documentation-only packet. Two owner choices pending. Inventory excludes itself.",
+  "implementation_source_pin": "bdf7f3da7113aabde60ab8eceab6a960a841bb88",
+  "owner_decisions": {
+    "integration": "Approved: stack on PR #231.",
+    "fault_model": "Approved: normal gas times 1.5 plus one faulty source identity on every invocation per transaction.",
+    "feed_check_configurability": "Pending; recommended yes, retain default 75000.",
+    "combined_branch": "Pending; recommended one combined branch stacked on PR #231."
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2651,
+      "sha256": "0491771a48043bc122f0ad7f8f8cd4128647a5d050c928592f0a61aaca7508af"
+    },
+    {
+      "path": "evidence/README.md",
+      "bytes": 5760,
+      "sha256": "04c4f2250734e2e8a79f926293813a2c14ac97f21f6f1467d709c9e74013d19e"
+    },
+    {
+      "path": "evidence/candidate-runtime.block-51524517.json",
+      "bytes": 36221,
+      "sha256": "b6e1efe80813e6c5d8e685eb1512568708df06364b2ab4ce3fb5a9c16becddc3"
+    },
+    {
+      "path": "evidence/live-readback.block-51524517.json",
+      "bytes": 17061,
+      "sha256": "2afb89b2e8272c4f2ae2aa072f7dbae0fe5516c5b5fb1963412cf02a44925194"
+    },
+    {
+      "path": "evidence/live-summary.block-51524517.json",
+      "bytes": 8516,
+      "sha256": "e714bd82ddb97ccc33fded3467ed98388a21135d9e99a27ef24ff8e346e471ef"
+    },
+    {
+      "path": "evidence/planning-v2-prompt.md",
+      "bytes": 26371,
+      "sha256": "c17bf4138738236ee1eb67266b47f4481253227f37112a7e1ce0c0f2b6d94e68"
+    },
+    {
+      "path": "evidence/planning-v2-resolutions.md",
+      "bytes": 13450,
+      "sha256": "cb98ea39ddc3cd8dd836400f86ef686c6f94fa0dc77c52628fae3769434c8265"
+    },
+    {
+      "path": "evidence/planning-v3-hashes.json",
+      "bytes": 1742,
+      "sha256": "5c980f817c838d74e699c4cd00473a07da8a5f6bd55a3b417bbe4007f0a500c5"
+    },
+    {
+      "path": "evidence/planning-v3-prompt.md",
+      "bytes": 42782,
+      "sha256": "595859373c8c9aa30636e5d5c4023ec1d20d13e8db98aaa9fe87df2b8f19a7af"
+    },
+    {
+      "path": "evidence/planning-v3-resolutions.md",
+      "bytes": 10999,
+      "sha256": "ebdd72820ef434afd4f33196fa74edd770e43820587c838e2015a366504d0005"
+    },
+    {
+      "path": "evidence/planning-v4-live-refresh.json",
+      "bytes": 34704,
+      "sha256": "999ec37c835770983361ac179a7c4e128c98fc941f2e0ea4222545ed927057e5"
+    },
+    {
+      "path": "evidence/pr-231-v4-readback.json",
+      "bytes": 384,
+      "sha256": "f848c88ef3cf10c917f65b3524550cc2e385c47429c47bcd0168cb835abac8ce"
+    },
+    {
+      "path": "evidence/reviewer-v4.txt",
+      "bytes": 7249,
+      "sha256": "505745f9585889ab1cb0aee680e676f6729b856c6c70190b9031316100ab98d4"
+    },
+    {
+      "path": "evidence/vyper-budget-layout-probe.json",
+      "bytes": 598,
+      "sha256": "41a9787658108be8c98fc27cf80ff9311adde4c1f8b9b9bd160940d961e844f8"
+    },
+    {
+      "path": "implementation-reference.md",
+      "bytes": 14649,
+      "sha256": "31b46954cc59f22deb693fc223d3451cbfb80426702766ca1aca80601f65215f"
+    },
+    {
+      "path": "review-resolutions.md",
+      "bytes": 9744,
+      "sha256": "024097a74077641268d153ae7c9a53e6b3d4320841002bea7a351ee733f2838a"
+    },
+    {
+      "path": "updated-prompt.md",
+      "bytes": 13218,
+      "sha256": "0a792687073e757b49d743d37aa2f0c16fa9a825b2d81431447b166051748847"
+    }
+  ]
+}

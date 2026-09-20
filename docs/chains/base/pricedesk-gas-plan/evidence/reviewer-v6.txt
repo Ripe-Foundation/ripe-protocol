@@ -1,0 +1,104 @@
+I'll read the revised packet, then verify the two corrections the planner made to my review and the branch/worktree setup.
+
+I'll check the branch/worktree state, contract size headroom (especially Teller, now in scope), the planner's delay correction, and test coverage for the touched code.
+
+The branch doesn't exist yet and the pin still matches the remote. Since there's no existing size test for Teller, I'll compile one from a read-only export of the pinned tree to check its EIP-170 headroom at the PR head.
+
+The export was declined, so I'll skip retrying it. I found an existing review worktree from an earlier PR #231 commit and will check if Teller is unchanged between that commit and the pin, so I can measure from there read-only.
+
+Teller is byte-identical at the pin, in that worktree, and on master. Compiling from the existing worktree (read-only; output to stdout).
+
+Teller's compiled template is 24,424 bytes — about 150 bytes under the 24,576 limit *before* immutables. That's decisive for the plan, so let me pin the exact deployed number rather than estimate.
+
+4 immutables → deployed Teller ≈ 24,552 bytes, i.e. roughly **24 bytes** of headroom. Let me confirm against the actual deployed candidate on Base.
+
+Confirmed on-chain that the PR #231 Teller is 24,552 bytes — 24 bytes under the size limit, which affects the new Teller scope. Next I'll check the already-executed migrations calling the old constructor and how ABIs/manifests get regenerated.
+
+The plan is not ready to hand off yet. The design is now sound, but there are three problems:
+- I found a Teller size blocker.
+- The plan still carries a lot of work beyond contracts and tests.
+- The branch and worktree setup is not precise enough for a fresh agent.
+
+## Blocker: the Teller change may not fit
+
+- **What I measured.** The PR #231 Teller candidate deployed on Base is 24,552 bytes against a 24,576-byte limit, which leaves 24 bytes of room. I read this on-chain from `0xFDdfdac4…99b0`, and it matches a local compile of the pinned source.
+- **Nothing to reclaim.** `Teller.vy` has no revert-reason strings that could be shortened. The plan only says to measure Teller's size, so a fresh agent would find this late.
+- **Knock-on effect.** Any Teller change also replaces the Teller address in the nonce-477 Safe batch (slot 17). The plan only tracks the PriceDesk slot (slot 7).
+
+Options:
+
+1. **A bare pre-call gas check in Teller.** I estimate it costs about 10–15 bytes, though I have not compiled it. It raises the minimum gas for every Teller action by about 510k.
+2. **Move the Curve reference-pool snapshot call into PriceDesk**, which has about 6.7 KB of headroom. Teller gets smaller, and the hard-coded 500k becomes one of the configurable budgets.
+3. **Leave Teller unchanged** and accept that snapshot path as a documented D01 exception.
+
+I'd pick option 2 for a clean result or option 3 for minimal change. Option 1 is the smallest change but uses up most of the remaining margin. Whichever you choose, the prompt should tell the agent to measure the size change first, and to stop the Teller part if it doesn't fit.
+
+## Process bloat
+
+The packet is back to 5,032 words (prompt 1,974, reference 3,058), close to the 5,548-word version you rejected. Some of that growth came from my own round-2 findings.
+
+Everything in Stage 2 and Stage 3 falls outside "contracts and the tests around them":
+- fork measurement sweeps;
+- the monitor tool;
+- the caller gas table across other repositories;
+- the Anvil estimator on a Base fork;
+- the recovery playbook;
+- the deployment rehearsal;
+- nonce-477 instructions;
+- five separate report files.
+
+I'd cut this handoff to Stage 1 only and move the rest into a follow-up document that stays in the packet:
+- **Live facts.** The contract task only needs the live facts already gathered, encoded as a mock-topology test: priority order `[1,8,2,9,4,5]` and the case where a nested lookup revisits the Undy source.
+- **Estimator check.** Use a Boa bisection test instead of Anvil. Bisect the minimum gas limit that succeeds and assert the same state as a generous limit, which is what `eth_estimateGas` does.
+- **Base numbers.** These stay as config. Leave `BluePrint.py` at the current values, flagged as unqualified.
+- **Test scope.** State explicitly that the full suite is not to be run. Neither file says that today.
+
+Exact test lanes to name in the prompt:
+- the three `tests/registries/test_price_desk_*` files;
+- the source-count guard test;
+- `tests/test_base_review_safety.py`;
+- the Curve green-ref tests, if Teller changes.
+
+## Branch and worktree
+
+Verified:
+- `codex/pricedesk-configurable-gas` does not exist locally or on the remote.
+- The remote PR #231 head still equals the pinned commit `bdf7f3da`.
+- You are on `master`, and the uncommitted packet is safe there.
+
+What is missing is the exact command. The prompt says "isolated branch" and the reference says "new isolated checkout, unused writable location". A fresh agent will likely pick `/private/tmp`, where worktrees have been lost before. I'd add this command, using the same sibling-folder convention as your TWAP worktree:
+
+```bash
+git -C /Users/wigglez/dev/ripe-protocol worktree add -b codex/pricedesk-configurable-gas /Users/wigglez/dev/ripe-protocol-pricedesk-gas bdf7f3da7113aabde60ab8eceab6a960a841bb88
+```
+
+Two notes to add alongside it:
+- **Sandbox.** The sandbox blocks `.git/worktrees`, so the command must run with the sandbox off. The clone fallback in the reference can stay.
+- **Python environment.** A new worktree has no `.venv`. Tell the agent to run `/Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest` from the worktree root. `pytest.ini` puts `.` and `tests` on the import path, so imports should resolve to the worktree; the agent should confirm that once.
+
+## Smaller precision gaps
+
+- **Pending language.** The prompt still says to finalize the two design answers before issuing it as executable. I recommend yes to both. After that, the "pending" and "recommended" wording should be removed.
+- **Executed migrations.**
+  - `2026091402` and `2026091403` have already run on Base and call the current constructor.
+  - `tests/test_base_review_safety.py` lines 197–201 pin the constructor argument positions.
+  - Add a rule not to edit executed migrations and to update that test deliberately.
+  - Also list the other constructor consumers: `tests/conf_core.py`, `config/BluePrint.py`, `scripts/abis/PriceDesk.json` via `scripts/export_abis.py`.
+  - Do not regenerate the deployed-candidate manifests.
+- **Override maximum.** "Qualified finite maxima" cannot be coded before qualification exists. Make the maximum an immutable constructor argument with a provisional Base value.
+- **Continuation reserve.** Drop it. For the funding proof to be sound, only the overhead before the call matters, because a parent that runs out of gas afterwards reverts atomically anyway. That leaves one constant, not an adjustable parameter with bounds.
+- **Names.** Give the setter, getter and event names, or the agent will invent them. A single setter where zero means reset is enough, so the separate reset function can go.
+- **Snapshot gas consequence.** With the eager snapshot check, every Undy deposit or withdrawal needs about 1.5M gas available at the snapshot step even when no snapshot is due. That is acceptable, but it should be written down so nobody is surprised later.
+
+## Planner's corrections
+
+Both of the planner's corrections to my earlier review are right:
+- **Registry delay.** I checked on-chain. The live PriceDesk source-registry delay is 0, and 21,600 is the HQ delay. My earlier claim that the setter bypasses a source delay was wrong.
+- **Constructor floors.** I agree they do not guarantee that a source stays available.
+
+## Decisions for you
+1. Answer the two pending design items. I'd say yes to both.
+2. Pick a Teller option.
+3. Cut this handoff to Stage 1.
+
+With those answers, the final prompt should come to roughly 1,000 words. I'd want one short look at it before it goes out.

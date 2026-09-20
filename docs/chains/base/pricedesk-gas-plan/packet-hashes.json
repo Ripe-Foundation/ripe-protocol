@@ -1,0 +1,223 @@
+{
+  "scope": "Revision-7 implementation packet with reviewer follow-up provenance. Canonical tracked copy in the designated worktree; qualification and operations remain deferred.",
+  "implementation_source_pin": "bdf7f3da7113aabde60ab8eceab6a960a841bb88",
+  "owner_decisions": {
+    "integration": "Approved: one combined branch stacked on PR #231.",
+    "feed_check_budget": "Approved: configurable.",
+    "conditional_quote_check": "Approved: result-dependent ordinary quotes; eager feed, snapshot and admission checks.",
+    "storage_policy": "Approved: immutable defaults/floors and plain per-source structs; no global default setter.",
+    "D01_scope": "Approved: both PriceDesk per-asset and Teller Curve reference-pool snapshots.",
+    "teller_architecture": "Approved: move the Curve call into PriceDesk, using Curve effective snapshot budget; preserve Teller failure event and genuine no-ops.",
+    "fault_model": "Approved: normal times 1.5 plus one exhausting/failing source identity across repeated/nested invocations.",
+    "margins": "Approved: source 1.5x, normal transaction 1.5x, 80 percent cap; measure batch limits without multiplying fault envelopes twice. Release qualification deferred.",
+    "current_scope": "Approved: smart-contract changes and related focused tests only, with remaining work deferred.",
+    "execution": "Approved: complete all implementation steps and affected tests without interim owner review; genuine unresolved issues reported at the end."
+  },
+  "provisional_configuration": {
+    "max_source_gas": 6000000,
+    "qualification": "Unqualified implementation input; not a measured safe maximum."
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2163,
+      "sha256": "2a30114c42e807f9f203c23aa2b76676d2fc97f7b02a07426b7576864f625310"
+    },
+    {
+      "path": "evidence/README.md",
+      "bytes": 10975,
+      "sha256": "6b6118e09bda3127bab2e952f81ec6693b10af93783ee499973bc7b8043930e1"
+    },
+    {
+      "path": "evidence/anvil-estimator-smoke-v5-sandbox.json",
+      "bytes": 258,
+      "sha256": "814ea2720c0dca7dbd45f428a13756fba991db8a594fc2160be43b9d5bf19354"
+    },
+    {
+      "path": "evidence/anvil-estimator-smoke-v5.json",
+      "bytes": 640,
+      "sha256": "b380c218323e92a7f23f4b326df1f9300650323fae883165f34740182a9cc479"
+    },
+    {
+      "path": "evidence/anvil-estimator-smoke-v5.py",
+      "bytes": 2798,
+      "sha256": "50ef05fdafadaeca396a0136c03c4d2a2c565c786484eb5e387475b8f43c5f42"
+    },
+    {
+      "path": "evidence/candidate-runtime.block-51524517.json",
+      "bytes": 36221,
+      "sha256": "b6e1efe80813e6c5d8e685eb1512568708df06364b2ab4ce3fb5a9c16becddc3"
+    },
+    {
+      "path": "evidence/legacy-pool-claims.block-51532106.json",
+      "bytes": 7203,
+      "sha256": "9f2bddb018674152000998f3576b29fb425af618d4ff28c7bf8aacab5cb1f65f"
+    },
+    {
+      "path": "evidence/live-readback.block-51524517.json",
+      "bytes": 17061,
+      "sha256": "2afb89b2e8272c4f2ae2aa072f7dbae0fe5516c5b5fb1963412cf02a44925194"
+    },
+    {
+      "path": "evidence/live-summary.block-51524517.json",
+      "bytes": 8516,
+      "sha256": "e714bd82ddb97ccc33fded3467ed98388a21135d9e99a27ef24ff8e346e471ef"
+    },
+    {
+      "path": "evidence/planning-v2-prompt.md",
+      "bytes": 26371,
+      "sha256": "c17bf4138738236ee1eb67266b47f4481253227f37112a7e1ce0c0f2b6d94e68"
+    },
+    {
+      "path": "evidence/planning-v2-resolutions.md",
+      "bytes": 13450,
+      "sha256": "cb98ea39ddc3cd8dd836400f86ef686c6f94fa0dc77c52628fae3769434c8265"
+    },
+    {
+      "path": "evidence/planning-v3-hashes.json",
+      "bytes": 1742,
+      "sha256": "5c980f817c838d74e699c4cd00473a07da8a5f6bd55a3b417bbe4007f0a500c5"
+    },
+    {
+      "path": "evidence/planning-v3-prompt.md",
+      "bytes": 42782,
+      "sha256": "595859373c8c9aa30636e5d5c4023ec1d20d13e8db98aaa9fe87df2b8f19a7af"
+    },
+    {
+      "path": "evidence/planning-v3-resolutions.md",
+      "bytes": 10999,
+      "sha256": "ebdd72820ef434afd4f33196fa74edd770e43820587c838e2015a366504d0005"
+    },
+    {
+      "path": "evidence/planning-v4-hashes.json",
+      "bytes": 3390,
+      "sha256": "accdeadcec91c34233748fb3f3f1022579315ffa40a2c15cdb521de67dc01969"
+    },
+    {
+      "path": "evidence/planning-v4-live-refresh.json",
+      "bytes": 34704,
+      "sha256": "999ec37c835770983361ac179a7c4e128c98fc941f2e0ea4222545ed927057e5"
+    },
+    {
+      "path": "evidence/planning-v4-prompt.md",
+      "bytes": 13218,
+      "sha256": "0a792687073e757b49d743d37aa2f0c16fa9a825b2d81431447b166051748847"
+    },
+    {
+      "path": "evidence/planning-v4-readme.md",
+      "bytes": 2651,
+      "sha256": "0491771a48043bc122f0ad7f8f8cd4128647a5d050c928592f0a61aaca7508af"
+    },
+    {
+      "path": "evidence/planning-v4-reference.md",
+      "bytes": 14649,
+      "sha256": "31b46954cc59f22deb693fc223d3451cbfb80426702766ca1aca80601f65215f"
+    },
+    {
+      "path": "evidence/planning-v4-resolutions.md",
+      "bytes": 9744,
+      "sha256": "024097a74077641268d153ae7c9a53e6b3d4320841002bea7a351ee733f2838a"
+    },
+    {
+      "path": "evidence/planning-v5-hashes.json",
+      "bytes": 6274,
+      "sha256": "31059204cbd4e3b688df67e35c71a0b58f6269f87edf6548194c696a8fd45358"
+    },
+    {
+      "path": "evidence/planning-v5-prompt.md",
+      "bytes": 15748,
+      "sha256": "ae51ab23f259dd1acaf4b06c725b2724965e6a49a8d0b0e64747ad7655e71569"
+    },
+    {
+      "path": "evidence/planning-v5-readme.md",
+      "bytes": 3546,
+      "sha256": "0417ac63b3abdc6d17929f96ff18c844f84449979dfbc5ab658310e71681685a"
+    },
+    {
+      "path": "evidence/planning-v5-reference.md",
+      "bytes": 24937,
+      "sha256": "9993038622135ace4f15243dc19a0332b5688464a65b859c5fed36732e705b4d"
+    },
+    {
+      "path": "evidence/planning-v5-resolutions.md",
+      "bytes": 12148,
+      "sha256": "6701d52a747fbdf6f12d2e8c93551d49c4577832c80337fb7168d155280425fa"
+    },
+    {
+      "path": "evidence/pr-231-v4-readback.json",
+      "bytes": 384,
+      "sha256": "f848c88ef3cf10c917f65b3524550cc2e385c47429c47bcd0168cb835abac8ce"
+    },
+    {
+      "path": "evidence/reviewer-v4.txt",
+      "bytes": 7249,
+      "sha256": "505745f9585889ab1cb0aee680e676f6729b856c6c70190b9031316100ab98d4"
+    },
+    {
+      "path": "evidence/reviewer-v5.txt",
+      "bytes": 10937,
+      "sha256": "909c0ddbf087d9c047750e1cb340ce52d483cbdcb37e1247b59d96875a1ebfe5"
+    },
+    {
+      "path": "evidence/reviewer-v6.txt",
+      "bytes": 8054,
+      "sha256": "0f1602ac6e380d4bd58b85cf345ca56ee963b9819f383666f618b9096064ab4e"
+    },
+    {
+      "path": "evidence/source-registry-delay-v5.block-51532116.json",
+      "bytes": 210,
+      "sha256": "648a5f8fd599e503cafa9f97025c96241b9ca04eb3c4124c32c530a7d4f3edd4"
+    },
+    {
+      "path": "evidence/teller-runtime-size-v6.json",
+      "bytes": 1205,
+      "sha256": "60816bcedf4bc2cf59f0a453d8eeb5995a447a69f4d7a03c9384a54aca159cff"
+    },
+    {
+      "path": "evidence/topology-v5.block-51532116.json",
+      "bytes": 759,
+      "sha256": "3ee25d6efc9117cfeebc2be63d2b2ebc4c14d39d8b89b7c5fc67aa4e57e448b0"
+    },
+    {
+      "path": "evidence/vyper-budget-layout-probe.json",
+      "bytes": 598,
+      "sha256": "41a9787658108be8c98fc27cf80ff9311adde4c1f8b9b9bd160940d961e844f8"
+    },
+    {
+      "path": "evidence/vyper-struct-member-probe-v5.json",
+      "bytes": 2552,
+      "sha256": "1fe824cff45478caeff0538d1025396a3b955a4e94f5934af983acda974cc88e"
+    },
+    {
+      "path": "follow-up-qualification.md",
+      "bytes": 6179,
+      "sha256": "cdeea4dcd3227631ae0a8c38f74d3cb20d1b809354607bd27ebb44b0ef9a9caf"
+    },
+    {
+      "path": "implementation-reference.md",
+      "bytes": 2833,
+      "sha256": "6c9684f2bf095e1dfb2535d490b30b2bed3f69549c4fa01fa21d95445aa2558a"
+    },
+    {
+      "path": "legacy-pool-claim-qualification.md",
+      "bytes": 6733,
+      "sha256": "9b9fed486f2940a6448f61fc6dd4d9c370bbb6b517fa4cb09927581b1d139498"
+    },
+    {
+      "path": "review-resolutions.md",
+      "bytes": 7827,
+      "sha256": "8119f1633a3e704f6fd4415608ca921ffecf3ca968157f476bf6f85acc98f436"
+    },
+    {
+      "path": "updated-prompt.md",
+      "bytes": 10269,
+      "sha256": "d9a69983c74ec4fde61e2c26d438b27fcae32dd1be98464d4854258cf89022f4"
+    }
+  ],
+  "workspace": {
+    "path": "/Users/wigglez/dev/ripe-protocol-pricedesk-gas",
+    "branch": "codex/pricedesk-configurable-gas",
+    "prepared": true,
+    "packet_tracking": "canonical tracked packet in codex/pricedesk-configurable-gas; main checkout copy is historical and unchanged"
+  }
+}

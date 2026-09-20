@@ -1,0 +1,9 @@
+{
+  "checked_date": "2026-09-19",
+  "method": "gh pr view 231 --repo Ripe-Foundation/ripe-protocol --json state,headRefName,headRefOid,baseRefName,url",
+  "baseRefName": "master",
+  "headRefName": "codex/base-upgrade-fork-rehearsal",
+  "headRefOid": "bdf7f3da7113aabde60ab8eceab6a960a841bb88",
+  "state": "OPEN",
+  "url": "https://github.com/Ripe-Foundation/ripe-protocol/pull/231"
+}
