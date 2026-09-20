@@ -150,7 +150,6 @@ def test_repository_default_abi_directory_is_byte_current():
     assert exported_names >= {
         "Addys.json",
         "Contributor.json",
-        "DefaultsBaseLive.json",
         "DefaultsRobinhood.json",
         "DefaultsRobinhoodLive.json",
         "Erc20Token.json",
@@ -158,6 +157,7 @@ def test_repository_default_abi_directory_is_byte_current():
         "RipeReserveEngine.json",
         "RipeReserveVesting.json",
         "SwitchboardFoxtrot.json",
+        "SwitchboardFoxtrotSetup.json",
         "SwitchboardGolf.json",
         "UniswapV2Prices.json",
         "VaultMigrator.json",

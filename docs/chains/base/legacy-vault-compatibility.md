@@ -1,6 +1,10 @@
 # Base legacy-vault compatibility release notes
 
-This change lets new departments read retained Stability Pool 1 through VaultBook while preserving direct, authorized settlement calls. Retained RipeGov 2 also remains usable through the new Teller and Lootbox. Ordinary tests compile both retained vaults from their authenticated historical sources; their provenance is recorded in `tests/fixtures/legacy_pool/provenance.json`.
+This change lets new departments read retained Stability Pool 1 through VaultBook while preserving direct, authorized settlement calls. Retained RipeGov 2 also remains usable through the new Teller, Lootbox and HumanResources. Ordinary tests compile both retained vaults from their authenticated historical sources; their provenance is recorded in `tests/fixtures/legacy_pool/provenance.json`.
+
+## Shared-source deployment dependency
+
+The updated AuctionHouse, Deleverage, SwitchboardAlpha and SwitchboardCharlie require the active VaultBook to expose `canAcceptLiquidationAsset`, `getDeleverageTraversalAsset` and `hasStabilityPoolInterface`. This applies on **Robinhood as well as Base**, even when every vault uses the modern interface. On modern-only chains, configure the new VaultBook with a zero `_legacyPool` binding and verify its three helper methods before activating any of those updated callers. A zero binding disables legacy dispatch; it does not remove the callers' dependency on the helper ABI.
 
 ## Pricing dependency of withdrawal preparation
 
@@ -20,7 +24,15 @@ VaultBook validates Base chain identity, HQ identity and the non-valuing legacy 
 
 `scripts/base_full_update_fork.py` compiles fresh candidates through its deployment adapter. The adapter now appends retained Pool 1 to both historical VaultBook constructor calls, including the populated replacement. Local tests deploy the resulting contracts and exercise all three compatibility helpers. Historical migration files and deployment records retain their original arguments.
 
+The existing full-update diagnostic still populates **rows 1–10**: retained vaults at 1–5 and future vaults at 6–10 (`numAddrs() == 11`). That differs from phase 1's retained-only **rows 1–5** (`numAddrs() == 6`). The constructor adapter fix preserves that historical diagnostic topology; it does not qualify a phase-1 cutover. A phase-1 rehearsal must verify the exact retained-only registry and absence of rows 6–10. No registry-topology or migration-policy change was made here.
+
 An already-staged on-chain VaultBook does not acquire these helpers from a source update. A compatible candidate and an updated production deployment step are still required before activating departments that call them. This task changed only the fork adapter and ran local tests; it did not restage contracts, execute a network fork campaign, or authorize activation.
+
+The recorded Base staging material also identifies an older pending HQ slot-8 VaultBook proposal and includes an unexecuted [cancellation batch](cancel-pending-vaultbook.safe.json). Before activation, governance must re-read `pendingAddrUpdate(8)` and resolve any conflicting proposal rather than confirm the old candidate. Its current live status was not refreshed here; cancellation or replacement remains an owner decision.
+
+## Merge coordination
+
+PR #231 may independently update the Foxtrot runtime pin and ABI inventory count. If those edits overlap, preserve the verified **18,278-byte** Foxtrot pin and **60-output** ABI count, with `SwitchboardFoxtrotSetup.json` as the added named ABI anchor. Remeasure or recount if the combined sources change. The re-review traced the manifest-consumer census failure to master as well; it should not be attributed only to PR #231. This note is for the merge owner; no external message or PR update was sent.
 
 ## Regression placement
 

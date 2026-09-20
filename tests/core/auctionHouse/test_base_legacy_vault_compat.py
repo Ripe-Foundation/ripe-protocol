@@ -1,8 +1,8 @@
-"""Ordinary, network-independent composition tests for retained Base Pool 1."""
+"""Ordinary, network-independent composition tests for retained Base vaults 1 and 2."""
 import boa
 import pytest
 
-from constants import EIGHTEEN_DECIMALS as WAD, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS as WAD, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import claim_from_stability_pool, filter_logs, redeem_from_stability_pool
 from conf_legacy_pool import PROVENANCE, call_tree, calls_to, storage_write
 
@@ -704,3 +704,214 @@ def test_legacy_redemption_preserves_green_backing_and_lp_readiness(legacy_env):
     assert e.pool.userBalances(e.bob, e.lp) == shares_before
     assert e.pool.getTotalAmountForUser(e.bob, e.lp) == nav_before == 100 * WAD
     assert e.ready()
+
+
+# The historical and current departments use this same eighteen-address tuple.
+ADDYS_ABI = "(" + ",".join(["address"] * 18) + ")"
+
+
+@pytest.fixture
+def legacy_gov_env(legacy_env, setRipeRewardsConfig):
+    e = legacy_env
+    setRipeRewardsConfig(_ripePerBlock=0)
+    e.configure(e.ripe, _vaultIds=[2], _debtTerms=e.terms(0, 0, 0, 0, 0, 0))
+    e.mc.setRipeGovVaultConfig(e.ripe, 100_00, False,
+                              (100, 1_000_000, 200_00, True, 10_00), sender=e.alpha.address)
+    e.prices.setPrice(e.ripe, WAD)
+    return e
+
+
+def legacy_gov_state(e, users):
+    return (
+        e.ripe.totalSupply(), e.ripe.balanceOf(e.ripe_gov),
+        e.ripe_gov.totalBalances(e.ripe), e.ripe_gov.totalGovPoints(),
+        e.ledger.ripeRewards(), e.ledger.globalDepositPoints(),
+        e.ledger.assetDepositPoints(2, e.ripe),
+        tuple((e.ripe.balanceOf(user), e.ripe_gov.userBalances(user, e.ripe),
+               e.ripe_gov.userGovData(user, e.ripe), e.ripe_gov.totalUserGovPoints(user),
+               e.ripe_gov.indexOfUserAsset(user, e.ripe),
+               e.ledger.getDepositLedgerData(user, 2), e.ledger.userDepositPoints(user, 2, e.ripe),
+               e.ledger.lastTouch(user)) for user in users),
+    )
+
+
+def assert_legacy_gov_call(trace, e, name, args, caller):
+    calls = calls_to(trace, e.ripe_gov.address, f"{name}({args},{ADDYS_ABI})")
+    assert len(calls) == 1 and not calls[0].is_error
+    assert calls[0].msg.sender == bytes.fromhex(caller.address[2:])
+
+
+@pytest.mark.parametrize("vault_id", [0, 2])
+def test_legacy_lock_adjustment_and_release_redistributes_fee_between_holders(legacy_gov_env, vault_id):
+    e = legacy_gov_env
+    for user in (e.bob, e.alice):
+        e.ripe.transfer(user, 100 * WAD, sender=e.whale)
+        e.ripe.approve(e.teller, 100 * WAD, sender=user)
+        assert e.teller.depositIntoGovVault(e.ripe, 100 * WAD, 100, sender=user) == 100 * WAD
+    before = legacy_gov_state(e, (e.bob, e.alice))
+    for operation in (
+        lambda: e.teller.adjustLock(e.ripe, 800, e.bob, vault_id, sender=e.sally),
+        lambda: e.teller.releaseLock(e.ripe, e.bob, vault_id, sender=e.sally),
+    ):
+        with boa.reverts("no perms"):
+            operation()
+        assert legacy_gov_state(e, (e.bob, e.alice)) == before
+
+    alice_lock = e.ripe_gov.userGovData(e.alice, e.ripe).unlock
+    e.teller.adjustLock(e.ripe, 800, e.bob, vault_id, sender=e.bob)
+    assert_legacy_gov_call(e.teller._computation, e, "adjustLock", "address,address,uint256", e.teller)
+    assert e.ripe_gov.userGovData(e.bob, e.ripe).unlock == boa.env.evm.patch.block_number + 800
+    assert e.ripe_gov.userGovData(e.alice, e.ripe).unlock == alice_lock
+    assert e.ripe_gov.userBalances(e.bob, e.ripe) == 100 * WAD * 10**8
+    supply = e.ripe.totalSupply()
+
+    e.teller.releaseLock(e.ripe, e.bob, vault_id, sender=e.bob)
+    assert_legacy_gov_call(e.teller._computation, e, "releaseLock", "address,address", e.teller)
+    assert e.ripe_gov.userGovData(e.bob, e.ripe).unlock == 0
+    assert e.ripe_gov.userGovData(e.alice, e.ripe).unlock == alice_lock
+    assert e.ripe_gov.userBalances(e.bob, e.ripe) == 90 * WAD * 10**8
+    assert e.ripe_gov.userBalances(e.alice, e.ripe) == 100 * WAD * 10**8
+    assert e.ripe_gov.totalBalances(e.ripe) == 190 * WAD * 10**8
+    assert e.ripe.balanceOf(e.ripe_gov) == 200 * WAD and e.ripe.totalSupply() == supply
+    # Ten percent of Bob's shares disappear; the unchanged custody belongs
+    # to the remaining 90:100 shares, including the historical virtual offset.
+    bob_amount = 94_736842105263157894
+    alice_amount = 105_263157894736842105
+    assert e.ripe_gov.getTotalAmountForUser(e.bob, e.ripe) == bob_amount < 100 * WAD
+    assert e.ripe_gov.getTotalAmountForUser(e.alice, e.ripe) == alice_amount > 100 * WAD
+    assert e.teller.withdraw(e.ripe, MAX_UINT256, e.bob, e.ripe_gov, sender=e.bob) == bob_amount
+    boa.env.time_travel(blocks=alice_lock - boa.env.evm.patch.block_number)
+    assert e.teller.withdraw(e.ripe, MAX_UINT256, e.alice, e.ripe_gov, sender=e.alice) == alice_amount
+    assert e.ripe.balanceOf(e.bob) == bob_amount and e.ripe.balanceOf(e.alice) == alice_amount
+    assert e.ripe.balanceOf(e.ripe_gov) == 1
+    assert e.ripe_gov.totalBalances(e.ripe) == 0 and e.ripe.totalSupply() == supply
+
+
+@pytest.fixture
+def legacy_contributor_env(legacy_gov_env, human_resources, contributor_template, switchboard_delta):
+    e = legacy_gov_env
+    e.hr, e.delta = human_resources, switchboard_delta
+    compensation = 1000 * WAD
+    vesting = 2 * 365 * 24 * 3600
+    e.mc.setHrConfig((contributor_template.address, compensation, 1, 100, 1, vesting),
+                     sender=e.delta.address)
+    e.ledger.setRipeAvailForHr(2 * compensation, sender=e.delta.address)
+    aid = e.hr.initiateNewContributor(e.bob, e.alice, compensation, 0, vesting,
+                                     90 * 24 * 3600, 365 * 24 * 3600, 200_000,
+                                     sender=e.gov.address)
+    mature(e.hr, aid)
+    assert e.hr.confirmNewContributor(aid, sender=e.gov.address)
+    address = filter_logs(e.hr, "NewContributorConfirmed")[0].contributorAddr
+    e.contributor = boa.load_partial("contracts/modules/Contributor.vy").at(address)
+    assert e.ledger.isHrContributor(address)
+    assert e.book.getAddr(2) == e.ripe_gov.address and e.hr.getRipeGovVaultId() == 2
+    assert e.ledger.ripeAvailForHr() == compensation
+    return e
+
+
+def contributor_state(e):
+    c = e.contributor
+    return (legacy_gov_state(e, (c.address, e.bob)), e.ripe.balanceOf(e.hr),
+            e.ripe.allowance(e.hr, e.teller), e.ledger.ripeAvailForHr(),
+            c.compensation(), c.totalClaimed(), c.endTime(), c.pendingRipeTransfer(),
+            c.pendingRipeTransferVaultId(), e.hr.legacyContributorRipeGovVaultId(c))
+
+
+def cash_legacy_contributor(e, timestamp):
+    boa.env.time_travel(seconds=timestamp - boa.env.evm.patch.timestamp)
+    before = e.ripe.totalSupply()
+    claimed = e.contributor.cashRipeCheck(sender=e.bob)
+    assert claimed > 0 and claimed == e.contributor.totalClaimed()
+    assert e.ripe.totalSupply() == before + claimed
+    assert e.ripe_gov.getTotalAmountForUser(e.contributor, e.ripe) == claimed
+    assert e.ripe.balanceOf(e.ripe_gov) == claimed
+    assert e.ripe.balanceOf(e.hr) == 0 and e.ripe.allowance(e.hr, e.teller) == 0
+    assert e.ripe_gov.userGovData(e.contributor, e.ripe).unlock > boa.env.evm.patch.block_number
+    return claimed
+
+
+@pytest.mark.parametrize("paused_ledger", [False, True])
+def test_legacy_hr_callback_transfers_contributor_position(legacy_contributor_env, paused_ledger):
+    e = legacy_contributor_env
+    c = e.contributor
+    claimed = cash_legacy_contributor(e, c.unlockTime() + 1)
+    shares = e.ripe_gov.userBalances(c, e.ripe)
+    before = contributor_state(e)
+    with boa.reverts("not allowed"):
+        e.ripe_gov.transferContributorRipeTokens(c, e.bob, 200_000, sender=e.bob)
+    assert contributor_state(e) == before
+    c.initiateRipeTransfer(False, sender=e.bob)
+    boa.env.time_travel(blocks=c.pendingRipeTransfer().confirmBlock - boa.env.evm.patch.block_number)
+    assert e.ripe_gov.userGovData(c, e.ripe).unlock > boa.env.evm.patch.block_number
+    if paused_ledger:
+        e.ledger.pause(True, sender=e.alpha.address)
+        before = contributor_state(e)
+        # Contributor labels a failed HR call with its own dev reason.
+        with boa.reverts("could not transfer"):
+            c.confirmRipeTransfer(False, sender=e.bob)
+        assert_legacy_gov_call(c._computation, e, "transferContributorRipeTokens", "address,address,uint256", e.hr)
+        registrations = calls_to(c._computation, e.ledger.address, "addVaultToUser(address,uint256)")
+        assert len(registrations) == 1 and registrations[0].is_error
+        assert contributor_state(e) == before
+        e.ledger.pause(False, sender=e.alpha.address)
+    supply, budget = e.ripe.totalSupply(), e.ledger.ripeAvailForHr()
+    c.confirmRipeTransfer(False, sender=e.bob)
+    assert_legacy_gov_call(c._computation, e, "transferContributorRipeTokens", "address,address,uint256", e.hr)
+    assert e.ripe_gov.userBalances(c, e.ripe) == 0
+    assert e.ripe_gov.userBalances(e.bob, e.ripe) == shares == e.ripe_gov.totalBalances(e.ripe)
+    assert e.ripe_gov.getTotalAmountForUser(e.bob, e.ripe) == claimed
+    assert e.ripe_gov.userGovData(e.bob, e.ripe).unlock == boa.env.evm.patch.block_number + 200_000
+    assert e.ledger.indexOfVault(e.bob, 2) != 0
+    # HR checkpoints the emptied position; Lootbox removes its registry row
+    # later during claimLoot, after any accrued reward entitlement is settled.
+    assert e.ledger.indexOfVault(c, 2) != 0
+    assert e.ledger.userDepositPoints(c, 2, e.ripe).lastBalance == 0
+    owner_points = e.ripe_gov.getUserLootBoxShare(e.bob, e.ripe)
+    assert e.ledger.userDepositPoints(e.bob, 2, e.ripe).lastBalance == owner_points > 0
+    assert e.ledger.assetDepositPoints(2, e.ripe).lastBalance == owner_points
+    assert not c.hasPendingRipeTransfer() and c.pendingRipeTransferVaultId() == 0
+    assert c.totalClaimed() == claimed and e.ledger.ripeAvailForHr() == budget
+    assert e.ripe.balanceOf(e.ripe_gov) == claimed and e.ripe.totalSupply() == supply
+    assert e.ripe.balanceOf(e.hr) == e.ripe.balanceOf(e.bob) == 0
+
+
+@pytest.mark.parametrize("paused_ledger", [False, True])
+def test_legacy_hr_callback_cancels_burns_and_restores_budget(legacy_contributor_env, paused_ledger):
+    e = legacy_contributor_env
+    c = e.contributor
+    compensation = c.compensation()
+    claimed = cash_legacy_contributor(e, c.startTime() + (c.cliffTime() - c.startTime()) // 2)
+    before = contributor_state(e)
+    with boa.reverts("not allowed"):
+        e.ripe_gov.withdrawContributorTokensToBurn(c, sender=e.bob)
+    assert contributor_state(e) == before
+    aid = e.delta.cancelPaycheckForContributor(c, sender=e.gov.address)
+    mature(e.delta, aid)
+    assert boa.env.evm.patch.timestamp < c.cliffTime()
+    assert e.ripe_gov.userGovData(c, e.ripe).unlock > boa.env.evm.patch.block_number
+    if paused_ledger:
+        e.ledger.pause(True, sender=e.alpha.address)
+        before = contributor_state(e)
+        with boa.reverts("not activated"):
+            e.delta.executePendingAction(aid, sender=e.gov.address)
+        assert_legacy_gov_call(e.delta._computation, e, "withdrawContributorTokensToBurn", "address", e.hr)
+        assert contributor_state(e) == before and e.delta.hasPendingAction(aid)
+        e.ledger.pause(False, sender=e.alpha.address)
+    supply, budget = e.ripe.totalSupply(), e.ledger.ripeAvailForHr()
+    assert e.delta.executePendingAction(aid, sender=e.gov.address)
+    trace = e.delta._computation
+    assert_legacy_gov_call(trace, e, "withdrawContributorTokensToBurn", "address", e.hr)
+    burns = calls_to(trace, e.ripe.address, "burn(uint256)")
+    assert len(burns) == 1 and not burns[0].is_error
+    assert burns[0].msg.sender == bytes.fromhex(e.hr.address[2:])
+    assert e.ripe.totalSupply() == supply - claimed
+    assert e.ripe.balanceOf(e.ripe_gov) == e.ripe.balanceOf(e.hr) == e.ripe.balanceOf(e.bob) == 0
+    assert e.ripe_gov.userBalances(c, e.ripe) == e.ripe_gov.totalBalances(e.ripe) == 0
+    # The points checkpoint clears the earning balance; registry cleanup is
+    # deferred until Lootbox claims any accrued entitlement.
+    assert e.ledger.indexOfVault(c, 2) != 0
+    assert e.ledger.userDepositPoints(c, 2, e.ripe).lastBalance == 0
+    assert e.ledger.assetDepositPoints(2, e.ripe).lastBalance == 0
+    assert e.ledger.ripeAvailForHr() == budget + compensation == 2 * compensation
+    assert c.compensation() == 0 and c.totalClaimed() == claimed and c.getClaimable() == 0
+    assert not e.delta.hasPendingAction(aid)

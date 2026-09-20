@@ -251,6 +251,12 @@ def test_constructor_structural_probes_do_not_require_nav_pricing(legacy_env, po
             e.pool.pause(True, sender=e.alpha.address)
         candidate = deploy_book(e.hq, e.pool)
         trace = candidate._computation
+        # Positive controls keep the negative trace assertions meaningful.
+        for signature in ("getRipeHq()", "indexOfAsset(address)",
+                          "claimableBalances(address,address)", "totalClaimableBalances(address)",
+                          "isPaused()", "vaultAssets(uint256)",
+                          "getUserAssetAtIndexAndHasBalance(address,uint256)"):
+            assert len(calls_to(trace, e.pool.address, signature)) == 1
         assert not calls_to(trace, e.pool.address, "getTotalAmountForUser(address,address)")
         for signature in ("getUsdValue(address,uint256)", "getUsdValue(address,uint256,bool)"):
             assert not calls_to(trace, e.pd.address, signature)
