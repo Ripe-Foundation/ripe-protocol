@@ -3,6 +3,10 @@
 Source pointers and runtime relations track this checkout. The retained live
 Robinhood Teller still has its direct Curve call; this catalogue's PriceDesk
 relay relation applies to the new implementation and does not claim redeployment.
+
+The historical graph retains known drift documented in
+docs/chains/base/pricedesk-gas-review-232.md under "Wider blueprint drift".
+Scoped checks do not establish semantic correctness of every relationship.
 """
 
 from __future__ import annotations

@@ -1,6 +1,9 @@
 """Focused regressions for Base staging review; no RPC or real history writes."""
 
 import ast
+import json
+import re
+import runpy
 from pathlib import Path
 import subprocess
 import sys
@@ -264,6 +267,15 @@ def test_base_harness_help_remains_available_without_rpc(module):
                             cwd=ROOT, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     assert "--defaults" in result.stdout
+    if module == "base_upgrade_fork":
+        help_text = " ".join(result.stdout.split())
+        for flag in ("probe", "legacy-probe", "ordinary-probe", "stability-probe",
+                     "stability-residual", "borrower-audit", "audit-blocker-migrations",
+                     "remediate-blockers"):
+            assert re.search(
+                rf"--{flag} Unsupported here; use scripts/base_full_update_fork.py",
+                help_text,
+            ), flag
 
 
 @pytest.mark.parametrize("flag", (
@@ -292,7 +304,7 @@ def test_legacy_probe_cli_rejects_before_setup(monkeypatch, capsys, flag):
     assert flag in diagnostic
 
 
-def test_legacy_staging_cli_remains_supported(monkeypatch):
+def test_legacy_staging_selection_reaches_load_dotenv(monkeypatch):
     import scripts.base_upgrade_fork as legacy
 
     class ReachedSupportedSetup(Exception):
@@ -308,3 +320,43 @@ def test_legacy_staging_cli_remains_supported(monkeypatch):
     ])
     with pytest.raises(ReachedSupportedSetup):
         legacy.main()
+
+
+ANVIL_ARCHIVE = ROOT / "docs/chains/base/pricedesk-gas-plan/evidence/anvil-estimator-smoke-v5.py"
+
+
+@pytest.mark.parametrize("value", (None, ""), ids=("missing", "empty"))
+def test_archived_anvil_requires_output_before_side_effects(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("PRICEDESK_REVIEW_OUTPUT", raising=False)
+    else:
+        monkeypatch.setenv("PRICEDESK_REVIEW_OUTPUT", value)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("missing output configuration reached mkdir or Anvil")
+
+    monkeypatch.setattr(Path, "mkdir", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    with pytest.raises(SystemExit) as error:
+        runpy.run_path(str(ANVIL_ARCHIVE), run_name="__main__")
+    assert str(error.value) == (
+        'Set PRICEDESK_REVIEW_OUTPUT to a non-empty output directory, for example: '
+        'export PRICEDESK_REVIEW_OUTPUT="/tmp/pr232 review"'
+    )
+
+
+def test_archived_anvil_output_path_with_spaces(monkeypatch, tmp_path):
+    output = tmp_path / "review output with spaces"
+    monkeypatch.setenv("PRICEDESK_REVIEW_OUTPUT", str(output))
+    launches = []
+
+    def blocked_launch(*args, **kwargs):
+        launches.append(args)
+        raise RuntimeError("test intercepted Anvil launch")
+
+    monkeypatch.setattr(subprocess, "Popen", blocked_launch)
+    runpy.run_path(str(ANVIL_ARCHIVE), run_name="__main__")
+    assert len(launches) == 1
+    report = json.loads((output / "pricedesk-v5-anvil-smoke.json").read_text())
+    assert report["status"] == "blocked"
+    assert report["error"] == "test intercepted Anvil launch"

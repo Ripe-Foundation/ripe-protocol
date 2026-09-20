@@ -1,8 +1,10 @@
 """Base upgrade rehearsal. All writes execute inside Titanoboa's local fork.
 
-No wallet key, signing, network environment, or live transaction submission is
-used. The report distinguishes deployments, compatibility probes and completed
-migrations; successful deployment alone is never qualification.
+This legacy CLI supports inventory, optional census and candidate staging.
+Probe, borrower-audit and remediation modes require scripts/base_full_update_fork.py
+and are rejected here before setup. Rehearsal methods remain available to the
+FullUpdate subclass. No wallet key, signing or live transaction submission is
+used; successful staging alone is never qualification.
 """
 
 from __future__ import annotations
@@ -949,14 +951,22 @@ def main():
     p.add_argument("--diagnose-replacing-pending", action="store_true")
     p.add_argument("--census", action="store_true")
     p.add_argument("--census-input", type=Path)
-    p.add_argument("--probe", action="store_true")
-    p.add_argument("--legacy-probe", action="store_true")
-    p.add_argument("--ordinary-probe", action="store_true")
-    p.add_argument("--stability-probe", action="store_true")
-    p.add_argument("--stability-residual", action="store_true")
-    p.add_argument("--borrower-audit", action="store_true")
-    p.add_argument("--audit-blocker-migrations", action="store_true")
-    p.add_argument("--remediate-blockers", action="store_true")
+    p.add_argument("--probe", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
+    p.add_argument("--legacy-probe", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
+    p.add_argument("--ordinary-probe", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
+    p.add_argument("--stability-probe", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
+    p.add_argument("--stability-residual", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
+    p.add_argument("--borrower-audit", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
+    p.add_argument("--audit-blocker-migrations", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
+    p.add_argument("--remediate-blockers", action="store_true",
+                   help="Unsupported here; use scripts/base_full_update_fork.py")
     p.add_argument("--only-user", help="Isolate a failing user; never full qualification")
     a = p.parse_args()
     unsupported = (

@@ -843,10 +843,14 @@ def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool:
         source.replace(relay, "", 1),
     )
     with pytest.raises(AssertionError, match="^intended post-callback rollback was not reached$") as failure:
+        # Deliberately reuse the positive proof so fixture/signature changes
+        # preserve one shared set of rollback, accounting and event assertions.
         positive_proof(
-            ripe_hq, governance, simple_erc20_vault, ripe_gov_vault, bob,
-            setGeneralConfig, setAssetConfig, mission_control, switchboard_alpha,
-            teller, ledger, vault_book,
+            ripe_hq=ripe_hq, governance=governance,
+            simple_erc20_vault=simple_erc20_vault, ripe_gov_vault=ripe_gov_vault,
+            bob=bob, setGeneralConfig=setGeneralConfig, setAssetConfig=setAssetConfig,
+            mission_control=mission_control, switchboard_alpha=switchboard_alpha,
+            teller=teller, ledger=ledger, vault_book=vault_book,
         )
     # Compilation, setup and unrelated assertions cannot satisfy this control.
     downstream = failure.value.__cause__

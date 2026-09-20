@@ -3,8 +3,14 @@ from pathlib import Path
 from datetime import datetime, timezone
 import requests
 
-# Portability edit: only the generated output location differs from the capture.
-review_output = Path(os.environ['PRICEDESK_REVIEW_OUTPUT'])
+# Archive maintenance: validate the portable output setting before side effects.
+output_setting = os.environ.get('PRICEDESK_REVIEW_OUTPUT')
+if not output_setting:
+    raise SystemExit(
+        'Set PRICEDESK_REVIEW_OUTPUT to a non-empty output directory, for example: '
+        'export PRICEDESK_REVIEW_OUTPUT="/tmp/pr232 review"'
+    )
+review_output = Path(output_setting)
 review_output.mkdir(parents=True, exist_ok=True)
 out = review_output / 'pricedesk-v5-anvil-smoke.json'
 result = {'checked_at': datetime.now(timezone.utc).isoformat(), 'scope': 'Local Anvil synthetic estimator/state smoke only; no Base fork or production qualification.'}

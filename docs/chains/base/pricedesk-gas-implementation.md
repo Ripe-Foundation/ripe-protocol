@@ -1,12 +1,20 @@
 # PriceDesk gas implementation and review follow-up
 
-Current review closure: [C01–C26 and R01–R16 changes and validation](pricedesk-gas-review-232.md).
+Current review closure: [C01–C26, R01–R16 and remaining maintenance changes and validation](pricedesk-gas-review-232.md).
 As of 2026-09-20, the source is published in [PR #232](https://github.com/Ripe-Foundation/ripe-protocol/pull/232).
 The earlier review results below are selected-suite historical evidence, not
 complete revised-head validation. See the PR description for the final workflow
 SHA and run results.
 
-The R01–R16 local follow-up validation passed **385 distinct tests** (358 affected
+The remaining nine-item maintenance follow-up passed **149 distinct local tests**
+(122 focused plus 27 workflow/hygiene), without skips in that selection. Whole-PR
+link validation covers all 28 added/modified Markdown files and 21 non-Markdown
+documentation files: **98 relative-link occurrences, zero broken targets**.
+All 39 current and 39 original packet hashes verify, with original inventory
+preserved. The closure records exact commands and scope; final CI must bind to
+this follow-up's published SHA. The earlier CI run applies only to `4b31851f`.
+
+The historical R01–R16 validation at `4b31851f` passed **385 distinct tests** (358 affected
 and blueprint cases plus 27 workflow/hygiene cases), with the existing C2
 attested-interpreter skip. The fresh-cache focused command used an output path
 containing spaces. ABI, packet hash, link and unchanged-scope checks passed.
@@ -426,9 +434,14 @@ Historical harness hashes identify recorded bytes; they cannot recreate missing
 original harness files. The current guarded harness is not an exact substitute.
 
 
-The R01–R16 follow-up repairs the named blueprint evidence and broadens bounds
-checks without reconciling the entire inherited graph. The exploratory scan found
-30 additional non-code pointers and an obsolete Charlie → AuctionHouse claim.
+The R01–R16 follow-up repaired the named blueprint evidence. The remaining
+maintenance safeguard checks substantive source content against an explicit
+occurrence-aware baseline: 30 distinct blank/comment-only pointers, 36 occurrences.
+It prevents new/additional exceptions and permits repairs, without reconciling the
+entire inherited graph. Known unsupported parent relationships are R-100
+Bravo → Switchboard and R-101 Bravo → Alpha (both cite MissionControl asset-deposit
+logic at `SwitchboardBravo.vy:490–492`), plus R-108 Charlie → AuctionHouse (no
+corresponding current call). All three remain included in the direct-edge count.
 The owner's 2026-09-20 direction was to preserve the scoped graph and report that
 wider drift; see [the closure record](pricedesk-gas-review-232.md#wider-blueprint-drift-retained-by-owner-direction).
 The unchanged 166 direct / 12 indirect counts are a scoped invariant, not evidence

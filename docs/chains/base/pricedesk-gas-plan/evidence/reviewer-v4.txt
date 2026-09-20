@@ -38,7 +38,7 @@ What I checked: the pinned SHA still matches the remote PR head. The PR diff is 
 - A starved inner desk reverts, and the outer `raw_call` contains that as an ordinary source failure, which the desk can isolate because it just proved it gave the source its full budget. No classifier or state writes are needed.
 - Budgets then have to nest by dependency depth: Curve at least Undy, Undy at least Chainlink. The prompt already asks for that dependency graph.
 - The prompt should warn off the post-call check (the OpenZeppelin forwarder style). A source that survives an inner out-of-gas and reverts with leftover gas slips past it.
-- This is my reading of [PriceDesk.vy](../../../../contracts/registries/PriceDesk.vy) and the source callbacks, not something I tested. Make it approach one, and say it counts as production-qualified if the matrix passes.
+- This is my reading of [PriceDesk.vy](../../../../../contracts/registries/PriceDesk.vy) and the source callbacks, not something I tested. Make it approach one, and say it counts as production-qualified if the matrix passes.
 
 **4. The envelope gate has no fault model.**
 - "Required worst-case behavior" is never defined.

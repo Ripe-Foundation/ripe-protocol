@@ -566,6 +566,8 @@ def test_nested_curve_fallback_requires_sufficient_enclosing_quote_budget(robinh
     )
     route.feed.setMockData(100_000_000, 1, 1, 1, 1)
     assert desk.getPrice(route.usdg, True, gas=10_000_000) == EIGHTEEN_DECIMALS
+    # The enclosing quote allowance cannot fund the nested quote/failure path;
+    # a larger outer transaction gas limit does not increase that allowance.
     assert desk.getPrice(route.green, False, gas=10_000_000) == 0
     with boa.reverts("has price config, no price"):
         desk.getPrice(route.green, True, gas=10_000_000)

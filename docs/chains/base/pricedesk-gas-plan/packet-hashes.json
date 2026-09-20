@@ -25,8 +25,8 @@
     },
     {
       "path": "evidence/README.md",
-      "bytes": 11714,
-      "sha256": "4414577bfcc7a7a8ed82fb2966de4c402ea3450dab57a908be09420677a19f34"
+      "bytes": 12274,
+      "sha256": "97a51d4bd575781e3c96f5c6958e38e88ca14fd1b8f1b4e92f471145c2a4c6de"
     },
     {
       "path": "evidence/anvil-estimator-smoke-v5-sandbox.json",
@@ -40,8 +40,8 @@
     },
     {
       "path": "evidence/anvil-estimator-smoke-v5.py",
-      "bytes": 2982,
-      "sha256": "7a38031ccd7c03e90d2709316028b886111ab28fab1c99543aa74f1b72680f08"
+      "bytes": 3215,
+      "sha256": "aab22a81653ca20b1c7fc4efc7d76ef6b1ed132a07138932a867b50c40c4f946"
     },
     {
       "path": "evidence/candidate-runtime.block-51524517.json",
@@ -150,8 +150,8 @@
     },
     {
       "path": "evidence/reviewer-v4.txt",
-      "bytes": 7249,
-      "sha256": "505745f9585889ab1cb0aee680e676f6729b856c6c70190b9031316100ab98d4"
+      "bytes": 7252,
+      "sha256": "1b157460f48a57638d6f00694d4dcd994776e69cd0bc5fff699fcf3da47b1936"
     },
     {
       "path": "evidence/reviewer-v5.txt",
@@ -421,6 +421,6 @@
       }
     ]
   },
-  "publication_note": "2026-09-19: portable paths and 24 archived navigation links repaired. 2026-09-20: R01-R16 follow-up clarifies floor decisions, revision-7 historical scope and deferred route/D01 evidence; quotes worktree paths and parameterizes generated smoke output. files describes current published bytes; original_published_inventory and embedded historical capture hashes retain their original provenance.",
+  "publication_note": "2026-09-19: portable paths and 24 archived navigation links repaired. 2026-09-20: R01-R16 follow-up clarifies floor decisions, revision-7 historical scope and deferred route/D01 evidence; quotes worktree paths and parameterizes generated smoke output. files describes current published bytes; original_published_inventory and embedded historical capture hashes retain their original provenance. Remaining maintenance follow-up: explicit missing/empty smoke-output configuration diagnostic and reviewer-v4.txt link correction; the archive was introduced by this PR at c0df6656, not inherited from its parent. Original inventory and historical capture provenance are unchanged.",
   "review_followup_scope": "R01-R16 follows reviewed head eaf460bf2fc5d1bf75ccf966903c6898b8889701. owner_decisions preserves the historical revision-7 approval record; current implementation/review scope and authorized workflow validation are described in README.md and the linked closure. Production qualification/deployment/activation remain separate."
 }

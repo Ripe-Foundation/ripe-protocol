@@ -6,6 +6,14 @@ repaired navigation links and clarified historical scope. They are historical
 evidence, not current execution instructions or byte-for-byte original captures. See the [packet entry point](../README.md)
 and [original versus published hashes](../packet-hashes.json) for exact provenance.
 
+The remaining maintenance follow-up adds an explicit missing/empty-output
+diagnostic to `anvil-estimator-smoke-v5.py` before side effects and repairs the
+PriceDesk link in `reviewer-v4.txt`. That text archive was introduced by this PR
+at `c0df6656` and was unchanged through `4b31851f`; the broken link was not inherited
+from the parent. These edits refresh current published hashes only; original
+inventory and captured historical results retain their provenance. Offline tests
+intercept Anvil launch and do not constitute a new estimator qualification run.
+
 **Historical revision-7 scope:** that revision authorized contracts and related
 tests only. Statements below about prerequisites, pending decisions or operational
 work describe their historical revisions. See the [current implementation

@@ -1421,18 +1421,68 @@ def _source_excerpt(reference):
     return "\n".join(lines[first - 1:last])
 
 
-def test_all_source_references_resolve_within_current_files():
-    references = re.findall(
+# Reviewed head 4b31851f: 30 distinct blank/comment-only pointers, 36 occurrences.
+# Preserve the owner's scoped graph; see the closure's wider-drift inventory.
+# Counts prevent an existing exception from being copied into another reference.
+# Repairs may reduce this set: remove obsolete entries/decrement counts when
+# repairing their references. This checks content, not relationship semantics.
+KNOWN_NON_CODE_REFERENCES = Counter({
+    "contracts/config/SwitchboardCharlie.vy:442": 1,
+    "contracts/config/SwitchboardCharlie.vy:464": 1,
+    "contracts/config/SwitchboardDelta.vy:1088": 1,
+    "contracts/config/SwitchboardDelta.vy:527": 1,
+    "contracts/core/AuctionHouse.vy:1123": 1,
+    "contracts/core/AuctionHouse.vy:414": 2,
+    "contracts/core/CreditEngine.vy:1145": 1,
+    "contracts/core/CreditEngine.vy:1233": 1,
+    "contracts/core/CreditEngine.vy:192": 1,
+    "contracts/core/CreditEngine.vy:269": 1,
+    "contracts/core/CreditEngine.vy:604": 1,
+    "contracts/core/CreditEngine.vy:734": 1,
+    "contracts/core/CreditRedeem.vy:204": 1,
+    "contracts/core/CreditRedeem.vy:207": 1,
+    "contracts/core/CreditRedeem.vy:244": 3,
+    "contracts/core/CreditRedeem.vy:312": 1,
+    "contracts/core/CreditRedeem.vy:319": 1,
+    "contracts/core/Deleverage.vy:1199": 1,
+    "contracts/core/Deleverage.vy:580": 1,
+    "contracts/core/Deleverage.vy:996": 1,
+    "contracts/core/EndaomentPSM.vy:293": 1,
+    "contracts/core/Lootbox.vy:1217-1220": 1,
+    "contracts/core/TellerUtils.vy:143": 2,
+    "contracts/registries/VaultBook.vy:147": 3,
+    "contracts/registries/VaultBook.vy:161": 1,
+    "contracts/registries/VaultBook.vy:162": 1,
+    "contracts/vaults/RipeGov.vy:259": 1,
+    "contracts/vaults/RipeGov.vy:383": 1,
+    "contracts/vaults/modules/StabVault.vy:651": 1,
+    "contracts/vaults/modules/StabVault.vy:866": 1,
+})
+
+
+def _source_references():
+    return re.findall(
         r"[\w/.-]+\.(?:vy|vyi|py|md|json):\d+(?:-\d+)?", MODULE.read_text(),
     )
+
+
+def _assert_source_reference_content(references):
     assert references, "Source proof pointers must remain present"
+    non_code = Counter()
     for reference in references:
-        excerpt = _source_excerpt(reference)
-        # Preserve the existing Teller content check. Other historical graph
-        # semantics are outside this scoped follow-up; bounds apply to all files.
+        excerpt = _source_excerpt(reference)  # Bounds apply to every occurrence.
+        substantive = any(line.strip() and not line.lstrip().startswith("#")
+                          for line in excerpt.splitlines())
         if reference.startswith("contracts/core/Teller.vy:"):
-            assert any(line.strip() and not line.lstrip().startswith("#")
-                       for line in excerpt.splitlines()), reference
+            assert substantive, reference  # No Teller exceptions are permitted.
+        if not substantive:
+            non_code[reference] += 1
+    unexpected = non_code - KNOWN_NON_CODE_REFERENCES
+    assert not unexpected, f"New or repeated non-code source references: {dict(unexpected)}"
+
+
+def test_all_source_references_resolve_within_current_files():
+    _assert_source_reference_content(_source_references())
     for _, relation in all_relations():
         assert len(set(relation.source_proof_refs)) == len(relation.source_proof_refs), relation.relation_id
 
@@ -1478,3 +1528,35 @@ def test_reviewed_relations_prove_current_calls_and_authority():
     for relation_id, expected_calls in calls.items():
         evidence = "\n".join(_source_excerpt(ref) for ref in by_id[relation_id].source_proof_refs)
         assert all(call in evidence for call in expected_calls), relation_id
+
+
+def test_source_reference_content_rejects_new_non_teller_comment():
+    references = _source_references()
+    references[references.index("contracts/config/SwitchboardBravo.vy:490-492")] = (
+        "contracts/config/SwitchboardBravo.vy:1"
+    )
+    with pytest.raises(AssertionError, match="New or repeated non-code source references"):
+        _assert_source_reference_content(references)
+
+
+def test_source_reference_content_rejects_extra_existing_exception():
+    references = _source_references()
+    references.append("contracts/core/AuctionHouse.vy:414")
+    with pytest.raises(AssertionError, match="New or repeated non-code source references"):
+        _assert_source_reference_content(references)
+
+
+def test_source_reference_content_permits_repair():
+    references = _source_references()
+    references[references.index("contracts/config/SwitchboardCharlie.vy:442")] = (
+        "contracts/config/SwitchboardBravo.vy:490-492"
+    )
+    _assert_source_reference_content(references)
+
+
+@pytest.mark.parametrize("line", (0, 100_000))
+def test_source_reference_content_rejects_out_of_bounds(line):
+    references = _source_references()
+    references.append(f"contracts/config/SwitchboardBravo.vy:{line}")
+    with pytest.raises(AssertionError, match="SwitchboardBravo"):
+        _assert_source_reference_content(references)

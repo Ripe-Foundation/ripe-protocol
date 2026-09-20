@@ -2,7 +2,8 @@
 
 This document records the C01–C26 changes from reviewed head
 `c0df6656cf1cc6db9e1d3c9b99930318d4c9a694` and the R01–R16 follow-up from
-`eaf460bf2fc5d1bf75ccf966903c6898b8889701`. The dedicated branch remains
+`eaf460bf2fc5d1bf75ccf966903c6898b8889701`, plus the nine-item maintenance
+follow-up from `4b31851f0862648a504d5f46b7c300d2313710cc`. The dedicated branch remains
 `codex/pricedesk-configurable-gas`, stacked on parent
 `bdf7f3da7113aabde60ab8eceab6a960a841bb88` (`codex/base-upgrade-fork-rehearsal`).
 The 2026-09-20 initial readback found no subsequent head or parent changes.
@@ -11,6 +12,20 @@ binds the final published/validated commit to its complete workflow run, actual
 counts and immutable links to this document and the handoff. This is implementation
 review evidence, not deployment approval.
 
+## Remaining maintenance follow-up: items 1–9
+
+| Item | Disposition and evidence |
+| --- | --- |
+| 1 | Disclose all three inherited unsupported edges R-100, R-101 and R-108 below, in the implementation handoff and PR description. Qualify `config/robinhood_blueprint.py`'s current-source description. Graph entries and 166 direct / 12 indirect counts remain unchanged. |
+| 2 | `KNOWN_NON_CODE_REFERENCES` in `tests/deployment/test_robinhood_blueprint.py` pins each of the 30 distinct exceptions and its occurrence allowance (36 total). The shared content validator rejects new or extra non-code references, allows repairs, retains all bounds/Teller/duplicate/named-call checks, and does not claim semantic validation. Five new regression cases cover non-Teller comments, extra existing exceptions, repair, and both bounds. Remove obsolete baseline entries or reduce counts when references are repaired. |
+| 3 | The legacy CLI module description and all eight rejected flags direct users to `scripts/base_full_update_fork.py`. Help coverage checks every flag; early rejection and inherited methods remain. `test_legacy_staging_selection_reaches_load_dotenv` establishes parsing reaches setup at `load_dotenv`, not successful staging execution. |
+| 4 | Add the enclosing-allowance mechanism immediately before the nested GREEN zero-price assertion. Direct fallback, zero result, strict revert and diagnostic 3.5M recovery remain unchanged; the larger allowance is not a production recommendation. |
+| 5 | Archived `anvil-estimator-smoke-v5.py` now exits with a quoted configuration example for missing/empty `PRICEDESK_REVIEW_OUTPUT`, before directories or Anvil. Three offline controls cover missing/empty values and output paths containing spaces, intercepting process launch. This is archive maintenance, not new Anvil or production qualification evidence. |
+| 6 | The rollback negative control invokes the same positive proof with named arguments and explains intentional coupling. Distinctive assertion, underlying `BoaError`, errored relay, absent callback and all positive restoration/event assertions remain. |
+| 7 | Repair the relative PriceDesk link in `evidence/reviewer-v4.txt`, introduced by this PR at `c0df6656` and unchanged through the reviewed follow-up; it was not inherited from the parent. Refresh published archive hashes while retaining the original inventory. Whole-PR link validation includes Markdown and non-Markdown documentation and multiline labels. |
+| 8 | Preserve every gas ceiling, the parent/current comparisons below, and existing behavior/accounting checks. These are local regression tolerances; no 2.5% tightening or new owner gate was requested or added. |
+| 9 | Preserve parent merge → retarget to `master` → integration revalidation → actual eligible `rh-pr-gate` success, plus all separate qualification and activation requirements. None is completed by this maintenance work. |
+
 ## R01–R16 follow-up disposition
 
 | Item | Disposition and file/test evidence |
@@ -18,7 +33,7 @@ review evidence, not deployment approval.
 | R01 | Aligned `config/BluePrint.py` comments, candidate README, implementation handoff, deferred qualification and this closure: retain Base's 1.5M/1.5M immutable floors for the approved implementation/rehearsal scope. Production qualification and any owner decision to lower them remain separate; no later lower-floor decision is recorded. Record the final decision and date when established. Lowering a deployed floor requires a replacement PriceDesk; overrides cannot do it. Values are unchanged. |
 | R02 | Added the parent/current comparison and sensitivity explanation below; retained all nine ceilings and behavioral assertions without a new approval gate. |
 | R03 | `test_governance_rollback_proof_rejects_missing_relay` in `tests/core/teller/test_teller_reentrancy_assessment_proofs.py` removes only the relay stub in memory, invokes the same positive proof, and catches only its distinctive failed post-callback assertion. It requires the underlying BoaError, an errored relay call and no snapshot callback call. Compilation/setup/unrelated assertion errors cannot satisfy the control. All positive balance, points, debt, participation and event assertions remain. No temporary plugin is required. |
-| R04 | `scripts/base_upgrade_fork.py::main` rejects `--probe` and all seven dependent modes immediately after parsing. Eight parameterized `test_legacy_probe_cli_rejects_before_setup` cases in `tests/test_base_review_safety.py` forbid setup/environment/RPC access, check exit 2 and the full-update diagnostic. A supported staging-selection test and existing import/help/compatibility tests remain. |
+| R04 | `scripts/base_upgrade_fork.py::main` rejects `--probe` and all seven dependent modes immediately after parsing. Eight parameterized `test_legacy_probe_cli_rejects_before_setup` cases in `tests/test_base_review_safety.py` forbid setup/environment/RPC access, check exit 2 and the full-update diagnostic. The supported-selection test reaches `load_dotenv`; it does not establish full staging execution. Existing import/help/compatibility tests remain. |
 | R05 | `_gas_source`, `_raw_source`, `_set_priorities`, `ETH` and `ZERO_ADDRESS` now live with the builder in non-collected `tests/registries/price_desk_helpers.py`. Isolation and source-budget suites import it directly; helper bodies, constructor budgets and ordering are preserved. |
 | R06 | Re-anchored all 21 authority relations in `config/robinhood_blueprint.py` to `_isSwitchboardAddr` and actual exported/wrapped callers. Current source also shows Endaoment's guarded wrappers and StabilityPool's disabled recovery, now accurately cited. Repaired R-099/R-271/R-279 by actual target calls, removed R-238's duplicate, and trimmed unrelated Teller headings. `test_robinhood_blueprint.py` validates all source-pointer bounds, duplicate relation pointers, the original Teller content check, and the named authority/direct-call evidence; 166 direct / 12 indirect edges remain. Bravo wording now identifies its current asset-deposit/accrual writes. |
 | R07 | The handoff's selected inventory now covers Curve, Undy, BlueChip, wsuperOETHb, conditional RedStone and retained legacy Aero, with source/config links and profile enablement. It links the explicitly incomplete, deferred production inventory; current monitor code does not authenticate legacy Aero. |
@@ -34,17 +49,27 @@ review evidence, not deployment approval.
 
 ### Wider blueprint drift retained by owner direction
 
-A broader exploratory scan found **30 distinct non-code pointers** (blank/comment
-only) outside the named R06 repairs. More importantly, the inherited R-108
-Charlie → AuctionHouse direct edge has no corresponding AuctionHouse call in
-current Charlie source. This is not solved by a line-bounds check. On 2026-09-20,
-the owner explicitly directed: **"Preserve the scoped graph and report wider
-drift"**. Those unrelated graph entries and the required 166/12 relation counts
-remain unchanged; reconciling the wider current-source graph is separate follow-up
-work, not a production-contract change or a claim that the whole graph is correct.
-The general regression checks bounds; semantic evidence checks cover the named
-R06 relations and retain Teller's existing content assertion. The complete
-exploratory pointer list follows.
+The reviewed baseline contains **30 distinct blank/comment-only references,
+appearing 36 times**, outside the named R06 repairs. Separately, these three
+unsupported direct relationships are inherited from parent `bdf7f3da` and remain
+included in the pinned **166 direct relationships**:
+
+| Relationship | Current-source evidence problem | Disposition |
+| --- | --- | --- |
+| R-100, Bravo → Switchboard | `SwitchboardBravo.vy:490–492` is MissionControl asset-deposit logic, not the claimed Switchboard call. | Retained; wider graph reconciliation deferred. |
+| R-101, Bravo → Alpha | Cites the same unrelated `SwitchboardBravo.vy:490–492`; current Bravo makes no corresponding Alpha call. | Retained; wider graph reconciliation deferred. |
+| R-108, Charlie → AuctionHouse | Current Charlie makes no corresponding AuctionHouse call. | Retained; wider graph reconciliation deferred. |
+
+On 2026-09-20 the owner explicitly directed: **"Preserve the scoped graph and
+report wider drift"**. These entries and the 166 direct / 12 indirect counts remain
+unchanged. The general safeguard checks bounds and substantive content across all
+covered source files, with explicit occurrence limits for the known non-code
+exceptions. It rejects new exceptions and additional occurrences while permitting
+repairs; bounds, duplicate-reference and Teller-content checks remain. Substantive
+content does not establish a claimed call: R-100/R-101 illustrate that distinction.
+Semantic checks cover the named R06 relationships, not the entire historical graph.
+Reconciliation remains separate implementation work. The complete non-code pointer
+inventory follows; occurrence allowances are explicit in the test baseline.
 
 The exploratory non-code-pointer list (not a complete semantic audit) is:
 
@@ -146,7 +171,56 @@ test and template test remain separate. The new Curve 3.5M quote allowance appea
 only in a regression; Base's implementation/rehearsal 1.5M/1.5M immutable floors
 are unchanged, with production qualification and any lower-floor decision separate.
 
-## Local validation result (2026-09-20)
+## Remaining maintenance local validation
+
+The nine-item follow-up passed **122 focused tests**: 84 blueprint cases,
+35 CLI/staging/archive-safety cases, both governance rollback proofs, and the
+nested Curve regression. There were **no skips, deselections or failures** in
+this explicit selection. It used a fresh Boa cache and an output path containing
+spaces. The workflow/hygiene checks passed **27 tests**, for **149 distinct local
+passes**. No skip, xfail or workflow exclusion was added. The supported CLI
+selection check stops at `load_dotenv`; Anvil checks intercept process launch.
+Neither establishes a completed staging or Anvil execution.
+
+Whole-PR relative-link validation compares parent `bdf7f3da` to the final review
+contents and inspects every added/modified Markdown file anywhere in the repository
+plus every added/modified non-Markdown file under `docs/`. It handles multiline
+Markdown-style labels in both formats. Final scope: **28 Markdown files / 97
+relative-link occurrences**, **21 non-Markdown documentation files / 1 occurrence**;
+**49 files / 98 occurrences, zero broken targets**. The same checker reproduced
+the reviewed baseline's 98 occurrences with exactly the reported broken archive
+link. The previous 62-link check was a narrower Markdown-only scope.
+
+Packet validation verifies all **39 current** and **39 original** size/SHA-256
+entries, exact **40-file** coverage including the manifest, and unchanged
+`original_published_inventory`. Scope checks confirm production contracts,
+interfaces/ABIs, budget values, gas ceilings, compiler settings, CI configuration,
+executed migrations and deployed manifests are unchanged from `4b31851f`.
+Only the blueprint module docstring changed; its graph data is identical.
+
+Use the output/cache environment documented below, then run:
+
+```sh
+"$PRICEDESK_PYTHON" -m pytest -q --tb=short -o addopts='' \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/focused.xml" \
+  tests/deployment/test_robinhood_blueprint.py \
+  tests/test_base_review_safety.py \
+  tests/core/teller/test_teller_reentrancy_assessment_proofs.py::test_governance_post_clear_nested_deposit_rolls_back_after_housekeeping \
+  tests/core/teller/test_teller_reentrancy_assessment_proofs.py::test_governance_rollback_proof_rejects_missing_relay \
+  tests/priceSources/curve/test_robinhood_launch_route.py::test_nested_curve_fallback_requires_sufficient_enclosing_quote_budget
+"$PRICEDESK_PYTHON" -m pytest -q \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  tests/test_lean_shard_coverage.py tests/inventory/test_repository_hygiene.py
+"$PRICEDESK_PYTHON" scripts/export_abis.py --check
+git diff --check 4b31851f
+```
+
+Complete applicable workflow evidence belongs to the exact published SHA, recorded
+in the PR description after publication. Earlier workflow run `35495658225`
+validated only `4b31851f`; it is not evidence for the new maintenance commit.
+
+## Historical R01–R16 local validation (reviewed head `4b31851f`)
 
 The exact focused command below, with a fresh Boa cache and a review-output path
 containing spaces, passed **358 tests** (279 affected cases + 79 blueprint cases),
@@ -159,7 +233,7 @@ workflow exclusion was added.
 
 ABI export check passed for **60 exports**, with the existing **58 excluded Vyper
 contracts**. All **39 current** and **39 original** packet entries verified, all
-**62 local documentation links** resolved, and shell syntax/path hygiene/diff
+**62 links in the then-selected Markdown scope** resolved (not all documentation formats), and shell syntax/path hygiene/diff
 checks passed. `config/BluePrint.py` has an identical Python AST to the reviewed
 head; only comments changed. Production contracts, budget values, interfaces,
 exported ABIs, compiler configuration, workflow selection, executed migrations
