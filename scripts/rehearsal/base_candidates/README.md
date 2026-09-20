@@ -19,5 +19,10 @@ real PriceDesk and Teller contracts with explicit local dependency doubles.
 
 The per-profile table in `config/BluePrint.py` is provisional rehearsal input.
 It does not qualify live sources, approve a deployment, or authorize activation.
-Base's lower immutable floors remain an owner decision; any changed floor must
-be assessed together with Curve and Undy overrides before deploying a final desk.
+Retain Base's **1.5M/1.5M immutable floors for the approved implementation and
+rehearsal scope**. Production qualification and any owner decision to lower those
+floors remain separate. No later decision to lower them is recorded; record the
+final decision and its date when established. Lowering a deployed immutable floor
+requires a replacement PriceDesk; source overrides cannot lower it.
+Assess any proposed replacement floors together with Curve and Undy overrides
+before qualifying a final deployment.

@@ -3,7 +3,10 @@ from pathlib import Path
 from datetime import datetime, timezone
 import requests
 
-out = Path('/private/tmp/pricedesk-v5-anvil-smoke.json')
+# Portability edit: only the generated output location differs from the capture.
+review_output = Path(os.environ['PRICEDESK_REVIEW_OUTPUT'])
+review_output.mkdir(parents=True, exist_ok=True)
+out = review_output / 'pricedesk-v5-anvil-smoke.json'
 result = {'checked_at': datetime.now(timezone.utc).isoformat(), 'scope': 'Local Anvil synthetic estimator/state smoke only; no Base fork or production qualification.'}
 process = None
 try:

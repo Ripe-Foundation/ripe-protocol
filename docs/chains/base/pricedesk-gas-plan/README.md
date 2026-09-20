@@ -9,9 +9,11 @@ on `codex/pricedesk-configurable-gas`, stacked on PR #231.
 The original approved scope was contract implementation and affected tests,
 using conditional ordinary quote checks, eager feed/snapshot/admission checks,
 immutable defaults with source overrides, and the Teller-to-PriceDesk Curve relay.
-Those design choices are settled. The later C01–C26 handoff additionally authorizes
-workflow coverage and complete applicable validation; its directions supersede
-the original selected-tests-only limit. Base floors remain 1.5M/1.5M.
+Those design choices are settled. The later C01–C26 and R01–R16 handoffs additionally authorize
+workflow coverage and complete applicable validation; their directions supersede
+the original selected-tests-only limit. Base floors remain 1.5M/1.5M for the approved
+implementation/rehearsal scope; production qualification and any lower-floor
+owner decision remain separate.
 
 [Deferred qualification](follow-up-qualification.md) and the
 [Pool-1 supplement](legacy-pool-claim-qualification.md) preserve release requirements.
@@ -30,10 +32,16 @@ For portable historical commands, set `RIPE_REPOSITORY` to the original checkout
 `PRICEDESK_WORKTREE` to the designated PR worktree and `PRICEDESK_PYTHON` to the
 pinned environment's Python executable. Optional integration references use
 `RIPE_WEB_REPOSITORY` and `UNDERSCORE_REPOSITORY`. The archived Anvil probe uses
-`ANVIL` or `anvil` on PATH. Verify the worktree branch before running any command.
+`ANVIL` or `anvil` on PATH and `PRICEDESK_REVIEW_OUTPUT` for its generated JSON.
+The handoff defines that writable output directory for caches/logs/XML as well;
+it contains generated outputs, not required plugin or report inputs. Verify the
+worktree branch before running any command.
 
-Published archival copies were edited on 2026-09-19 solely to sanitize local paths
+Published archival copies were edited on 2026-09-19 to sanitize local paths
 and repair 24 links to the corresponding archived versions or shared supplements.
+The 2026-09-20 follow-up quotes worktree paths, parameterizes the historical smoke
+output, and clarifies revision-7 scope; current qualification material gains the
+route-inventory and D01 templates.
 They are not byte-for-byte originals. [Packet inventory](packet-hashes.json)
 contains current published sizes/SHA-256 in `files` and the reviewed-head original
 published inventory in `original_published_inventory`; upstream capture hashes

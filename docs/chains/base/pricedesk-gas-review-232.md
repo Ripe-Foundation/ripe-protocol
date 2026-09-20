@@ -1,16 +1,69 @@
-# PR #232: C01–C26 review changes
+# PR #232: implementation review closure
 
-This follow-up starts from reviewed head `c0df6656cf1cc6db9e1d3c9b99930318d4c9a694`
-on `codex/pricedesk-configurable-gas`. The parent remains
-`bdf7f3da7113aabde60ab8eceab6a960a841bb88` on
-`codex/base-upgrade-fork-rehearsal`; no upstream drift affected these fixes.
-[PR #232](https://github.com/Ripe-Foundation/ripe-protocol/pull/232) records the final
-published commit, complete workflow run SHA, job results and run link. This file
-records source changes and reproducible local validation, not a deployment approval.
-After the parent merges and this PR is retargeted to the repository's `master`,
-the resulting integration requires validation again. There is no `main` branch.
+This document records the C01–C26 changes from reviewed head
+`c0df6656cf1cc6db9e1d3c9b99930318d4c9a694` and the R01–R16 follow-up from
+`eaf460bf2fc5d1bf75ccf966903c6898b8889701`. The dedicated branch remains
+`codex/pricedesk-configurable-gas`, stacked on parent
+`bdf7f3da7113aabde60ab8eceab6a960a841bb88` (`codex/base-upgrade-fork-rehearsal`).
+The 2026-09-20 initial readback found no subsequent head or parent changes.
+Signed prior history is preserved. [PR #232](https://github.com/Ripe-Foundation/ripe-protocol/pull/232)
+binds the final published/validated commit to its complete workflow run, actual
+counts and immutable links to this document and the handoff. This is implementation
+review evidence, not deployment approval.
 
-## Disposition
+## R01–R16 follow-up disposition
+
+| Item | Disposition and file/test evidence |
+| --- | --- |
+| R01 | Aligned `config/BluePrint.py` comments, candidate README, implementation handoff, deferred qualification and this closure: retain Base's 1.5M/1.5M immutable floors for the approved implementation/rehearsal scope. Production qualification and any owner decision to lower them remain separate; no later lower-floor decision is recorded. Record the final decision and date when established. Lowering a deployed floor requires a replacement PriceDesk; overrides cannot do it. Values are unchanged. |
+| R02 | Added the parent/current comparison and sensitivity explanation below; retained all nine ceilings and behavioral assertions without a new approval gate. |
+| R03 | `test_governance_rollback_proof_rejects_missing_relay` in `tests/core/teller/test_teller_reentrancy_assessment_proofs.py` removes only the relay stub in memory, invokes the same positive proof, and catches only its distinctive failed post-callback assertion. It requires the underlying BoaError, an errored relay call and no snapshot callback call. Compilation/setup/unrelated assertion errors cannot satisfy the control. All positive balance, points, debt, participation and event assertions remain. No temporary plugin is required. |
+| R04 | `scripts/base_upgrade_fork.py::main` rejects `--probe` and all seven dependent modes immediately after parsing. Eight parameterized `test_legacy_probe_cli_rejects_before_setup` cases in `tests/test_base_review_safety.py` forbid setup/environment/RPC access, check exit 2 and the full-update diagnostic. A supported staging-selection test and existing import/help/compatibility tests remain. |
+| R05 | `_gas_source`, `_raw_source`, `_set_priorities`, `ETH` and `ZERO_ADDRESS` now live with the builder in non-collected `tests/registries/price_desk_helpers.py`. Isolation and source-budget suites import it directly; helper bodies, constructor budgets and ordering are preserved. |
+| R06 | Re-anchored all 21 authority relations in `config/robinhood_blueprint.py` to `_isSwitchboardAddr` and actual exported/wrapped callers. Current source also shows Endaoment's guarded wrappers and StabilityPool's disabled recovery, now accurately cited. Repaired R-099/R-271/R-279 by actual target calls, removed R-238's duplicate, and trimmed unrelated Teller headings. `test_robinhood_blueprint.py` validates all source-pointer bounds, duplicate relation pointers, the original Teller content check, and the named authority/direct-call evidence; 166 direct / 12 indirect edges remain. Bravo wording now identifies its current asset-deposit/accrual writes. |
+| R07 | The handoff's selected inventory now covers Curve, Undy, BlueChip, wsuperOETHb, conditional RedStone and retained legacy Aero, with source/config links and profile enablement. It links the explicitly incomplete, deferred production inventory; current monitor code does not authenticate legacy Aero. |
+| R08 | Added the deferred D01 caller/estimator evidence matrix in `pricedesk-gas-plan/follow-up-qualification.md`, covering identical inputs/pre-state, due/no-op/ring/batch/position state, actual RPC/buffered/generous limits, state/events and final binding across wallets/frontends, keepers, liquidation and Appraiser/integrations. No qualification run or operational tool added. |
+| R09 | Renamed the Curve regression to `test_nested_curve_fallback_requires_sufficient_enclosing_quote_budget`; removed two misplaced comments and retained the explanation in the actual allowance-margin test. Direct fallback, nested failure, strict caller and illustrative recovery assertions remain. |
+| R10 | `test_drafts_do_not_enter_live_base_migration_queue` detects stable candidate identifiers through parsed string constants as well as bytes/names. Both drafts fail the renamed CamelStyle/comment-edited control. Ordinary/fresh-label future migrations and advancing synthetic history remain allowed; real history is untouched. |
+| R11 | Quoted worktree/cache/output paths in the current handoff and historical commands; documented `PRICEDESK_REVIEW_OUTPUT` as generated outputs. The negative control requires only committed input. Published packet hashes are refreshed while `original_published_inventory` and historical capture hashes remain unchanged. |
+| R12 | The PR completion statement and evidence links bind to the final published SHA after it exists; workflow evidence must match that same SHA. The final PR description is the post-publication record. |
+| R13 | Evidence README labels the contracts/tests-only instruction as historical revision-7 scope, links current handoff/closure, and retains the notice that portability/navigation edits changed archival bytes. |
+| R14 | Separate topical commits retain the existing signed history. This table maps every requested item to evidence; the final report identifies the new signed commits. |
+| R15 | Accepted governance/API behavior is unchanged: immediate `_canGovern` writes while paused, separate registry timelocks, whole-tuple writes, per-field zero resets, effective getter, address lifecycle and read-modify-write/intervening-change checks. No new timelock, getter or paused-write restriction. |
+| R16 | Refreshed #231/#232 status and retained parent-merge → retarget to `master` → revalidate integration. Manual CI cannot satisfy `rh-pr-gate`; a later eligible PR/merge-group run must execute/pass it, and retargeting alone is not a guaranteed trigger. Qualification, authentication, fork/claim, deployment and activation boundaries remain below. |
+
+### Wider blueprint drift retained by owner direction
+
+A broader exploratory scan found **30 distinct non-code pointers** (blank/comment
+only) outside the named R06 repairs. More importantly, the inherited R-108
+Charlie → AuctionHouse direct edge has no corresponding AuctionHouse call in
+current Charlie source. This is not solved by a line-bounds check. On 2026-09-20,
+the owner explicitly directed: **"Preserve the scoped graph and report wider
+drift"**. Those unrelated graph entries and the required 166/12 relation counts
+remain unchanged; reconciling the wider current-source graph is separate follow-up
+work, not a production-contract change or a claim that the whole graph is correct.
+The general regression checks bounds; semantic evidence checks cover the named
+R06 relations and retain Teller's existing content assertion. The complete
+exploratory pointer list follows.
+
+The exploratory non-code-pointer list (not a complete semantic audit) is:
+
+| Current source file | Inherited pointer line(s) retained |
+| --- | --- |
+| `contracts/config/SwitchboardCharlie.vy` | `442`, `464` |
+| `contracts/config/SwitchboardDelta.vy` | `527`, `1088` |
+| `contracts/core/AuctionHouse.vy` | `414`, `1123` |
+| `contracts/core/CreditEngine.vy` | `192`, `269`, `604`, `734`, `1145`, `1233` |
+| `contracts/core/CreditRedeem.vy` | `204`, `207`, `244`, `312`, `319` |
+| `contracts/core/Deleverage.vy` | `580`, `996`, `1199` |
+| `contracts/core/EndaomentPSM.vy` | `293` |
+| `contracts/core/Lootbox.vy` | `1217-1220` |
+| `contracts/core/TellerUtils.vy` | `143` |
+| `contracts/registries/VaultBook.vy` | `147`, `161`, `162` |
+| `contracts/vaults/RipeGov.vy` | `259`, `383` |
+| `contracts/vaults/modules/StabVault.vy` | `651`, `866` |
+
+## C01–C26 disposition
 
 | Item | Disposition |
 | --- | --- |
@@ -18,7 +71,7 @@ the resulting integration requires validation again. There is no `main` branch.
 | C02 | Added the complete source-budget module (18 gas cases) and the named nested BlueChip starvation case to snapshot-gas; the inclusion guard requires both. The 30-minute limit is unchanged. |
 | C03 | Corrected the CLI runtime-template pin to 24,360 and removed the retired-waiver comment; the separate complete deployed pin remains 24,488. |
 | C04 | Both governance callback doubles and the repayment/stock-backing doubles implement the successful no-op relay. `getAddr`, unsafe-asset checks and the callback's `addPriceSnapshot` phase remain. |
-| C05 | The rollback test positively requires `intended post-callback rollback`, emitted only after callback success. Balance, points, debt, participation and event restoration checks remain. The missing-relay in-memory negative control must fail this exact assertion. |
+| C05 | The rollback test positively requires `intended post-callback rollback`, emitted only after callback success. Balance, points, debt, participation and event restoration checks remain. The committed R03 negative control proves the missing-relay variant fails this exact assertion. |
 | C06 | All nine absolute gas measurements/violations are reported together. The three exceeded limits receive explicit measured headroom below; accounting, monotonic growth and relative traversal checks remain. |
 | C07 | Removed local-user paths without exempting archives from hygiene. Current published hashes/sizes and original reviewed-head hashes are separate inventory fields. |
 | C08 | Real Curve/Chainlink regression preserves direct fallback success, nested failure at the Base floor, strict-caller failure and recovery with an illustrative larger enclosing allowance. The nested route inventory and isolation scope are in the implementation handoff. No production budget or contract changed. |
@@ -61,6 +114,26 @@ No production contract code or compiler configuration changed in this review rou
 | Liquidation preflight | 490,664 | 600,000 | 600,000 | 22.28% |
 | Liquidation iterator | 490,181 | 600,000 | 600,000 | 22.40% |
 
+The parent comparison uses the same local measurement basis:
+
+| Path | Parent measurement / ceiling | Parent headroom | Current measurement / ceiling | Current headroom |
+| --- | ---: | ---: | ---: | ---: |
+| Deposit | 536,011 / 540,000 | 3,989 gas; 0.74% | 575,512 / 610,000 | 34,488 gas; 5.99% |
+| Withdrawal | 475,707 / 480,000 | 4,293 gas; 0.90% | 515,208 / 550,000 | 34,792 gas; 6.75% |
+| Claim batch | 8,608,932 / 9,100,000 | 491,068 gas; 5.70% | 9,314,307 / 9,790,000 | 475,693 gas; 5.11% |
+
+Deposit and withdrawal gained relative headroom, so the updated ceilings are less
+sensitive to small increases than their parent limits. Claim-batch headroom
+tightened slightly. A 5% tolerance, rounded up to 10,000, accommodates small local
+execution/layout cost changes while still failing larger increases on these
+costly paths; it is a regression tolerance, not production transaction sizing.
+Rounding makes the deposit/withdrawal allowance somewhat larger than 5%. The
+existing-receipt ceiling remains comparatively loose at about 346% headroom;
+the nine-path check is not equally sensitive on every path. Behavioral, accounting,
+monotonic-growth and relative-traversal assertions remain independent safeguards.
+Routine local ceiling updates do not introduce a new owner-approval gate. R02
+changes no ceiling and requires no production optimization.
+
 The diagnostic retained all behavioral assertions and exposed all three original
 violations in one failure. Only those three limits changed: measured gas × 1.05,
 rounded up to the next 10,000. Existing passing limits were retained. The cost of
@@ -70,21 +143,53 @@ Teller's CLI runtime template is **24,360 bytes**. Its complete deployed runtime
 **24,488 bytes** including immutable data, leaving **88 bytes** below EIP-170.
 PriceDesk remains **19,541 bytes** (5,035 bytes headroom). The complete runtime-table
 test and template test remain separate. The new Curve 3.5M quote allowance appears
-only in a regression; Base's approved 1.5M/1.5M immutable floors are unchanged.
+only in a regression; Base's implementation/rehearsal 1.5M/1.5M immutable floors
+are unchanged, with production qualification and any lower-floor decision separate.
+
+## Local validation result (2026-09-20)
+
+The exact focused command below, with a fresh Boa cache and a review-output path
+containing spaces, passed **358 tests** (279 affected cases + 79 blueprint cases),
+with the existing single C2 attested-interpreter skip. The workflow/hygiene command
+passed **27 tests**, for **385 distinct local passes**. Both the positive rollback
+proof and its committed negative control passed. Earlier exploratory validation
+exposed unrelated non-code blueprint pointers; the scoped final check follows the
+owner's direction above, retaining all pre-existing assertions. No skip, xfail or
+workflow exclusion was added.
+
+ABI export check passed for **60 exports**, with the existing **58 excluded Vyper
+contracts**. All **39 current** and **39 original** packet entries verified, all
+**62 local documentation links** resolved, and shell syntax/path hygiene/diff
+checks passed. `config/BluePrint.py` has an identical Python AST to the reviewed
+head; only comments changed. Production contracts, budget values, interfaces,
+exported ABIs, compiler configuration, workflow selection, executed migrations
+and deployed manifests are unchanged from `eaf460bf`.
+
+The local code/test commits are GPG-signed `27816ce6` (proofs/CLI/helpers/drafts)
+and `c2ad884c` (scoped blueprint evidence). The final documentation commit follows
+these without rewriting history. Complete workflow evidence is recorded after
+publication in the PR description, with the exact final SHA and immutable links;
+this local result does not substitute for that workflow or for `rh-pr-gate`.
 
 ## Reproducible validation
 
-Run from the designated worktree with `PRICEDESK_PYTHON` pointing to the repository's
-pinned Python environment. Cache/output paths below are local review artifacts.
+Set `PRICEDESK_WORKTREE` to the existing dedicated worktree and
+`PRICEDESK_PYTHON` to the repository's pinned Python executable.
+`PRICEDESK_REVIEW_OUTPUT` is an optional writable local output directory; paths
+containing spaces are supported. All caches/logs/XML are generated outputs. No
+pre-existing output, completion report or temporary pytest plugin is an input.
 
 ```sh
+cd "$PRICEDESK_WORKTREE"
+export PRICEDESK_REVIEW_OUTPUT="${PRICEDESK_REVIEW_OUTPUT:-${TMPDIR:-/tmp}/pr232-review}"
+mkdir -p "$PRICEDESK_REVIEW_OUTPUT"
 export PYTHONHASHSEED=0
-export PYTHONPYCACHEPREFIX=/private/tmp/pr232-review/python
-export RIPE_BOA_CACHE_DIR=/private/tmp/pr232-review/boa
+export PYTHONPYCACHEPREFIX="$PRICEDESK_REVIEW_OUTPUT/python"
+export RIPE_BOA_CACHE_DIR="$PRICEDESK_REVIEW_OUTPUT/boa"
 
 "$PRICEDESK_PYTHON" -m pytest -q --tb=short -o addopts='' \
-  -o cache_dir=/private/tmp/pr232-review/pytest \
-  --junitxml=/private/tmp/pr232-review/focused-final.xml \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/focused.xml" \
   tests/test_base_review_safety.py tests/test_price_desk_staging.py \
   tests/test_price_desk_gas_helpers.py tests/test_vault_pointer_runtime_sizes.py \
   tests/core/teller/test_teller_deposit.py::test_m1_teller_runtime_size_dual_guard \
@@ -94,14 +199,13 @@ export RIPE_BOA_CACHE_DIR=/private/tmp/pr232-review/boa
   tests/priceSources/curve/test_robinhood_launch_route.py \
   tests/registries/test_price_desk_isolation.py \
   tests/registries/test_price_desk_source_budgets.py \
-  tests/vaults/modules/test_stab_vault_hardening.py::test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling
-
-"$PRICEDESK_PYTHON" -m pytest --collect-only -q -o addopts='' -m gas \
-  tests/registries/test_price_desk_source_budgets.py
-"$PRICEDESK_PYTHON" -m pytest -q \
-  tests/test_lean_shard_coverage.py tests/inventory/test_repository_hygiene.py
-"$PRICEDESK_PYTHON" -m pytest -q -o addopts='' \
+  tests/vaults/modules/test_stab_vault_hardening.py::test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling \
   tests/deployment/test_robinhood_blueprint.py
+
+"$PRICEDESK_PYTHON" -m pytest -q \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/workflow-hygiene.xml" \
+  tests/test_lean_shard_coverage.py tests/inventory/test_repository_hygiene.py
 "$PRICEDESK_PYTHON" scripts/export_abis.py --check
 git diff --check
 git grep -lI '/''Users/'  # Expected status 1: no matches.
@@ -110,19 +214,35 @@ gh workflow run python-tests.yml --repo Ripe-Foundation/ripe-protocol \
   --ref codex/pricedesk-configurable-gas -f lane=lean
 ```
 
-The hygiene grep uses a split pattern to avoid embedding the prohibited path. The unchanged hygiene rule
-also checks machine hostnames and embedded session citations.
+The hygiene grep uses a split pattern to avoid embedding the prohibited path.
+The unchanged hygiene rule also checks machine hostnames and embedded session
+citations. Packet validation recomputes every `files` size/SHA-256, compares the
+untouched `original_published_inventory` to its recorded Git revision, and checks
+local links against their actual targets. Portability edits are disclosed in the
+packet README and inventory publication notes.
 
-The repaired rollback test also runs with a local pytest collection plugin removing
-only `addGreenRefPoolSnapshot` from `GOVERNANCE_REVERTING_PRICE_CALLBACK_SOURCE`
-in memory. Invoke the same node with `PYTHONPATH=/private/tmp/pr232-review` and
-`-p rollback_negative_control`. Its expected failure is the positive distinctive
-reason assertion at the early missing-relay call; no worktree file is mutated.
-The positive run retains all accounting/event rollback assertions.
+For just the positive proof and committed negative control, use the environment
+above and this fresh-checkout command (both cases should **pass**):
+
+```sh
+"$PRICEDESK_PYTHON" -m pytest -q --tb=short -o addopts='' \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  tests/core/teller/test_teller_reentrancy_assessment_proofs.py::test_governance_post_clear_nested_deposit_rolls_back_after_housekeeping \
+  tests/core/teller/test_teller_reentrancy_assessment_proofs.py::test_governance_rollback_proof_rejects_missing_relay
+```
+
+The negative control deletes only the double's successful relay stub, then calls
+the positive proof unchanged. It must fail the distinctive intended-rollback
+assertion, with an underlying BoaError trace proving the errored relay and absence
+of `addPriceSnapshot`. An arbitrary pytest nonzero exit is not evidence. The
+positive case retains every accounting/event restoration assertion.
 
 Complete validation means the 12 lean shards, deployment-controls, snapshot-gas
 and Solidity job all succeed on the published SHA. Manual dispatch skips only the
-PR/merge aggregation job `rh-pr-gate`. Lean excludes deployment, release, artifact,
+PR/merge aggregation job `rh-pr-gate`. A later eligible PR or merge-group run must
+actually execute and pass it. The workflow does not explicitly subscribe to
+edited PR events; changing the base branch alone is not a guaranteed trigger.
+Lean excludes deployment, release, artifact,
 fuzz, gas and fork-qualification markers; separate jobs cover deployment controls
 and the selected gas suites. Deployment retains the existing four named defaults
 snapshot deselections (seven parameter cases), plus existing marker/archive gates.
@@ -139,3 +259,13 @@ single-source faults, the actual chain/client cap and its 80% bound. Table entri
 are not automatic deployment configuration. Existing candidate labels and frozen
 seven-argument migrations do not authenticate compatible new nine-argument desks
 or relay Tellers. No live transactions, migration rewrites or merge were performed.
+
+
+The 2026-09-20 status readback found #231 open with changes requested and #232 a
+draft targeting the parent. Do not merge or retarget prematurely. After the
+parent merges, retarget #232 to `master` and validate that resulting integration
+again. There is no `main` branch. Activate authenticated PriceDesk HQ slot 7 before
+relay Teller slot 17 (or atomically in that order); roll back Teller first before
+restoring an incompatible desk. Requalify runtimes and compiled forwarding overhead
+after compiler/optimizer/code changes and after relevant gas-schedule changes.
+Historical harness hashes do not recreate missing original harness bytes.

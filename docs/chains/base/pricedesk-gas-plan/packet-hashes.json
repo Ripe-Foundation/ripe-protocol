@@ -20,13 +20,13 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 2614,
-      "sha256": "ba22f013eb1b7e01a825187e10ba4a3ee54e692d9439380eae0ffce2642b108e"
+      "bytes": 3149,
+      "sha256": "61eac4f0bf7ce081e95ff6dc500b2697dee6f1b12472dec3317eee3e0a032ed8"
     },
     {
       "path": "evidence/README.md",
-      "bytes": 11315,
-      "sha256": "114a1a9cee40ad522dad1a8094fbfd5b48429444caf3a0110cad0ae51706c0c3"
+      "bytes": 11714,
+      "sha256": "4414577bfcc7a7a8ed82fb2966de4c402ea3450dab57a908be09420677a19f34"
     },
     {
       "path": "evidence/anvil-estimator-smoke-v5-sandbox.json",
@@ -40,8 +40,8 @@
     },
     {
       "path": "evidence/anvil-estimator-smoke-v5.py",
-      "bytes": 2795,
-      "sha256": "6432f5da50b83c454123ad4e357f5812257b6e1817eb98b6f17fd772337b7de8"
+      "bytes": 2982,
+      "sha256": "7a38031ccd7c03e90d2709316028b886111ab28fab1c99543aa74f1b72680f08"
     },
     {
       "path": "evidence/candidate-runtime.block-51524517.json",
@@ -160,8 +160,8 @@
     },
     {
       "path": "evidence/reviewer-v6.txt",
-      "bytes": 7981,
-      "sha256": "f16f43d96a27a258c25648d6d8b07139020376eb132500b68c62fbb687f1fa55"
+      "bytes": 7985,
+      "sha256": "0e51cab76234b2c841ecf624066b269eb2c4dad096949c24648cee6e6d46a7e8"
     },
     {
       "path": "evidence/source-registry-delay-v5.block-51532116.json",
@@ -190,8 +190,8 @@
     },
     {
       "path": "follow-up-qualification.md",
-      "bytes": 6179,
-      "sha256": "cdeea4dcd3227631ae0a8c38f74d3cb20d1b809354607bd27ebb44b0ef9a9caf"
+      "bytes": 10967,
+      "sha256": "01a04c728874cae4f074f34e6bf63bdb5d2ca51ce2c4b9ed6d04bad76d04de65"
     },
     {
       "path": "implementation-reference.md",
@@ -210,8 +210,8 @@
     },
     {
       "path": "updated-prompt.md",
-      "bytes": 10199,
-      "sha256": "cfefa261a9be5ad138b0f1839595f7152eb47b047462527837efd92e370a21fd"
+      "bytes": 10203,
+      "sha256": "5411e76e387a2a66a5c8b251e21808e3694a335ade49e3dc26307dbd79381392"
     }
   ],
   "workspace": {
@@ -421,5 +421,6 @@
       }
     ]
   },
-  "publication_note": "2026-09-19: portable paths and 24 archived navigation links repaired; files describes published bytes, original_published_inventory describes the reviewed-head packet."
+  "publication_note": "2026-09-19: portable paths and 24 archived navigation links repaired. 2026-09-20: R01-R16 follow-up clarifies floor decisions, revision-7 historical scope and deferred route/D01 evidence; quotes worktree paths and parameterizes generated smoke output. files describes current published bytes; original_published_inventory and embedded historical capture hashes retain their original provenance.",
+  "review_followup_scope": "R01-R16 follows reviewed head eaf460bf2fc5d1bf75ccf966903c6898b8889701. owner_decisions preserves the historical revision-7 approval record; current implementation/review scope and authorized workflow validation are described in README.md and the linked closure. Production qualification/deployment/activation remain separate."
 }

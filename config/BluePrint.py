@@ -53,8 +53,11 @@ ADDYS = {
 
 # Provisional rehearsal inputs, not qualified production budgets. Raw tuples are
 # (quote, snapshot, feed); zero resets a field to its immutable default. The Base
-# entries respect the currently approved 1.5M floors. Lowering those floors is a
-# separate owner decision; the 3.5M Undy quote covers the measured two-lookup mock.
+# entries retain 1.5M/1.5M immutable floors for the approved implementation and
+# rehearsal scope. Production qualification and any owner decision to lower them
+# remain separate; record that decision and its date when established. Lowering a
+# deployed floor requires a replacement PriceDesk; source overrides cannot do it.
+# The 3.5M Undy quote covers the measured two-lookup mock only.
 # Curve's 500k local/Robinhood allowance retains the former Teller cap; cold
 # due snapshots used 122,801 gas in the local fresh-slot fixture (4.07x at
 # 500k). Complete-transaction qualification remains required for each deployment.
@@ -63,7 +66,8 @@ ADDYS = {
 # the inner proof needs B + ceil(B/63) + 5,000 (1,528,810 at Base's 1.5M floor).
 # Real Curve/Chainlink tests reproduce direct USDG fallback but lost nested GREEN
 # fallback at the Curve floor; illustrative 3.5M restores that test only. Qualify
-# Curve, wsuperOETHb's SUPER_OETH lookup and RedStone's conditional ETH/USD route.
+# every enabled nested route; see the selected inventory and deferred complete
+# inventory in docs/chains/base/pricedesk-gas-implementation.md.
 # Table entries do not automatically configure shared fixtures or deployments;
 # outside tests, only the Base rehearsal drafts currently consume this table.
 PRICE_DESK_SOURCE_GAS_OVERRIDES = {

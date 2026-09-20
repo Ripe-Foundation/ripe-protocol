@@ -1,11 +1,19 @@
 # Historical planning evidence
 
-Publication note (2026-09-19): archived copies have portable path substitutions
-and repaired navigation links. They are historical evidence, not current execution
-instructions or byte-for-byte original captures. See the [packet entry point](../README.md)
+Publication note (2026-09-19, extended 2026-09-20): archived copies have portable
+path substitutions, quoted worktree commands, a parameterized smoke-output path,
+repaired navigation links and clarified historical scope. They are historical
+evidence, not current execution instructions or byte-for-byte original captures. See the [packet entry point](../README.md)
 and [original versus published hashes](../packet-hashes.json) for exact provenance.
 
-**Revision 7 scope controls:** current execution is contracts and related tests only. Statements below about implementation prerequisites, pending decisions or active operational work describe earlier revisions. Deployed-source authentication, Base qualification and operations now belong to `../follow-up-qualification.md`; old evidence does not add them back to the current task.
+**Historical revision-7 scope:** that revision authorized contracts and related
+tests only. Statements below about prerequisites, pending decisions or operational
+work describe their historical revisions. See the [current implementation
+handoff](../../pricedesk-gas-implementation.md) and [review closure](../../pricedesk-gas-review-232.md)
+for subsequently authorized maintenance, publication and complete applicable
+workflow validation. Deployed-source authentication, Base qualification and
+operations remain in [deferred qualification](../follow-up-qualification.md);
+the archive does not authorize their execution.
 
 These files preserve planning evidence, not implementation acceptance or deployment approval. The historical verification paragraphs below describe the earlier v2/v3 reviews; revision-4 checks are listed separately at the end.
 
@@ -47,7 +55,7 @@ No contract regression suite, gas sweep, complete transaction rehearsal, product
 
 `vyper-struct-member-probe-v5.json` contains exact Vyper 0.4.3 source, runtime opcodes and SLOAD counts: one member/one read, two members/two reads, full struct/three reads. It corrects the inference that three storage slots force three reads for every getter. The reviewer's absolute gas figures and production layout performance were not rerun.
 
-`anvil-estimator-smoke-v5.py` and its JSON output preserve a synthetic, non-fork local smoke using Anvil 1.3.5, loopback only, zero generated accounts, synthetic addresses and no private keys or `.env`. It estimates 43,106 gas, restores the same local snapshot for each run, and verifies the same SSTORE result with estimated versus 100,000 gas. The separate `*-sandbox.json` records the initial listener permission failure; a permitted retry succeeded and terminated the node. It is not Base qualification or a D01 contract regression. Re-running requires adapting the documented local binary/output paths and verifying the chosen port is unused before launch. This historical smoke script is evidence, not the production qualification runner.
+`anvil-estimator-smoke-v5.py` and its JSON output preserve a synthetic, non-fork local smoke using Anvil 1.3.5, loopback only, zero generated accounts, synthetic addresses and no private keys or `.env`. It estimates 43,106 gas, restores the same local snapshot for each run, and verifies the same SSTORE result with estimated versus 100,000 gas. The separate `*-sandbox.json` records the initial listener permission failure; a permitted retry succeeded and terminated the node. It is not Base qualification or a D01 contract regression. Re-running requires selecting the documented binary, setting `PRICEDESK_REVIEW_OUTPUT` (the JSON is a generated output), and verifying the chosen port is unused before launch. This historical smoke script is evidence, not the production qualification runner.
 
 This review also inspected pinned D01 and Teller's 500k fail-open call, current feed-decimals helpers, LocalGov authorization, and local Underscore Appraiser caller sites. It did not implement production guards, alter third-party repositories, run actual Base fault injection or broadcast any live transaction. The actual historical source/dependency audit and full caller inventory are implementation prerequisites.
 

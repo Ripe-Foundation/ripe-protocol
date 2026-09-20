@@ -1,10 +1,17 @@
 # PriceDesk gas implementation and review follow-up
 
-Current review closure: [C01–C26 changes and validation](pricedesk-gas-review-232.md).
-As of 2026-09-19, the source is published in [PR #232](https://github.com/Ripe-Foundation/ripe-protocol/pull/232).
+Current review closure: [C01–C26 and R01–R16 changes and validation](pricedesk-gas-review-232.md).
+As of 2026-09-20, the source is published in [PR #232](https://github.com/Ripe-Foundation/ripe-protocol/pull/232).
 The earlier review results below are selected-suite historical evidence, not
 complete revised-head validation. See the PR description for the final workflow
 SHA and run results.
+
+The R01–R16 local follow-up validation passed **385 distinct tests** (358 affected
+and blueprint cases plus 27 workflow/hygiene cases), with the existing C2
+attested-interpreter skip. The fresh-cache focused command used an output path
+containing spaces. ABI, packet hash, link and unchanged-scope checks passed.
+The closure includes exact commands and the separately deferred wider blueprint
+drift; the PR description binds complete CI evidence to the final published SHA.
 
 The contract implementation is commit `e35f86542eb516ee7953e336845bafe9ee9b00ab`,
 stacked on PR #231 pin `bdf7f3da7113aabde60ab8eceab6a960a841bb88` in
@@ -14,7 +21,7 @@ review feedback with local tests, staging compatibility fixes and documentation.
 It does not approve a production configuration, deployment, activation or release.
 
 The integration branch still resolves to the original `bdf7f3da` pin (read-only
-remote check on 2026-09-19). Executed `2026091402`/`2026091403`, Base deployment
+remote check on 2026-09-20). Executed `2026091402`/`2026091403`, Base deployment
 manifests and the historical constructor-position test remain unchanged. The
 planning packet is now tracked here, including its 39 inventoried files and
 checksum manifest. This is the canonical copy; the original checkout's older
@@ -29,11 +36,13 @@ published in PR #232 on 2026-09-19 and remain GPG-signed.
 
 ## Configuration boundaries
 
-Base's immutable quote/snapshot floors remain **1.5M/1.5M**. The C01–C26 handoff
-explicitly preserves them and directs completion of independent fixes without
-waiting for a new production-budget decision. Lower floors remain an optional
-future design decision, not a blocker to this scoped review. No deployment values
-are qualified by the local mock experiments below.
+Retain Base's **1.5M/1.5M immutable floors for the approved implementation and
+rehearsal scope**. Production qualification and any owner decision to lower those
+floors remain separate. No later decision to lower them is recorded; record the
+final decision and its date when established. Lowering a deployed immutable floor
+requires a replacement PriceDesk; source overrides cannot lower it.
+This independent follow-up does not wait for that production decision. No deployment
+values are qualified by the local mock experiments below.
 
 `PRICE_DESK_SOURCE_GAS_OVERRIDES` in `config/BluePrint.py` now holds explicit
 per-profile raw `(quote, snapshot, feed)` tuples. The rehearsal drafts apply
@@ -41,7 +50,7 @@ these before relinquishing setup governance and verify all effective values:
 
 | Profile | Source | Raw override tuple | Status |
 | --- | --- | --- | --- |
-| Base | Curve | `(0, 1_500_000, 0)` | Respects the approved immutable floor; cannot use 500k yet. |
+| Base | Curve | `(0, 1_500_000, 0)` | Retains the implementation/rehearsal floor; a lower floor needs a replacement desk. |
 | Base | Undy | `(3_500_000, 1_500_000, 0)` | Provisional; quote allowance passes the existing two-lookup mock at the 1.5M floor. |
 | Local / Robinhood | Curve | `(0, 500_000, 0)` | Provisional; preserves the former Teller allowance, with local cold measurements below. |
 
@@ -74,10 +83,10 @@ overrides, and complete-transaction evidence before cutover.
 
 | Review item | Disposition |
 | --- | --- |
-| 1. Base floor and nested faults | Approved Base floors preserved; alternative floors deferred. Added a cold synthetic comparison reproducing the 1.5M floor's repeated-failure cost and lost Undy route, alongside a 250k floor / 2M Undy experiment. These are experiments, not live-source qualification. |
+| 1. Base floor and nested faults | Implementation/rehearsal Base floors preserved; production qualification and any lower-floor decision remain separate. Added a cold synthetic comparison reproducing the 1.5M floor's repeated-failure cost and lost Undy route, alongside a 250k floor / 2M Undy experiment. These are experiments, not live-source qualification. |
 | 2. Teller activation order | Added a real-Teller regression against a desk without the relay, including last-touch rollback. Documented slot 7 before slot 17, including atomic ordering and rollback. The full-update diagnostic explicitly checks that order. |
 | 3. Foxtrot runtime failure | Fixed the stale 12,061-byte expectation to the measured 18,278 bytes. The growth came from predecessor `0833dddd`; the earlier implementation report missed the full edited runtime-table test. That omission was an error. The full table is now in the recorded default lane. |
-| 4. Curve snapshot allowance | The re-review adds explicit provisional per-profile Curve overrides and cold local measurements; Base cannot lower its override below the still-approved 1.5M immutable floor. |
+| 4. Curve snapshot allowance | The re-review adds explicit provisional per-profile Curve overrides and cold local measurements; Base cannot lower its override below the retained 1.5M implementation/rehearsal immutable floor. |
 | 5. Curve cold boundary | Reproduced and pinned warm 120k and cold 160k at 10k resolution, with a cold 250k/160k = 1.5625x margin check. The old 110k warm pin understates the current requirement. |
 | 6. Constructor consumers | Appended both arguments in the two snapshot diagnostic call sites. Added current-ABI oracle and bridge/Teller bodies with fresh labels; the re-review moved them out of the live queue to `scripts/rehearsal/base_candidates/`. The full-update diagnostic loads the oracle draft by path and fingerprints both drafts. Frozen `2026091402`/`2026091403` and deployed manifests are unchanged. |
 | 7. Three-field replacement | Read-modify-write procedure below; zero is explicitly a reset. |
@@ -175,37 +184,43 @@ housekeeping execution gas.
 
 ## Historical re-review verification commands and results (before C01–C26)
 
+These historical commands now use portable, quoted paths. Set `PRICEDESK_WORKTREE`
+and `PRICEDESK_PYTHON` to the designated worktree and pinned interpreter.
+`PRICEDESK_REVIEW_OUTPUT` is an optional writable output directory (spaces are
+supported); logs, JUnit XML and caches are generated outputs, never required inputs.
 Run from the designated worktree with the interpreter/cache environment below.
 The deployment command mirrors the required job's test selection and existing
 exclusions. Workflow files were not changed in that historical run; C02 now extends gas coverage.
 
 ```sh
-cd $PRICEDESK_WORKTREE
-export PYTHONPYCACHEPREFIX=/private/tmp/pricedesk-configurable-gas/python
-export RIPE_BOA_CACHE_DIR=/private/tmp/pricedesk-configurable-gas/boa
+cd "$PRICEDESK_WORKTREE"
+export PRICEDESK_REVIEW_OUTPUT="${PRICEDESK_REVIEW_OUTPUT:-${TMPDIR:-/tmp}/pr232-review}"
+mkdir -p "$PRICEDESK_REVIEW_OUTPUT"
+export PYTHONPYCACHEPREFIX="$PRICEDESK_REVIEW_OUTPUT/python"
+export RIPE_BOA_CACHE_DIR="$PRICEDESK_REVIEW_OUTPUT/boa"
 pricedesk_python="$PRICEDESK_PYTHON"
 
 "$pricedesk_python" -m pytest -q \
-  -o cache_dir=/private/tmp/pricedesk-configurable-gas/pytest \
-  --junitxml=/private/tmp/pricedesk-configurable-gas/rereview-focused.xml \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/rereview-focused.xml" \
   tests/test_price_desk_staging.py tests/test_base_review_safety.py \
   tests/priceSources/curve/test_robinhood_launch_route.py \
-  > /private/tmp/pricedesk-configurable-gas/rereview-focused.log 2>&1
+  > "$PRICEDESK_REVIEW_OUTPUT/rereview-focused.log" 2>&1
 
 "$pricedesk_python" -m pytest -q -s -m gas \
-  -o cache_dir=/private/tmp/pricedesk-configurable-gas/pytest \
-  --junitxml=/private/tmp/pricedesk-configurable-gas/rereview-curve-gas.xml \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/rereview-curve-gas.xml" \
   tests/priceSources/curve/test_robinhood_launch_route.py \
-  > /private/tmp/pricedesk-configurable-gas/rereview-curve-gas.log 2>&1
+  > "$PRICEDESK_REVIEW_OUTPUT/rereview-curve-gas.log" 2>&1
 
 env -u WEB3_ALCHEMY_API_KEY -u ALCHEMY_API_KEY -u ETH_RPC_URL \
   -u BASE_RPC_URL -u RPC_URL -u WEB3_PROVIDER_URI -u PRIVATE_KEY \
   -u MNEMONIC -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY \
   -u ETHERSCAN_API_KEY -u BASESCAN_API_KEY PYTHONHASHSEED=0 \
   "$pricedesk_python" -m pytest -q -o addopts='' \
-  -o cache_dir=/private/tmp/pricedesk-configurable-gas/pytest \
-  --basetemp=/private/tmp/pricedesk-configurable-gas/rereview-deployment-final-tmp \
-  --junitxml=/private/tmp/pricedesk-configurable-gas/rereview-deployment-final.xml \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --basetemp="$PRICEDESK_REVIEW_OUTPUT/rereview-deployment-final-tmp" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/rereview-deployment-final.xml" \
   --durations=25 \
   -m 'not release and not artifact and not fuzz and not gas and not fork_qualification' \
   --deselect 'tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_rejects_every_non_robinhood_mainnet_chain' \
@@ -213,10 +228,10 @@ env -u WEB3_ALCHEMY_API_KEY -u ALCHEMY_API_KEY -u ETH_RPC_URL \
   --deselect 'tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_sanitizes_untrusted_token_metadata' \
   --deselect 'tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_preserves_safe_existing_labels' \
   tests/deployment \
-  > /private/tmp/pricedesk-configurable-gas/rereview-deployment-final.log 2>&1
+  > "$PRICEDESK_REVIEW_OUTPUT/rereview-deployment-final.log" 2>&1
 
 "$pricedesk_python" scripts/export_abis.py --check \
-  > /private/tmp/pricedesk-configurable-gas/rereview-abi.log 2>&1
+  > "$PRICEDESK_REVIEW_OUTPUT/rereview-abi.log" 2>&1
 git diff --check
 git verify-commit fc275c5c ce54ae6e 62ad1a48
 ```
@@ -245,15 +260,16 @@ checkout; `pytest.ini` resolves repository/test imports from this worktree.
 All local artifacts and caches go outside the checkout:
 
 ```sh
-cd $PRICEDESK_WORKTREE
-export PYTHONPYCACHEPREFIX=/private/tmp/pricedesk-configurable-gas/python
-export RIPE_BOA_CACHE_DIR=/private/tmp/pricedesk-configurable-gas/boa
+cd "$PRICEDESK_WORKTREE"
+export PRICEDESK_REVIEW_OUTPUT="${PRICEDESK_REVIEW_OUTPUT:-${TMPDIR:-/tmp}/pr232-review}"
+mkdir -p "$PRICEDESK_REVIEW_OUTPUT"
+export PYTHONPYCACHEPREFIX="$PRICEDESK_REVIEW_OUTPUT/python"
+export RIPE_BOA_CACHE_DIR="$PRICEDESK_REVIEW_OUTPUT/boa"
 pricedesk_python="$PRICEDESK_PYTHON"
-mkdir -p /private/tmp/pricedesk-configurable-gas
 
 "$pricedesk_python" -m pytest -q \
-  -o cache_dir=/private/tmp/pricedesk-configurable-gas/pytest \
-  --junitxml=/private/tmp/pricedesk-configurable-gas/review-default.xml \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/review-default.xml" \
   tests/registries/test_price_desk_isolation.py \
   tests/registries/test_price_desk_token_decimals.py \
   tests/test_price_desk_aggregate_source_count_guard.py \
@@ -267,24 +283,24 @@ mkdir -p /private/tmp/pricedesk-configurable-gas
   tests/config/test_switchboard_bravo_token_scale.py::test_replacement_mission_control_updates_only_its_price_desk \
   tests/priceSources/aero/test_minimal_prices.py::test_price_desk_composition_treats_monitor_as_valid_no_feed \
   tests/priceSources/curve/test_robinhood_launch_route.py \
-  > /private/tmp/pricedesk-configurable-gas/review-default.log 2>&1
+  > "$PRICEDESK_REVIEW_OUTPUT/review-default.log" 2>&1
 
 "$pricedesk_python" -m pytest -q -s -m gas \
-  -o cache_dir=/private/tmp/pricedesk-configurable-gas/pytest \
-  --junitxml=/private/tmp/pricedesk-configurable-gas/review-gas-final.xml \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/review-gas-final.xml" \
   tests/registries/test_price_desk_gas.py \
   tests/registries/test_price_desk_aggregate_protocol_gas.py \
   tests/registries/test_price_desk_source_budgets.py \
   tests/priceSources/curve/test_robinhood_launch_route.py \
-  > /private/tmp/pricedesk-configurable-gas/review-gas-final.log 2>&1
+  > "$PRICEDESK_REVIEW_OUTPUT/review-gas-final.log" 2>&1
 
 "$pricedesk_python" -m pytest -q -o addopts='' \
-  -o cache_dir=/private/tmp/pricedesk-configurable-gas/pytest \
-  --junitxml=/private/tmp/pricedesk-configurable-gas/review-abi-staging.xml \
+  -o cache_dir="$PRICEDESK_REVIEW_OUTPUT/pytest" \
+  --junitxml="$PRICEDESK_REVIEW_OUTPUT/review-abi-staging.xml" \
   tests/deployment/test_stale_time_oracle_abi.py \
   tests/deployment/test_base_staging_runner_order.py \
   tests/deployment/test_price_desk_token_scale_bootstrap.py \
-  > /private/tmp/pricedesk-configurable-gas/review-abi-staging.log 2>&1
+  > "$PRICEDESK_REVIEW_OUTPUT/review-abi-staging.log" 2>&1
 ```
 
 Default and gas lanes retain repository addopts. The final command deliberately
@@ -296,7 +312,7 @@ built-in validation also passes when importing `config.robinhood_blueprint`.
 These two historical local validation runs preceded publication of PR #232.
 They did not run the full repository suite, an RPC fork, live qualification,
 deployment, Safe operation, push or publication. Current validation is recorded
-in the C01–C26 closure linked above.
+in the C01–C26 / R01–R16 closure linked above.
 
 ## Budget changes and activation
 
@@ -344,11 +360,19 @@ with stale Chainlink, while nested GREEN returns zero (or the strict-caller erro
 at the Curve floor even with 10M transaction gas. An illustrative 3.5M Curve quote
 override restores that test route; it is not a production recommendation.
 
-| Nested route | Qualification scope |
+The following is a **selected current-source inventory**, not the complete production
+route inventory. References describe the checkout and candidate configuration,
+not authenticated deployed implementations. The [complete final inventory remains
+deferred](pricedesk-gas-plan/follow-up-qualification.md#complete-production-route-inventory).
+
+| Nested route | Repository evidence and qualification scope |
 | --- | --- |
-| Curve → USDG | Concrete stale-Chainlink fallback loss reproduced above. |
-| wsuperOETHb → SUPER_OETH | Qualify its nested underlying lookup and dependency behavior. |
-| RedStone → ETH/USD | Qualify the nested lookup when `needsEthToUsd` is enabled. |
+| Curve → underlying coins / USDG | [CurvePrices](../../../contracts/priceSources/CurvePrices.vy), `_getStableLpPrice`, `_getCryptoLpPrice`, `_getSingleTokenPrice`, calls PriceDesk for underlying assets. The real Curve/Chainlink regression reproduces stale-Chainlink fallback loss for nested GREEN/USDG. Qualify every enabled pool/coin route. |
+| Undy → underlying asset | [UndyVaultPrices](../../../contracts/priceSources/UndyVaultPrices.vy), `_getPrice`, looks up `_config.underlyingAsset`; configuration validation also prices the underlying. Authenticate every retained vault and dependency, including any nested/repeated underlying paths. The one/two-lookup fault experiment is a synthetic comparison. |
+| BlueChip → underlying asset | [BlueChipYieldPrices](../../../contracts/priceSources/BlueChipYieldPrices.vy), `_getPrice`, prices the underlying before protocol-specific share conversion. Both [Base oracle](../../../scripts/rehearsal/base_candidates/oracles_psm_reserves.py) and [bridge](../../../scripts/rehearsal/base_candidates/price_desk_gas_bridge.py) drafts keep slot 3 disabled. The [Robinhood profile](../../../config/BluePrint.py), `CM-018`, defers BlueChip; local tests deliberately enable it. Qualify this route only for a profile/configuration that actually enables it. |
+| wsuperOETHb → SUPER_OETH | [wsuperOETHbPrices](../../../contracts/priceSources/wsuperOETHbPrices.vy), `_getPrice`, uses a strict nested SUPER_OETH lookup. Qualify its underlying implementation, fallback and conversion behavior. |
+| RedStone → ETH/USD | [RedStone](../../../contracts/priceSources/RedStone.vy), `_getPrice`, performs the nested lookup only when `needsEthToUsd` is enabled and the primary feed produced a usable price. Bind the final per-asset flag. |
+| Retained legacy Aero | Both Base drafts retain the legacy slot-6 address. The current [AeroRipePrices](../../../contracts/priceSources/AeroRipePrices.vy) is a monitor: its PriceSource surface returns no feed, while its separate monitoring valuation looks up WETH. This does **not** establish the legacy oracle's lookup/catch behavior; authenticate its actual deployed implementation and dependencies before inventorying its production routes. |
 
 This does not claim that every live route fails. An adequately funded enclosing
 route must cover inner failed, malformed and zero-with-feed branches as well as
@@ -359,7 +383,8 @@ deposit housekeeping. At a 1.5M snapshot budget the relay needs at least 1,528,8
 gas at its funding sample even for a genuine no-op; absent/disabled sources return
 before that proof. RPC-estimator D01 must compare identical prestates at estimated,
 submitted buffered and generous limits for both generic and reference snapshots,
-across frontend, wallet, keeper and integration callers, including Appraiser.
+across frontend, wallet, keeper, liquidation and integration callers, including Appraiser.
+Use the deferred [D01 evidence matrix](pricedesk-gas-plan/follow-up-qualification.md#d01-caller-and-estimator-evidence-matrix).
 
 Canonical `(price > 0, true)` and `(0, false)` replies intentionally bypass the
 ordinary-quote full-budget proof. A dependency can catch inner underfunding and
@@ -388,3 +413,23 @@ ongoing source availability.
 Recheck the actual chain/client transaction cap during qualification. Changing the
 immutable maximum later requires a new deployment. Bind each acceptance decision
 to its final implementation, source addresses, configuration and qualification evidence.
+
+
+The 2026-09-20 status refresh found #231 open with changes requested and #232 a
+draft targeting the parent branch. The integration sequence remains: **parent
+merges → #232 targets `master` → resulting integration is validated again**.
+A manual workflow success does not establish `rh-pr-gate` success: an eligible PR
+or merge-group run must actually execute and pass that gate. The workflow does
+not explicitly subscribe to edited PR events, so retargeting alone must not be
+assumed to trigger it. Separate deployment/activation authority remains required.
+Historical harness hashes identify recorded bytes; they cannot recreate missing
+original harness files. The current guarded harness is not an exact substitute.
+
+
+The R01–R16 follow-up repairs the named blueprint evidence and broadens bounds
+checks without reconciling the entire inherited graph. The exploratory scan found
+30 additional non-code pointers and an obsolete Charlie → AuctionHouse claim.
+The owner's 2026-09-20 direction was to preserve the scoped graph and report that
+wider drift; see [the closure record](pricedesk-gas-review-232.md#wider-blueprint-drift-retained-by-owner-direction).
+The unchanged 166 direct / 12 indirect counts are a scoped invariant, not evidence
+that every inherited relationship matches current source.

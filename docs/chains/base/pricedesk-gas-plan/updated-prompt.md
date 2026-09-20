@@ -14,7 +14,7 @@ Work continuously through steps 1–4, implementation fixes and affected tests. 
 Work only in `$PRICEDESK_WORKTREE`, branch `codex/pricedesk-configurable-gas`. This dedicated worktree is already prepared from PR #231 head `bdf7f3da7113aabde60ab8eceab6a960a841bb88`; its packet is the current handoff. Verify the path, branch and baseline ancestry, then continue there, preserving existing progress. Do not edit the original checkout or recreate/reset an existing worktree. On another machine, create it only if both path and branch are unused:
 
 ```sh
-git -C $RIPE_REPOSITORY worktree add -b codex/pricedesk-configurable-gas $PRICEDESK_WORKTREE bdf7f3da7113aabde60ab8eceab6a960a841bb88
+git -C "$RIPE_REPOSITORY" worktree add -b codex/pricedesk-configurable-gas "$PRICEDESK_WORKTREE" bdf7f3da7113aabde60ab8eceab6a960a841bb88
 ```
 
 Required filesystem permissions still apply. If transferring the packet, use `packet-hashes.json`, excluding `.claude/`; it is absent from the baseline commit and is now tracked with the review follow-up. Eventual integration targets `codex/base-upgrade-fork-rehearsal`; keep the frozen baseline and note upstream drift at the end.
