@@ -11,49 +11,49 @@
   "local_runs": [
     {
       "selection": "focused contracts",
-      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa /Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache tests/core/auctionHouse tests/core/deleverage tests/registries/test_vault_book.py tests/registries/test_vault_book_legacy_compat.py tests/config/test_switchboard_alpha.py tests/config/test_switchboard_alpha_borrow_interval_target.py tests/config/test_switchboard_charlie.py tests/config/test_switchboard_bravo.py tests/config/test_switchboard_bravo_token_scale.py tests/config/test_promotional_accrual_gate.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache tests/core/auctionHouse tests/core/deleverage tests/registries/test_vault_book.py tests/registries/test_vault_book_legacy_compat.py tests/config/test_switchboard_alpha.py tests/config/test_switchboard_alpha_borrow_interval_target.py tests/config/test_switchboard_charlie.py tests/config/test_switchboard_bravo.py tests/config/test_switchboard_bravo_token_scale.py tests/config/test_promotional_accrual_gate.py",
       "passed": 1234,
       "failed": 0,
       "summary": "1234 passed, 2 deselected, 1 warning in 818.82s (0:13:38)"
     },
     {
       "selection": "migration safety, direct verifier, monitor and runtime",
-      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa /Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' tests/test_legacy_vault_preflight.py tests/test_base_review_safety.py tests/test_legacy_cutover_verifier.py tests/test_vault_pointer_runtime_sizes.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' tests/test_legacy_vault_preflight.py tests/test_base_review_safety.py tests/test_legacy_cutover_verifier.py tests/test_vault_pointer_runtime_sizes.py",
       "passed": 159,
       "failed": 0,
       "summary": "159 passed, 1 warning in 1944.04s (0:32:24)"
     },
     {
       "selection": "final monitor",
-      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa /Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' tests/test_legacy_vault_preflight.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' tests/test_legacy_vault_preflight.py",
       "passed": 44,
       "failed": 0,
       "summary": "44 passed, 1 warning in 54.90s"
     },
     {
       "selection": "deployment controls",
-      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa /Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' -m 'not release and not artifact and not fuzz and not gas and not fork_qualification' --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_rejects_every_non_robinhood_mainnet_chain --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_accepts_robinhood_mainnet_chain --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_sanitizes_untrusted_token_metadata --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_preserves_safe_existing_labels tests/deployment",
+      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' -m 'not release and not artifact and not fuzz and not gas and not fork_qualification' --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_rejects_every_non_robinhood_mainnet_chain --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_accepts_robinhood_mainnet_chain --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_sanitizes_untrusted_token_metadata --deselect=tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_preserves_safe_existing_labels tests/deployment",
       "passed": 875,
       "failed": 0,
       "summary": "875 passed, 13 deselected, 1 warning in 30.53s"
     },
     {
       "selection": "snapshot gas",
-      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa /Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' -m gas tests/priceSources/blueChip/test_bluechip_local.py tests/priceSources/curve/test_robinhood_launch_route.py tests/core/test_sc24_gas_matrix.py tests/registries/test_price_desk_gas.py 'tests/registries/test_price_desk_aggregate_protocol_gas.py::test_aggregate_protocol_gas[valuation-intended_prompt]'",
+      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' -m gas tests/priceSources/blueChip/test_bluechip_local.py tests/priceSources/curve/test_robinhood_launch_route.py tests/core/test_sc24_gas_matrix.py tests/registries/test_price_desk_gas.py 'tests/registries/test_price_desk_aggregate_protocol_gas.py::test_aggregate_protocol_gas[valuation-intended_prompt]'",
       "passed": 21,
       "failed": 0,
       "summary": "21 passed, 85 deselected in 91.03s (0:01:31)"
     },
     {
       "selection": "workflow, manifest and ABI artifacts",
-      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa /Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q --tb=short -o addopts='-p no:unraisableexception' -o cache_dir=/private/tmp/pr233-r3-cache tests/test_lean_shard_coverage.py tests/test_current_manifest_consumers.py tests/deployment/test_abi_export.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa python -m pytest -q --tb=short -o addopts='-p no:unraisableexception' -o cache_dir=/private/tmp/pr233-r3-cache tests/test_lean_shard_coverage.py tests/test_current_manifest_consumers.py tests/deployment/test_abi_export.py",
       "passed": 42,
       "failed": 0,
       "summary": "42 passed in 58.77s"
     },
     {
       "selection": "compiler cache isolation",
-      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa /Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' tests/test_legacy_rehearsal_cache.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 RIPE_BOA_CACHE_DIR=/private/tmp/ripe-legacy-vault-compat-boa python -m pytest -q --tb=short -o cache_dir=/private/tmp/pr233-r3-cache -o addopts='' tests/test_legacy_rehearsal_cache.py",
       "passed": 2,
       "failed": 0,
       "summary": "2 passed, 1 warning in 0.15s"
@@ -61,12 +61,19 @@
     {
       "selection": "ABI regeneration/check",
       "commands": [
-        "PYTHONDONTWRITEBYTECODE=1 /Users/wigglez/dev/ripe-protocol/.venv/bin/python scripts/export_abis.py",
-        "PYTHONDONTWRITEBYTECODE=1 /Users/wigglez/dev/ripe-protocol/.venv/bin/python scripts/export_abis.py --check"
+        "PYTHONDONTWRITEBYTECODE=1 python scripts/export_abis.py",
+        "PYTHONDONTWRITEBYTECODE=1 python scripts/export_abis.py --check"
       ],
       "exit_code": 0,
       "outputs": 60,
       "abi_delta": "none; internal gas admission does not change public ABI"
+    },
+    {
+      "selection": "repository hygiene after evidence portability fix",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -o addopts='' -o cache_dir=/private/tmp/pr233-r3-hygiene-cache tests/inventory/test_repository_hygiene.py",
+      "passed": 2,
+      "failed": 0,
+      "summary": "2 passed in 0.19s"
     }
   ],
   "counts_note": "Per-command executions; selections overlap. The monitor suite grew from 36 in the combined run to its final 44 in the separate run. Final-head CI tests the complete final tree.",
@@ -87,14 +94,14 @@
     "live_transactions_sent": 0
   },
   "clean_commands": [
-    "BASE_RPC_URL=<archive-capable-Base-RPC> PYTHONDONTWRITEBYTECODE=1 python -u -m scripts.base_legacy_compat_fork --block 51575411 --baseline-manifest docs/chains/base/legacy-vault-rehearsal/re-review/pre-stage-baseline.json --baseline-sha256 495b2075514d1345a2df0274705791d5a511cdda963a3039288ac65498531043 --output <outside-checkout-new-qualification.json> --measure-gas",
-    "BASE_RPC_URL=<archive-capable-Base-RPC> PYTHONDONTWRITEBYTECODE=1 python -u -m scripts.verify_legacy_vault_cutover --replay-staging --expected-phase staged --block 51575411 --baseline-manifest docs/chains/base/legacy-vault-rehearsal/re-review/pre-stage-baseline.json --baseline-sha256 495b2075514d1345a2df0274705791d5a511cdda963a3039288ac65498531043 --output <outside-checkout-new-verifier.json>"
+    "BASE_RPC_URL=<archive-capable-Base-RPC> PYTHONDONTWRITEBYTECODE=1 python -u -m scripts.base_legacy_compat_fork --block 51575411 --baseline-manifest docs/chains/base/legacy-vault-rehearsal/re-review/pre-stage-baseline.json --baseline-sha256 872c5c22fafa0d0709aa4e5846d8d8bf0c361c5f4e46e4680830a71e151e0418 --output <outside-checkout-new-qualification.json> --measure-gas",
+    "BASE_RPC_URL=<archive-capable-Base-RPC> PYTHONDONTWRITEBYTECODE=1 python -u -m scripts.verify_legacy_vault_cutover --replay-staging --expected-phase staged --block 51575411 --baseline-manifest docs/chains/base/legacy-vault-rehearsal/re-review/pre-stage-baseline.json --baseline-sha256 872c5c22fafa0d0709aa4e5846d8d8bf0c361c5f4e46e4680830a71e151e0418 --output <outside-checkout-new-verifier.json>"
   ],
   "artifact_sha256": {
     "qualification.json": "76d0d1873f03b6c20e39a18b40840e569004de986d79075eb6ea8811745784df",
-    "pre-stage-baseline.json": "495b2075514d1345a2df0274705791d5a511cdda963a3039288ac65498531043",
+    "pre-stage-baseline.json": "872c5c22fafa0d0709aa4e5846d8d8bf0c361c5f4e46e4680830a71e151e0418",
     "verifier.json": "ffc0aca9e8bc5d833ad4b0f74abaed4e31d6d0db9479226c7ec2492c7d667500",
-    "handoff.md": "60b0ba3e414ba3763e62ab9fb80c391eb8d482d3cfd77fcf02b5ffa3f5237892"
+    "handoff.md": "5982b899f08f5f3448a83c9d6ac223a20531bda47d66a479dd5a3623179e3b3c"
   },
   "ci_merge_gate": "PR stays draft. Require all final-head Python tests jobs and rh-pr-gate; final exact-head run and full artifact are published in PR #233 handoff.",
   "preservation": {
@@ -106,5 +113,29 @@
       "tests/fixtures/legacy_pool/contracts/vaults/RipeGov.vy",
       "tests/fixtures/legacy_pool/contracts/modules/Addys.vy"
     ]
-  }
+  },
+  "command_portability_note": "Commands retain their executed flags; python denotes the local Python 3.12.13 virtual-environment interpreter. Its host-specific absolute path is omitted for repository hygiene.",
+  "historical_report_baseline": {
+    "commit": "c56bce6a09e372540cf4dd7158d165a71f520a8e",
+    "path": "docs/chains/base/legacy-vault-rehearsal/re-review/pre-stage-baseline.json",
+    "sha256": "495b2075514d1345a2df0274705791d5a511cdda963a3039288ac65498531043",
+    "reports": [
+      "qualification.json",
+      "verifier.json"
+    ]
+  },
+  "portable_baseline": {
+    "sha256": "872c5c22fafa0d0709aa4e5846d8d8bf0c361c5f4e46e4680830a71e151e0418",
+    "metadata_only_change": "source_manifest_path is repository-relative; all other fields are identical to the historical immutable baseline",
+    "used_by": "final-head fork artifacts published on PR #233"
+  },
+  "ci_prior_attempt": {
+    "head": "23c25e09cdf7b3addf859998f99be2a946f8b684",
+    "run": 35543215480,
+    "passed_test_executions": 7782,
+    "failed": 1,
+    "failure": "tests/inventory/test_repository_hygiene.py::test_repository_text_does_not_embed_local_user_or_host_provenance",
+    "fix": "portable baseline path metadata and validation command spelling; no contract or tooling behavior changed"
+  },
+  "clean_commands_note": "Commands target the portable baseline for final-head PR artifacts. To reproduce the committed c56bce6a reports, check out that code commit and use historical_report_baseline.sha256; that commit retains the original baseline bytes."
 }

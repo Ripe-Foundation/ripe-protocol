@@ -33588,6 +33588,6 @@
   "block": 51575411,
   "block_hash": "3bd7415ea242fb3bae7f9ceb46747fa5b22f7504d5e442a362153fd7d6378acd",
   "source_manifest_sha256": "d63073791b4d9acb829ea0c42d2d332de11609002bafb91b4aceff87ccabf56c",
-  "source_manifest_path": "/Users/wigglez/dev/ripe-protocol-legacy-vault-compat/migration_history/base-mainnet/v1/current-manifest.json",
+  "source_manifest_path": "migration_history/base-mainnet/v1/current-manifest.json",
   "live_transactions_sent": 0
 }

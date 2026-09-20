@@ -2,7 +2,7 @@
 
 The contract, staging, verifier, executable monitor and test changes are implemented. **This is not release approval.** The exact proposed bridge configuration fails strict pricing for one route and therefore does not qualify the sampled current mixed holders or the preserved 26-claim stress set. The qualification command deliberately exits nonzero and retains its complete evidence; staging and standalone staged verification are separate results.
 
-PR base remains `codex/base-upgrade-fork-rehearsal` at `bdf7f3da7113aabde60ab8eceab6a960a841bb88`. This work stacks on PR #231 and remains draft. Code commits are signed; clean evidence below is from `c56bce6a09e372540cf4dd7158d165a71f520a8e`, tree `c343bf98bd0520cbfdacb3cd7e603d499d43759d`. The following commit adds only documentation and evidence. Its own final-head rerun and full payload are published on PR #233, avoiding a self-referential report/commit cycle.
+PR base remains `codex/base-upgrade-fork-rehearsal` at `bdf7f3da7113aabde60ab8eceab6a960a841bb88`. This work stacks on PR #231 and remains draft. Code commits are signed; clean evidence below is from `c56bce6a09e372540cf4dd7158d165a71f520a8e`, tree `c343bf98bd0520cbfdacb3cd7e603d499d43759d`. Subsequent commits add only documentation/evidence and portable provenance. The original evidence-only head `23c25e09` failed one repository-hygiene check because the new baseline metadata and validation commands embedded a local user path; its other 7,782 test executions passed. The follow-up changes only that path metadata and command spelling. Final-head reruns and full payloads are published on PR #233, avoiding a self-referential report/commit cycle.
 
 ## Resolution of the 13 requested items
 
@@ -50,7 +50,7 @@ PR base remains `codex/base-upgrade-fork-rehearsal` at `bdf7f3da7113aabde60ab8ec
 
 ## Pinned configuration and operational capacity
 
-Base block **51,575,411**, hash **`0x3bd7415ea242fb3bae7f9ceb46747fa5b22f7504d5e442a362153fd7d6378acd`**. Independent baseline SHA-256: **`495b2075514d1345a2df0274705791d5a511cdda963a3039288ac65498531043`**.
+Base block **51,575,411**, hash **`0x3bd7415ea242fb3bae7f9ceb46747fa5b22f7504d5e442a362153fd7d6378acd`**. Portable independent baseline SHA-256: **`872c5c22fafa0d0709aa4e5846d8d8bf0c361c5f4e46e4680830a71e151e0418`**. Its canonical chain data, ABIs, addresses, runtimes, pending actions and source-manifest hash are identical to the original baseline; only `source_manifest_path` is now repository-relative. The original immutable baseline with SHA-256 `495b2075514d1345a2df0274705791d5a511cdda963a3039288ac65498531043` remains recoverable at signed commit `c56bce6a09e372540cf4dd7158d165a71f520a8e`. The committed `qualification.json` and `verifier.json` authenticate that original baseline. Final-head PR artifacts authenticate the portable baseline with its separately supplied new hash.
 
 Bridge PriceDesk **`0xad70893E2F51076b0e9bA18fC593e924593a073F`**; MissionControl **`0xD2c97549F4D44ca8Eb000d2AB2f3c5da8623D1D7`**; Defaults **`0x249c4798C49Fc8Ad86a43dC425D80396971E7AcC`**. Foxtrot configuration/rewards initialization is simulated through its actual methods after staged-state verification. Source order `[1,8,2,9,4,5]`, stale time 86,400 seconds, price/snapshot source allowances 1.5M each. All source addresses, validity and runtime hashes are in the report.
 
