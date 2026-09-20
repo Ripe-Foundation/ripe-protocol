@@ -3,11 +3,11 @@ import pytest
 
 from conf_utils import filter_logs, redeem_collateral
 from constants import EIGHTEEN_DECIMALS
-from registries.price_desk_helpers import _isolated_price_desk
+from registries.price_desk_helpers import (
+    ETH, ZERO_ADDRESS, _gas_source, _isolated_price_desk, _raw_source, _set_priorities,
+)
 
 
-ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 RAW_CANONICAL = 0
 RAW_REVERT = 1
 RAW_EMPTY = 2
@@ -16,54 +16,6 @@ RAW_OVERSIZED_ONE = 4
 RAW_NONCANONICAL_BOOL = 5
 RAW_OVERSIZED_96 = 6
 RAW_SNAPSHOT_FALSE = 7
-
-
-def _raw_source(
-    price=0,
-    has_feed=False,
-    price_mode=0,
-    has_feed_mode=0,
-    snapshot_mode=0,
-):
-    source = boa.load(
-        "contracts/mock/MockRawPriceSource.vy",
-        name="raw_price_source",
-    )
-    source.configure(
-        price,
-        has_feed,
-        price_mode,
-        has_feed_mode,
-        snapshot_mode,
-    )
-    return source
-
-
-def _gas_source(
-    price=0,
-    has_feed=False,
-    price_iterations=0,
-    has_feed_iterations=0,
-    snapshot_iterations=0,
-    exhaust_price=False,
-    exhaust_has_feed=False,
-    exhaust_snapshot=False,
-):
-    source = boa.load(
-        "contracts/mock/MockGasBurningPriceSource.vy",
-        name="gas_burning_price_source",
-    )
-    source.configure(
-        price,
-        has_feed,
-        price_iterations,
-        has_feed_iterations,
-        snapshot_iterations,
-        exhaust_price,
-        exhaust_has_feed,
-        exhaust_snapshot,
-    )
-    return source
 
 
 def test_price_source_gas_is_set_per_deployment(ripe_hq, deploy3r):
@@ -162,13 +114,6 @@ def qualifyExplicit(
         _staleTime,
     )
 """
-
-
-def _set_priorities(mission_control, switchboard_alpha, source_ids):
-    mission_control.setPriorityPriceSourceIds(
-        source_ids,
-        sender=switchboard_alpha.address,
-    )
 
 
 def _register_sources(price_desk, governance, sources):

@@ -205,8 +205,6 @@ def test_green_route_uses_curve_and_chainlink_usdg_without_recursion(
 def test_green_config_transition_with_normal_block_and_timestamp_progression(
     robinhood_curve_launch_route,
 ):
-    # Allowance-margin comparison on the shared local route. Complete profile
-    # constructor/override behavior is covered separately below.
     route = robinhood_curve_launch_route
     route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
     action_id = route.curve.setGreenRefPoolConfig(
@@ -338,8 +336,6 @@ def test_full_capacity_ten_green_ring_teller_housekeeping_gas(
     deleverage,
     alice,
 ):
-    # Allowance-margin comparison on the shared local route. Complete profile
-    # constructor/override behavior is covered separately below.
     route = robinhood_curve_launch_route
     route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
     action_id = route.curve.setGreenRefPoolConfig(
@@ -557,7 +553,7 @@ def test_profile_curve_snapshot_allowance_has_cold_margin(
     print(f"CURVE_COLD_DUE profile={profile} mature={mature} source_gas={used} budget={budget} margin={budget / used:.4f}")
 
 
-def test_review_nested_curve_fallback(robinhood_curve_launch_route, ripe_hq, deploy3r):
+def test_nested_curve_fallback_requires_sufficient_enclosing_quote_budget(robinhood_curve_launch_route, ripe_hq, deploy3r):
     """A generous transaction limit cannot repair an inadequate enclosing cap."""
     from registries.price_desk_helpers import _isolated_price_desk
 

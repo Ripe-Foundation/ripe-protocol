@@ -264,3 +264,47 @@ def test_base_harness_help_remains_available_without_rpc(module):
                             cwd=ROOT, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     assert "--defaults" in result.stdout
+
+
+@pytest.mark.parametrize("flag", (
+    "--probe", "--legacy-probe", "--ordinary-probe", "--stability-probe",
+    "--stability-residual", "--borrower-audit", "--audit-blocker-migrations",
+    "--remediate-blockers",
+))
+def test_legacy_probe_cli_rejects_before_setup(monkeypatch, capsys, flag):
+    import scripts.base_upgrade_fork as legacy
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("unsupported probe reached setup/RPC/staging")
+
+    for name in ("load_dotenv", "Rehearsal", "fingerprint"):
+        monkeypatch.setattr(legacy, name, forbidden)
+    monkeypatch.setattr(sys, "argv", [
+        "base_upgrade_fork.py", "--block", "1", "--defaults", "not-read.json",
+        "--report", "not-written.json", flag,
+    ])
+    with pytest.raises(SystemExit) as error:
+        legacy.main()
+    assert error.value.code == 2
+    diagnostic = capsys.readouterr().err
+    assert "BASE_COMPATIBILITY_PROBE_REQUIRES_FULL_UPDATE" in diagnostic
+    assert "scripts/base_full_update_fork.py" in diagnostic
+    assert flag in diagnostic
+
+
+def test_legacy_staging_cli_remains_supported(monkeypatch):
+    import scripts.base_upgrade_fork as legacy
+
+    class ReachedSupportedSetup(Exception):
+        pass
+
+    def reached_setup(*args, **kwargs):
+        raise ReachedSupportedSetup
+
+    monkeypatch.setattr(legacy, "load_dotenv", reached_setup)
+    monkeypatch.setattr(sys, "argv", [
+        "base_upgrade_fork.py", "--block", "1", "--defaults", "not-read.json",
+        "--report", "not-written.json", "--census", "--diagnose-replacing-pending",
+    ])
+    with pytest.raises(ReachedSupportedSetup):
+        legacy.main()

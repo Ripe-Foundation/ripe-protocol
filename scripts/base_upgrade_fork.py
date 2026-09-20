@@ -959,6 +959,18 @@ def main():
     p.add_argument("--remediate-blockers", action="store_true")
     p.add_argument("--only-user", help="Isolate a failing user; never full qualification")
     a = p.parse_args()
+    unsupported = (
+        "probe", "legacy_probe", "ordinary_probe", "stability_probe",
+        "stability_residual", "borrower_audit", "audit_blocker_migrations",
+        "remediate_blockers",
+    )
+    selected = ["--" + name.replace("_", "-") for name in unsupported if getattr(a, name)]
+    if selected:
+        p.error(
+            "BASE_COMPATIBILITY_PROBE_REQUIRES_FULL_UPDATE: "
+            + ", ".join(selected)
+            + " requires scripts/base_full_update_fork.py for current-source dependencies"
+        )
     load_dotenv(ROOT / ".env")
     r = Rehearsal(os.environ["BASE_MAINNET_RPC_URL"], a.block, a.report, overwrite=a.overwrite)
     r.diagnose_replacing_pending = a.diagnose_replacing_pending

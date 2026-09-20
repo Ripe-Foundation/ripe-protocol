@@ -202,12 +202,29 @@ def test_drafts_do_not_enter_live_base_migration_queue(tmp_path):
     from scripts.utils.migration_runner import MigrationRunner
 
     def assert_no_drafts(runner):
-        drafts = {path.read_bytes() for path in (ROOT / CANDIDATE_DIR).glob("*.py")}
-        prohibited_names = {path.stem for path in (ROOT / CANDIDATE_DIR).glob("*.py")}
+        candidates = tuple((ROOT / CANDIDATE_DIR).glob("*.py"))
+        drafts = {path.read_bytes() for path in candidates}
+        prohibited_names = {path.stem for path in candidates}
+        # Deployment identities survive renamed files and comment/format edits.
+        # Fresh production labels remain eligible for a separately authorized migration.
+        identifiers = {
+            node.value.value
+            for path in (ROOT / ORACLES, ROOT / BRIDGE)
+            for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+            and any(isinstance(target, ast.Name) and target.id in ("LABEL", "TELLER_LABEL", "SUFFIX")
+                    for target in node.targets)
+        }
+        assert len(identifiers) == 3
         for filename, _, _ in runner._filtered_migration_filenames(None, None):
             path = Path(filename)
-            assert path.read_bytes() not in drafts, f"Rehearsal draft in live queue: {path.name}"
-            assert not any(name in path.stem for name in prohibited_names), path.name
+            diagnostic = f"Rehearsal draft in live queue: {path.name}"
+            assert path.read_bytes() not in drafts, diagnostic
+            assert not any(name in path.stem for name in prohibited_names), diagnostic
+            strings = [node.value for node in ast.walk(ast.parse(path.read_text()))
+                       if isinstance(node, ast.Constant) and isinstance(node.value, str)]
+            assert not any(identifier in value for identifier in identifiers for value in strings), diagnostic
 
     runner = MigrationRunner(str(ROOT / "migrations/base-mainnet"),
                              str(ROOT / "migration_history/base-mainnet/v1"), {})
@@ -230,10 +247,25 @@ def test_drafts_do_not_enter_live_base_migration_queue(tmp_path):
     assert [timestamp for _, timestamp, _ in
             future._filtered_migration_filenames("1000", None, inclusive=False)] == ["1001"]
     assert_no_drafts(future)
-    # The same assertion must detect a timestamped copy even under another name.
-    (queue / "1002_AccidentalDraft.py").write_bytes((ROOT / BRIDGE).read_bytes())
-    with pytest.raises(AssertionError, match="Rehearsal draft in live queue"):
-        assert_no_drafts(future)
+    fresh = queue / "1002_AuthorizedFreshLabels.py"
+    fresh.write_text('LABEL = "PriceDeskAuthorizedProductionCandidate"\n'
+                     'TELLER_LABEL = "TellerAuthorizedProductionCandidate"\n')
+    assert_no_drafts(future)
+    # Ordinary future migrations can also advance the synthetic recorded frontier.
+    (history / "1001-manifest.json").write_text("{}")
+    advanced = MigrationRunner(str(queue), str(history), {})
+    assert advanced._recorded_frontier() == "1001"
+    advanced._require_start_point(None, "1002")
+    assert_no_drafts(advanced)
+    for draft in (ORACLES, BRIDGE):
+        copied = queue / "1003_AccidentalCamelStyleCopy.py"
+        copied.write_bytes((ROOT / draft).read_bytes())
+        with pytest.raises(AssertionError, match="Rehearsal draft in live queue"):
+            assert_no_drafts(advanced)
+        copied.write_text("# Irrelevant comment-only edit to a renamed draft.\n" + copied.read_text())
+        with pytest.raises(AssertionError, match="Rehearsal draft in live queue"):
+            assert_no_drafts(advanced)
+        copied.unlink()
 
 
 @pytest.mark.parametrize("missing", (6, 8, 5, 7, 17))

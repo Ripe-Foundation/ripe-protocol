@@ -12,6 +12,7 @@ from pathlib import Path
 import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
+from eth_utils import keccak
 
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
@@ -748,6 +749,11 @@ def test_governance_post_clear_nested_deposit_preserves_complete_accounting(
     ]
 
 
+def _require_intended_post_callback_rollback(error):
+    if not _boa_error_has_dev_reason(error, "intended post-callback rollback"):
+        raise AssertionError("intended post-callback rollback was not reached") from error
+
+
 def test_governance_post_clear_nested_deposit_rolls_back_after_housekeeping(
     ripe_hq,
     governance,
@@ -796,9 +802,7 @@ def test_governance_post_clear_nested_deposit_rolls_back_after_housekeeping(
     )
     with pytest.raises(BoaError) as downstream:
         teller.depositIntoGovVault(token, amount, 500, bob, sender=bob)
-    assert _boa_error_has_dev_reason(
-        downstream.value, "intended post-callback rollback"
-    )
+    _require_intended_post_callback_rollback(downstream.value)
 
     assert before == (
         token.balanceValue(bob),
@@ -818,3 +822,46 @@ def test_governance_post_clear_nested_deposit_rolls_back_after_housekeeping(
     )
     assert nested_amount == 1
     assert filter_logs(teller, "TellerDeposit") == []
+
+
+def test_governance_rollback_proof_rejects_missing_relay(
+    ripe_hq, governance, simple_erc20_vault, ripe_gov_vault, bob,
+    setGeneralConfig, setAssetConfig, mission_control, switchboard_alpha,
+    teller, ledger, vault_book, monkeypatch,
+):
+    """The same positive proof must reject a revert before its callback phase."""
+    relay = """@external
+def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool:
+    return True
+
+"""
+    source = GOVERNANCE_REVERTING_PRICE_CALLBACK_SOURCE
+    assert source.count(relay) == 1
+    positive_proof = test_governance_post_clear_nested_deposit_rolls_back_after_housekeeping
+    monkeypatch.setitem(
+        positive_proof.__globals__, "GOVERNANCE_REVERTING_PRICE_CALLBACK_SOURCE",
+        source.replace(relay, "", 1),
+    )
+    with pytest.raises(AssertionError, match="^intended post-callback rollback was not reached$") as failure:
+        positive_proof(
+            ripe_hq, governance, simple_erc20_vault, ripe_gov_vault, bob,
+            setGeneralConfig, setAssetConfig, mission_control, switchboard_alpha,
+            teller, ledger, vault_book,
+        )
+    # Compilation, setup and unrelated assertions cannot satisfy this control.
+    downstream = failure.value.__cause__
+    assert isinstance(downstream, BoaError)
+    desk = bytes.fromhex(str(ripe_hq.getAddr(7))[2:])
+
+    def descendants(computation):
+        for child in computation.children:
+            yield child
+            yield from descendants(child)
+
+    desk_calls = [call for call in descendants(downstream.call_trace.computation)
+                  if call.msg.code_address == desk]
+    relay_selector = keccak(text="addGreenRefPoolSnapshot(uint256)")[:4]
+    snapshot_selector = keccak(text="addPriceSnapshot(address)")[:4]
+    assert any(bytes(call.msg.data[:4]) == relay_selector and call.is_error
+               for call in desk_calls)
+    assert not any(bytes(call.msg.data[:4]) == snapshot_selector for call in desk_calls)
