@@ -286,10 +286,27 @@ def legacy_compat_staging(legacy_env, switchboard, monkeypatch):
     monkeypatch.setattr(checks, "SETUP_DEPLOYER", str(e.bob))
     minimum, maximum = PARAMS["base"]["MIN_SWITCHBOARD_CHANGE_TIMELOCK"], PARAMS["base"]["MAX_SWITCHBOARD_CHANGE_TIMELOCK"]
     records, controllers = {}, {}
+    setup_mc = boa.loads(f"""
+@external
+@view
+def getRipeHq() -> address:
+    return {e.hq.address}
+@external
+@view
+def numAssets() -> uint256:
+    return 1
+@external
+@view
+def numLiteSigners() -> uint256:
+    return 1
+""")
+    records["MissionControl" + module.PREVIOUS_SUFFIX] = {"address": str(setup_mc.address), "abi": setup_mc.abi}
+    records["DefaultsBaseLive" + module.PREVIOUS_SUFFIX] = {"address": str(fifth.address), "abi": fifth.abi}
     for row, name in checks.REUSED_CONTROLLERS.items():
         args = (e.hq.address, e.bob if row == 6 else ZERO, minimum, maximum)
         controller = boa.load(f"contracts/config/{name}.vy", *args)
         if row == 6:
+            controller.startDefaultsInitialization(setup_mc, fifth, sender=e.bob)
             controller.relinquishGov(sender=e.bob)
         controllers[row] = controller
         records[name + module.PREVIOUS_SUFFIX] = dict(address=str(controller.address), abi=controller.abi,
@@ -326,6 +343,9 @@ def legacy_compat_staging(legacy_env, switchboard, monkeypatch):
             directory = "registries" if name in ("VaultBook", "Switchboard") else "config" if name.startswith("Switchboard") else "core"
             contract = boa.load(f"contracts/{directory}/{name}.vy", *args)
             self.deployed[name] = contract
+            self.records[label] = dict(address=str(contract.address), abi=contract.abi,
+                solc_json=contract.deployer.solc_json, args=encode_constructor_args(contract.abi, args),
+                file=f"contracts/{directory}/{name}.vy")
             assert label == name + module.SUFFIX
             return contract
         def execute(self, function, *args):
@@ -465,3 +485,45 @@ def test_exposed_cutover_book_checks_fail_closed(legacy_compat_staging, fault):
         book.startGovernanceChange(e.dl, sender=e.gov.address)
     with pytest.raises(RuntimeError, match="BASE_LEGACY_COMPAT_"):
         verify_book(book, e.pool, retained)
+
+
+@pytest.mark.parametrize("field,value", [("missionControl", 1), ("defaults", 1), ("initStep", 2), ("nextAssetIndex", 1), ("rewardsInitialized", 1)])
+def test_staging_rejects_foxtrot_progress_before_deploying(legacy_compat_staging, field, value):
+    from conf_legacy_pool import storage_write
+    module, migration, _ = legacy_compat_staging
+    storage_write(migration.controllers[6], None, field, [], value)
+    with pytest.raises(RuntimeError, match="FOXTROT_SETUP:" + field):
+        module.migrate(migration)
+    assert not migration.deployed and not migration.calls
+
+
+@pytest.mark.parametrize("fault", ["retained_row", "deleverage", "controller_runtime", "controller_governance",
+                                   "foxtrot", "hq_update", "hq_disable", "book_update", "board_disable"])
+def test_staging_rechecks_source_and_pending_state_after_last_transaction(legacy_compat_staging, monkeypatch, fault):
+    from conf_legacy_pool import storage_write
+    module, migration, e = legacy_compat_staging
+    original = migration.execute
+    def execute(function, *args):
+        result = original(function, *args)
+        if len(migration.calls) == 28:
+            if fault == "retained_row":
+                storage_write(e.book, "registry", "addrInfo", [3], e.dl.address)
+            elif fault == "deleverage":
+                e.dl.setMinDeleverageBps(100, sender=e.alpha.address)
+            elif fault == "controller_runtime":
+                boa.env.set_code(migration.controllers[2].address, b"\x00")
+            elif fault == "controller_governance":
+                storage_write(migration.controllers[2], "gov", "governance", [], e.bob)
+            elif fault == "foxtrot":
+                storage_write(migration.controllers[6], None, "nextAssetIndex", [], 1)
+            elif fault in ("hq_update", "hq_disable"):
+                storage_write(e.hq, "registry", "pendingAddrUpdate" if fault == "hq_update" else "pendingAddrDisable", [9], e.dl.address if fault == "hq_update" else 1)
+            elif fault == "book_update":
+                storage_write(migration.deployed["VaultBook"], "registry", "pendingAddrUpdate", [1], e.dl.address)
+            else:
+                storage_write(migration.deployed["Switchboard"], "registry", "pendingAddrDisable", [2], 1)
+        return result
+    monkeypatch.setattr(migration, "execute", execute)
+    with pytest.raises(RuntimeError, match="(?:BASE_LEGACY_COMPAT_|MIGRATION_CANDIDATE_)"):
+        module.migrate(migration)
+    assert len(migration.calls) == 28

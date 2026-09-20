@@ -76,6 +76,11 @@ LEGACY_POOL: public(immutable(address))
 LEGACY_POOL_REG_ID: constant(uint256) = 1
 # Per optional read; qualified against pinned Base routes and claim inventories.
 LEGACY_READ_GAS: constant(uint256) = 8_000_000
+# Reserve for cold CALL access, bounded 68-byte input / 33-byte output memory,
+# and generated setup between GAS and STATICCALL. EIP-150 needs ceil(gas/63)
+# in addition to the stipend. Check even successful zero-returning targets:
+# a nested price source can fail soft inside an otherwise successful call.
+LEGACY_READ_MIN_GAS: constant(uint256) = LEGACY_READ_GAS + (LEGACY_READ_GAS + 62) // 63 + 50_000
 
 
 @deploy
@@ -180,6 +185,7 @@ def getDeleverageTraversalAsset(_user: address, _vaultAddr: address, _index: uin
 @view
 @internal
 def _optionalUint(_target: address, _data: Bytes[68]) -> uint256:
+    assert msg.gas >= LEGACY_READ_MIN_GAS, "insufficient legacy read gas"
     success: bool = False
     response: Bytes[33] = b""
     success, response = raw_call(_target, _data, gas=LEGACY_READ_GAS, max_outsize=33, is_static_call=True, revert_on_failure=False)

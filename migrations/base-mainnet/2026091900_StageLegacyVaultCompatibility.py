@@ -11,7 +11,7 @@ from scripts.utils import log
 from scripts.utils.migration import Migration
 from scripts.utils.legacy_vault_compat import (
     address, require, verify_book, verify_local_governance, authenticate_reused_controllers,
-    REUSED_CONTROLLERS,
+    REUSED_CONTROLLERS, source_state, verify_registry_pending,
 )
 
 ZERO = "0x" + "00" * 20
@@ -57,6 +57,8 @@ def migrate(migration: Migration):
     params = migration.blueprint().PARAMS
     min_lock, max_lock = params["MIN_SWITCHBOARD_CHANGE_TIMELOCK"], params["MAX_SWITCHBOARD_CHANGE_TIMELOCK"]
     reused = authenticate_reused_controllers(migration.get_record, old_switchboard, hq.address, min_lock, max_lock)
+    before_source = source_state(hq, old_book, active_dl, migration.get_record, old_switchboard,
+                                 min_lock, max_lock, DELEVERAGE_PARAMS)
     candidates = {}
 
     log.h1("1. Deploy the compatible VaultBook and callers under fresh labels")
@@ -105,6 +107,11 @@ def migrate(migration: Migration):
                      if reg_id in REUSED_CONTROLLERS else candidates["Switchboard" + suffix].address)
         require(address(board.getAddr(reg_id)) == address(candidate)
                 and board.getRegId(candidate) == reg_id and board.isValidRegId(reg_id), f"SWITCHBOARD_ROW:{reg_id}")
+    verify_registry_pending(book, range(1, 6))
+    verify_registry_pending(board, range(1, 8))
+    after_source = source_state(hq, old_book, active_dl, migration.get_record, old_switchboard,
+                                min_lock, max_lock, DELEVERAGE_PARAMS)
+    require(after_source == before_source, "SOURCE_STATE_DRIFT")
     for name, candidate in candidates.items():
         size = len(boa.env.get_code(candidate.address))
         require(0 < size <= 24_576, f"RUNTIME_SIZE:{name}:{size}")

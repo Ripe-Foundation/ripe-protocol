@@ -1002,7 +1002,8 @@ def test_owner_specific_deleverage_rounding_residual_is_skipped_by_next_batch(le
     assert executable * custody_value // custody == 0
     clear_transient_storage()
     with boa.env.anchor():
-        with boa.reverts():
+        reason = "max withdraw stab amount is 0" if quote == 1007 else "zero collateral value (vault under-send)"
+        with boa.reverts(reason):
             e.teller.deleverageWithSpecificAssets([(1, e.lp.address, WAD)], e.bob, sender=e.bob)
     assert e.nav() == (e.lp.address, 0)
     assert e.dl.getDeleverageInfo(e.bob) == (0, 0)
@@ -1167,3 +1168,126 @@ def totalClaimableBalances(a: address) -> uint256:
     assert trace.get_gas_used() < 9_500_000
     assert before == (debt(e), e.lp.balanceOf(e.pool))
     assert debt(e, e.alice) == 200 * WAD and payment.balanceOf(e.funds) == 100 * WAD
+
+
+@pytest.mark.parametrize("target", ["getTotalAmountForUser", "getTotalUserValue", "convertToAssets", "nested_price"])
+def test_optional_read_requires_full_allowance_before_every_target(legacy_env, target):
+    e = legacy_env
+    token = e.sg if target == "convertToAssets" else e.lp
+    e.deposit(e.bob, 100 * WAD, token)
+    burn = "    x: bytes32 = empty(bytes32)\n    for i: uint256 in range(10_000):\n        x = keccak256(x)\n    assert x != empty(bytes32)\n"
+    source = f"""
+@external
+@view
+def isPaused() -> bool:
+    return False
+@external
+@view
+def totalClaimableBalances(a: address) -> uint256:
+    return 0
+@external
+@view
+def getUserAssetAtIndexAndHasBalance(u: address, i: uint256) -> (address, bool):
+    return {token.address}, True
+"""
+    for getter in ("getTotalAmountForUser", "getTotalUserValue"):
+        prefix = burn if (getter == "getTotalAmountForUser" and target != getter) or target in ("convertToAssets", "nested_price") else ""
+        source += f"@external\n@view\ndef {getter}(u: address, a: address) -> uint256:\n" + prefix + f"    return {100 * WAD}\n"
+    synthetic = boa.loads(source)
+    boa.env.set_code(e.pool.address, boa.env.get_code(synthetic.address))
+    if target == "nested_price":
+        oracle = boa.loads(f"""
+@external
+@view
+def getPriceAndHasFeed(a: address, stale: uint256, desk: address) -> (uint256, bool):
+    assert msg.gas >= 100_000, "source budget unavailable"
+    x: bytes32 = empty(bytes32)
+    for i: uint256 in range(1_000):
+        x = keccak256(x)
+    assert x != empty(bytes32)
+    return {WAD}, True
+@external
+@view
+def hasPriceFeed(a: address) -> bool:
+    return True
+""")
+        boa.env.set_code(e.prices.address, boa.env.get_code(oracle.address))
+        # Positive reproduction: a real PriceDesk can succeed with zero when
+        # an inner source is gas-starved. Checking only outer success is wrong.
+        zero_seen = False
+        for gas in range(30_000, 250_001, 10_000):
+            clear_transient_storage()
+            try:
+                value = e.pd.getUsdValue(e.lp, 100 * WAD, gas=gas)
+            except boa.BoaError:
+                continue
+            if value == 0:
+                trace = e.pd._computation
+                assert not trace.is_error
+                assert any(c.is_error for c in calls_to(trace, e.prices.address, "getPriceAndHasFeed(address,uint256,address)"))
+                zero_seen = True
+                break
+        assert zero_seen
+        clear_transient_storage()
+        assert e.pd.getUsdValue(e.lp, 100 * WAD, gas=8_000_000) == 100 * WAD
+    address, signature = {
+        "getTotalAmountForUser": (e.pool.address, "getTotalAmountForUser(address,address)"),
+        "getTotalUserValue": (e.pool.address, "getTotalUserValue(address,address)"),
+        "convertToAssets": (e.sg.address, "convertToAssets(uint256)"),
+        "nested_price": (e.pd.address, "getUsdValue(address,uint256)"),
+    }[target]
+    predecessor = {"getTotalUserValue": "getTotalAmountForUser(address,address)",
+                   "convertToAssets": "getTotalUserValue(address,address)",
+                   "nested_price": "getTotalUserValue(address,address)"}.get(target)
+    blocked = False
+    for gas in range(8_000_000, 13_000_001, 250_000):
+        clear_transient_storage()
+        try:
+            result = e.book.getDeleverageTraversalAsset(e.bob, e.pool, 1, True, gas=gas)
+        except boa.BoaError as error:
+            assert "insufficient legacy read gas" in str(error)
+            trace = e.book._computation
+            if not calls_to(trace, address, signature) and (predecessor is None or calls_to(trace, e.pool.address, predecessor)):
+                blocked = True
+        else:
+            assert result == (token.address, 100 * WAD)
+            assert calls_to(e.book._computation, address, signature)[0].msg.gas == 8_000_000
+    assert blocked, target
+    clear_transient_storage()
+    assert e.book.getDeleverageTraversalAsset(e.bob, e.pool, 1, True, gas=20_000_000) == (token.address, 100 * WAD)
+
+
+@pytest.mark.parametrize("cohort", ["lp", "sg", "mixed"])
+@pytest.mark.parametrize("healthy_first", [True, False])
+def test_gas_limit_scan_cannot_succeed_with_an_intended_user_omitted(legacy_env, cohort, healthy_first):
+    e = legacy_env
+    e.borrower(e.bob)
+    fund_healthy_batch_user(e)
+    tokens = (e.lp, e.sg) if cohort == "mixed" else (getattr(e, cohort),)
+    claims = [e.token(f"gas scan {cohort} {i}") for i in range(26)]
+    for asset in claims:
+        e.prices.setPrice(asset, WAD)
+    for token in tokens:
+        e.deposit(e.bob, (100 if cohort == "mixed" else 200) * WAD, token)
+        for asset in claims:
+            e.claim(asset, 1, cohort=token)
+    users = [(e.alice, 100 * WAD), (e.bob, 150 * WAD)]
+    if not healthy_first:
+        users.reverse()
+    outcomes = set()
+    for gas in (*range(400_000, 16_000_001, 400_000), 24_000_000):
+        with boa.env.anchor():
+            clear_transient_storage()
+            before = debt(e, e.alice), debt(e, e.bob), pool_state(e)
+            try:
+                paid = e.teller.deleverageManyUsers(users, sender=e.alpha.address, gas=gas)
+            except boa.BoaError:
+                outcomes.add("reverted")
+                assert (debt(e, e.alice), debt(e, e.bob), pool_state(e)) == before
+            else:
+                outcomes.add("complete")
+                assert paid == 250 * WAD, (cohort, healthy_first, gas, paid)
+                assert debt(e, e.alice) == 200 * WAD and debt(e, e.bob) == 150 * WAD
+                events = filter_logs(e.teller, "DeleverageUser")
+                assert {str(log.user) for log in events} == {str(e.alice), str(e.bob)}
+    assert outcomes == {"reverted", "complete"}

@@ -196,12 +196,14 @@ def test_python_workflow_routes_validation_jobs_on_automatic_events():
         "rh",
         "rh-audit-remediation",
         "codex/rh-reviewed-correctness-fixes",
+        "codex/base-upgrade-fork-rehearsal",
     ]
     assert workflow["on"]["merge_group"]["branches"] == [
         "master",
         "rh",
         "rh-audit-remediation",
         "codex/rh-reviewed-correctness-fixes",
+        "codex/base-upgrade-fork-rehearsal",
     ]
     assert workflow["on"]["push"]["branches"] == [
         "master",

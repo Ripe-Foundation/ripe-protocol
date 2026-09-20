@@ -62,11 +62,16 @@ def fingerprint(root, extra_paths=()):
         ("interfaces", {".vy", ".vyi", ".json"}),
         ("scripts", {".py"}), ("config", {".py", ".json"}),
         ("migrations/base-mainnet", {".py"}),
+        ("migration_history/base-mainnet/v1", {".json"}),
+        ("tests/fixtures/legacy_pool", {".vy", ".vyi", ".json"}),
     ):
         paths.update(p for p in (root / directory).rglob("*") if p.suffix in suffixes)
+    paths.update(p for p in (root / "docs/chains/base/fork-rehearsal/full-update-final.json",
+                             root / "docs/chains/base/legacy-vault-rehearsal/review-qualification.json") if p.exists())
     paths.update(Path(p).resolve() for p in extra_paths)
     paths.update([root / "requirements.txt", root / "migration_history/base-mainnet/v1/current-manifest.json"])
     return {
+        "source_tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=root, text=True).strip(),
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
         "dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True).strip()),
         "scope": "conservative project-input superset, including selected Defaults and manifest",
