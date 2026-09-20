@@ -3,7 +3,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS as WAD, ZERO_ADDRESS
-from conf_utils import filter_logs
+from conf_utils import claim_from_stability_pool, filter_logs, redeem_from_stability_pool
 from conf_legacy_pool import PROVENANCE, call_tree, calls_to, storage_write
 
 
@@ -579,3 +579,128 @@ def test_stabilization_reservation_blocks_both_payment_paths(legacy_env, green_c
     assert not filter_logs(e.teller, "CollateralSwappedWithStabPool")
     assert e.ledger.hasFungibleAuction(e.bob, 3, e.collateral)
     assert pool_state(e, e.alice) == before and e.green.totalSupply() == supply
+
+
+@pytest.fixture
+def legacy_claim_env(legacy_env, setRipeRewardsConfig):
+    e = legacy_env
+    setRipeRewardsConfig(_ripePerBlock=0, _stabPoolRipePerDollarClaimed=2 * WAD)
+    e.mc.setRipeGovVaultConfig(e.ripe, 100_00, False, (10, 1000, 100_00, False, 0),
+                              sender=e.alpha.address)
+    e.configure(e.ripe, _vaultIds=[2])
+    e.prices.setPrice(e.ripe, WAD)
+    e.ledger.setRipeAvailForRewards(100 * WAD, sender=e.alpha.address)
+    e.deposit(e.bob, 100 * WAD)
+    e.claim(e.collateral, 40 * WAD, paid=40 * WAD)
+    return e
+
+
+def claim_reward_state(e):
+    return (
+        pool_state(e), e.pool.totalClaimableBalances(e.collateral),
+        e.pool.indexOfClaimableAsset(e.lp, e.collateral), e.pool.numClaimableAssets(e.lp),
+        e.collateral.balanceOf(e.bob), e.collateral.balanceOf(e.pool),
+        e.ripe.totalSupply(), e.ripe.allowance(e.pool, e.teller),
+        tuple(e.ripe.balanceOf(account) for account in (e.pool, e.book, e.teller, e.ripe_gov, e.bob)),
+        e.ripe_gov.userBalances(e.bob, e.ripe), e.ripe_gov.totalBalances(e.ripe),
+        e.ripe_gov.userGovData(e.bob, e.ripe), e.ripe_gov.totalGovPoints(),
+        e.ledger.ripeAvailForRewards(), e.ledger.ripeRewards(),
+        e.ledger.getDepositLedgerData(e.bob, 1), e.ledger.getDepositLedgerData(e.bob, 2),
+        e.ledger.lastTouch(e.bob), e.ledger.userDebt(e.bob),
+    )
+
+
+def test_legacy_claim_mints_rewards_and_stakes_in_retained_vault2(legacy_claim_env):
+    e = legacy_claim_env
+    assert e.book.getAddr(2) == e.ripe_gov.address
+    assert e.mc.coreRipeGovVaultId() == 2
+    shares_before = e.pool.userBalances(e.bob, e.lp)
+    supply_before = e.ripe.totalSupply()
+    collateral_before = e.collateral.balanceOf(e.bob)
+    assert claim_from_stability_pool(e.teller, 1, e.lp, e.collateral,
+                                     max_usd_value=20 * WAD, sender=e.bob) == 20 * WAD
+    trace = e.teller._computation
+    reward = 40 * WAD
+    assert e.collateral.balanceOf(e.bob) == collateral_before + 20 * WAD
+    assert e.collateral.balanceOf(e.pool) == e.pool.totalClaimableBalances(e.collateral) == 20 * WAD
+    assert e.pool.claimableBalances(e.lp, e.collateral) == 20 * WAD
+    assert e.pool.userBalances(e.bob, e.lp) == shares_before - 20 * WAD * 10**8
+    assert e.pool.totalBalances(e.lp) == e.pool.userBalances(e.bob, e.lp)
+    assert e.ripe.totalSupply() == supply_before + reward
+    assert e.ledger.ripeAvailForRewards() == 100 * WAD - reward
+    assert e.ripe.balanceOf(e.ripe_gov) == reward
+    assert e.ripe_gov.getTotalAmountForUser(e.bob, e.ripe) == reward
+    assert e.ripe_gov.userBalances(e.bob, e.ripe) == reward * 10**8
+    assert e.ripe.allowance(e.pool, e.teller) == 0
+    assert all(e.ripe.balanceOf(account) == 0 for account in (e.pool, e.book, e.teller, e.bob))
+    for target, signature, sender in (
+        (e.book, "mintRipeForStabPoolClaims(uint256,address,address)", e.pool),
+        (e.ripe, "mint(address,uint256)", e.book),
+        (e.ledger, "didGetRewardsFromStabClaims(uint256)", e.book),
+    ):
+        calls = calls_to(trace, target.address, signature)
+        assert len(calls) == 1
+        assert calls[0].msg.sender == bytes.fromhex(sender.address[2:])
+    deposits = filter_logs(e.teller, "RipeGovVaultDeposit")
+    assert len(deposits) == 1
+    assert deposits[0].user == e.bob and deposits[0].amount == reward
+    assert deposits[0].lockDuration == 10
+    gov_state = e.ripe_gov.userGovData(e.bob, e.ripe)
+    assert gov_state.unlock == boa.env.evm.patch.block_number + 10
+    # New Teller also honors the retained vault's lock and withdrawal ABI.
+    before = claim_reward_state(e)
+    with boa.reverts():
+        e.teller.withdraw(e.ripe, reward, e.bob, e.ripe_gov, sender=e.bob)
+    assert claim_reward_state(e) == before
+    boa.env.time_travel(blocks=10)
+    assert e.teller.withdraw(e.ripe, reward, e.bob, e.ripe_gov, sender=e.bob) == reward
+    assert e.ripe.balanceOf(e.bob) == reward and e.ripe.balanceOf(e.ripe_gov) == 0
+    assert e.ripe_gov.userBalances(e.bob, e.ripe) == 0
+    assert e.ripe.totalSupply() == supply_before + reward
+    assert e.ledger.ripeAvailForRewards() == 100 * WAD - reward
+
+
+def test_paused_ledger_rolls_back_legacy_claim_and_reward_mint(legacy_claim_env):
+    e = legacy_claim_env
+    e.ledger.pause(True, sender=e.alpha.address)
+    before = claim_reward_state(e)
+    with boa.reverts():
+        claim_from_stability_pool(e.teller, 1, e.lp, e.collateral,
+                                  max_usd_value=20 * WAD, sender=e.bob)
+    trace = e.teller._computation
+    assert claim_reward_state(e) == before
+    # The revert follows the token transfer and reward mint; EVM rollback
+    # restores them as well as the shares, claims and shared reward budget.
+    mints = calls_to(trace, e.ripe.address, "mint(address,uint256)")
+    debits = calls_to(trace, e.ledger.address, "didGetRewardsFromStabClaims(uint256)")
+    assert len(mints) == 1 and not mints[0].is_error
+    assert len(debits) == 1 and debits[0].is_error
+    e.ledger.pause(False, sender=e.alpha.address)
+    assert claim_from_stability_pool(e.teller, 1, e.lp, e.collateral,
+                                     max_usd_value=20 * WAD, sender=e.bob) == 20 * WAD
+    assert e.ripe_gov.getTotalAmountForUser(e.bob, e.ripe) == 40 * WAD
+
+
+def test_legacy_redemption_preserves_green_backing_and_lp_readiness(legacy_env):
+    e = legacy_env
+    e.deposit(e.bob, 100 * WAD)
+    e.claim(e.collateral, 40 * WAD, paid=40 * WAD)
+    e.green.mint(e.alice, 50 * WAD, sender=e.ah.address)
+    e.green.approve(e.teller, 50 * WAD, sender=e.alice)
+    shares_before = e.pool.userBalances(e.bob, e.lp)
+    nav_before = e.pool.getTotalAmountForUser(e.bob, e.lp)
+    supply_before = e.green.totalSupply()
+    collateral_before = e.collateral.balanceOf(e.alice)
+    assert redeem_from_stability_pool(e.teller, 1, e.collateral, 50 * WAD,
+                                       should_refund_savings_green=False, sender=e.alice) == 40 * WAD
+    assert e.green.balanceOf(e.alice) == 10 * WAD
+    assert e.collateral.balanceOf(e.alice) == collateral_before + 40 * WAD
+    assert e.collateral.balanceOf(e.pool) == e.pool.totalClaimableBalances(e.collateral) == 0
+    assert e.pool.claimableBalances(e.lp, e.collateral) == 0
+    assert e.green.balanceOf(e.pool) == e.pool.totalClaimableBalances(e.green) == 40 * WAD
+    assert e.pool.claimableBalances(e.lp, e.green) == 40 * WAD
+    assert e.green.balanceOf(e.teller) == 0 and e.green.totalSupply() == supply_before
+    assert e.lp.balanceOf(e.pool) == 60 * WAD
+    assert e.pool.userBalances(e.bob, e.lp) == shares_before
+    assert e.pool.getTotalAmountForUser(e.bob, e.lp) == nav_before == 100 * WAD
+    assert e.ready()

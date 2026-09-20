@@ -65,6 +65,13 @@ class DeploymentAdapter:
     def deploy(self, name, *args, label):
         key = label.removesuffix(SUFFIX)
         path = self.defaults if name == "DefaultsBaseLive" else next((ROOT / "contracts").rglob(name + ".vy"))
+        if name == "VaultBook":
+            # Historical migrations retain their four-argument constructor.
+            # Bind fresh fork-only candidates to retained Pool 1; do not reuse
+            # the staged on-chain address or rewrite deployment history.
+            if len(args) != 4:
+                raise ValueError("UNEXPECTED_HISTORICAL_VAULTBOOK_CONSTRUCTOR")
+            args = (*args, self.run.vaults[1].address)
         contract = self.run.deploy(key, *args, path=path)
         if key == "SwitchboardPopulated":
             self.run.new["Switchboard"] = contract

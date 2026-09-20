@@ -11,8 +11,8 @@ from eth_utils import event_abi_to_log_topic
 import pytest
 
 from config.BluePrint import PARAMS
-from scripts.base_upgrade_fork import Rehearsal, permission_keys, remediation_sets
-from scripts.base_full_update_fork import FullUpdate
+from scripts.base_upgrade_fork import Rehearsal, ZERO, permission_keys, remediation_sets
+from scripts.base_full_update_fork import DeploymentAdapter, FullUpdate, SUFFIX
 from scripts.utils.fork_reports import require_new_report, sanitize
 from scripts.verify_defaults import compare_mission_control_config, SCALAR_GETTERS
 
@@ -222,3 +222,32 @@ def test_full_config_comparison_identifies_drift(drift):
     compare_mission_control_config(new, lambda name, *args: getattr(old, name)(*args),
                                   lambda field, got, want: differences.append(field) if got != want else None)
     assert any(field.startswith(drift) for field in differences)
+
+
+@pytest.mark.parametrize("key", ["VaultBook", "VaultBookPopulated"])
+def test_full_update_adapter_binds_fresh_vault_book_to_retained_pool(tmp_path, legacy_env, key):
+    e = legacy_env
+    run = bare_run(tmp_path)
+    run.vaults = {1: e.pool}
+    run.new = {}
+    run.report.update(deployments={}, constructor_profile="local review test")
+    adapter = DeploymentAdapter(run, None)
+    temp_gov = ZERO if key == "VaultBook" else e.alice
+    registrar = e.gov.address if key == "VaultBook" else e.alice
+    book = adapter.deploy("VaultBook", e.hq.address, temp_gov, 21_600, 100_000,
+                          label=key + SUFFIX)
+    assert book.address != e.book.address
+    assert run.new["VaultBook"] is book
+    assert run.report["deployments"][key]["constructor_args"] == [
+        e.hq.address, temp_gov, 21_600, 100_000, e.pool.address]
+    book.startAddNewAddressToRegistry(e.pool, "Retained Pool 1", sender=registrar)
+    assert book.confirmNewAddressToRegistry(e.pool, sender=registrar) == 1
+    assert book.hasStabilityPoolInterface(e.pool, e.sg, e.sg)
+    assert not book.canAcceptLiquidationAsset(e.pool, e.lp, e.collateral)
+    e.deposit(e.bob, 100 * 10**18)
+    assert book.canAcceptLiquidationAsset(e.pool, e.lp, e.collateral)
+    assert book.getDeleverageTraversalAsset(e.bob, e.pool, 1, True) == (e.lp.address, 100 * 10**18)
+    # Explicitly supplied bindings are not silently replaced by the adapter.
+    with pytest.raises(ValueError, match="UNEXPECTED_HISTORICAL_VAULTBOOK_CONSTRUCTOR"):
+        adapter.deploy("VaultBook", e.hq.address, e.gov.address, 21_600, 100_000,
+                       e.pool.address, label=key + SUFFIX)

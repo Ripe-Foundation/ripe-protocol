@@ -63,13 +63,13 @@ CCIP_RUNNER_CONSUMERS = {
     },
     "get_address_on_chain": {
         "migrations/base-mainnet/2026082400_CcipWirePlan.py",
-        "migrations/base-mainnet/2026082401_CcipActivationFinalized.py",
+        "scripts/utils/ccip.py",
         "migrations/base-sepolia/0002_CcipWire.py",
         "migrations/robinhood-testnet/0002_CcipWire.py",
     },
     "get_solidity_contract": {
         "migrations/base-mainnet/2026082400_CcipWirePlan.py",
-        "migrations/base-mainnet/2026082401_CcipActivationFinalized.py",
+        "scripts/utils/ccip.py",
         "migrations/base-sepolia/0002_CcipWire.py",
         "migrations/robinhood-testnet/0002_CcipWire.py",
     },
@@ -241,7 +241,9 @@ def test_every_committed_current_manifest_is_declared_here():
 
 def test_every_retained_migration_runner_call_resolves_to_a_callable_method():
     consumers = {}
-    for path in sorted(MIGRATIONS.rglob("*.py")):
+    # Activation readback delegates manifest access to the shared CCIP helper.
+    paths = [*MIGRATIONS.rglob("*.py"), ROOT / "scripts/utils/ccip.py"]
+    for path in sorted(paths):
         relative = path.relative_to(ROOT).as_posix()
         for method in _migration_runner_calls(path):
             consumers.setdefault(method, set()).add(relative)

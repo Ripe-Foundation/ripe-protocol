@@ -1,4 +1,4 @@
-"""Local Base fixture using the exact historical Pool-1 dependency closure."""
+"""Local Base fixture using the authenticated historical Pool-1 and RipeGov-2 sources."""
 import hashlib
 import json
 from pathlib import Path
@@ -55,45 +55,63 @@ def base_chain():
         boa.env.evm.patch.chain_id = previous
 
 
-@pytest.fixture(scope="session")
-def legacy_pool_deployer():
+def _legacy_deployer(record):
     for path, expected in PROVENANCE["sources"].items():
         assert hashlib.sha256((FIXTURE_ROOT / path).read_bytes()).hexdigest() == expected
     previous = boa.interpret._search_path
     try:
         boa.interpret.set_search_path([str(FIXTURE_ROOT.resolve())])
-        deployer = boa.load_partial(str(FIXTURE_ROOT / "contracts/vaults/StabilityPool.vy"))
+        deployer = boa.load_partial(str(FIXTURE_ROOT / record["source_file"]))
     finally:
         boa.interpret.set_search_path(previous)
     runtime = deployer.compiler_data.bytecode_runtime
-    assert len(runtime) == PROVENANCE["pool"]["compiled_runtime_bytes"]
-    assert hashlib.sha256(runtime).hexdigest() == PROVENANCE["pool"]["compiled_runtime_sha256"]
+    assert len(runtime) == record["compiled_runtime_bytes"]
+    assert hashlib.sha256(runtime).hexdigest() == record["compiled_runtime_sha256"]
     return deployer
+
+
+def _deploy_legacy_vault(deployer, hq, record):
+    vault = deployer.deploy(hq)
+    code = boa.env.get_code(vault.address)
+    assert code[-32:] == int(hq.address, 16).to_bytes(32, "big")
+    canonical = code[:-32] + bytes.fromhex(record["immutable_word"])
+    assert hashlib.sha256(canonical).hexdigest() == record["deployed_sha256"]
+    assert len(code) == record["deployed_bytes"]
+    return vault
+
+
+@pytest.fixture(scope="session")
+def legacy_pool_deployer():
+    return _legacy_deployer(PROVENANCE["pool"])
+
+
+@pytest.fixture(scope="session")
+def legacy_ripe_gov_deployer():
+    return _legacy_deployer(PROVENANCE["ripe_gov"])
 
 
 @pytest.fixture
 def legacy_pool(base_chain, legacy_pool_deployer, ripe_hq):
-    pool = legacy_pool_deployer.deploy(ripe_hq)
-    code = boa.env.get_code(pool.address)
-    assert code[-32:] == int(ripe_hq.address, 16).to_bytes(32, "big")
-    canonical = code[:-32] + bytes.fromhex(PROVENANCE["pool"]["immutable_word"])
-    assert hashlib.sha256(canonical).hexdigest() == PROVENANCE["pool"]["deployed_sha256"]
-    assert len(code) == PROVENANCE["pool"]["deployed_bytes"]
-    return pool
+    return _deploy_legacy_vault(legacy_pool_deployer, ripe_hq, PROVENANCE["pool"])
+
+
+@pytest.fixture
+def legacy_ripe_gov(base_chain, legacy_ripe_gov_deployer, ripe_hq):
+    return _deploy_legacy_vault(legacy_ripe_gov_deployer, ripe_hq, PROVENANCE["ripe_gov"])
 
 
 @pytest.fixture
 def legacy_env(
-    legacy_pool, ripe_hq, governance, ripe_gov_vault, simple_erc20_vault,
+    legacy_pool, legacy_ripe_gov, ripe_hq, governance, simple_erc20_vault,
     rebase_erc20_vault, mission_control, switchboard_alpha, switchboard_charlie,
     teller, auction_house, deleverage, credit_engine, ledger, lootbox,
-    green_token, savings_green, price_desk, mock_price_source, endaoment_funds,
+    green_token, savings_green, ripe_token, price_desk, mock_price_source, endaoment_funds,
     alpha_token, alpha_token_whale, bob, alice, sally, whale,
     setGeneralConfig, setGeneralDebtConfig, setAssetConfig, createDebtTerms,
     performDeposit,
 ):
     book = boa.load("contracts/registries/VaultBook.vy", ripe_hq, ZERO_ADDRESS, 1, 1000, legacy_pool)
-    for i, vault in enumerate((legacy_pool, ripe_gov_vault, simple_erc20_vault, rebase_erc20_vault), 1):
+    for i, vault in enumerate((legacy_pool, legacy_ripe_gov, simple_erc20_vault, rebase_erc20_vault), 1):
         book.startAddNewAddressToRegistry(vault, f"local vault {i}", sender=governance.address)
         assert book.confirmNewAddressToRegistry(vault, sender=governance.address) == i
     book.setRegistryTimeLockAfterSetup(sender=governance.address)
@@ -128,6 +146,7 @@ def legacy_env(
         mc=mission_control, alpha=switchboard_alpha, charlie=switchboard_charlie,
         teller=teller, ah=auction_house, dl=deleverage, ce=credit_engine,
         ledger=ledger, lootbox=lootbox, green=green_token, sg=savings_green,
+        ripe=ripe_token, ripe_gov=legacy_ripe_gov,
         pd=price_desk, prices=mock_price_source, funds=endaoment_funds, lp=lp,
         collateral=alpha_token, ordinary=simple_erc20_vault,
         bob=bob, alice=alice, sally=sally, whale=whale,

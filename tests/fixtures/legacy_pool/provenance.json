@@ -27,7 +27,10 @@
     "contracts/vaults/modules/StabVault.vy": "50ce4f6d8bb345095e0e9f03e39e158a6affb158bab68434d5f27546a0de1762",
     "interfaces/Vault.vyi": "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7",
     "contracts/modules/Addys.vy": "8e9462307c84f64bbfe7e57ae1f2518675a76f3200f2c9f9ae60e50483127599",
-    "contracts/vaults/modules/VaultData.vy": "d84d81ccf45405954404fa6af2c6651ed251efeca958242934eda8f032917e7f"
+    "contracts/vaults/modules/VaultData.vy": "d84d81ccf45405954404fa6af2c6651ed251efeca958242934eda8f032917e7f",
+    "contracts/vaults/RipeGov.vy": "b949f3bed8d3a72970a2d841bc65b3e7fb3998f857f730f69b0e20e43f3d80c5",
+    "interfaces/ConfigStructs.vyi": "6038cdbf454c788457d8fbf20919042656ddfbf13335c079ec2c50280b07b94b",
+    "contracts/vaults/modules/SharesVault.vy": "7a0ccbfc8c98f8274c3788ef577741053426b9a7ee6618cefb84768425989b3f"
   },
   "dust_claims": [
     {
@@ -196,5 +199,20 @@
       "staged_unfloored_usd_value": 9720534898526400
     }
   ],
-  "immutable_substitution": "Tests replace only the final 32-byte HQ immutable with a local test HQ. All source bytes are unchanged."
+  "immutable_substitution": "Tests replace only the final 32-byte HQ immutable with a local test HQ. All source bytes are unchanged.",
+  "ripe_gov": {
+    "id": 2,
+    "address": "0xe42b3dc546527eb70d741b185dc57226ca01839d",
+    "source_file": "contracts/vaults/RipeGov.vy",
+    "source_sha256": "b949f3bed8d3a72970a2d841bc65b3e7fb3998f857f730f69b0e20e43f3d80c5",
+    "compiled_runtime_bytes": 21018,
+    "compiled_runtime_sha256": "6d8276189194eb857bee2ae2267c54c9f45d5d4ac927b65edd3317f019161845",
+    "deployed_bytes": 21050,
+    "deployed_sha256": "1cec547e6b8d47be32d6aaea9d42d3bf855b40e048c737b44745010300456fd2",
+    "deployed_keccak256": "0xcbd9e0bf841a1d23252693eb0a8075e9b956875bc7ff4daf07cd40d4bc124e71",
+    "immutable_bytes": 32,
+    "immutable_word": "0000000000000000000000006162df1b329e157479f8f1407e888260e0ec3d2b",
+    "hq_getter": "0x6162df1b329e157479f8f1407e888260e0ec3d2b",
+    "exact_equality": true
+  }
 }

@@ -40,7 +40,7 @@ def test_constructor_rejects_wrong_hq_and_noncontract(base_chain, legacy_pool_de
         deploy_book(ripe_hq, bob)
 
 
-@pytest.mark.parametrize("missing", ["indexOfAsset", "claimableBalances", "totalClaimableBalances", "isPaused", "vaultAssets", "getUserAssetAtIndexAndHasBalance"])
+@pytest.mark.parametrize("missing", [None, "indexOfAsset", "claimableBalances", "totalClaimableBalances", "isPaused", "vaultAssets", "getUserAssetAtIndexAndHasBalance"])
 def test_constructor_requires_legacy_getters(base_chain, ripe_hq, missing):
     methods = {
         "indexOfAsset": "def indexOfAsset(a: address) -> uint256:\n    return 0",
@@ -55,8 +55,11 @@ def test_constructor_requires_legacy_getters(base_chain, ripe_hq, missing):
         if name != missing:
             source += "\n@external\n@view\n" + body + "\n"
     candidate = boa.loads(source)
-    with boa.reverts():
+    if missing is None:
         deploy_book(ripe_hq, candidate)
+    else:
+        with boa.reverts():
+            deploy_book(ripe_hq, candidate)
 
 
 @pytest.mark.parametrize("corruption", ["unregistered", "wrong_id", "wrong_address", "invalid_row"])
@@ -217,11 +220,37 @@ def test_green_and_sgreen_readiness_uses_token_conversions(legacy_env):
     e.prices.setPrice(e.sg, 0)
     assert e.sg.convertToAssets(e.sg.balanceOf(e.pool)) > 0
     assert e.ready(e.sg)
-    assert not calls_to(e.book._computation, e.pd.address, "getUsdValue(address,uint256)")
+    for signature in ("getUsdValue(address,uint256)", "getUsdValue(address,uint256,bool)"):
+        assert not calls_to(e.book._computation, e.pd.address, signature)
     e.configure(e.green, _vaultIds=[1], _debtTerms=e.terms(0, 0, 0, 0, 0, 0), _shouldBurnAsPayment=True)
     e.green.mint(e.bob, 100 * WAD, sender=e.ah.address)
     e.green.approve(e.teller, 100 * WAD, sender=e.bob)
     e.teller.deposit(e.green, 100 * WAD, e.bob, e.pool, sender=e.bob)
     e.prices.setPrice(e.green, 0)
     assert e.ready(e.green)
-    assert not calls_to(e.book._computation, e.pd.address, "getUsdValue(address,uint256)")
+    for signature in ("getUsdValue(address,uint256)", "getUsdValue(address,uint256,bool)"):
+        assert not calls_to(e.book._computation, e.pd.address, signature)
+
+
+@pytest.mark.parametrize("populated", [False, True])
+def test_constructor_structural_probes_do_not_require_nav_pricing(legacy_env, populated):
+    e = legacy_env
+    asset = ZERO_ADDRESS
+    if populated:
+        e.deposit(e.bob, 100 * WAD)
+        claim = e.token()
+        e.claim(claim, WAD)
+        e.prices.setShouldRevert(claim, True)
+        asset = e.lp
+    # A zero user still triggers valuation in the authentic legacy getter.
+    # Empty-address probes fail too: IERC20(empty(address)).balanceOf cannot decode.
+    with boa.reverts():
+        e.pool.getTotalAmountForUser(ZERO_ADDRESS, asset)
+    for paused in (False, True):
+        if paused:
+            e.pool.pause(True, sender=e.alpha.address)
+        candidate = deploy_book(e.hq, e.pool)
+        trace = candidate._computation
+        assert not calls_to(trace, e.pool.address, "getTotalAmountForUser(address,address)")
+        for signature in ("getUsdValue(address,uint256)", "getUsdValue(address,uint256,bool)"):
+            assert not calls_to(trace, e.pd.address, signature)
