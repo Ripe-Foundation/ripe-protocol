@@ -10,6 +10,7 @@ import tempfile
 from unittest.mock import patch
 
 import boa
+import boa.interpret as boa_interpret
 from web3 import Web3
 
 from scripts.utils.deploy_args import DeployArgs
@@ -24,6 +25,22 @@ from scripts.utils.legacy_vault_compat import require
 
 
 @contextmanager
+def isolated_compiler_cache():
+    """Boa bundles retain resolved paths; never share them across checkouts.
+
+    Match the production CLI's cache isolation, while keeping this disposable
+    checkout clean and restoring the caller's exact cache object on every exit.
+    """
+    previous = boa_interpret._disk_cache
+    with tempfile.TemporaryDirectory(prefix="ripe-legacy-boa-") as cache:
+        try:
+            boa_interpret.set_cache_dir(cache)
+            yield
+        finally:
+            boa_interpret._disk_cache = previous
+
+
+@contextmanager
 def staged_fork(rpc, block, report):
     """Replay the actual runner in disposable local state; never broadcast."""
     history_source = ROOT / "migration_history/base-mainnet/v1"
@@ -33,7 +50,7 @@ def staged_fork(rpc, block, report):
             report["simulated_transactions"] = self._count
             report["journal"] = self._transactions.copy()
             return super().end()
-    with tempfile.TemporaryDirectory(prefix="ripe-legacy-compat-fork-") as temp:
+    with isolated_compiler_cache(), tempfile.TemporaryDirectory(prefix="ripe-legacy-compat-fork-") as temp:
         history = Path(temp) / "history"
         shutil.copytree(history_source, history)
         with readonly_fork(rpc, block) as env:
