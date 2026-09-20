@@ -149,3 +149,13 @@ Teller, PSM entry points and reserve sales remain closed in the diagnostic.
 Successful registration alone is **not** successful operational activation.
 The production activation/funds-migration batch must not be signed from this
 diagnostic until these blockers are resolved and the full rehearsal passes.
+
+## Current report fingerprint format
+
+`migration_source_sha256` maps repository-relative POSIX paths to source SHA-256
+values (for example `scripts/rehearsal/base_candidates/price_desk_gas_bridge.py`).
+Earlier archived reports used filename-oriented keys. Compare matching source
+identities with that format change in mind; basename equality alone can collide.
+Historical reports remain unchanged. Current fingerprints include every retained
+historical staging body and every current candidate/helper, including the bridge.
+No consumer requiring a compatibility normalizer has been identified.

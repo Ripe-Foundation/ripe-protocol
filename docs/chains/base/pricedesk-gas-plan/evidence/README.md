@@ -1,5 +1,10 @@
 # Historical planning evidence
 
+Publication note (2026-09-19): archived copies have portable path substitutions
+and repaired navigation links. They are historical evidence, not current execution
+instructions or byte-for-byte original captures. See the [packet entry point](../README.md)
+and [original versus published hashes](../packet-hashes.json) for exact provenance.
+
 **Revision 7 scope controls:** current execution is contracts and related tests only. Statements below about implementation prerequisites, pending decisions or active operational work describe earlier revisions. Deployed-source authentication, Base qualification and operations now belong to `../follow-up-qualification.md`; old evidence does not add them back to the current task.
 
 These files preserve planning evidence, not implementation acceptance or deployment approval. The historical verification paragraphs below describe the earlier v2/v3 reviews; revision-4 checks are listed separately at the end.

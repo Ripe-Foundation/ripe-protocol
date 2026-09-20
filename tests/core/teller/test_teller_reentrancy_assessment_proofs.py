@@ -2,7 +2,8 @@
 
 This module is assessment evidence only. Temporary Teller candidates are
 compiled from in-memory source strings; the tracked production contract is not
-changed.
+changed. The governance PriceDesk doubles implement the current no-op Curve
+relay interface; the nested callback still executes inside addPriceSnapshot.
 """
 
 from importlib.metadata import version
@@ -55,12 +56,16 @@ def addPriceSnapshot(_asset: address) -> bool:
             revert_on_failure=False,
         )
         assert success # dev: nested callback failed
-        raise
+        raise # dev: intended post-callback rollback
     return True
 """
 
 
 GOVERNANCE_PRICE_CALLBACK_SOURCE = M1_PRICE_CALLBACK_SOURCE + """
+@external
+def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool:
+    return True
+
 @view
 @external
 def getAddr(_reg_id: uint256) -> address:
@@ -81,6 +86,10 @@ def getUsdValue(
 GOVERNANCE_REVERTING_PRICE_CALLBACK_SOURCE = (
     REVERTING_PRICE_CALLBACK_SOURCE
     + """
+@external
+def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool:
+    return True
+
 @view
 @external
 def getAddr(_reg_id: uint256) -> address:
@@ -595,8 +604,8 @@ def test_post_clear_nested_deposit_rolls_back_with_downstream_failure(
             0,
             sender=credit_engine.address,
         )
-    assert not _boa_error_has_dev_reason(
-        downstream.value, "nested callback failed"
+    assert _boa_error_has_dev_reason(
+        downstream.value, "intended post-callback rollback"
     )
 
     assert before == (
@@ -787,8 +796,8 @@ def test_governance_post_clear_nested_deposit_rolls_back_after_housekeeping(
     )
     with pytest.raises(BoaError) as downstream:
         teller.depositIntoGovVault(token, amount, 500, bob, sender=bob)
-    assert not _boa_error_has_dev_reason(
-        downstream.value, "nested callback failed"
+    assert _boa_error_has_dev_reason(
+        downstream.value, "intended post-callback rollback"
     )
 
     assert before == (

@@ -243,3 +243,24 @@ def test_price_desk_current_constructor_bindings(price_desk):
     assert (price_desk.PRICE_SOURCE_PRICE_GAS(), price_desk.PRICE_SOURCE_SNAPSHOT_GAS(),
             price_desk.PRICE_SOURCE_HAS_FEED_GAS(), price_desk.MAX_SOURCE_GAS()) == (
                 250_000, 150_000, 75_000, 6_000_000)
+
+
+def test_legacy_compatibility_probe_rejects_before_first_mutation():
+    run = object.__new__(Rehearsal)
+    mutations = []
+    run.transact = lambda *args: mutations.append(args)
+    run.transact_expect = lambda *args: mutations.append(args)
+    # Deliberately omit even the registry fields: validation must precede reads.
+    with pytest.raises(RuntimeError, match="BASE_COMPATIBILITY_PROBE_REQUIRES_FULL_UPDATE") as error:
+        run.compatibility_probe()
+    assert "scripts/base_full_update_fork.py" in str(error.value)
+    assert "BASE_ACTIVATION_REQUIRED_SLOT_MISSING:7" in str(error.value)
+    assert mutations == []
+
+
+@pytest.mark.parametrize("module", ("base_upgrade_fork", "base_full_update_fork"))
+def test_base_harness_help_remains_available_without_rpc(module):
+    result = subprocess.run([sys.executable, "-m", "scripts." + module, "--help"],
+                            cwd=ROOT, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert "--defaults" in result.stdout

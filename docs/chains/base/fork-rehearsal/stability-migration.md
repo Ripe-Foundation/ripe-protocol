@@ -8,6 +8,16 @@ The other registered vaults are already covered by the previous complete
 This additional run exercises the 82 funded Stability Pool positions separately;
 it is not a claim that all five vaults completed in one combined run.
 
+Historical reproduction only: [stability-evidence.json](stability-evidence.json) records contract source
+`1ede38351e6da918806dff70d34b2066bf8cde8c` and harness SHA-256
+`efea0f1ab537b58bb9b367967c86ced5770a5e0ea6e0c7aca2f6db5aa7e7c333`. Both must be bound; checking out the contract revision
+alone does not recover the recorded harness. No matching harness body was found in the available tracked history; recover
+and verify the original harness bytes before claiming an exact reproduction.
+The current `compatibility_probe` rejects before its first simulated registry
+mutation because its retained plan omits the compatible PriceDesk. For current
+source use `scripts/base_full_update_fork.py` and the [current full-update scope](full-update-summary.md),
+not the historical command below. Shared imports and `--help` remain supported.
+
 ```sh
 python3 scripts/base_upgrade_fork.py \
   --block 51135337 \

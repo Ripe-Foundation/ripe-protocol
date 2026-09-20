@@ -3,6 +3,7 @@ import pytest
 
 from conf_utils import filter_logs, redeem_collateral
 from constants import EIGHTEEN_DECIMALS
+from registries.price_desk_helpers import _isolated_price_desk
 
 
 ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
@@ -63,30 +64,6 @@ def _gas_source(
         exhaust_snapshot,
     )
     return source
-
-
-def _isolated_price_desk(ripe_hq, deploy3r, sources, price_gas=250_000, snapshot_gas=150_000):
-    desk = boa.load(
-        "contracts/registries/PriceDesk.vy",
-        ripe_hq,
-        deploy3r,
-        ETH,
-        1,
-        2,
-        price_gas,
-        snapshot_gas,
-        75_000,
-        6_000_000,
-        name="isolated_price_desk",
-    )
-    for index, source in enumerate(sources, start=1):
-        assert desk.startAddNewAddressToRegistry(
-            source,
-            f"source {index}",
-            sender=deploy3r,
-        )
-        assert desk.confirmNewAddressToRegistry(source, sender=deploy3r) == index
-    return desk
 
 
 def test_price_source_gas_is_set_per_deployment(ripe_hq, deploy3r):

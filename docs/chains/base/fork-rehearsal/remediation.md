@@ -71,6 +71,16 @@ finished without an execution error, but remains `not_qualified` because of
 
 ## Reproduction and limits
 
+Historical reproduction only: [remediation-evidence.json](remediation-evidence.json) records contract source
+`1ede38351e6da918806dff70d34b2066bf8cde8c` and harness SHA-256
+`ba8cde187d788dc01c71d2d481be51cb56fe933beb5fc6b77756a9568b4e8f12`. Both must be bound; checking out the contract revision
+alone does not recover the recorded harness. No matching harness body was found in the available tracked history; recover
+and verify the original harness bytes before claiming an exact reproduction.
+The current `compatibility_probe` rejects before its first simulated registry
+mutation because its retained plan omits the compatible PriceDesk. For current
+source use `scripts/base_full_update_fork.py` and the [current full-update scope](full-update-summary.md),
+not the historical command below. Shared imports and `--help` remain supported.
+
 ```sh
 python3 scripts/base_upgrade_fork.py \
   --block 51135337 \

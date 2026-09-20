@@ -1409,3 +1409,14 @@ def test_symbolic_authority_class_mutations_fail_closed():
         ),
     )
     assert_code("H03_SYMBOLIC_FIELD", incorrect_blueprint)
+
+
+def test_teller_source_references_stay_within_current_contract():
+    source = (ROOT / "contracts/core/Teller.vy").read_text().splitlines()
+    pointers = re.findall(r"contracts/core/Teller\.vy:(\d+)(?:-(\d+))?", MODULE.read_text())
+    assert pointers, "Teller relation pointers must remain present"
+    for start, end in pointers:
+        first, last = int(start), int(end or start)
+        assert 1 <= first <= last <= len(source), (first, last, len(source))
+        assert any(line.strip() and not line.lstrip().startswith("#")
+                   for line in source[first - 1:last]), (first, last)

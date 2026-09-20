@@ -205,6 +205,8 @@ def test_green_route_uses_curve_and_chainlink_usdg_without_recursion(
 def test_green_config_transition_with_normal_block_and_timestamp_progression(
     robinhood_curve_launch_route,
 ):
+    # Allowance-margin comparison on the shared local route. Complete profile
+    # constructor/override behavior is covered separately below.
     route = robinhood_curve_launch_route
     route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
     action_id = route.curve.setGreenRefPoolConfig(
@@ -336,6 +338,8 @@ def test_full_capacity_ten_green_ring_teller_housekeeping_gas(
     deleverage,
     alice,
 ):
+    # Allowance-margin comparison on the shared local route. Complete profile
+    # constructor/override behavior is covered separately below.
     route = robinhood_curve_launch_route
     route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
     action_id = route.curve.setGreenRefPoolConfig(
@@ -495,7 +499,7 @@ def test_pause_disable_repair_and_reenable_order_preserves_safe_green_failure(
 def test_current_price_desk_relay_uses_existing_curve_authorization(
     robinhood_curve_launch_route, ripe_hq, deploy3r, teller, governance, bob,
 ):
-    from registries.test_price_desk_isolation import _isolated_price_desk
+    from registries.price_desk_helpers import _isolated_price_desk
     from registries.price_desk_gas_helpers import calls_to, cold_trial
 
     route = robinhood_curve_launch_route
@@ -516,12 +520,14 @@ def test_current_price_desk_relay_uses_existing_curve_authorization(
 @pytest.mark.gas
 @pytest.mark.parametrize("profile", ("base", "local", "robinhood"))
 @pytest.mark.parametrize("mature", (False, True), ids=("first_due", "full_ring_due"))
-def test_profile_curve_snapshot_override_has_cold_margin(
+def test_profile_curve_snapshot_allowance_has_cold_margin(
     robinhood_curve_launch_route, teller, profile, mature, request,
 ):
     from config.BluePrint import PARAMS, PRICE_DESK_SOURCE_GAS_OVERRIDES
     from registries.price_desk_gas_helpers import calls_to, cold_trial
 
+    # Allowance-margin comparison on the shared local route. Complete profile
+    # constructor/override behavior is covered separately below.
     route = robinhood_curve_launch_route
     route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
     action = route.curve.setGreenRefPoolConfig(
@@ -549,3 +555,97 @@ def test_profile_curve_snapshot_override_has_cold_margin(
         assert tuple(route.curve.greenRefPoolData()) != before
     request.node.user_properties.extend((("source_execution_gas", used), ("snapshot_budget", budget)))
     print(f"CURVE_COLD_DUE profile={profile} mature={mature} source_gas={used} budget={budget} margin={budget / used:.4f}")
+
+
+def test_review_nested_curve_fallback(robinhood_curve_launch_route, ripe_hq, deploy3r):
+    """A generous transaction limit cannot repair an inadequate enclosing cap."""
+    from registries.price_desk_helpers import _isolated_price_desk
+
+    route = robinhood_curve_launch_route
+    fallback = boa.load("contracts/mock/MockPriceSource.vy", ripe_hq, 1, 2)
+    fallback.setPrice(route.usdg, EIGHTEEN_DECIMALS)
+    desk = _isolated_price_desk(
+        ripe_hq, deploy3r, [route.chainlink, route.curve, fallback],
+        price_gas=1_500_000, snapshot_gas=1_500_000,
+    )
+    route.feed.setMockData(100_000_000, 1, 1, 1, 1)
+    assert desk.getPrice(route.usdg, True, gas=10_000_000) == EIGHTEEN_DECIMALS
+    assert desk.getPrice(route.green, False, gas=10_000_000) == 0
+    with boa.reverts("has price config, no price"):
+        desk.getPrice(route.green, True, gas=10_000_000)
+    # Diagnostic allowance only; not a production qualification recommendation.
+    desk.setSourceGasBudgets(route.curve, 3_500_000, 0, 0, sender=deploy3r)
+    assert desk.getPrice(route.green, True, gas=10_000_000) == EIGHTEEN_DECIMALS
+
+
+@pytest.fixture(params=("base", "local", "robinhood"))
+def configured_price_desk_profile(request, robinhood_curve_launch_route, ripe_hq, deploy3r):
+    from scripts.rehearsal.base_candidates.price_desk_budgets import (
+        BUDGET_KEYS, apply_source_gas_budgets, verify_price_desk_defaults,
+    )
+    from registries.price_desk_helpers import ETH
+
+    profile = request.param
+    route = robinhood_curve_launch_route
+    blueprint = SimpleNamespace(
+        PARAMS=source_blueprint.PARAMS[profile],
+        PRICE_DESK_SOURCE_GAS_OVERRIDES=source_blueprint.PRICE_DESK_SOURCE_GAS_OVERRIDES[profile],
+    )
+    desk = boa.load("contracts/registries/PriceDesk.vy", ripe_hq, deploy3r, ETH, 1, 2,
+                    *(blueprint.PARAMS[key] for key in BUDGET_KEYS))
+    sources = {"ChainlinkPrices": route.chainlink, "CurvePrices": route.curve}
+    if "UndyVaultPrices" in blueprint.PRICE_DESK_SOURCE_GAS_OVERRIDES:
+        # The real Curve route exercises nested behavior. This stand-in checks
+        # the other profile entry's applied call allowance, not live Undy cost.
+        sources["UndyVaultPrices"] = boa.load("contracts/mock/MockPriceSource.vy", ripe_hq, 1, 2)
+    bindings = {}
+    for slot, (name, source) in enumerate(sources.items(), 1):
+        desk.startAddNewAddressToRegistry(source, name, sender=deploy3r)
+        assert desk.confirmNewAddressToRegistry(source, sender=deploy3r) == slot
+        if name in blueprint.PRICE_DESK_SOURCE_GAS_OVERRIDES:
+            bindings[name] = (slot, source.address)
+    migration = SimpleNamespace(blueprint=lambda: blueprint,
+                                execute=lambda fn, *args: fn(*args, sender=deploy3r))
+    apply_source_gas_budgets(migration, desk, bindings)
+    defaults = verify_price_desk_defaults(desk, blueprint.PARAMS)
+    for name, (_, address) in bindings.items():
+        expected = tuple(raw or floor for raw, floor in zip(
+            blueprint.PRICE_DESK_SOURCE_GAS_OVERRIDES[name], defaults[:3]))
+        assert tuple(desk.getSourceGasBudgets(address)) == expected
+    # Authorize this actual profile desk for the real Curve relay.
+    ripe_hq.startAddressUpdateToRegistry(7, desk, sender=route.governance.address)
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
+    ripe_hq.confirmAddressUpdateToRegistry(7, sender=route.governance.address)
+    yield SimpleNamespace(profile=profile, desk=desk, route=route, sources=sources)
+
+
+def test_complete_profile_config_exercises_quote_and_snapshot(configured_price_desk_profile, teller):
+    from registries.price_desk_gas_helpers import calls_to, cold_trial
+
+    configured = configured_price_desk_profile
+    desk, route = configured.desk, configured.route
+    route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
+    action = route.curve.setGreenRefPoolConfig(
+        route.curve_system, 10, 60_00, 100, 10_00,
+        100_000 * EIGHTEEN_DECIMALS, sender=route.governance.address,
+    )
+    boa.env.time_travel(blocks=route.curve.actionTimeLock() + 1)
+    assert route.curve.confirmGreenRefPoolConfig(action, sender=route.governance.address)
+    boa.env.time_travel(blocks=1)  # The configured snapshot must be due.
+    route.feed.setMockData(100_000_000, 1, 1, boa.env.timestamp, boa.env.timestamp)
+    assert desk.getPrice(route.green, True, gas=10_000_000) == EIGHTEEN_DECIMALS
+    before = tuple(route.curve.greenRefPoolData())
+    with cold_trial(desk, route.curve, route.curve_system):
+        assert desk.addGreenRefPoolSnapshot(2, sender=teller.address, gas=10_000_000)
+        call, = calls_to(desk._computation, route.curve)
+        assert not call.is_error and int.from_bytes(call.output, "big") == 1
+        assert call.msg.gas == desk.getSourceGasBudgets(route.curve)[1]
+        assert tuple(route.curve.greenRefPoolData()) != before
+    if "UndyVaultPrices" in configured.sources:
+        source = configured.sources["UndyVaultPrices"]
+        asset = boa.env.generate_address()
+        source.setPrice(asset, EIGHTEEN_DECIMALS)
+        with cold_trial(desk, source):
+            assert desk.getPrice(asset, True, gas=10_000_000) == EIGHTEEN_DECIMALS
+            quote, = calls_to(desk._computation, source)
+            assert quote.msg.gas == desk.getSourceGasBudgets(source)[0]

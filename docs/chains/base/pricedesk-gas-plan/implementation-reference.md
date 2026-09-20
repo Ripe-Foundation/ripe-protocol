@@ -2,10 +2,10 @@
 
 The [implementation prompt](updated-prompt.md) controls. This reference adds test/setup commands only; run them as part of the uninterrupted implementation, not after an owner review. No RPC, live inventory, fork sweeps or operational tooling is required for the contract task.
 
-Run from `/Users/wigglez/dev/ripe-protocol-pricedesk-gas`. Its checkout has no `.venv`; use the original repository’s interpreter. Confirm once that `config` and test imports resolve to this worktree (`pytest.ini` adds `.` and `tests`). Use writable task-local Boa/Python/pytest caches; `tests/conftest.py` supports `RIPE_BOA_CACHE_DIR`. Keep temporary caches separate from the persistent checkout.
+Run from `$PRICEDESK_WORKTREE`. Its checkout has no `.venv`; use the original repository’s interpreter. Confirm once that `config` and test imports resolve to this worktree (`pytest.ini` adds `.` and `tests`). Use writable task-local Boa/Python/pytest caches; `tests/conftest.py` supports `RIPE_BOA_CACHE_DIR`. Keep temporary caches separate from the persistent checkout.
 
 ```sh
-/Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q \
+"$PRICEDESK_PYTHON" -m pytest -q \
   tests/registries/test_price_desk_isolation.py \
   tests/registries/test_price_desk_token_decimals.py \
   tests/test_price_desk_aggregate_source_count_guard.py \
@@ -13,7 +13,7 @@ Run from `/Users/wigglez/dev/ripe-protocol-pricedesk-gas`. Its checkout has no `
   tests/test_base_review_safety.py::test_price_desk_current_constructor_bindings \
   tests/priceSources/curve/test_green_ref_pool.py
 
-/Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest -q -m gas \
+"$PRICEDESK_PYTHON" -m pytest -q -m gas \
   tests/registries/test_price_desk_gas.py \
   tests/registries/test_price_desk_aggregate_protocol_gas.py
 ```

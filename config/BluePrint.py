@@ -58,7 +58,14 @@ ADDYS = {
 # Curve's 500k local/Robinhood allowance retains the former Teller cap; cold
 # due snapshots used 122,801 gas in the local fresh-slot fixture (4.07x at
 # 500k). Complete-transaction qualification remains required for each deployment.
-# Base cannot use 500k under its current floor.
+# Base cannot use 500k under its current floor. Equal enclosing/inner quote caps
+# cannot fund nested fallback after failed/malformed/zero-with-feed replies:
+# the inner proof needs B + ceil(B/63) + 5,000 (1,528,810 at Base's 1.5M floor).
+# Real Curve/Chainlink tests reproduce direct USDG fallback but lost nested GREEN
+# fallback at the Curve floor; illustrative 3.5M restores that test only. Qualify
+# Curve, wsuperOETHb's SUPER_OETH lookup and RedStone's conditional ETH/USD route.
+# Table entries do not automatically configure shared fixtures or deployments;
+# outside tests, only the Base rehearsal drafts currently consume this table.
 PRICE_DESK_SOURCE_GAS_OVERRIDES = {
     "base": {
         "CurvePrices": (0, 1_500_000, 0),

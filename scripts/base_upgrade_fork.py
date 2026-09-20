@@ -28,6 +28,7 @@ from eth_abi import decode, encode
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scripts.utils.base_activation import department_confirmation_order
 from scripts.utils.fork_reports import (
     SANITIZER_VERSION, fingerprint, require_new_report, require_unoptimized, sanitize,
 )
@@ -408,6 +409,14 @@ class Rehearsal:
 
     def compatibility_probe(self):
         """Isolated core switch; treasury and user migrations are not claimed complete."""
+        replacements = [5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20]
+        try:
+            confirmation_order = department_confirmation_order(replacements)
+        except RuntimeError as error:
+            raise RuntimeError(
+                "BASE_COMPATIBILITY_PROBE_REQUIRES_FULL_UPDATE: current-source "
+                "dependencies require scripts/base_full_update_fork.py; " + str(error)
+            ) from error
         book, sb = self.new["VaultBook"], self.new["Switchboard"]
         for vid, v in self.vaults.items():
             self.transact(book.startAddNewAddressToRegistry, v.address, "Retained " + str(vid))
@@ -421,7 +430,6 @@ class Rehearsal:
             self.transact_expect(vid, sb.confirmNewAddressToRegistry, c.address)
         # Core integration diagnostic: stateful treasury departments deliberately
         # remain routed to the originals until their separate custody handoff.
-        replacements = [5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20]
         for i in replacements:
             pending = self.hq.pendingAddrUpdate(i)
             if pending[0] != ZERO:
@@ -451,7 +459,7 @@ class Rehearsal:
             borrow_expected[u] = self.old["Lootbox"].getClaimableBorrowLoot(u)
         # No block advances within this diagnostic switch, so old/new reward
         # reads have identical timestamps and stored Ledger balances.
-        for i in [8, 5, 6] + [x for x in replacements if x not in [8, 5, 6]]:
+        for i in confirmation_order:
             self.transact(self.hq.confirmAddressUpdateToRegistry, i)
         self.transact_expect(25, self.hq.confirmNewAddressToRegistry, self.new["VaultMigrator"].address)
         assert str(self.hq.getAddr(4)).lower() == str(self.old["Ledger"].address).lower()

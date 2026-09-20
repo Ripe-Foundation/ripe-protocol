@@ -1,9 +1,15 @@
 # PriceDesk gas implementation and review follow-up
 
+Current review closure: [C01–C26 changes and validation](pricedesk-gas-review-232.md).
+As of 2026-09-19, the source is published in [PR #232](https://github.com/Ripe-Foundation/ripe-protocol/pull/232).
+The earlier review results below are selected-suite historical evidence, not
+complete revised-head validation. See the PR description for the final workflow
+SHA and run results.
+
 The contract implementation is commit `e35f86542eb516ee7953e336845bafe9ee9b00ab`,
 stacked on PR #231 pin `bdf7f3da7113aabde60ab8eceab6a960a841bb88` in
 `codex/pricedesk-configurable-gas`, worktree
-`/Users/wigglez/dev/ripe-protocol-pricedesk-gas`. This follow-up addresses the
+`$PRICEDESK_WORKTREE`. This follow-up addresses the
 review feedback with local tests, staging compatibility fixes and documentation.
 It does not approve a production configuration, deployment, activation or release.
 
@@ -18,23 +24,16 @@ approved prompt from subsequent implementation and review follow-ups.
 The first-review commits are `fc275c5c` (staging compatibility), `ce54ae6e`
 (test coverage and measurements), and `62ad1a48` (handoff). Re-review code and tests
 are committed as `1ee9585b`; this documentation commit versions the canonical
-packet and records the complete disposition. All commits remain local and
-GPG-signed.
+packet and records that earlier disposition. These commits were subsequently
+published in PR #232 on 2026-09-19 and remain GPG-signed.
 
-## Configuration decision still requiring the owner
+## Configuration boundaries
 
-Base's immutable quote/snapshot floors remain **1.5M/1.5M**, as explicitly
-required by the original approved prompt. This re-review again asked the owner
-whether to lower them to **250k/150k**. No owner answer has been received; the
-reviewer's “yes to both” is a recommendation, not a change to that explicit
-approval. All independent fixes are complete. No interim review blocked the work.
-
-The proposed lower Base floors must be assessed together with **Curve snapshot,
-Undy quote, and Undy snapshot overrides**. A smaller immutable floor reduces the
-cost of repeated faulty calls and cannot be introduced later with a setter.
-The existing local mock passes with 250k quote floor and a 2M Undy quote override;
-that is candidate input, not live qualification. The provisional Undy snapshot
-allowance remains 1.5M pending fresh source measurement.
+Base's immutable quote/snapshot floors remain **1.5M/1.5M**. The C01–C26 handoff
+explicitly preserves them and directs completion of independent fixes without
+waiting for a new production-budget decision. Lower floors remain an optional
+future design decision, not a blocker to this scoped review. No deployment values
+are qualified by the local mock experiments below.
 
 `PRICE_DESK_SOURCE_GAS_OVERRIDES` in `config/BluePrint.py` now holds explicit
 per-profile raw `(quote, snapshot, feed)` tuples. The rehearsal drafts apply
@@ -58,10 +57,10 @@ overrides, and complete-transaction evidence before cutover.
 
 | Re-review item | Result |
 | --- | --- |
-| 1. Drafts occupy the live migration queue | Moved both bodies to `scripts/rehearsal/base_candidates/`, without timestamped migration names. `FullUpdate` and offline tests load paths directly. The real runner reports frontier `2026091403` and no later pending migration; an isolated future-queue regression proves the drafts cannot force a later stage behind them. Production reintroduction requires qualification, explicit authorization, and fresh timestamps/labels. |
+| 1. Drafts occupy the live migration queue | Moved both bodies to `scripts/rehearsal/base_candidates/`, without timestamped migration names. `FullUpdate` and offline tests load paths directly. Direct live-queue exclusion and isolated queue/history tests protect this boundary without freezing the future migration frontier. Production reintroduction requires qualification, explicit authorization, and fresh timestamps/labels. |
 | 2. Required deployment-controls failure | Kept the correct current-source indirect Teller→Curve relation and deliberately changed the direct/indirect pins from 167/11 to 166/12. Ran the whole required deployment-controls selection: 876 passed. |
 | Four inherited reserve-engine failures | Reproduced and fixed the omitted `SwitchboardFoxtrotSetup` source inventory. Both Foxtrot sources now have semantic-method and reserve-mutator checks. Source review remains separate from the approved registered deployment inventory: this does not silently authorize a new live variant. Three additional regressions cover those boundaries. |
-| 3. Interacting floor/override decisions | Added the per-profile table above, shared constructor/budget checks, exact address bindings, and apply/readback before governance relinquishment in both drafts. Tests cover replay and refused handoff on missing entries, invalid budgets, dropped writes, or constructor mismatch. The lower Base floors remain the one pending owner decision. |
+| 3. Interacting floor/override decisions | Added the per-profile table above, shared constructor/budget checks, exact address bindings, and apply/readback before governance relinquishment in both drafts. Tests cover replay and refused handoff on missing entries, invalid budgets, dropped writes, or constructor mismatch. The C01–C26 handoff preserves Base floors; optional lower floors remain deferred. |
 | 4. Source versus live Robinhood blueprint | Module documentation explicitly scopes pointers/relations to the current checkout. The retained Robinhood Teller generation uses its direct Curve call; the new relay description is not evidence of live redeployment. |
 | Duplicated oracle body | Kept the historical executed body independent: sharing mutable implementation would change its seven-argument behavior and break reproducibility. Both current drafts share the new budget helper. A structural parity regression pins the oracle draft's non-budget behavior to frozen `2026091402`, allowing only named constructor/readback/override/label changes. |
 | Weakened readback assertion | Both drafts now verify all four immutable getters. Independent literal constructor-profile pins already exist in `test_price_desk_current_constructor_bindings` and were preserved and rerun; new literal override-table pins and a constructor-mismatch test add coverage. Comparing the deployment readback to its blueprint is appropriate when a separate test pins the approved profile. |
@@ -75,7 +74,7 @@ overrides, and complete-transaction evidence before cutover.
 
 | Review item | Disposition |
 | --- | --- |
-| 1. Base floor and nested faults | Owner choice pending above. Added a cold synthetic comparison reproducing the 1.5M floor's repeated-failure cost and lost Undy route, alongside a 250k floor / 2M Undy experiment. These are experiments, not live-source qualification. |
+| 1. Base floor and nested faults | Approved Base floors preserved; alternative floors deferred. Added a cold synthetic comparison reproducing the 1.5M floor's repeated-failure cost and lost Undy route, alongside a 250k floor / 2M Undy experiment. These are experiments, not live-source qualification. |
 | 2. Teller activation order | Added a real-Teller regression against a desk without the relay, including last-touch rollback. Documented slot 7 before slot 17, including atomic ordering and rollback. The full-update diagnostic explicitly checks that order. |
 | 3. Foxtrot runtime failure | Fixed the stale 12,061-byte expectation to the measured 18,278 bytes. The growth came from predecessor `0833dddd`; the earlier implementation report missed the full edited runtime-table test. That omission was an error. The full table is now in the recorded default lane. |
 | 4. Curve snapshot allowance | The re-review adds explicit provisional per-profile Curve overrides and cold local measurements; Base cannot lower its override below the still-approved 1.5M immutable floor. |
@@ -174,17 +173,17 @@ not qualify every ring state or dependency. Existing Curve-route measurements
 also reproduce: 28,374 nested quote, 169,797 four-coin quote, and 73,218 Teller
 housekeeping execution gas.
 
-## Re-review verification commands and results
+## Historical re-review verification commands and results (before C01–C26)
 
 Run from the designated worktree with the interpreter/cache environment below.
 The deployment command mirrors the required job's test selection and existing
-exclusions. Workflow files were not changed.
+exclusions. Workflow files were not changed in that historical run; C02 now extends gas coverage.
 
 ```sh
-cd /Users/wigglez/dev/ripe-protocol-pricedesk-gas
+cd $PRICEDESK_WORKTREE
 export PYTHONPYCACHEPREFIX=/private/tmp/pricedesk-configurable-gas/python
 export RIPE_BOA_CACHE_DIR=/private/tmp/pricedesk-configurable-gas/boa
-pricedesk_python=/Users/wigglez/dev/ripe-protocol/.venv/bin/python
+pricedesk_python="$PRICEDESK_PYTHON"
 
 "$pricedesk_python" -m pytest -q \
   -o cache_dir=/private/tmp/pricedesk-configurable-gas/pytest \
@@ -246,10 +245,10 @@ checkout; `pytest.ini` resolves repository/test imports from this worktree.
 All local artifacts and caches go outside the checkout:
 
 ```sh
-cd /Users/wigglez/dev/ripe-protocol-pricedesk-gas
+cd $PRICEDESK_WORKTREE
 export PYTHONPYCACHEPREFIX=/private/tmp/pricedesk-configurable-gas/python
 export RIPE_BOA_CACHE_DIR=/private/tmp/pricedesk-configurable-gas/boa
-pricedesk_python=/Users/wigglez/dev/ripe-protocol/.venv/bin/python
+pricedesk_python="$PRICEDESK_PYTHON"
 mkdir -p /private/tmp/pricedesk-configurable-gas
 
 "$pricedesk_python" -m pytest -q \
@@ -294,8 +293,10 @@ run the deployment suite. The prior review results were **292 default + 44 gas +
 with zero failures, errors or skips in these selected lanes. JUnit case identities
 were checked for duplicates across the three runs. The Robinhood blueprint's
 built-in validation also passes when importing `config.robinhood_blueprint`.
-Neither the prior follow-up nor this re-review ran the full repository suite, an
-RPC fork, live qualification, deployment, Safe operation, push or publication.
+These two historical local validation runs preceded publication of PR #232.
+They did not run the full repository suite, an RPC fork, live qualification,
+deployment, Safe operation, push or publication. Current validation is recorded
+in the C01–C26 closure linked above.
 
 ## Budget changes and activation
 
@@ -312,6 +313,9 @@ To change only one effective budget:
    three effective values and `SourceGasBudgetsUpdated` after execution. Recheck
    for intervening governance changes before signing/execution.
 
+Budget writes use `_canGovern` immediately, including while paused; they do not
+use the registry action timelock. This chosen authority model is unchanged.
+
 The view exposes effective values. Preserving a default as an explicit nonzero
 value preserves behavior but differs from raw zero in events. If raw-zero
 representation matters, reconstruct the raw fields from authenticated events;
@@ -325,6 +329,37 @@ source overrides before opening Teller. Roll back the relay Teller before
 restoring an incompatible desk. See [the staging guide](staged-upgrade-deployment.md).
 
 ## Remaining release work and limitations
+
+Adequately funded direct source calls retain failure isolation. Ordinary quotes
+require full-budget funding after failed, malformed or zero-with-feed results;
+canonical usable/no-feed replies bypass that proof. Admission, feed checks and
+both snapshot paths check funding eagerly. A detected funding failure reverts
+that PriceDesk invocation, but an enclosing isolation boundary may catch it, so
+nested fallback availability depends on qualified enclosing budgets.
+
+For an enclosing cap B, an inner failing call with the same budget needs
+`B + ceil(B / 63) + 5,000`: 1,528,810 gas at Base's 1.5M floor, before other
+source work. The real Curve/Chainlink regression has direct USDG fallback success
+with stale Chainlink, while nested GREEN returns zero (or the strict-caller error)
+at the Curve floor even with 10M transaction gas. An illustrative 3.5M Curve quote
+override restores that test route; it is not a production recommendation.
+
+| Nested route | Qualification scope |
+| --- | --- |
+| Curve → USDG | Concrete stale-Chainlink fallback loss reproduced above. |
+| wsuperOETHb → SUPER_OETH | Qualify its nested underlying lookup and dependency behavior. |
+| RedStone → ETH/USD | Qualify the nested lookup when `needsEthToUsd` is enabled. |
+
+This does not claim that every live route fails. An adequately funded enclosing
+route must cover inner failed, malformed and zero-with-feed branches as well as
+its normal source work and repeated invocations.
+
+Teller's 19 housekeeping call sites span all flow families plus conditional
+deposit housekeeping. At a 1.5M snapshot budget the relay needs at least 1,528,810
+gas at its funding sample even for a genuine no-op; absent/disabled sources return
+before that proof. RPC-estimator D01 must compare identical prestates at estimated,
+submitted buffered and generous limits for both generic and reference snapshots,
+across frontend, wallet, keeper and integration callers, including Appraiser.
 
 Canonical `(price > 0, true)` and `(0, false)` replies intentionally bypass the
 ordinary-quote full-budget proof. A dependency can catch inner underfunding and
@@ -349,3 +384,7 @@ The changed BlueChip setup is a reminder that admission must fund inner failures
 a route previously admitted via starved nested calls can fail under the new
 requirements. Neither a floor nor an immediate governance setter guarantees
 ongoing source availability.
+
+Recheck the actual chain/client transaction cap during qualification. Changing the
+immutable maximum later requires a new deployment. Bind each acceptance decision
+to its final implementation, source addresses, configuration and qualification evidence.

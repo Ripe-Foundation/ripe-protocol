@@ -69,12 +69,12 @@ Verified:
 What is missing is the exact command. The prompt says "isolated branch" and the reference says "new isolated checkout, unused writable location". A fresh agent will likely pick `/private/tmp`, where worktrees have been lost before. I'd add this command, using the same sibling-folder convention as your TWAP worktree:
 
 ```bash
-git -C /Users/wigglez/dev/ripe-protocol worktree add -b codex/pricedesk-configurable-gas /Users/wigglez/dev/ripe-protocol-pricedesk-gas bdf7f3da7113aabde60ab8eceab6a960a841bb88
+git -C $RIPE_REPOSITORY worktree add -b codex/pricedesk-configurable-gas $PRICEDESK_WORKTREE bdf7f3da7113aabde60ab8eceab6a960a841bb88
 ```
 
 Two notes to add alongside it:
 - **Sandbox.** The sandbox blocks `.git/worktrees`, so the command must run with the sandbox off. The clone fallback in the reference can stay.
-- **Python environment.** A new worktree has no `.venv`. Tell the agent to run `/Users/wigglez/dev/ripe-protocol/.venv/bin/python -m pytest` from the worktree root. `pytest.ini` puts `.` and `tests` on the import path, so imports should resolve to the worktree; the agent should confirm that once.
+- **Python environment.** A new worktree has no `.venv`. Tell the agent to run `"$PRICEDESK_PYTHON" -m pytest` from the worktree root. `pytest.ini` puts `.` and `tests` on the import path, so imports should resolve to the worktree; the agent should confirm that once.
 
 ## Smaller precision gaps
 

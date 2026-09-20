@@ -137,6 +137,11 @@ def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint25
 @external
 def getAddr(_regId: uint256) -> address:
     return empty(address)
+
+@external
+def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool:
+    return True
+
 """
 
 

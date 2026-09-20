@@ -18,6 +18,7 @@ from eth_utils import keccak, to_checksum_address, event_abi_to_log_topic
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.base_upgrade_fork import Rehearsal, plain, error_text, error_frames, permission_keys, HQ_IDS, ZERO
+from scripts.utils.base_activation import department_confirmation_order
 from scripts.utils.deploy_args import BluePrint
 from scripts.utils.fork_reports import fingerprint, require_unoptimized
 
@@ -39,18 +40,6 @@ def staging_source_hashes(root=ROOT):
     paths.update((root / CANDIDATE_DIR).rglob("*.py"))
     return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
             for path in sorted(paths)}
-
-
-def department_confirmation_order(replacements):
-    """Validate dependencies before proposing any department changes."""
-    if len(replacements) != len(set(replacements)):
-        raise RuntimeError("BASE_ACTIVATION_DUPLICATE_SLOT")
-    required = (6, 8, 5, 7, 17)
-    for slot in required:
-        if slot not in replacements:
-            raise RuntimeError(f"BASE_ACTIVATION_REQUIRED_SLOT_MISSING:{slot}")
-    # The relay Teller needs the compatible PriceDesk already active.
-    return [6, 8, 5, 7] + [slot for slot in replacements if slot not in (6, 8, 5, 7)]
 
 
 def candidate_key(label):

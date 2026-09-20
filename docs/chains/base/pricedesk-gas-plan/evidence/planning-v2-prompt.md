@@ -4,7 +4,7 @@ Working instruction: minimize smart-contract changes. Measure before choosing th
 
 1. **Bind the source, scope, and live situation before implementation.**
 
-   Repository: `/Users/wigglez/dev/ripe-protocol`. PR #231 is open against `master`. Its head was independently verified on 2026-09-19 as `bdf7f3da7113aabde60ab8eceab6a960a841bb88`, branch `codex/base-upgrade-fork-rehearsal`. The local `master` reference was `1ede38351e6da918806dff70d34b2066bf8cde8c`.
+   Repository: `$RIPE_REPOSITORY`. PR #231 is open against `master`. Its head was independently verified on 2026-09-19 as `bdf7f3da7113aabde60ab8eceab6a960a841bb88`, branch `codex/base-upgrade-fork-rehearsal`. The local `master` reference was `1ede38351e6da918806dff70d34b2066bf8cde8c`.
 
    Use an isolated worktree and a new `codex/pricedesk-base-gas-qualification` branch starting from the full PR head above. Do not switch, reset, clean, or modify the coworker's checkout/branch or unrelated untracked files. Recheck the remote head first. If it moved, document the delta and obtain a target decision before implementing against a different revision; frozen historical experiments may continue.
 

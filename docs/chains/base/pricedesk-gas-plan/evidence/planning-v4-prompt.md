@@ -16,7 +16,7 @@ The design below describes the recommended combined, three-budget version. Resol
 
 Use an isolated `codex/pricedesk-configurable-gas` branch from PR #231's frozen head `bdf7f3da7113aabde60ab8eceab6a960a841bb88`. Its eventual PR targets `codex/base-upgrade-fork-rehearsal`, if publication is later authorized. Record upstream drift; continue at the frozen pin and reconcile the actual integrated tree before deployment qualification. Preserve unrelated work. Copy this entire uncommitted packet into the implementation checkout; it is absent from the pinned commit.
 
-Read [implementation-reference.md](implementation-reference.md) for exact tooling, cold-fork mechanics, test lanes and activation details. Older prompts in `evidence/` are superseded.
+Read [implementation-reference.md](planning-v4-reference.md) for exact tooling, cold-fork mechanics, test lanes and activation details. Older prompts in `evidence/` are superseded.
 
 ## Stage 1 — Contract design and focused tests
 

@@ -6,8 +6,10 @@ from eth_abi import encode
 from conf_utils import filter_logs
 from registries.price_desk_gas_helpers import cold_trial, calls_to, CallGasMeter
 from registries.test_price_desk_isolation import (
-    ETH, ZERO_ADDRESS, _gas_source, _isolated_price_desk, _raw_source, _set_priorities,
+    ETH, ZERO_ADDRESS, _gas_source, _raw_source, _set_priorities,
 )
+
+from registries.price_desk_helpers import _isolated_price_desk
 
 DEFAULTS = (250_000, 150_000, 75_000)
 MAXIMUM = 6_000_000

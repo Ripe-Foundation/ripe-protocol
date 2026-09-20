@@ -1,6 +1,6 @@
 All **20 numbered findings/nits from the re-review** are addressed: R1–R13 plus the seven unnumbered nits, labeled N1–N7 below. Two additional recommendations—the state-drift hypothesis and proposal-only pricing-policy scope—are recorded after the table. A planning disposition is not a completed implementation or qualification claim.
 
-The current [updated prompt](updated-prompt.md) uses Phases 0–6 for ordering and references A–F for detail. The prior 28-item record is preserved at `evidence/planning-v2-resolutions.md`; the current decisions below supersede its conflicting PR, pytest and policy-gate instructions.
+The current [updated prompt](planning-v3-prompt.md) uses Phases 0–6 for ordering and references A–F for detail. The prior 28-item record is preserved at `evidence/planning-v2-resolutions.md`; the current decisions below supersede its conflicting PR, pytest and policy-gate instructions.
 
 | Item | Resolution | Current location |
 | --- | --- | --- |

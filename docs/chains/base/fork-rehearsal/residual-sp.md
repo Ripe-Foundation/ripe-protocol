@@ -73,6 +73,16 @@ To repeat the combined run, add `--legacy-probe --ordinary-probe` to the command
 below. All calls remain fork-only; none of its newly deployed addresses should
 be used as live deployment addresses.
 
+Historical reproduction only: [residual-sp-evidence.json](residual-sp-evidence.json) records contract source
+`1ede38351e6da918806dff70d34b2066bf8cde8c` and harness SHA-256
+`e0dace3aecb0238438974bafc53b35bfc122c4543e59faabab037ea80cd1d675`. Both must be bound; checking out the contract revision
+alone does not recover the recorded harness. The matching harness body is available at
+`55876cd7d3ff0b8980ea52bed321a18dfbf98530:scripts/base_upgrade_fork.py`.
+The current `compatibility_probe` rejects before its first simulated registry
+mutation because its retained plan omits the compatible PriceDesk. For current
+source use `scripts/base_full_update_fork.py` and the [current full-update scope](full-update-summary.md),
+not the historical command below. Shared imports and `--help` remain supported.
+
 ```sh
 python3 scripts/base_upgrade_fork.py \
   --block 51187713 \

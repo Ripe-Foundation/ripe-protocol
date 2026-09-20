@@ -201,23 +201,39 @@ def test_current_price_desk_call_sites_compile_the_full_constructor(ripe_hq, dep
 def test_drafts_do_not_enter_live_base_migration_queue(tmp_path):
     from scripts.utils.migration_runner import MigrationRunner
 
-    migrations = ROOT / "migrations/base-mainnet"
-    history = ROOT / "migration_history/base-mainnet/v1"
-    runner = MigrationRunner(str(migrations), str(history), {})
-    assert runner._recorded_frontier() == "2026091403"
-    assert runner._filtered_migration_filenames("2026091403", None, inclusive=False) == []
+    def assert_no_drafts(runner):
+        drafts = {path.read_bytes() for path in (ROOT / CANDIDATE_DIR).glob("*.py")}
+        prohibited_names = {path.stem for path in (ROOT / CANDIDATE_DIR).glob("*.py")}
+        for filename, _, _ in runner._filtered_migration_filenames(None, None):
+            path = Path(filename)
+            assert path.read_bytes() not in drafts, f"Rehearsal draft in live queue: {path.name}"
+            assert not any(name in path.stem for name in prohibited_names), path.name
+
+    runner = MigrationRunner(str(ROOT / "migrations/base-mainnet"),
+                             str(ROOT / "migration_history/base-mainnet/v1"), {})
+    assert_no_drafts(runner)
     assert ORACLES.is_relative_to(CANDIDATE_DIR)
     assert BRIDGE.is_relative_to(CANDIDATE_DIR)
 
-    # Exercise the real start-point guard on an isolated future queue. The
-    # drafts must not force an otherwise valid new migration behind them.
-    queue = tmp_path / "migrations"
+    # Completion/frontier behavior belongs to synthetic history, so valid new
+    # production migrations can advance independently of this draft-exclusion test.
+    queue, history = tmp_path / "migrations", tmp_path / "history"
     queue.mkdir()
-    for path, _, _ in runner._filtered_migration_filenames(None, None):
-        (queue / Path(path).name).write_text("# enumeration only\n")
-    (queue / "2026092000_AuthorizedFutureStage.py").write_text("# enumeration only\n")
+    history.mkdir()
+    for name in ("1000-manifest.json", "current-manifest.json"):
+        (history / name).write_text("{}")
+    (queue / "1000_Completed.py").write_text("# completed fixture migration")
+    (queue / "1001_AuthorizedFutureStage.py").write_text("# ordinary future migration")
     future = MigrationRunner(str(queue), str(history), {})
-    future._require_start_point(None, "2026092000")
+    assert future._recorded_frontier() == "1000"
+    future._require_start_point(None, "1001")
+    assert [timestamp for _, timestamp, _ in
+            future._filtered_migration_filenames("1000", None, inclusive=False)] == ["1001"]
+    assert_no_drafts(future)
+    # The same assertion must detect a timestamped copy even under another name.
+    (queue / "1002_AccidentalDraft.py").write_bytes((ROOT / BRIDGE).read_bytes())
+    with pytest.raises(AssertionError, match="Rehearsal draft in live queue"):
+        assert_no_drafts(future)
 
 
 @pytest.mark.parametrize("missing", (6, 8, 5, 7, 17))

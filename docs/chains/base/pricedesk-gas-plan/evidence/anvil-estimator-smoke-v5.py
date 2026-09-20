@@ -7,7 +7,7 @@ out = Path('/private/tmp/pricedesk-v5-anvil-smoke.json')
 result = {'checked_at': datetime.now(timezone.utc).isoformat(), 'scope': 'Local Anvil synthetic estimator/state smoke only; no Base fork or production qualification.'}
 process = None
 try:
-    process = subprocess.Popen(['/Users/wigglez/.foundry/bin/anvil', '--host', '127.0.0.1', '--port', '18577', '--accounts', '0', '--silent'], env={'PATH': os.environ['PATH']}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    process = subprocess.Popen([os.environ.get('ANVIL', 'anvil'), '--host', '127.0.0.1', '--port', '18577', '--accounts', '0', '--silent'], env={'PATH': os.environ['PATH']}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     def rpc(method, params):
         response = requests.post('http://127.0.0.1:18577', json={'jsonrpc':'2.0', 'id':1, 'method':method, 'params':params}, timeout=3)
         payload = response.json()

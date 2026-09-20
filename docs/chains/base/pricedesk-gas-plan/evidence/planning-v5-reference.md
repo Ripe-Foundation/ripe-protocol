@@ -4,7 +4,7 @@ Use this with `updated-prompt.md`. It supplies setup, measurement, test and acti
 
 ## Source and workspace
 
-Repository: `/Users/wigglez/dev/ripe-protocol`. Frozen implementation baseline: `bdf7f3da7113aabde60ab8eceab6a960a841bb88`, PR #231, branch `codex/base-upgrade-fork-rehearsal`. Master reference: `1ede38351e6da918806dff70d34b2066bf8cde8c`. Read the pinned tree's:
+Repository: `$RIPE_REPOSITORY`. Frozen implementation baseline: `bdf7f3da7113aabde60ab8eceab6a960a841bb88`, PR #231, branch `codex/base-upgrade-fork-rehearsal`. Master reference: `1ede38351e6da918806dff70d34b2066bf8cde8c`. Read the pinned tree's:
 
 - `contracts/registries/PriceDesk.vy`, its registry/governance modules, relevant interfaces, `config/BluePrint.py` and constructor consumers.
 - `docs/chains/base/staged-upgrade-deployment.md`, `docs/chains/base/review-231.md`, `migrations/base-mainnet/2026091403_StageBaseBridgePriceDesk.py`.
@@ -110,7 +110,7 @@ Rehearse final deployment, setup, governance proposal/confirmation, overwrite/de
 
 ## Consumer compatibility and recovery
 
-Inventory actual transaction construction and `eth_call` policies in the frontend, wallets, keepers, direct integrations and external contracts; include buffers, fixed caps, estimation failures and non-strict calls that now can revert. Starting pointers are `/Users/wigglez/dev/ripe-web` and `/Users/wigglez/dev/underscore-protocol/contracts/core/Appraiser.vy`: the latter contains direct `getPrice(..., False)`, conversions and `addPriceSnapshot` calls, while PriceDesk expressly authorizes the configured Underscore Appraiser. Bind the actual deployed generation; local sources alone are not proof of production caller behavior. Document unowned/unreadable integrations explicitly and prepare required client patches as proposals outside this implementation's file scope.
+Inventory actual transaction construction and `eth_call` policies in the frontend, wallets, keepers, direct integrations and external contracts; include buffers, fixed caps, estimation failures and non-strict calls that now can revert. Starting pointers are `$RIPE_WEB_REPOSITORY` and `$UNDERSCORE_REPOSITORY/contracts/core/Appraiser.vy`: the latter contains direct `getPrice(..., False)`, conversions and `addPriceSnapshot` calls, while PriceDesk expressly authorizes the configured Underscore Appraiser. Bind the actual deployed generation; local sources alone are not proof of production caller behavior. Document unowned/unreadable integrations explicitly and prepare required client patches as proposals outside this implementation's file scope.
 
 Every row of `caller-gas-matrix.csv` identifies endpoint, caller/application version, chain, input/state envelope, call multiplicity, normal and each supported fault-case minimum gas, estimator result, submitted limit/buffer, transaction ceiling and readiness. Include maximum supported keeper batches and indivisible multi-asset positions, not merely one-token happy paths. A smaller operator batch cannot repair an indivisible position that needs an unsupported number of quotes/snapshots.
 

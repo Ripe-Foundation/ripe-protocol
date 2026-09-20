@@ -1,11 +1,41 @@
-# PriceDesk gas-budget packet — final handoff (revision 7)
+# PriceDesk gas-budget packet — current reading path
 
-Start with [updated-prompt.md](updated-prompt.md) and the short [test/setup reference](implementation-reference.md). They are the only required execution documents. **Implement all steps continuously, fix resulting issues and run only affected tests; no interim owner-review checkpoints or full-suite run.**
+Start with [the implementation handoff](../pricedesk-gas-implementation.md) and
+[PR #232 review closure](../pricedesk-gas-review-232.md) for current status,
+validation, configuration boundaries and remaining work. The implementation is
+published in [PR #232](https://github.com/Ripe-Foundation/ripe-protocol/pull/232)
+on `codex/pricedesk-configurable-gas`, stacked on PR #231.
 
-The prepared workspace is `/Users/wigglez/dev/ripe-protocol-pricedesk-gas`, branch `codex/pricedesk-configurable-gas`, based on PR #231 head `bdf7f3da7113aabde60ab8eceab6a960a841bb88`. Use this worktree and its packet. The original checkout’s older packet is superseded; do not edit or copy it back over this one. This worktree's packet is now the canonical Git-tracked copy, including its evidence and hash inventory. The main checkout's untracked copy remains untouched and is not authoritative.
+The original approved scope was contract implementation and affected tests,
+using conditional ordinary quote checks, eager feed/snapshot/admission checks,
+immutable defaults with source overrides, and the Teller-to-PriceDesk Curve relay.
+Those design choices are settled. The later C01–C26 handoff additionally authorizes
+workflow coverage and complete applicable validation; its directions supersede
+the original selected-tests-only limit. Base floors remain 1.5M/1.5M.
 
-All design choices are settled: conditional ordinary quote checks; eager feed/snapshot/admission checks; immutable defaults with per-source overrides; and a Teller-to-PriceDesk Curve snapshot relay. Measure runtime early, resolve routine implementation details independently and collect any genuine remaining questions in the final report. This is scoped contract/test work, not release qualification.
+[Deferred qualification](follow-up-qualification.md) and the
+[Pool-1 supplement](legacy-pool-claim-qualification.md) preserve release requirements.
+Production budgets, RPC-estimator D01, deployment and activation remain separately
+authorized work. No document in this archive authorizes those operations now.
 
-[Review dispositions](review-resolutions.md) explain the changes. [Deferred qualification](follow-up-qualification.md) and the unchanged [Pool-1 supplement](legacy-pool-claim-qualification.md) preserve later release requirements; do not execute them now. Archived evidence is optional background, not additional instructions.
+## Historical implementation directions and provenance
 
-For transfer, copy the files in [packet-hashes.json](packet-hashes.json), plus that inventory, preserving relative paths and excluding `.claude/` and unlisted session files. Revision 7 records the original approved implementation scope. The implementation and subsequent reviewer fixes are recorded in [the current handoff](../pricedesk-gas-implementation.md); consult it for current paths, commands, configuration decisions, and remaining release work. Historical prompts and evidence are preserved for provenance, not as instructions to rerun old operations.
+[Revision-7 prompt](updated-prompt.md), [setup reference](implementation-reference.md)
+and [review resolutions](review-resolutions.md) preserve the original execution
+scope and decisions. Earlier revisions under `evidence/` are historical background,
+not instructions to rerun operations. This is the canonical tracked packet; any
+older untracked checkout copy is superseded.
+
+For portable historical commands, set `RIPE_REPOSITORY` to the original checkout,
+`PRICEDESK_WORKTREE` to the designated PR worktree and `PRICEDESK_PYTHON` to the
+pinned environment's Python executable. Optional integration references use
+`RIPE_WEB_REPOSITORY` and `UNDERSCORE_REPOSITORY`. The archived Anvil probe uses
+`ANVIL` or `anvil` on PATH. Verify the worktree branch before running any command.
+
+Published archival copies were edited on 2026-09-19 solely to sanitize local paths
+and repair 24 links to the corresponding archived versions or shared supplements.
+They are not byte-for-byte originals. [Packet inventory](packet-hashes.json)
+contains current published sizes/SHA-256 in `files` and the reviewed-head original
+published inventory in `original_published_inventory`; upstream capture hashes
+inside evidence describe those earlier captures. Copy the listed files plus the
+inventory, preserving relative paths and excluding unlisted session files.

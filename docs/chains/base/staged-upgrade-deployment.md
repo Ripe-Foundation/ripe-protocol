@@ -81,6 +81,11 @@ to the live migration directory with a fresh timestamp and fresh candidate label
 Do not substitute an old candidate's address or journal. No migration-history
 change or runner bypass is needed to use these drafts in the fork diagnostic.
 
+`TellerBaseUpgradeCandidate20260914` is the historical pre-relay Teller candidate.
+The separate `TellerPriceDeskGasCandidate20260919` requires authentication of its
+actual deployment bytecode and configuration; compiling current source in a
+rehearsal authenticates neither historical nor future live candidates.
+
 At an authorized cutover, confirm the compatible PriceDesk in **HQ slot 7 before
 Teller in slot 17**, or confirm both in one atomic batch with slot 7 first. Check
 that slot 7 implements `addGreenRefPoolSnapshot(uint256) -> bool` and that its

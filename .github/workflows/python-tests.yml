@@ -405,6 +405,8 @@ jobs:
             tests/priceSources/curve/test_robinhood_launch_route.py \
             tests/core/test_sc24_gas_matrix.py \
             tests/registries/test_price_desk_gas.py \
+            tests/registries/test_price_desk_source_budgets.py \
+            tests/registries/test_price_desk_aggregate_protocol_gas.py::test_nested_bluechip_is_starved_by_preceding_all_asset_stipend_exhaustion \
             'tests/registries/test_price_desk_aggregate_protocol_gas.py::test_aggregate_protocol_gas[valuation-intended_prompt]'
 
   rh-pr-gate:

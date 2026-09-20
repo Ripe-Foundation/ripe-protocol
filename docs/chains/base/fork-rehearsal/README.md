@@ -11,7 +11,16 @@ ready-to-sign Safe batch. **No live transactions are submitted.** All contract
 creation, governance impersonation, time travel and migration calls execute in
 Titanoboa's local fork. The only external calls are reads against Base.
 
-## Reproduction
+## Historical reproduction
+
+The command below belongs to the historical master `1ede3835` contract source,
+with the matching harness required by each report's saved fingerprint. Subsequent
+[remediation](remediation.md), [residual](residual-sp.md) and
+[Stability migration](stability-migration.md) notes bind their own source/harness
+evidence. Do not run this older compatibility route with current-source Teller:
+it intentionally rejects before its first registry mutation because slot 7 is
+missing from its replacement plan. Use `scripts/base_full_update_fork.py` for the
+current compatible stack; the old module remains importable and supports help.
 
 Use the repository Python environment with Titanoboa, requests, python-dotenv,
 eth-abi and eth-utils installed. Set `BASE_MAINNET_RPC_URL` in `.env`; no wallet

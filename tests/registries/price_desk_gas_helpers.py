@@ -9,13 +9,19 @@ from conf_utils import clear_transient_storage
 
 @contextmanager
 def cold_trial(*contracts):
-    """Restore storage AND transaction warmth, including enclosing Boa anchors."""
+    """Restore storage AND transaction warmth, including enclosing Boa anchors.
+
+    Pinned Titanoboa 0.2.7 / py-evm 0.12.1b1: _reset_access_counters replaces
+    AccountDB._journal_accessed_state. The enclosing anchor owns checkpoints in
+    the previous journal, which must be restored even when the trial raises.
+    tests/test_price_desk_gas_helpers.py pins these private-API assumptions.
+    """
     state = boa.env.evm.vm.state
     db = state._account_db
     previous_accesses = db._journal_accessed_state
-    boa.env._reset_access_counters()
-    clear_transient_storage()
     try:
+        boa.env._reset_access_counters()
+        clear_transient_storage()
         with boa.env.anchor():
             for contract in contracts:
                 address = bytes.fromhex(str(contract.address)[2:])
