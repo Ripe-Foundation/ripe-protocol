@@ -191,6 +191,11 @@ def reconcile(intended, emitter, logs):
 
 
 def dry_run(records, report, intended, keeper, gas_limit=BATCH_GAS):
+    # A reused diagnostic must never retain a previous successful batch when
+    # a later attempt fails admission, execution, or all-user reconciliation.
+    report["keeper_ready"] = False
+    for key in ("reconciliation", "simulation", "intended", "keeper", "calldata_sha256"):
+        report.pop(key, None)
     require(report["passed"] and report["book"] == report["active_book"], "KEEPER_PREFLIGHT_NOT_ACTIVE_OR_HEALTHY")
     require(0 < gas_limit <= BATCH_GAS, "KEEPER_GAS_BUDGET")
     require(all(address(i["user"]) in report["users"] for i in intended), "KEEPER_USER_NOT_PROBED")
