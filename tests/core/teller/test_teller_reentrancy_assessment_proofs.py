@@ -63,8 +63,14 @@ def addPriceSnapshot(_asset: address) -> bool:
 GOVERNANCE_PRICE_CALLBACK_SOURCE = M1_PRICE_CALLBACK_SOURCE + """
 @view
 @external
-def getAddr(_reg_id: uint256) -> address:
+def addGreenRefPoolSnapshot(_reg_id: uint256) -> bool:
     # CurvePrices is intentionally configured off in this focused harness.
+    return True
+
+@view
+@external
+def getAddr(_reg_id: uint256) -> address:
+    # CreditEngine still resolves its Curve source through the registry.
     return empty(address)
 
 @view
@@ -83,8 +89,14 @@ GOVERNANCE_REVERTING_PRICE_CALLBACK_SOURCE = (
     + """
 @view
 @external
-def getAddr(_reg_id: uint256) -> address:
+def addGreenRefPoolSnapshot(_reg_id: uint256) -> bool:
     # CurvePrices is intentionally configured off in this focused harness.
+    return True
+
+@view
+@external
+def getAddr(_reg_id: uint256) -> address:
+    # CreditEngine still resolves its Curve source through the registry.
     return empty(address)
 
 @view
