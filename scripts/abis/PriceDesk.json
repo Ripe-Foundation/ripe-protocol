@@ -1879,6 +1879,23 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "addGreenRefPoolSnapshot",
+    "inputs": [
+      {
+        "name": "_curveSourceId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "addPriceSnapshot",
     "inputs": [
       {
@@ -1902,6 +1919,30 @@
       {
         "name": "",
         "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "PRICE_SOURCE_PRICE_GAS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "PRICE_SOURCE_SNAPSHOT_GAS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ]
   },
@@ -1944,6 +1985,14 @@
       },
       {
         "name": "_maxRegistryTimeLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_priceSourcePriceGas",
+        "type": "uint256"
+      },
+      {
+        "name": "_priceSourceSnapshotGas",
         "type": "uint256"
       }
     ],

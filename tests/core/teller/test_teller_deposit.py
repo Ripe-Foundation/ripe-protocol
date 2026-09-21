@@ -3639,8 +3639,9 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    # RH-D031 pins the exact third-party-touch artifact; any drift reopens it.
-    assert len(runtime) == 24_424
+    # Compiler runtime excludes 128 bytes of immutables. The complete runtime
+    # is independently pinned in test_vault_pointer_runtime_sizes.py.
+    assert len(runtime) == 24_360
 
 
 ############################################################################

@@ -65,7 +65,7 @@ def _gas_source(
     return source
 
 
-def _isolated_price_desk(ripe_hq, deploy3r, sources):
+def _isolated_price_desk(ripe_hq, deploy3r, sources, price_gas=250_000, snapshot_gas=150_000):
     desk = boa.load(
         "contracts/registries/PriceDesk.vy",
         ripe_hq,
@@ -73,6 +73,8 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources):
         ETH,
         1,
         2,
+        price_gas,
+        snapshot_gas,
         name="isolated_price_desk",
     )
     for index, source in enumerate(sources, start=1):

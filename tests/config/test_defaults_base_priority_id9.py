@@ -41,6 +41,8 @@ def test_defaults_base_id9_does_not_win_ahead_of_id4(
             "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
             min_tl,
             max_tl,
+            250_000,
+            150_000,
             name="id9_desk",
         )
         sources = []
@@ -213,6 +215,8 @@ def test_replacement_mission_control_uses_own_price_desk(
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         min_tl,
         max_tl,
+        250_000,
+        150_000,
         name="replacement_mc_own_desk",
     )
     src = boa.load(

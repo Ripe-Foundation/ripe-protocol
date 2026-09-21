@@ -1,3 +1,4 @@
+import ast
 import re
 from pathlib import Path
 
@@ -120,11 +121,13 @@ def test_ltv_bearing_assets_remain_within_direct_price_allowlist():
 
 
 def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
-    assert _source_uint_constant(
-        "contracts/registries/PriceDesk.vy",
-        "PRICE_SOURCE_PRICE_GAS",
-    ) == QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND, (
-        "PriceDesk price-source stipend changed; aggregate protocol-gas "
+    # The old qualification applies to the explicitly deployed test allowance,
+    # not every value the new constructor can accept.
+    tree = ast.parse(Path("tests/conf_core.py").read_text())
+    fixture = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "price_desk_deploy")
+    deployment = next(node.value for node in fixture.body if isinstance(node, ast.Return))
+    assert ast.literal_eval(deployment.args[-2]) == QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND, (
+        "PriceDesk test price-source stipend changed; aggregate protocol-gas "
         "requalification is required"
     )
     assert _source_uint_constant(
