@@ -366,9 +366,25 @@ def test_full_capacity_ten_green_ring_teller_housekeeping_gas(
     gas_used = teller._computation.get_gas_used()
     print(f"CURVE_FULL_CAPACITY_TEN_TELLER_HOUSEKEEPING_GAS={gas_used}")
     assert route.curve.greenRefPoolData().nextIndex == 1
-    # The deterministic in-process measurement is 69,103 gas. The 150k ceiling
-    # is more than 100% above it and is independent of the call stipend.
+    # Keep the existing complete-housekeeping ceiling across the PriceDesk relay.
     assert gas_used <= 150_000
+
+
+def test_price_desk_relay_preserves_curve_authorization(
+    robinhood_curve_launch_route, ripe_hq, deploy3r, teller, bob,
+):
+    from registries.test_price_desk_isolation import _isolated_price_desk
+
+    route = robinhood_curve_launch_route
+    assert ripe_hq.isValidAddr(route.price_desk.address)
+    # An unconfigured reference pool returns False without reverting. The relay
+    # reports successful execution, preserving the existing Teller behavior.
+    assert route.price_desk.addGreenRefPoolSnapshot(2, sender=teller.address)
+    unregistered = _isolated_price_desk(ripe_hq, deploy3r, [route.curve])
+    assert not ripe_hq.isValidAddr(unregistered.address)
+    assert not unregistered.addGreenRefPoolSnapshot(1, sender=teller.address)
+    with boa.reverts("no perms"):
+        route.curve.addGreenRefPoolSnapshot(sender=bob)
 
 
 @pytest.mark.parametrize("failure", ("zero_pool", "zero_chainlink", "stale_chainlink"))

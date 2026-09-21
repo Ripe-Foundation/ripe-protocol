@@ -118,9 +118,13 @@ def _register_source(desk, source, deployer, description):
 
 
 def _isolated_price_desk(ripe_hq, deploy3r, sources, price_limit=None):
-    source_path = Path("contracts/registries/PriceDesk.vy")
     desk = boa.load(
-        str(source_path), ripe_hq, deploy3r, ETH, 1, 2,
+        "contracts/registries/PriceDesk.vy",
+        ripe_hq,
+        deploy3r,
+        ETH,
+        1,
+        2,
         250_000 if price_limit is None else price_limit,
         150_000,
         name="gas_measurement_price_desk",

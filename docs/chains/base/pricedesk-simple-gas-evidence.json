@@ -1,0 +1,279 @@
+{
+  "scope": "local source/configuration diagnostic; no production activation proof",
+  "local_overrides": [
+    "HQ slots 5,6,7",
+    "candidate MC configured with recorded Defaults",
+    "PriceDesk runtime; unchanged registry and token-scale storage"
+  ],
+  "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367",
+  "price_config": [
+    86400,
+    [
+      1,
+      8,
+      2,
+      9,
+      4,
+      5
+    ]
+  ],
+  "quotes": [
+    {
+      "quote_allowance": 1500000,
+      "runtime_sha256": "c336a32c23e6ecf559ffdf4b105e363572ce891e4b49272334ed49f968ca2aa6",
+      "passed": false,
+      "execution_gas": 1610167,
+      "failures": [
+        {
+          "target": "0xad70893e2f51076b0e9ba18fc593e924593a073f",
+          "selector": "76d69760",
+          "gas_limit": 16000000,
+          "gas_left": 14389833,
+          "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1ahas price config, no price\\x00\\x00\\x00\\x00\\x00\\x00'"
+        },
+        {
+          "target": "0x64d0f785c3d4bf4675f4b8432d765175f014a8ac",
+          "selector": "abe4ffb4",
+          "gas_limit": 1500000,
+          "gas_left": 20242,
+          "error": "b''"
+        },
+        {
+          "target": "0x99e65176f7fa8743e3fbaef277d1da448e361367",
+          "selector": "07a2d13a",
+          "gas_limit": 1276945,
+          "gas_left": 0,
+          "error": "Out of gas: Needed 10 - Remaining 6 - Reason: JUMPI"
+        },
+        {
+          "target": "0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2",
+          "selector": "70a08231",
+          "gas_limit": 617,
+          "gas_left": 0,
+          "error": "Out of gas: Needed 10 - Remaining 1 - Reason: JUMPI"
+        }
+      ]
+    },
+    {
+      "quote_allowance": 2000000,
+      "runtime_sha256": "e57ba396aa9dcef0444ad87e9ff86ca06056c2b6d412fa8c59d65792065bf908",
+      "value": 1015727967608860000,
+      "passed": true,
+      "execution_gas": 1749770,
+      "failures": []
+    },
+    {
+      "quote_allowance": 3000000,
+      "runtime_sha256": "df0a6b4d6b9b79ba07b9fd991beac821198d1b01796e0461c4958fa6419ed556",
+      "value": 1015727967608860000,
+      "passed": true,
+      "execution_gas": 1749770,
+      "failures": []
+    },
+    {
+      "quote_allowance": 4000000,
+      "runtime_sha256": "a1f210c93cc396b0e9c21d9527b2572e804a2debaedd73e1d7cf4586e5394acf",
+      "value": 1015727967608860000,
+      "passed": true,
+      "execution_gas": 1749770,
+      "failures": []
+    },
+    {
+      "quote_allowance": 6000000,
+      "runtime_sha256": "990487fcbd22eb1ff8fea256e9a87d74161ffb69726b660660e0143ec95e0f33",
+      "value": 1015727967608860000,
+      "passed": true,
+      "execution_gas": 1749770,
+      "failures": []
+    }
+  ],
+  "snapshots": [
+    {
+      "snapshot_allowance": 1500000,
+      "before": [
+        281990,
+        1015865,
+        1790019055
+      ],
+      "value": false,
+      "execution_gas": 1544890,
+      "failures": [
+        {
+          "target": "0x64d0f785c3d4bf4675f4b8432d765175f014a8ac",
+          "selector": "5ad6a4b7",
+          "gas_limit": 1500000,
+          "gas_left": 23739,
+          "error": "b''"
+        },
+        {
+          "target": "0x99e65176f7fa8743e3fbaef277d1da448e361367",
+          "selector": "07a2d13a",
+          "gas_limit": 1444385,
+          "gas_left": 839,
+          "error": "b''"
+        },
+        {
+          "target": "0x14852dceea98d5e781335ba8ea8d4b3a14508868",
+          "selector": "8665f6bb",
+          "gas_limit": 28537,
+          "gas_left": 413,
+          "error": "b''"
+        },
+        {
+          "target": "0x7bfa7c4f149e7415b73bdedfe609237e29cbf34a",
+          "selector": "4cdad506",
+          "gas_limit": 27703,
+          "gas_left": 0,
+          "error": "Out of gas: Needed 1 - Remaining 0 - Reason: JUMPDEST"
+        },
+        {
+          "target": "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb",
+          "selector": "7784c685",
+          "gas_limit": 1200,
+          "gas_left": 0,
+          "error": "Out of gas: Needed 2100 - Remaining 148 - Reason: SLOAD"
+        }
+      ],
+      "after": [
+        281990,
+        1015865,
+        1790019055
+      ],
+      "advanced": false,
+      "call_succeeded": true,
+      "passed": false
+    },
+    {
+      "snapshot_allowance": 2000000,
+      "before": [
+        281990,
+        1015865,
+        1790019055
+      ],
+      "value": true,
+      "execution_gas": 1619441,
+      "failures": [],
+      "after": [
+        281990,
+        1015865,
+        1790019582
+      ],
+      "advanced": true,
+      "call_succeeded": true,
+      "passed": true
+    },
+    {
+      "snapshot_allowance": 3000000,
+      "before": [
+        281990,
+        1015865,
+        1790019055
+      ],
+      "value": true,
+      "execution_gas": 1619441,
+      "failures": [],
+      "after": [
+        281990,
+        1015865,
+        1790019582
+      ],
+      "advanced": true,
+      "call_succeeded": true,
+      "passed": true
+    },
+    {
+      "snapshot_allowance": 4000000,
+      "before": [
+        281990,
+        1015865,
+        1790019055
+      ],
+      "value": true,
+      "execution_gas": 1619441,
+      "failures": [],
+      "after": [
+        281990,
+        1015865,
+        1790019582
+      ],
+      "advanced": true,
+      "call_succeeded": true,
+      "passed": true
+    },
+    {
+      "snapshot_allowance": 6000000,
+      "before": [
+        281990,
+        1015865,
+        1790019055
+      ],
+      "value": true,
+      "execution_gas": 1619441,
+      "failures": [],
+      "after": [
+        281990,
+        1015865,
+        1790019582
+      ],
+      "advanced": true,
+      "call_succeeded": true,
+      "passed": true
+    }
+  ],
+  "source_sha256": "5035c43963b8672c22f0be7f3acbcbbeafcdd505138f97e105a22e6ce446cd50",
+  "price_sources": [
+    {
+      "id": 1,
+      "address": "0xD11B23b6391e294DF49961E64231bddDE5bB5E89",
+      "runtime_sha256": "dec975d025b317d9fffecbae28604a731d931ff3a97eaf1df95c87537dae086f"
+    },
+    {
+      "id": 2,
+      "address": "0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d",
+      "runtime_sha256": "7f03ccd161725fa67f7a7c2c8bd748cae19d7e2f6703393728e0d005ce7eb21e"
+    },
+    {
+      "id": 3,
+      "address": "0x0000000000000000000000000000000000000000",
+      "runtime_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": 4,
+      "address": "0x16371fAf6f603f8d8D6cef8C46253c80AdEe8b98",
+      "runtime_sha256": "e84426798dfbfb192362785d453872cb510e18cae2611343f6a5120006da020a"
+    },
+    {
+      "id": 5,
+      "address": "0xceE8Ed804f72b6EcB6B2D679ca17B545bD654bF6",
+      "runtime_sha256": "0fd79dab3b9536e759b83335fc0f6bad4e1a2509578760830ff8eaaa3d269bed"
+    },
+    {
+      "id": 6,
+      "address": "0x5ce2BbD5eBe9f7d9322a8F56740F95b9576eE0A2",
+      "runtime_sha256": "54b02123900f2a609858775f6a708e535f503bd3faebf1ad2b807e745c869531"
+    },
+    {
+      "id": 7,
+      "address": "0x064488f53849616eeE3EE32c29307922B319bb7C",
+      "runtime_sha256": "b7856f121feb0b24d45987cfd8459b5b2f7c66486fb1a327c4f3642d2e525431"
+    },
+    {
+      "id": 8,
+      "address": "0x64D0F785c3D4bf4675f4b8432D765175F014A8Ac",
+      "runtime_sha256": "aa3b8ae65e10b122407f9029a707672508cc77e78297817531a7b869fee8e4a0"
+    },
+    {
+      "id": 9,
+      "address": "0x9f20F25f037046721A292B19A486932ef390EAf9",
+      "runtime_sha256": "3b994e15089b9d6d9a099dfa45300443586b1b569e81afb8101e9b3959da355e"
+    }
+  ],
+  "block": 51614967,
+  "block_hash": "0xa3264bcb1cd80dd58daa590690a556b0303196f15e0b091469800caaba917e82",
+  "live_transactions": 0,
+  "manifest_sha256": "d63073791b4d9acb829ea0c42d2d332de11609002bafb91b4aceff87ccabf56c",
+  "contract_source_heads": {
+    "pr233": "6252f649226da9739ee21a13efc79ac60bea6856",
+    "pr238": "0c43eaf53b3a9fd33c90db244b3e530b2c5f1390"
+  }
+}

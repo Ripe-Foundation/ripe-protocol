@@ -451,6 +451,22 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 ###################
 
 
+@external
+def addGreenRefPoolSnapshot(_curveSourceId: uint256) -> bool:
+    assert msg.sender == addys._getTellerAddr() # dev: no perms
+    priceSource: address = registry._getAddr(_curveSourceId)
+    if priceSource == empty(address):
+        return True
+
+    # Preserve Teller's low-level success semantics, including False/no-op replies.
+    return raw_call(
+        priceSource,
+        method_id("addGreenRefPoolSnapshot()"),
+        gas=PRICE_SOURCE_SNAPSHOT_GAS,
+        revert_on_failure=False,
+    )
+
+
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
     if not addys._isValidRipeAddr(msg.sender):

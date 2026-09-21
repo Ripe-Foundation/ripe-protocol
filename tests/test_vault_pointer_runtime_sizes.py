@@ -8,7 +8,8 @@ EIP170_LIMIT = 24_576
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
 # Tight EIP-170 headrooms vs 24,576: AuctionHouse 11, Deleverage 146,
-# Teller 24, CreditEngine 33, Lootbox 165, Alpha 594, Golf 3,541.
+# Teller 88 after the PriceDesk relay merge.
+# CreditEngine 33, Lootbox 165, Alpha 594, Golf 3,541.
 # Charlie is 22,326 / 2,250 free. MissionControl is 18,948. Ledger is
 # 13,306 and must stay unchanged. Do not add nits to AuctionHouse or
 # Deleverage without remeasuring.
@@ -27,7 +28,7 @@ EXPECTED_RUNTIME_BYTES = {
     "SwitchboardGolf": 21035,
     "VaultMigrator": 15626,
     "VaultBook": 18382,
-    "Teller": 24552,
+    "Teller": 24488,
     "TellerUtils": 9113,
     "BondRoom": 10927,
     "Ledger": 13306,
@@ -42,7 +43,7 @@ EXPECTED_RUNTIME_BYTES = {
     "CreditEngine": 24543,
     "CreditRedeem": 8504,
     "Endaoment": 23386,
-    "PriceDesk": 17898,
+    "PriceDesk": 18156,
     "Deleverage": 24430,
     "StabilityPool": 24332,
     "BlueChipYieldPrices": 20857,

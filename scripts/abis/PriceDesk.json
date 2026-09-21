@@ -1879,6 +1879,23 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "addGreenRefPoolSnapshot",
+    "inputs": [
+      {
+        "name": "_curveSourceId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "addPriceSnapshot",
     "inputs": [
       {
