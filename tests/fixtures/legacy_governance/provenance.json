@@ -1,0 +1,36 @@
+{
+  "source": "Recorded Base manifest solc_json; files byte-for-byte checked against Ledger and Contributor records",
+  "compiler": "0.4.3",
+  "source_sha256": {
+    "Contributor.vy": "2b19c20b89acb5bb7c8f94c042cb7a5b43baf0421481d985850529f438576af9",
+    "ledger/interfaces/Department.vyi": "4022e08f4321cf2a061b4e6b15820958c96ff499d4fa72fcf789ed97dc234ed8",
+    "ledger/interfaces/Defaults.vyi": "1b582b32a94a0df0e291f31eec4edc0c96f0133ed32bc6023947f49832fd2a5e",
+    "ledger/interfaces/ConfigStructs.vyi": "6038cdbf454c788457d8fbf20919042656ddfbf13335c079ec2c50280b07b94b",
+    "ledger/contracts/modules/DeptBasics.vy": "9a59ebe09a5c42dc943976e0cd48bc28ca56b7209a516514f11bf9162114043f",
+    "ledger/contracts/modules/Addys.vy": "8e9462307c84f64bbfe7e57ae1f2518675a76f3200f2c9f9ae60e50483127599",
+    "ledger/contracts/data/Ledger.vy": "eb54d0094d8018f72ff0c236a87745afbab22e01ea533101204f4d30df4d8c3a"
+  },
+  "pinned_block": 51611893,
+  "hq": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+  "ledger": {
+    "address": "0x365256e322a47Aa2015F6724783F326e9B24fA47",
+    "runtime_sha256": "a8cacd456cc038a74eba236eacbbe50cbde8af4d0f9cc4cb22f98653a67b0b5d"
+  },
+  "contributor": {
+    "addresses": [
+      "0x6fcbd998568e9b63dccda5a5e0598374a63b23f4",
+      "0xdbd0b12484b1bc7670765eb2c3f8d81839f9cb37"
+    ],
+    "runtime_sha256": "e121de3c1983e6ebb046e26147156bbfbcf69b9c1defd6de0d5b0d8fc9ff63de",
+    "compiled_runtime_sha256": "051752e11a6014aa890869542f729f38d705b3f5173084003e57643cf86863a0",
+    "immutable_words": [
+      555977013094037342170537630999746207414045392171,
+      43200,
+      302400
+    ]
+  },
+  "manifest": "migration_history/base-mainnet/v1/current-manifest.json",
+  "manifest_sha256": "d63073791b4d9acb829ea0c42d2d332de11609002bafb91b4aceff87ccabf56c",
+  "reverified_block": 51614967,
+  "reverified_block_hash": "0xa3264bcb1cd80dd58daa590690a556b0303196f15e0b091469800caaba917e82"
+}

@@ -9,10 +9,20 @@ from vyper.cli.vyper_json import compile_json
 import boa
 
 from scripts.verify_legacy_vault_cutover import ROOT, SUFFIX, attach
+from scripts.base_upgrade_fork import HQ_IDS
 from scripts.utils.legacy_vault_compat import PREVIOUS_SUFFIX, address, require
 
 ALLOWANCE = 8_000_000
 TX_BUDGET = 16_000_000
+REPLACEMENT_ROLES = {slot: HQ_IDS[slot] for slot in (5, 13, 15, 16, 17, 20, 21)}
+
+
+def verify_department_graph(hq, replacements, retained_endaoment):
+    """Reject a rehearsal wired to old HR or a clobbered Endaoment slot."""
+    require(address(hq.getAddr(14)) == address(retained_endaoment), "GAS_ENDAOMENT_CHANGED")
+    for slot, target in replacements.items():
+        require(address(hq.getAddr(slot)) == address(target), f"GAS_HQ_ADDRESS:{slot}")
+        require(hq.getRegId(target) == slot and hq.isValidRegId(slot), f"GAS_HQ_IDENTITY:{slot}")
 
 
 def cold():
@@ -46,6 +56,7 @@ def measure(records, evidence):
     import hashlib
     from scripts.legacy_vault_preflight import reconcile, probe
     hq, pool = attach(records, "RipeHq"), attach(records, "StabilityPool")
+    retained_endaoment = hq.getAddr(14)
     book = attach(records, "VaultBook" + SUFFIX)
     hq_layout, pool_layout = layout(records["RipeHq"]), layout(records["StabilityPool"])
     evidence.update(units="EVM execution gas; add intrinsic gas to funded limits", allowance_per_optional_read=ALLOWANCE,
@@ -60,13 +71,13 @@ def measure(records, evidence):
     setup = attach(records, "SwitchboardFoxtrotSetup" + PREVIOUS_SUFFIX)
     while setup.initStep() < 5:
         setup.initConfig(sender=hq.governance(), gas=64_000_000)
-    roles = {5: "MissionControl", 13: "CreditEngine", 14: "HumanResources", 16: "Lootbox", 17: "Teller", 20: "TellerUtils", 21: "EndaomentFunds"}
-    replacements = {i: records[n + PREVIOUS_SUFFIX]["address"] for i, n in roles.items()}
+    replacements = {i: records[n + PREVIOUS_SUFFIX]["address"] for i, n in REPLACEMENT_ROLES.items()}
     replacements.update({7: records["PriceDeskBridge" + PREVIOUS_SUFFIX]["address"],
                          6: records["Switchboard" + SUFFIX]["address"], 8: book.address,
                          9: records["AuctionHouse" + SUFFIX]["address"], 18: records["Deleverage" + SUFFIX]["address"]})
     for slot, target in replacements.items():
         point(slot, target)
+    verify_department_graph(hq, replacements, retained_endaoment)
     setup.initRewards(sender=hq.governance(), gas=64_000_000)
     mc, pd = attach(records, "MissionControl" + PREVIOUS_SUFFIX), attach(records, "PriceDeskBridge" + PREVIOUS_SUFFIX)
     dl, teller = attach(records, "Deleverage" + SUFFIX), attach(records, "Teller" + PREVIOUS_SUFFIX)

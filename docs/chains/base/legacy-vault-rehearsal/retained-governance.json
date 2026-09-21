@@ -1,0 +1,819 @@
+{
+  "local_overrides": [
+    "candidate MC configuration",
+    "HQ department pointers",
+    "current Teller/AuctionHouse/Deleverage/PriceDesk code on recorded local candidate state",
+    "local retained-only VaultBook"
+  ],
+  "cases": [
+    {
+      "operation": "historical transfer",
+      "contributor": "0x6FCBd998568E9B63dccDA5a5E0598374a63b23f4",
+      "pending_across_switch": true,
+      "passed": true
+    },
+    {
+      "operation": "historical transfer",
+      "contributor": "0xdBD0b12484B1Bc7670765EB2c3F8d81839f9CB37",
+      "pending_across_switch": false,
+      "passed": true
+    },
+    {
+      "value": 327846497587429899763,
+      "passed": true,
+      "execution_gas": 5478248,
+      "failures": [
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 15130715,
+          "gas_left": 15130602,
+          "error": "b''"
+        },
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 14912463,
+          "gas_left": 14912350,
+          "error": "b''"
+        },
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 14593190,
+          "gas_left": 14593077,
+          "error": "b''"
+        },
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 14411232,
+          "gas_left": 14411119,
+          "error": "b''"
+        },
+        {
+          "target": "0x4549a368c00f803862d457c4c0c659a293f26c66",
+          "selector": "fdda8295",
+          "gas_limit": 13245789,
+          "gas_left": 13245676,
+          "error": "b''"
+        }
+      ],
+      "operation": "reward claim",
+      "stake": false,
+      "quote": 327846497608494092228,
+      "funded_execution_gas": 15950000,
+      "auto_stake_ratio": 7500,
+      "minted": 327846497587429899763,
+      "cash": 81961624396857474941,
+      "staked": 245884873190572424822
+    },
+    {
+      "value": 327846497587429899763,
+      "passed": true,
+      "execution_gas": 5449914,
+      "failures": [
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 15130715,
+          "gas_left": 15130602,
+          "error": "b''"
+        },
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 14912463,
+          "gas_left": 14912350,
+          "error": "b''"
+        },
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 14593190,
+          "gas_left": 14593077,
+          "error": "b''"
+        },
+        {
+          "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+          "selector": "fdda8295",
+          "gas_limit": 14411232,
+          "gas_left": 14411119,
+          "error": "b''"
+        },
+        {
+          "target": "0x4549a368c00f803862d457c4c0c659a293f26c66",
+          "selector": "fdda8295",
+          "gas_limit": 13245789,
+          "gas_left": 13245676,
+          "error": "b''"
+        }
+      ],
+      "operation": "reward claim",
+      "stake": true,
+      "quote": 327846497608494092228,
+      "funded_execution_gas": 15950000,
+      "auto_stake_ratio": 7500,
+      "minted": 327846497587429899763,
+      "cash": 0,
+      "staked": 327846497587429899763
+    },
+    {
+      "value": 1002886221930669024229,
+      "passed": true,
+      "execution_gas": 2172153,
+      "failures": [],
+      "operation": "strict mixed-holder valuation",
+      "user": "0x381490fF607bb11de75E730FF0698d72573fAedb"
+    },
+    {
+      "value": 2818084191462001552,
+      "passed": true,
+      "execution_gas": 2124017,
+      "failures": [],
+      "operation": "strict mixed-holder valuation",
+      "user": "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275"
+    },
+    {
+      "value": 52999256569529101699,
+      "passed": true,
+      "execution_gas": 2098294,
+      "failures": [],
+      "operation": "strict mixed-holder valuation",
+      "user": "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567"
+    },
+    {
+      "value": 3740935077366537037804,
+      "passed": true,
+      "execution_gas": 2047835,
+      "failures": [],
+      "operation": "strict mixed-holder valuation",
+      "user": "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F"
+    },
+    {
+      "value": 1000000000000000000,
+      "passed": true,
+      "execution_gas": 6542906,
+      "failures": [],
+      "operation": "retained settlement",
+      "sample": "mixed",
+      "funded_execution_gas": 15950000,
+      "reconciliation": {
+        "0x381490ff607bb11de75e730ff0698d72573faedb": {
+          "target": 1000000000000000000,
+          "credit": 1000000000000000000,
+          "debt_cleared": 1000000000000000000
+        }
+      }
+    },
+    {
+      "value": 2000000000000000000,
+      "passed": true,
+      "execution_gas": 8450592,
+      "failures": [],
+      "operation": "retained settlement",
+      "sample": "lp_then_sg",
+      "funded_execution_gas": 15950000,
+      "reconciliation": {
+        "0x3cd41761ae6e1adba6c85290dc78ed6497bb027d": {
+          "target": 1000000000000000000,
+          "credit": 1000000000000000000,
+          "debt_cleared": 1000000000000000000
+        },
+        "0x0e1f4af8f4233db542ac7d858382b30f87c93660": {
+          "target": 1000000000000000000,
+          "credit": 1000000000000000000,
+          "debt_cleared": 1000000000000000000
+        }
+      }
+    },
+    {
+      "value": 2000000000000000000,
+      "passed": true,
+      "execution_gas": 8450592,
+      "failures": [],
+      "operation": "retained settlement",
+      "sample": "sg_then_lp",
+      "funded_execution_gas": 15950000,
+      "reconciliation": {
+        "0x0e1f4af8f4233db542ac7d858382b30f87c93660": {
+          "target": 1000000000000000000,
+          "credit": 1000000000000000000,
+          "debt_cleared": 1000000000000000000
+        },
+        "0x3cd41761ae6e1adba6c85290dc78ed6497bb027d": {
+          "target": 1000000000000000000,
+          "credit": 1000000000000000000,
+          "debt_cleared": 1000000000000000000
+        }
+      }
+    },
+    {
+      "value": 30380971373554657176,
+      "passed": true,
+      "execution_gas": 6896174,
+      "failures": [],
+      "operation": "retained settlement",
+      "sample": "both_cohorts",
+      "funded_execution_gas": 15950000,
+      "reconciliation": {
+        "0x381490ff607bb11de75e730ff0698d72573faedb": {
+          "target": 30380971373554657176,
+          "credit": 30380971373554657176,
+          "debt_cleared": 30380971373554657176
+        }
+      }
+    }
+  ],
+  "contributors": [
+    {
+      "address": "0x6FCBd998568E9B63dccDA5a5E0598374a63b23f4",
+      "owner": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+      "runtime_sha256": "e121de3c1983e6ebb046e26147156bbfbcf69b9c1defd6de0d5b0d8fc9ff63de",
+      "shares": 7492219328870606039512710488,
+      "gov": [
+        15529774244643288,
+        7492219328870606039512710488,
+        39144549,
+        39172407,
+        [
+          43200,
+          47304000,
+          20000,
+          true,
+          8000
+        ]
+      ],
+      "points": [
+        13625307008491272,
+        7492219328,
+        39144549
+      ]
+    },
+    {
+      "address": "0xdBD0b12484B1Bc7670765EB2c3F8d81839f9CB37",
+      "owner": "0x7190081341F0e0223E237270b8479159951A5a46",
+      "runtime_sha256": "e121de3c1983e6ebb046e26147156bbfbcf69b9c1defd6de0d5b0d8fc9ff63de",
+      "shares": 7376896169921140406776598559,
+      "gov": [
+        0,
+        7376896169921140406776598559,
+        39144549,
+        39187749,
+        [
+          43200,
+          47304000,
+          20000,
+          true,
+          8000
+        ]
+      ],
+      "points": [
+        0,
+        7376896169,
+        39144549
+      ]
+    }
+  ],
+  "runtime_sha256": {
+    "AuctionHouse": "4b4925bed13b15a20f2b897a32d20f87fa881e53063eaf1569f6dea347fbbc13",
+    "CreditEngine": "e80f06f37d7056027e892380e89f6cc72bb9d1a133fa9d02e5952352771956f0",
+    "HumanResources": "851780b49a0680b1843d97d8894a76fa63a724a07bbbc449a55c04f2f9c864b7",
+    "Lootbox": "76c841738f5f81d949099951bb68072de34cff26582715d46b4d64f342dfdfe4",
+    "Teller": "6f0e7c06bfc6b3f7b4d88747a1a4c7e6557fce7268c86565e9a1b2cf06fc3c37",
+    "Deleverage": "25d2afb8a7ca13e37c27c3fdc3eef77a0c51abd293b1cf1d8cec8c1140ef17ff",
+    "TellerUtils": "8caa42ab687780d254e66c2c74315fc0c5ba971f690405ee52fe69cdebcbd5a5",
+    "EndaomentFunds": "4a410e1c04cc435f3642348de36c5ee25d3db3c8c64b13a7a1f9b33a08afef5f",
+    "PriceDesk": "667569b85551284942268c492061f38d7a126d29da8f079d5a0f8c7ae28d6e0d"
+  },
+  "stress_price_checks": [
+    {
+      "value": 1,
+      "passed": true,
+      "execution_gas": 156005,
+      "failures": [],
+      "asset": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf"
+    },
+    {
+      "value": 688924020000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631"
+    },
+    {
+      "value": 2767986819390000000000,
+      "passed": true,
+      "execution_gas": 68024,
+      "failures": [],
+      "asset": "0x4200000000000000000000000000000000000006"
+    },
+    {
+      "value": 3064663218933409280389,
+      "passed": true,
+      "execution_gas": 247624,
+      "failures": [],
+      "asset": "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6"
+    },
+    {
+      "value": 1,
+      "passed": true,
+      "execution_gas": 153810,
+      "failures": [],
+      "asset": "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5"
+    },
+    {
+      "value": 2055920000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0xA88594D404727625A9437C3f886C7643872296AE"
+    },
+    {
+      "value": 97890000000000000,
+      "passed": true,
+      "execution_gas": 65353,
+      "failures": [],
+      "asset": "0xcbD06E5A2B0C65597161de254AA074E489dEb510"
+    },
+    {
+      "value": 118157636840000000000,
+      "passed": true,
+      "execution_gas": 65551,
+      "failures": [],
+      "asset": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55"
+    },
+    {
+      "value": 701296954043962884,
+      "passed": true,
+      "execution_gas": 281392,
+      "failures": [],
+      "asset": "0x96F1a7ce331F40afe866F3b707c223e377661087"
+    },
+    {
+      "value": 701419910000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b"
+    },
+    {
+      "value": 86348981677550000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
+    },
+    {
+      "value": 1023424338456080000,
+      "passed": true,
+      "execution_gas": 322560,
+      "failures": [],
+      "asset": "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf"
+    },
+    {
+      "value": 999918260000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    },
+    {
+      "value": 1248516030000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2"
+    },
+    {
+      "value": 1167022928205540000,
+      "passed": true,
+      "execution_gas": 687775,
+      "failures": [],
+      "asset": "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8"
+    },
+    {
+      "value": 2800801002316130833125,
+      "passed": true,
+      "execution_gas": 842132,
+      "failures": [],
+      "asset": "0x02981DB1a99A14912b204437e7a2E02679B57668"
+    },
+    {
+      "value": 3156887210070000000000,
+      "passed": true,
+      "execution_gas": 62739,
+      "failures": [],
+      "asset": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22"
+    },
+    {
+      "value": 86403723477974299598000,
+      "passed": true,
+      "execution_gas": 499081,
+      "failures": [],
+      "asset": "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493"
+    },
+    {
+      "value": 242305810000000000,
+      "passed": true,
+      "execution_gas": 68024,
+      "failures": [],
+      "asset": "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c"
+    },
+    {
+      "value": 1502851670000000000,
+      "passed": true,
+      "execution_gas": 65353,
+      "failures": [],
+      "asset": "0xcb585250f852C6c6bf90434AB21A00f02833a4af"
+    },
+    {
+      "value": 61721570000000000000,
+      "passed": true,
+      "execution_gas": 65353,
+      "failures": [],
+      "asset": "0xcb17C9Db87B595717C857a08468793f5bAb6445F"
+    },
+    {
+      "value": 1143240000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+    },
+    {
+      "value": 597401035003540441,
+      "passed": true,
+      "execution_gas": 323303,
+      "failures": [],
+      "asset": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0"
+    },
+    {
+      "value": 1015727967608860000,
+      "passed": true,
+      "execution_gas": 1749770,
+      "failures": [],
+      "asset": "0x99e65176F7FA8743E3fbaEF277d1Da448e361367"
+    },
+    {
+      "value": 999881450000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0x820C137fa70C8691f0e44Dc420a5e53c168921Dc"
+    },
+    {
+      "value": 1146530980000000000,
+      "passed": true,
+      "execution_gas": 62541,
+      "failures": [],
+      "asset": "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42"
+    }
+  ],
+  "quote_allowance": 3000000,
+  "snapshot_allowance": 3000000,
+  "passed": true,
+  "block": 51614967,
+  "block_hash": "0xa3264bcb1cd80dd58daa590690a556b0303196f15e0b091469800caaba917e82",
+  "live_transactions": 0,
+  "manifest_sha256": "d63073791b4d9acb829ea0c42d2d332de11609002bafb91b4aceff87ccabf56c",
+  "probe_sha256": "d1374bb205a3718d6da57d10a492e58b1b5b232f0740c9e9384b329a4dacdb34",
+  "source_sha256": {
+    "contracts/config/BondBooster.vy": "0dc697c5d346938896ac0ece74ce1d062f57e73d7cf742df4516a5b36cc00b00",
+    "contracts/config/DefaultsBase.vy": "e59401a5aa44e24e53799766a23e7ab2686455b012b5014897b41281df960d1d",
+    "contracts/config/DefaultsBaseLive.vy": "7b118a210efe6aa3a92e6c001175bcc0dbeaeb7c033e25ddefc20723663f6c37",
+    "contracts/config/DefaultsLocal.vy": "b2ab27b873b4526a79773ba79548b6fcd8ccf7322f004ce8f00bfc2415a0fb5c",
+    "contracts/config/DefaultsRobinhood.vy": "fa11dd9935a489dfc8b20bcf644866c62eb2311228610d996c7a3bb1cddbcd5c",
+    "contracts/config/DefaultsRobinhoodLive.vy": "ef99afcda80fc962b073a54bf107c9d0a4d10d15840fab28dfac74219f61edb6",
+    "contracts/config/SwitchboardAlpha.vy": "cb2110d772917dc3d1acd3f444e893ee734d20388394d55735d98b04335d0241",
+    "contracts/config/SwitchboardBravo.vy": "97056b3fc1bb6918838d8a0548f2d6693068832425ee9b80655d5aaeb0ab4513",
+    "contracts/config/SwitchboardCharlie.vy": "408e69c4593f5970db8b7d077656b72fd9d063701c8279f8ec6a762a1c590cd0",
+    "contracts/config/SwitchboardDelta.vy": "c90b51311ee70988a8df8c1f8ec27b4675bc283239e90be295632c8b4129853a",
+    "contracts/config/SwitchboardEcho.vy": "dc780952ef79d6c2e37b6a192a8eb86085c1b483eb2115059872c3bf92f0d8cf",
+    "contracts/config/SwitchboardFoxtrot.vy": "443f69dbd78e1161f9ea436188c88e8f98ab1ec1c27f6c7c521f02f6198a9394",
+    "contracts/config/SwitchboardFoxtrotSetup.vy": "03dec5c594aa1ff6dd0d6ea97f6f19a6401180a9ce9eda7e8349c3957e428122",
+    "contracts/config/SwitchboardGolf.vy": "7a2f7b911c7a26db5c29a4488975dc757bbd449d593703274af77d3bfde694d3",
+    "contracts/config/TrainingWheels.vy": "2c828fbe101b783713384a6c0f8bbc436df7e8390881bebce68ddc4483625926",
+    "contracts/core/AuctionHouse.vy": "7e3fe3c0779ceca7ea259491955f7da062eb0a64787e5ee4982b4293a5228f78",
+    "contracts/core/AuctionHouseNFT.vy": "a77d332e29d24d608ab7da1703836e32cfd9e0da78b1ad826695954e0d879cb6",
+    "contracts/core/Boardroom.vy": "cfe01e3a97e972b1d39477e63c21076a60044619bd8b579afbde2ccef318660e",
+    "contracts/core/BondRoom.vy": "2e64060a836bfe6e4d678bb907d45271524c9efde5ce45168a20e68402a43b4a",
+    "contracts/core/CreditEngine.vy": "294aac86d656e9607ba3765071c7e1e04ae7c9622687f08a1c95025119917164",
+    "contracts/core/CreditRedeem.vy": "2041c3e4cb4d316073a47415d565d9f81535f460a38d43857b01c6406e579192",
+    "contracts/core/Deleverage.vy": "210ae86075e0638e02bb3b4fb32b7c6232a78bef12951e356b520d156cb0b135",
+    "contracts/core/Endaoment.vy": "610856c2b9ff7ec6ba1102028375ec38b9bf64554c0946cde8dbdce253bc4fc5",
+    "contracts/core/EndaomentFunds.vy": "66e283ba33c16ba49c9ae15a9c97720d4e7d794ab8654063a6925be70916a357",
+    "contracts/core/EndaomentPSM.vy": "b09dc366a29538a7ba807d84794fddec4487bce25aef327743b7db3402ece39d",
+    "contracts/core/HumanResources.vy": "5ef1628dff3c9e4ca82f162815846e91b0bea631f7461b0ee1bc5d267a0a2fb6",
+    "contracts/core/Lootbox.vy": "c4b2602f8adaab65f9ff53b8bcb2631421fa441f14c57afbae53300ef9be05b6",
+    "contracts/core/RipeReserveEngine.vy": "4a33d5f9587081ee37f58d482cf858a507fdaadf653dee0b8633ce8400b3b59c",
+    "contracts/core/RipeReserveVesting.vy": "01ef0c0f32cfa0378fad3baf317e5dd2932a2bb06b78a7f64af67f6eda11f21d",
+    "contracts/core/Teller.vy": "702fd392e12c750dba4630d47a2e4aa9e089125f73b63fe0f280e006d8f5dc40",
+    "contracts/core/TellerUtils.vy": "ca0e85225270942c3d415e17a73157218374c553a3354d07e548b6c4c95df011",
+    "contracts/core/VaultMigrator.vy": "4310b5c8650674bd83f651d16dcc9e82d05feeaa909f4276dd0093ce4cff5d63",
+    "contracts/data/Ledger.vy": "318ace525e662a4ae4cf4722b19ce83bca2fe4077fab360d6e61d6ab306edcc2",
+    "contracts/data/MissionControl.vy": "5fa4683d23a2c477d7a6ad22a673eff99b5d2418ca1f84fd491225ff9dc121c1",
+    "contracts/mock/MockAeroRipePool.vy": "507c9da9e59161780b53cbd9f6d6a467707f03dba2eefbe87ebfd053375df370",
+    "contracts/mock/MockAuctionHouse.vy": "bd52314347c21bf6f34b5178177904c45bf2e1d4749379c005c8d4e596225414",
+    "contracts/mock/MockBadERC1271.vy": "956b50b50527e26e38c2a622dbecf3de09a64754409c73e28dc770426350cbdb",
+    "contracts/mock/MockBlacklistErc20.vy": "f4636d1686fd9fd27822dc1191f0b4a51c7ea4754d0ed487c9e1da9164f468fe",
+    "contracts/mock/MockChainlinkFeed.vy": "a4e4174d19e602f01c9002c8e38d9ee1dada4b79727d352637292d92dd08d680",
+    "contracts/mock/MockCurvePrices.vy": "f10bcfbbf4e9c7b99a39685cc6dc01a268f637e69075fc6d07a7f14af488f8eb",
+    "contracts/mock/MockCurveRefPool.vy": "3964dfc232b95cf457c3cad7a5b27733d483230a34238d0a77dd8ea76f84adb2",
+    "contracts/mock/MockCurveRefPoolRegistry.vy": "2727eae0e8280bac3b01b1fe8f8a697ac90b878bfb7d910ab55d18d5a98e40fa",
+    "contracts/mock/MockDepartment.vy": "096604bb09d217759c82a0e92def784e7c917f872784f83083e5503836319754",
+    "contracts/mock/MockERC1271.vy": "589048a4ff35e8484ac07eb375a07455e44bc313b8224602d9a640b22729bd4d",
+    "contracts/mock/MockErc20.vy": "9f83a9357ed3c595112a60e0c7c213af068f167a3115c243e4c00e3bff48d5f7",
+    "contracts/mock/MockErc4626Vault.vy": "e7c0568f582072bcc57fdc23fe5a3072c808ff944e9be3cd35130109383182fe",
+    "contracts/mock/MockErc4626VaultWithSafeGap.vy": "11cf72b722bb5590df6ba2c8455fe0a071e282873c79e270df7fb6504b7305f2",
+    "contracts/mock/MockErc721.vy": "b27ab946b3f2f3694a62a052cac6a258b0a7ec995ab5cb63f580eb5e4e5ca314",
+    "contracts/mock/MockFeeOnTransferErc20.vy": "03d8fb6ac10e8f01ae45330d00ee1175c9cad172d8cae289570e0217f78c881f",
+    "contracts/mock/MockGasBurningPriceSource.vy": "def3ebe940940bfc84fe4b67f8d02cfe5ffa25c69899fbc06a56ed58825e884b",
+    "contracts/mock/MockLootboxVaultAccounting.vy": "9608ad2064db8f2bccebe35e0261a8a9099bfa491d021dd3c9c9f4a207757db0",
+    "contracts/mock/MockLootboxVaultMalformed.vy": "1fe79a074df39983f0f2011b987eaac79122f4fb1e7408ae2c41b23c277f69b0",
+    "contracts/mock/MockLootboxVaultNoConverter.vy": "1c565db6545f3b9ec437f334db1833c5143386335e9b7819c5a28bf7d1c274a9",
+    "contracts/mock/MockLootboxVaultNoTotals.vy": "4c40abb22d3a07494112073cf0c31e0cd545dd619f182797e3652382e459bc4e",
+    "contracts/mock/MockLootboxVaultTotalsMalformed.vy": "7b23c3d31563cb2a505506e112692b5011a851794fd3b2ef122cc30de24b66f5",
+    "contracts/mock/MockLootboxVaultTotalsVoid.vy": "7a4f969dc1f978f733ca897eef3c2f7cc366cd89a462107aaffeb7ce6e429136",
+    "contracts/mock/MockLootboxVaultVoidReturn.vy": "26d20c306ad38ab195b290c171083f163e0322da19ff1178dece5fa61097a514",
+    "contracts/mock/MockMoonwellToken.vy": "8a4d855bfc028a5bcca80e3a878c10c65300a8800baf5d401e8077f8df58ce9f",
+    "contracts/mock/MockMorphoV2Factory.vy": "d4afb38408b542ef123ba5df453de8ed8a871116e85f916be983c934a0f4da60",
+    "contracts/mock/MockMorphoV2Vault.vy": "d5c84d5c58f996b5cad7db1928de3fc8b144fd6322beccaad86396ab3cab5dac",
+    "contracts/mock/MockPriceSource.vy": "285a7d180de81a22bc1a0be616de34bc2cc0e30c86a92c3098c71cd14ac338a3",
+    "contracts/mock/MockProbeErc20.vy": "7d84c3f995c7f06588cabda1c8a12d8376217c653a9c4371a69ac8e559bf6a48",
+    "contracts/mock/MockPyth.vy": "c4da5b855a7d15c87668af54974d60bea1e862ebe4f1aa442fcc478f0a71ad96",
+    "contracts/mock/MockRando.vy": "595578be0162fe26843d063d93ff14a835fbc5fa229351d31535bbbef04ebe57",
+    "contracts/mock/MockRawPriceSource.vy": "e4234db46e44f966454860cf5150f67ac466d7f437da9575ee03a40199e310a3",
+    "contracts/mock/MockReentrantErc20.vy": "9ab02ded4309853b1736b52ac12c8a535165cce2c9d557e7f978e37fe374b2d3",
+    "contracts/mock/MockReentrantRepayToken.vy": "732806b536d08c8cba10b5b1448ead5bc60810ca71fd060bd59f0c39fe5890ed",
+    "contracts/mock/MockRegistry.vy": "7a8468aaf2936bfb6a8a83eeedc808bacea0c5a1dd43407061c91ea5297cf12c",
+    "contracts/mock/MockRevertOnReceive.vy": "5cac1b4b870260c1d11c8d7bd06b69c17e97dac8132240fa147d81d70d84ac1c",
+    "contracts/mock/MockRobinhoodCurveSystem.vy": "59d1760a02ebda07c276e487700b726440b7ee18e9e438512fc85901326a27b4",
+    "contracts/mock/MockSGreenPrice.vy": "5a715935318ee60277299f02668399e9ba69089a07becf12ff6c7cb29a9b9757",
+    "contracts/mock/MockStabClaimLedger.vy": "4133e9a34526e2904e68162741e6fcc79ac1c31031ec0a02c485696269f15897",
+    "contracts/mock/MockStockTokenControls.vy": "5d1527262aad66642a6e0f6dfdaad03458abdc4085a0445ebff0af8969614ef7",
+    "contracts/mock/MockStork.vy": "792778ebb1c4586de69e22b86e78773d1ba79b416c08e92cc142ca7a512c41ea",
+    "contracts/mock/MockUndyV2.vy": "d1f12f31177bd669dc235781707ea04aa1dc027501f5654c212ff881d142734d",
+    "contracts/mock/MockUniswapV2Pair.vy": "7c6bc92970be39fa8118c4000379b722bcb87592779c6cb3b45df1f5cab76350",
+    "contracts/mock/MockUniswapV2QuotePriceDesk.vy": "7b84dfaafb51e51b07dc725b739e422421bc419c56b51804164aeab231c6fdf5",
+    "contracts/mock/MockUniswapV2RipeHq.vy": "4a696548ef6f130d227133d70b3b6ee93558d78a18cf253e4364a9c63af85d4d",
+    "contracts/mock/MockUniswapV2Token.vy": "0e109020f202db31e7a09c6e473b95aad39901f98acbf439fa11aeecacf0b588",
+    "contracts/mock/MockWhitelist.vy": "9cb8699f678f57c5dde6b6f26bc2a29dcccc27594e51837be2cb963e1ac0a512",
+    "contracts/mock/MockWithGov.vy": "faf63d77d8a33e7b07b097e18bcc126cb7c56c16fe14c37ddfe57f13c94eba24",
+    "contracts/mock/MockWithTimeLock.vy": "fdc071f5498e3a8461b24f1c2a43155303d0f07bc8ac83f2bb75421cedcfeeca",
+    "contracts/mock/MockYieldRegistry.vy": "b645e1bc1f9fdb036da47a508f54dac43e000b362463e095ddb434b358de7c5d",
+    "contracts/modules/Addys.vy": "db23f14c93f6897fae890575d24fe9766e726df65b3f8b63343bb430060ccdf4",
+    "contracts/modules/Contributor.vy": "c05caa18b0035dcb5118e617f4372c50939b286a3f65d25a07db8453d7f79d4b",
+    "contracts/modules/DeptBasics.vy": "41c6d1b6fe6ca13f8721fb819406115192b745cf51e5036254f933d7963649c2",
+    "contracts/modules/LocalGov.vy": "ff9fa3133ec3dbe53301d4ab0598e17ea93dc403e1ab4f89d4573fc6b12a9751",
+    "contracts/modules/TimeLock.vy": "c42c8c606f1ab9625ea8d758052b52c1d9d6a5cd4144ae75c9ec549f98de0ef8",
+    "contracts/priceSources/AeroRipePrices.vy": "bfd777be453f826ae07a49f1f82a2357bc6cfd10482b8847f6033e9f66c0fee6",
+    "contracts/priceSources/BlueChipYieldPrices.vy": "b369f9e2a3cf11ff77e2e724e99aece0e99e7aabbadd5c65290486a41477cc51",
+    "contracts/priceSources/ChainlinkPrices.vy": "710bcd0faa6dfb1b15eeb1c910c795e6a336077069dc84720a44685f98bfae33",
+    "contracts/priceSources/CurvePrices.vy": "273751fb21d48e5705e3f1d5409e2967ea158601b55e08b931416ce75db6cf54",
+    "contracts/priceSources/PythPrices.vy": "32e4c92eb21296ff6a330b1190b4e9b2268927a6ff3842d90507f7c438e5d767",
+    "contracts/priceSources/RedStone.vy": "29ad9b6cafbd7f7daf296c0ad99368624f33cfd17e9024b359e0259852b449ab",
+    "contracts/priceSources/StorkPrices.vy": "c534e068bd9a66f3a32e8e8795e1e3889c8ffc1314798c53c326b0fd98bf7b21",
+    "contracts/priceSources/UndyVaultPrices.vy": "1458e2cd8798d61088eb63e5ff56e0e3fa042aef5b4d69166274adb7810989f2",
+    "contracts/priceSources/UniswapV2Prices.vy": "c414aa2adaecd5c3ef187231b64172a4ad7628639a1d8c0481f1afc99a371cda",
+    "contracts/priceSources/modules/PriceSourceData.vy": "41a151b05e6ca7b2ecb82392f92b5fb31b8aa57c886bb2e47e92f660e57b2628",
+    "contracts/priceSources/wsuperOETHbPrices.vy": "b200822a400558bc952de90ab59c6f798316e4c9170be969d7501032521d8f99",
+    "contracts/registries/PriceDesk.vy": "5035c43963b8672c22f0be7f3acbcbbeafcdd505138f97e105a22e6ce446cd50",
+    "contracts/registries/RipeHq.vy": "5f1932bdc10886855e908044397cd2d153a8ecb84b84f62b488653cae46b58f5",
+    "contracts/registries/Switchboard.vy": "b0ec25ecc89286fd14a941d5581497094e12fe64e5af784c9fc90787eae9d546",
+    "contracts/registries/VaultBook.vy": "32b5723cf0ff9d2850a9380facb51c452a4fb0776383971dff0abd79b170e1ab",
+    "contracts/registries/modules/AddressRegistry.vy": "6d0d5d06d7fe5acbced6c82890668869803f64dd4ab6570d5634ff2045657ff1",
+    "contracts/tokens/GreenToken.vy": "3f000b0f1289cb44fb9378ee50885ae2e4d7c2fe8b0a2acdce3210fe959663ee",
+    "contracts/tokens/RipeToken.vy": "c523e764f03a7287b7a9b2550670a6cd28923862a8e894bb92a0a6b06dbaf4a9",
+    "contracts/tokens/SavingsGreen.vy": "83ba4e5418e215fb58c1921494478b88ab5e69eeece95da181509a76a7cf1ae3",
+    "contracts/tokens/modules/Erc20Token.vy": "2c52693d56f7c6fc88c129ac81746a8e74fcf584344c0e1a4653613d7e7e83b8",
+    "contracts/tokens/modules/Erc4626Token.vy": "162977666530a583866e64dc84c91cb44046744d5699c89dba6d9034dae0722c",
+    "contracts/vaults/RebaseErc20.vy": "5e448fb6ebfed4d4632af0e1926e05140025387033f397148a8f072da7f5dd82",
+    "contracts/vaults/RipeGov.vy": "ea19ac30f63bc862b987d1e603a0a169ee432684e155c42b04c4c0e661f65432",
+    "contracts/vaults/SimpleErc20.vy": "6f1b29619bc14c2893a95cd7d88348a813152bb92835fb4c411d79db38c08a07",
+    "contracts/vaults/StabilityPool.vy": "8b205fbf9754d361ba166458638c8cc77d341959b682a7b3f896f7cc7b8d9929",
+    "contracts/vaults/modules/BasicVault.vy": "96630345786f20175db8a71e61a02b71f429e473a08d0cb196ad9e911b6bb120",
+    "contracts/vaults/modules/SharesVault.vy": "eb9f3f87a255f31f9d57995339d6c300cae9699478f9d07f8fa6777354f6e4b4",
+    "contracts/vaults/modules/StabVault.vy": "27691deee55fb7fd8c6fcf6b891e413b55203698cac379c52835c4267b8a5130",
+    "contracts/vaults/modules/VaultData.vy": "2b6a2a377605223e6b8393e2c536ae75569714c4b68d79ede60f047ef2f5a5ad"
+  },
+  "contract_source_heads": {
+    "pr233": "6252f649226da9739ee21a13efc79ac60bea6856",
+    "pr238": "0c43eaf53b3a9fd33c90db244b3e530b2c5f1390"
+  },
+  "lower_funding_comparison": {
+    "block": 51614967,
+    "block_hash": "0xa3264bcb1cd80dd58daa590690a556b0303196f15e0b091469800caaba917e82",
+    "probe_sha256": "ec71d6cede0f77cb570e78554dfd180552b18deeddedc7db3b126012cdaf5c2a",
+    "quote_allowance": 3000000,
+    "snapshot_allowance": 3000000,
+    "cases": [
+      {
+        "value": 327846497587429899763,
+        "passed": true,
+        "execution_gas": 5478248,
+        "failures": [
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 12078383,
+            "gas_left": 12078270,
+            "error": "b''"
+          },
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 11860130,
+            "gas_left": 11860017,
+            "error": "b''"
+          },
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 11540857,
+            "gas_left": 11540744,
+            "error": "b''"
+          },
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 11358900,
+            "gas_left": 11358787,
+            "error": "b''"
+          },
+          {
+            "target": "0x4549a368c00f803862d457c4c0c659a293f26c66",
+            "selector": "fdda8295",
+            "gas_limit": 10193457,
+            "gas_left": 10193344,
+            "error": "b''"
+          }
+        ],
+        "operation": "reward claim",
+        "stake": false,
+        "quote": 327846497608494092228,
+        "funded_execution_gas": 12800000,
+        "auto_stake_ratio": 7500,
+        "minted": 327846497587429899763,
+        "cash": 81961624396857474941,
+        "staked": 245884873190572424822
+      },
+      {
+        "value": 327846497587429899763,
+        "passed": true,
+        "execution_gas": 5449914,
+        "failures": [
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 12078383,
+            "gas_left": 12078270,
+            "error": "b''"
+          },
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 11860130,
+            "gas_left": 11860017,
+            "error": "b''"
+          },
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 11540857,
+            "gas_left": 11540744,
+            "error": "b''"
+          },
+          {
+            "target": "0xf75b566ef80fde0defcc045a4d57b540eb43ddfd",
+            "selector": "fdda8295",
+            "gas_limit": 11358900,
+            "gas_left": 11358787,
+            "error": "b''"
+          },
+          {
+            "target": "0x4549a368c00f803862d457c4c0c659a293f26c66",
+            "selector": "fdda8295",
+            "gas_limit": 10193457,
+            "gas_left": 10193344,
+            "error": "b''"
+          }
+        ],
+        "operation": "reward claim",
+        "stake": true,
+        "quote": 327846497608494092228,
+        "funded_execution_gas": 12800000,
+        "auto_stake_ratio": 7500,
+        "minted": 327846497587429899763,
+        "cash": 0,
+        "staked": 327846497587429899763
+      },
+      {
+        "value": 1000000000000000000,
+        "passed": true,
+        "execution_gas": 6542906,
+        "failures": [],
+        "operation": "retained settlement",
+        "sample": "mixed",
+        "funded_execution_gas": 12800000,
+        "reconciliation": {
+          "0x381490ff607bb11de75e730ff0698d72573faedb": {
+            "target": 1000000000000000000,
+            "credit": 1000000000000000000,
+            "debt_cleared": 1000000000000000000
+          }
+        }
+      },
+      {
+        "passed": false,
+        "execution_gas": 6617369,
+        "failures": [
+          {
+            "target": "0xfddfdac47b73e32143356078f34fc905ab6399b0",
+            "selector": "4f08c95c",
+            "gas_limit": 12800000,
+            "gas_left": 6182631,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          },
+          {
+            "target": "0xea53b631dafc8520007f00c32609e32e75c0a6bf",
+            "selector": "2c2b81af",
+            "gas_limit": 12588770,
+            "gas_left": 5982848,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          },
+          {
+            "target": "0xc6acb7d16d51f72eaa659668f30a40d87e2e0551",
+            "selector": "2d6c9b8c",
+            "gas_limit": 5904037,
+            "gas_left": 5889172,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          }
+        ],
+        "operation": "retained settlement",
+        "sample": "lp_then_sg",
+        "funded_execution_gas": 12800000
+      },
+      {
+        "passed": false,
+        "execution_gas": 5243232,
+        "failures": [
+          {
+            "target": "0xfddfdac47b73e32143356078f34fc905ab6399b0",
+            "selector": "4f08c95c",
+            "gas_limit": 12800000,
+            "gas_left": 7556768,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          },
+          {
+            "target": "0xea53b631dafc8520007f00c32609e32e75c0a6bf",
+            "selector": "2c2b81af",
+            "gas_limit": 12588770,
+            "gas_left": 7356985,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          },
+          {
+            "target": "0xc6acb7d16d51f72eaa659668f30a40d87e2e0551",
+            "selector": "2d6c9b8c",
+            "gas_limit": 7256843,
+            "gas_left": 7241836,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          }
+        ],
+        "operation": "retained settlement",
+        "sample": "sg_then_lp",
+        "funded_execution_gas": 12800000
+      },
+      {
+        "passed": false,
+        "execution_gas": 4973094,
+        "failures": [
+          {
+            "target": "0xfddfdac47b73e32143356078f34fc905ab6399b0",
+            "selector": "4f08c95c",
+            "gas_limit": 12800000,
+            "gas_left": 7826906,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          },
+          {
+            "target": "0xea53b631dafc8520007f00c32609e32e75c0a6bf",
+            "selector": "2c2b81af",
+            "gas_limit": 12588980,
+            "gas_left": 7627119,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          },
+          {
+            "target": "0xc6acb7d16d51f72eaa659668f30a40d87e2e0551",
+            "selector": "2d6c9b8c",
+            "gas_limit": 7522616,
+            "gas_left": 7507751,
+            "error": "b'\\x08\\xc3y\\xa0\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00 \\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x1cinsufficient legacy read gas\\x00\\x00\\x00\\x00'"
+          }
+        ],
+        "operation": "retained settlement",
+        "sample": "both_cohorts",
+        "funded_execution_gas": 12800000
+      }
+    ]
+  }
+}

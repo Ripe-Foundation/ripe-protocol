@@ -1,4 +1,4 @@
-# Retained StabilityPool compatibility coverage
+# Retained vault compatibility coverage
 
 This follow-up extends PR #233 from `ace6996059e51f85cd1fee2cfd39b436f889d6e3`. It adds 115 ordinary, network-independent test cases using the authenticated historical Pool-1 fixture. The existing CI core and supporting shards discover these files without changes to exclusions or required checks.
 
@@ -57,8 +57,111 @@ No new live Base fork or production keeper run is claimed by these local results
 
 ## Separate qualification requirements
 
-These tests strengthen local behavioral coverage. They do not change the bridge PriceDesk configuration or replace the recorded failed Base rehearsal with a successful result. The exact nested route, mixed holders and 26-claim inventory in [issue #237](https://github.com/Ripe-Foundation/ripe-protocol/issues/237) still require successful final-configuration execution, including genuine retained token balances and runtimes. That work must preserve the original difficult routes and prove per-user settlement within the intended gas budget.
+These tests strengthen local behavioral coverage. They do not change the bridge PriceDesk configuration or replace the recorded failed Base rehearsal with a successful result. The later retained-RipeGov section below records successful nested pricing and selected mixed-holder settlements with #238. Full 26-claim settlement capacity in [issue #237](https://github.com/Ripe-Foundation/ripe-protocol/issues/237) remains unqualified; successful individual quotes do not establish batch capacity.
 
 The local keeper tests exercise actual contract simulation, changed-state rejection and event reconciliation. The external production scheduler, actual keeper caller, complete current user inventory, and final receipt integration remain the separate requirements in [issue #236](https://github.com/Ripe-Foundation/ripe-protocol/issues/236). No production keeper implementation exists in this repository. These tests do not claim that external integration has been completed.
 
 The modern pool rounding follow-up in [issue #234](https://github.com/Ripe-Foundation/ripe-protocol/issues/234) remains separately scoped. No historical fixture sources, deployed configuration, recorded manifests, or activation gates are changed by this coverage follow-up.
+
+## Retained RipeGov follow-up with PR #238
+
+This follow-up includes the new StabilityPool tests at `6252f649226da9739ee21a13efc79ac60bea6856`
+and combines that contract source with PR #238 at
+`0c43eaf53b3a9fd33c90db244b3e530b2c5f1390` for the fork checks. PR #232 is absent.
+No additional RipeGov adapter or production contract edit was required by these
+checks. The existing Ledger and governance vault remain in place at HQ slot 4
+and VaultBook row 2 respectively.
+
+The added historical Ledger and Contributor fixtures are byte-for-byte copies
+of recorded compiler inputs, authenticated by source and runtime hashes in
+`tests/fixtures/legacy_governance/provenance.json`. The governance suite covers
+RIPE/LP deposits and locked/mature withdrawals, positive rewards, restaking,
+StabilityPool bonuses staking into old RipeGov with the historical Ledger,
+historical Contributor callbacks, transfer/cancellation boundaries, permissions,
+paused-Ledger rollback, and exact shares/custody/reward-budget accounting. The
+Ledger runtime substitution is isolated to each test. The Base-defaults test
+executes the real MissionControl/Foxtrot configuration and reward initialization
+methods, including early/repeated/unauthorized rejection and retained routing.
+
+The existing gas diagnostic now selects HumanResources at HQ **15**, and checks
+all substituted department identities and reverse IDs. HQ **14** remains the
+retained Endaoment. Five cases reject wrong HR, reverse IDs, disabled rows or an
+overwritten Endaoment.
+
+[The read-only fork evidence](legacy-vault-rehearsal/retained-governance.json)
+records Base block **51,614,967** and its hash, contract/runtime hashes and local
+substitutions. It authenticates both registered historical Contributors and
+transfers both positions, including a pending transfer spanning the department
+switch. With #238's quote/snapshot allowances both set to **3,000,000** locally:
+
+- The previously failing holder completes both reward claim modes. The default
+  mode mints 25% to the wallet and stakes 75%, as configured; explicit restaking
+  stakes 100%. Supply and custody deltas reconcile exactly to the returned claim.
+- All four mixed holders pass strict debt valuation, and all **26 original
+  stress assets** return strict prices, without token-balance or price overrides.
+- One mixed-holder settlement, two-user LP/sGREEN settlements in both orders,
+  and a target crossing both internal cohorts reconcile credit and debt changes.
+  These consume **6.54M–8.45M execution gas** and pass with **15.95M supplied
+  execution gas**, leaving 50k for intrinsic gas below a 16M transaction budget.
+- At **12.8M supplied execution gas**, claims and the small mixed-holder settlement
+  pass; both two-user orders and the cross-cohort target revert with
+  `insufficient legacy read gas`. The 8M compatibility-read guard makes supplied
+  gas materially different from consumed gas. These are measured examples,
+  not a universal batch-size guarantee or a minimum-gas search.
+
+The fork uses candidate configuration, a local retained-only VaultBook (rows
+1–5), and explicitly substituted department/PriceDesk runtimes. It sends **zero
+live transactions**. It is contract-composition evidence, not evidence that the
+production configuration or a deployment process has been verified. Production
+RPC gas estimation and external keeper execution are not certified here.
+
+Run the ordinary governance/department tests in #233. Run the fork probe in a
+combined #233 + #238 source tree, which supplies `pricedesk_gas_probe.py`:
+
+```sh
+python -m pytest -q tests/core/auctionHouse/test_base_legacy_governance.py \
+  tests/test_legacy_department_graph.py
+PYTHONPATH=. python tests/diagnostics/retained_governance_probe.py \
+  --manifest migration_history/base-mainnet/v1/current-manifest.json \
+  --block 51614967 --output /tmp/retained-governance.json
+```
+
+The probe refuses to overwrite its output. `--transaction-gas 12800000`
+reproduces the lower-funding failures and exits nonzero after writing evidence.
+Use the pinned Python dependencies and a writable `RIPE_BOA_CACHE_DIR` for pytest.
+
+Accepted boundaries remain explicit: historical lock adjustment/release can
+leave the Ledger reward checkpoint stale; zero weight does not disable old
+points, and pausing the old vault does not freeze all lock methods. Those tests
+reproduce inherited behavior, not a fix. Modern point-disable/migration methods
+are unsupported on the retained vault. Keeping core vault 2 avoids requiring
+legacy Contributor routing overrides; a later core rotation needs separate work.
+
+The historical **26-claim settlement capacity remains unqualified** under 16M;
+26 successful individual prices do not make that batch supported. Issue #235's
+historical-runtime contract checks and the pricing/selected-settlement portions
+of #237 now have evidence, while full inventory, external keeper and operator
+sign-off retain their separate scope. No deployment scripts, manifests, Safe
+batches, activation procedures or CI definitions were changed by this follow-up.
+
+
+The added **23 governance** and **5 department-identity** cases pass. Regression
+checks also pair the historical fixture with modern Contributor callbacks and
+runtime pins in the same process, verifying restoration of both EVM state and
+Boa's source registry. All **115** tests from the incoming #233 commit pass in
+the combined source tree. Individual PR ABI checks match **60** outputs for #233
+and **59** for #238; the integrated tree regenerates and checks **60** outputs.
+The combined runtime pins include Teller **24,488** (88 bytes spare), PriceDesk
+**18,156**, VaultBook **18,382**, AuctionHouse **24,565** and Deleverage **24,430**.
+
+The isolated integration resolves overlapping fixture/size-pin changes using
+#233's retained-VaultBook fixtures and #238's Teller/PriceDesk runtime sizes,
+then regenerates the ABI completion seal. Production contract sources merge
+without conflict. The PR branches remain independently reviewable; no combined
+branch is substituted for either PR or for the operator's deployment process.
+Historical fixture whitespace is retained intentionally for byte-for-byte
+source provenance; whitespace checks cover the remaining changes.
+
+The final combined regression selection passed **175 cases** (28 ordinary-marker
+exclusions), including the corrected fixture restoration, real repayment and
+Curve relay cases, PriceDesk allowance cases, runtime pins and source-count guards.
