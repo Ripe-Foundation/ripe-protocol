@@ -78,3 +78,74 @@ The existing 150,000-gas complete Curve-housekeeping ceiling passed at 70,719
 gas in its local fixture. These are local implementation results, not Base
 deployment qualification. The contract diff changes only PriceDesk's constructor
 and immutable declarations, adds its relay, and replaces Teller's Curve call.
+
+## Base retained-vault measurements
+
+[The pinned evidence](pricedesk-simple-gas-evidence.json) uses this PR's exact
+PriceDesk source at `0c43eaf53b3a9fd33c90db244b3e530b2c5f1390`, without #232, and the
+recorded Base source registry. At block **51,614,967** the nested price route for
+`0x99e65176F7FA8743E3fbaEF277d1Da448e361367` behaves as follows. Measurements start
+cold; snapshot cases advance local time until a write is due and verify the
+stored snapshot, rather than accepting a successful outer receipt.
+
+| Per-source allowance | Strict quote | Due generic snapshot |
+| --- | --- | --- |
+| 1,500,000 | Reverts | Returns False; no stored update |
+| 2,000,000 | Succeeds | Returns True; stored update advances |
+| 3,000,000 | Succeeds | Returns True; stored update advances |
+| 4,000,000 | Succeeds | Returns True; stored update advances |
+| 6,000,000 | Succeeds | Returns True; stored update advances |
+
+A successful complete PriceDesk quote consumes **1,749,770 execution gas**; a
+successful due snapshot consumes **1,619,441**. These enclosing-call measurements
+are not exact source-cap thresholds. **3M quote / 3M snapshot** is the measured
+recommendation with margin for these routes, not a universal sufficiency bound.
+The contract still takes both constructor arguments explicitly. No deployment
+configuration is changed here.
+
+The combined #233 + #238 fork also passes the previously failing retained
+RipeGov holder's reward claim (configured cash/stake split and full restaking),
+strict valuation of four mixed holders, all 26 original stress-asset price
+routes, and four retained settlement examples. Claims consume **5.45M–5.48M** and
+settlements **6.54M–8.45M** execution gas. All pass with **15.95M supplied execution
+gas**. Several settlements reject 12.8M supplied gas because #233 deliberately
+requires enough remaining gas for its full 8M legacy read. Consumed gas alone
+therefore cannot select the transaction limit. Details and negative funding
+results live in #233's retained-governance evidence.
+
+Five additional local cases cover one, two and three consecutive 3M source
+exhaustions before successful fallback, and both snapshot entry points with a
+source requiring more than 1.5M. The underfunded calls return False without
+writing; properly funded calls write. The actual Curve/Teller tests authorize
+PriceDesk as the new caller, and the repayment price mock implements the relay.
+Those fixture updates resolve the three failures present on the incoming PR
+head without changing the protocol implementation.
+
+Reproduce the source measurement from #238 with a read-only copy of the #233
+manifest (the ordinary master manifest lacks the recorded candidate setup):
+
+```sh
+PYTHONPATH=. python tests/diagnostics/pricedesk_gas_probe.py \
+  --manifest /path/to/pr233/migration_history/base-mainnet/v1/current-manifest.json \
+  --block 51614967 --output /tmp/pricedesk-base-gas.json
+```
+
+The probe refuses to overwrite output; omitting `--block` selects a finalized
+block and records its hash. Its RPC transport permits reads only. Candidate
+configuration and code substitutions occur solely inside Boa; no live
+transactions are sent. Runtime/source/manifest hashes and all tested source
+identities are in the evidence. Inner reverted frames can be expected feature
+probes; the top-level `passed` flag and state assertions determine each result.
+
+This does not qualify the historical 26-claim settlement batch, production RPC
+estimation, external keeper behavior or deployment wiring. Fail-soft snapshot
+underfunding remains part of #238's deliberately small design. The fork checks
+actual Undy due writes; Curve relay permissions, due writes, repeated block
+numbers and full-capacity gas bounds are exercised by local contract tests.
+
+Follow-up validation: **221 selected cases passed** (96 allowance/isolation/route
+cases, 116 repayment/Curve cases, and 9 runtime/source-count/hygiene checks).
+The Curve selection used the ordinary marker filter (28 cases deselected);
+the separate 96-case selection explicitly included its gas cases. ABI export
+validation still matches all **59** outputs. This is focused validation, not a
+new full-suite claim.

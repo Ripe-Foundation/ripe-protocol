@@ -207,3 +207,51 @@ def getAddr(id: uint256) -> address:
     _activate(ripe_hq, governance, 7, price_desk)
     teller.performHousekeeping(False, alice, False, sender=deleverage.address)
     assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+
+
+@pytest.mark.parametrize("failures", [1, 2, 3])
+def test_measured_budget_preserves_fallback_after_repeated_source_exhaustion(
+    ripe_hq,
+    deploy3r,
+    mission_control,
+    switchboard_alpha,
+    failures,
+):
+    """A larger per-source allowance must still fit complete fallback traversal."""
+    broken = [_gas_source(price_iterations=100_000) for _ in range(failures)]
+    healthy = _raw_source(123, True)
+    desk = _isolated_price_desk(
+        ripe_hq, deploy3r, broken + [healthy], 3_000_000, 3_000_000
+    )
+    _set_priorities(mission_control, switchboard_alpha, list(range(1, failures + 2)))
+    assert desk.getPrice(ETH, True, gas=16_000_000) == 123
+    trace = desk._computation
+    for source in broken:
+        calls = _calls_to(trace, source)
+        assert len(calls) == 1 and calls[0].is_error
+        assert calls[0].msg.gas == 3_000_000
+    assert not _calls_to(trace, healthy)[0].is_error
+    assert trace.get_gas_used() < 12_800_000
+
+
+@pytest.mark.parametrize("relay", [False, True])
+def test_three_million_snapshot_budget_preserves_due_writes_and_underfunding(
+    ripe_hq,
+    deploy3r,
+    teller,
+    relay,
+):
+    source = boa.loads(SNAPSHOT_SOURCE)
+    source.setWork(25_000)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [source], 3_000_000, 3_000_000)
+
+    def take(limit):
+        if relay:
+            return desk.addGreenRefPoolSnapshot(1, sender=teller.address, gas=limit)
+        return desk.addPriceSnapshot(ETH, sender=teller.address, gas=limit)
+
+    assert not take(150_000)
+    assert source.count() == 0
+    assert take(4_000_000)
+    assert source.count() == 1
+    assert _calls_to(desk._computation, source)[-1].get_gas_used() > 1_500_000
