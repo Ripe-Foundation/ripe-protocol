@@ -63,6 +63,12 @@ class DeploymentAdapter:
         return self.run.at(name, address)
 
     def deploy(self, name, *args, label):
+        # Historical migration inputs predate constructor bootstrap. Preserve
+        # those files; this fresh-code fork adapter supplies empty bootstrap lists.
+        if name == "ChainlinkPrices" and len(args) == 10:
+            args = (*args, [])
+        elif name == "CurvePrices" and len(args) == 7:
+            args = (*args, [], [])
         key = label.removesuffix(SUFFIX)
         path = self.defaults if name == "DefaultsBaseLive" else next((ROOT / "contracts").rglob(name + ".vy"))
         if name == "VaultBook":

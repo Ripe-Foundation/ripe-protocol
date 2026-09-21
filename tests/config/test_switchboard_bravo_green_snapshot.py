@@ -306,7 +306,7 @@ def local_green_ref_curve(ripe_hq, green_token, savings_green, ripe_token, gover
         green_token,
         savings_green,
         1,
-        100,
+        100, [], [],
         name="bravo_green_ref_curve_prices",
     )
     return {

@@ -2007,6 +2007,32 @@
       {
         "name": "_defaultStaleTime",
         "type": "uint256"
+      },
+      {
+        "name": "_initialFeeds",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "feed",
+            "type": "address"
+          },
+          {
+            "name": "staleTime",
+            "type": "uint256"
+          },
+          {
+            "name": "needsEthToUsd",
+            "type": "bool"
+          },
+          {
+            "name": "needsBtcToUsd",
+            "type": "bool"
+          }
+        ]
       }
     ],
     "outputs": []

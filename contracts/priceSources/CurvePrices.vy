@@ -70,6 +70,10 @@ struct PendingCurvePrice:
     actionId: uint256
     config: CurvePriceConfig
 
+struct InitialCurveFeed:
+    asset: address
+    pool: address
+
 struct CurveRegistries:
     StableSwapNg: address
     TwoCryptoNg: address
@@ -239,6 +243,8 @@ def __init__(
     _savingsGreen: address,
     _minPriceChangeTimeLock: uint256,
     _maxPriceChangeTimeLock: uint256,
+    _initialFeeds: DynArray[InitialCurveFeed, 50],
+    _initialGreenRefPool: DynArray[GreenRefPoolConfig, 1],
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -258,6 +264,24 @@ def __init__(
             TwoCrypto= staticcall CurveAddressProvider(_curveAddressProvider).get_address(TWO_CRYPTO_FACTORY_ID),
             MetaPool= staticcall CurveAddressProvider(_curveAddressProvider).get_address(METAPOOL_FACTORY_ID),
         )
+
+    # Constructor bootstrap validates registry identity and dependency structure,
+    # but deliberately does not price through the not-yet-upgraded PriceDesk.
+    # Sequential insertion checks each new edge against every prior route.
+    for entry: InitialCurveFeed in _initialFeeds:
+        config: CurvePriceConfig = self._getCurvePoolConfig(entry.pool)
+        assert self._isValidNewFeedStructure(entry.asset, config) # dev: invalid initial pool
+        self.curveConfig[entry.asset] = config
+        priceData._addPricedAsset(entry.asset)
+        log NewCurvePriceAdded(asset=entry.asset, pool=config.pool)
+
+    for refConfig: GreenRefPoolConfig in _initialGreenRefPool:
+        poolConfig: CurvePriceConfig = self._getCurvePoolConfig(refConfig.pool)
+        assert self._isValidGreenRefPoolConfig(poolConfig, refConfig, refConfig.maxNumSnapshots, refConfig.dangerTrigger, refConfig.staleBlocks, refConfig.stabilizerAdjustWeight, refConfig.stabilizerMaxPoolDebt, GREEN) # dev: invalid initial ref pool
+        assert convert(staticcall IERC20Detailed(refConfig.altAsset).decimals(), uint256) == refConfig.altAssetDecimals # dev: invalid initial decimals
+        self.greenRefPoolConfig = refConfig
+        assert self._addGreenRefPoolSnapshot() # dev: invalid initial snapshot
+        log GreenRefPoolConfigUpdated(pool=refConfig.pool, maxNumSnapshots=refConfig.maxNumSnapshots, dangerTrigger=refConfig.dangerTrigger, staleBlocks=refConfig.staleBlocks, stabilizerAdjustWeight=refConfig.stabilizerAdjustWeight, stabilizerMaxPoolDebt=refConfig.stabilizerMaxPoolDebt)
 
 
 ###############

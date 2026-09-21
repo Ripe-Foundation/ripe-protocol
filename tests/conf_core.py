@@ -1020,7 +1020,7 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
         ADDYS[fork]["BTC"],
         CHAINLINK_ETH_USD,
         CHAINLINK_BTC_USD,
-        default_stale_time,
+        default_stale_time, [],
         name="chainlink",
     )
 
@@ -1056,7 +1056,7 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r, green_token, savings_green):
         green_token,
         savings_green,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
-        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"], [], [],
         name="curve_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)

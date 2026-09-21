@@ -53,6 +53,13 @@ struct PendingChainlinkConfig:
     actionId: uint256
     config: ChainlinkConfig
 
+struct InitialChainlinkFeed:
+    asset: address
+    feed: address
+    staleTime: uint256
+    needsEthToUsd: bool
+    needsBtcToUsd: bool
+
 event NewChainlinkFeedPending:
     asset: indexed(address)
     feed: indexed(address)
@@ -140,6 +147,7 @@ def __init__(
     _ethUsdFeed: address,
     _btcUsdFeed: address,
     _defaultStaleTime: uint256,
+    _initialFeeds: DynArray[InitialChainlinkFeed, 50],
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -158,6 +166,22 @@ def __init__(
         assert self._setDefaultFeedOnDeploy(_wethAddr, _ethUsdFeed, _defaultStaleTime) # dev: invalid feed
     if _btcUsdFeed != empty(address):
         assert self._setDefaultFeedOnDeploy(_btcAddr, _btcUsdFeed, _defaultStaleTime) # dev: invalid feed
+
+    # Constructor-only bootstrap: no call back through the active PriceDesk.
+    # Stage all anchors before checking conversion routes, independent of order.
+    for entry: InitialChainlinkFeed in _initialFeeds:
+        assert entry.asset != empty(address) # dev: invalid asset
+        assert self.feedConfig[entry.asset].feed == empty(address) # dev: duplicate initial feed
+        hasDecimals: bool = False
+        decimals: uint256 = 0
+        hasDecimals, decimals = self._readFeedDecimals(entry.feed)
+        assert hasDecimals # dev: invalid feed decimals
+        self.feedConfig[entry.asset] = ChainlinkConfig(feed=entry.feed, decimals=decimals, needsEthToUsd=entry.needsEthToUsd, needsBtcToUsd=entry.needsBtcToUsd, staleTime=entry.staleTime)
+        priceData._addPricedAsset(entry.asset)
+    for entry: InitialChainlinkFeed in _initialFeeds:
+        config: ChainlinkConfig = self.feedConfig[entry.asset]
+        assert self._isValidFeedConfig(entry.asset, config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, config.staleTime) # dev: invalid initial feed
+        log NewChainlinkFeedAdded(asset=entry.asset, feed=config.feed, needsEthToUsd=config.needsEthToUsd, needsBtcToUsd=config.needsBtcToUsd, staleTime=config.staleTime)
 
 
 # set default feeds

@@ -17,7 +17,7 @@ def _load_local_curve_prices(ripe_hq, green, savings_green):
         green,
         savings_green,
         1,
-        100,
+        100, [], [],
     )
 
 

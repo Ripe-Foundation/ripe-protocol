@@ -180,7 +180,7 @@ def _load_curve(ripe_hq, green_token, savings_green, fork, ap):
         green_token,
         savings_green,
         min_tl,
-        max_tl,
+        max_tl, [], [],
         name="curve_n_coins",
     )
 

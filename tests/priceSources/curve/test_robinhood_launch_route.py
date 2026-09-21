@@ -116,7 +116,7 @@ def robinhood_curve_launch_route(
             green_token,
             savings_green,
             10,
-            1_000,
+            1_000, [], [],
             name="robinhood_curve_route_prices",
         )
         assert curve.addNewPriceFeed(
@@ -284,7 +284,7 @@ def test_final_curve_worst_case_honest_nested_price_desk_gas(
         green_token,
         savings_green,
         1,
-        2,
+        2, [], [],
         name="final_four_coin_curve_gas_source",
     )
     assert curve.addNewPriceFeed(curve_system, curve_system, sender=governance.address)
@@ -430,7 +430,7 @@ def test_missing_uninitialized_and_incompatible_pool_responses_fail_closed(
         route.green,
         savings_green,
         10,
-        1_000,
+        1_000, [], [],
         name="robinhood_curve_uninitialized_prices",
     )
     assert uninitialized.getPriceAndHasFeed(route.green) == (0, False)
