@@ -16,8 +16,9 @@ initial_feeds = [
 ```
 
 Decimals are read from the feed, not trusted from supplied metadata. Entries
-are checked against real rounds and conversion anchors after the entire list is
-installed. Conversion anchors can therefore appear anywhere in the list.
+are validated and installed in a single pass using the existing new-feed
+validator. Supply ETH/USD and BTC/USD anchors before any feeds that depend on
+them (or use the existing default-feed constructor arguments).
 Zero stale time retains its existing meaning: inherit the active MissionControl
 policy; explicit nonzero stale times avoid that dependency during staging.
 Duplicate assets, including collisions with the existing ETH/WETH/BTC default

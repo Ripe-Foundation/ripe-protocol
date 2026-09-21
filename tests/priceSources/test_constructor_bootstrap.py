@@ -37,12 +37,15 @@ def test_chainlink_bootstrap_conversion_anchor_order_and_decimals(system):
     _, green, _, _, eth, _, _, _ = system
     quote = boa.load("contracts/mock/MockChainlinkFeed.vy", 2 * E18)
     anchor = boa.load("contracts/mock/MockChainlinkFeed.vy", 2000 * E18)
-    c = chainlink(system, [(green.address, quote.address, 86400, True, False),
-                           (eth, anchor.address, 86400, False, False)])
+    feeds = [(eth, anchor.address, 86400, False, False),
+             (green.address, quote.address, 86400, True, False)]
+    c = chainlink(system, feeds)
     assert c.getPrice(green) == 4000 * E18
     assert c.feedConfig(green).decimals == 8
     assert c.pendingUpdates(green).actionId == 0
     assert len(c.getPricedAssets()) == 2
+    with boa.reverts("invalid initial feed"):
+        chainlink(system, feeds[::-1])
 
 
 @pytest.mark.parametrize("invalid", ["duplicate", "zero", "stale", "both_conversions", "missing_anchor", "default_duplicate"])
@@ -60,8 +63,7 @@ def test_chainlink_constructor_rejects_invalid_config(system, invalid):
     if invalid == "default_duplicate":
         default = feed.address
         entries = [(alt.address, feed.address, 86400, False, False)]
-    reason = "duplicate initial feed" if invalid in ("duplicate", "default_duplicate") else "invalid asset" if invalid == "zero" else "invalid initial feed"
-    with boa.reverts(reason):
+    with boa.reverts("invalid initial feed"):
         chainlink(system, entries, default)
 
 

@@ -168,20 +168,15 @@ def __init__(
         assert self._setDefaultFeedOnDeploy(_btcAddr, _btcUsdFeed, _defaultStaleTime) # dev: invalid feed
 
     # Constructor-only bootstrap: no call back through the active PriceDesk.
-    # Stage all anchors before checking conversion routes, independent of order.
+    # Supply conversion anchors before feeds that depend on them.
     for entry: InitialChainlinkFeed in _initialFeeds:
-        assert entry.asset != empty(address) # dev: invalid asset
-        assert self.feedConfig[entry.asset].feed == empty(address) # dev: duplicate initial feed
         hasDecimals: bool = False
         decimals: uint256 = 0
         hasDecimals, decimals = self._readFeedDecimals(entry.feed)
-        assert hasDecimals # dev: invalid feed decimals
+        assert hasDecimals and self._isValidNewFeed(entry.asset, entry.feed, decimals, entry.needsEthToUsd, entry.needsBtcToUsd, entry.staleTime) # dev: invalid initial feed
         self.feedConfig[entry.asset] = ChainlinkConfig(feed=entry.feed, decimals=decimals, needsEthToUsd=entry.needsEthToUsd, needsBtcToUsd=entry.needsBtcToUsd, staleTime=entry.staleTime)
         priceData._addPricedAsset(entry.asset)
-    for entry: InitialChainlinkFeed in _initialFeeds:
-        config: ChainlinkConfig = self.feedConfig[entry.asset]
-        assert self._isValidFeedConfig(entry.asset, config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, config.staleTime) # dev: invalid initial feed
-        log NewChainlinkFeedAdded(asset=entry.asset, feed=config.feed, needsEthToUsd=config.needsEthToUsd, needsBtcToUsd=config.needsBtcToUsd, staleTime=config.staleTime)
+        log NewChainlinkFeedAdded(asset=entry.asset, feed=entry.feed, needsEthToUsd=entry.needsEthToUsd, needsBtcToUsd=entry.needsBtcToUsd, staleTime=entry.staleTime)
 
 
 # set default feeds
