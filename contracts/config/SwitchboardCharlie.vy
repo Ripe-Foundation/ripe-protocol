@@ -55,7 +55,9 @@ interface MissionControl:
     def setRewardVaultId(_asset: address, _vaultId: uint256): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def getAssetRetirementConfig(_asset: address) -> AssetRetirementConfig: view
+    def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def assetStakersPointsAlloc(_asset: address) -> uint256: view
     def setTrainingWheels(_trainingWheels: address): nonpayable
     def setPreferredStabVaultId(_vaultId: uint256): nonpayable
     def setCoreRipeGovVaultId(_vaultId: uint256): nonpayable
@@ -65,11 +67,9 @@ interface MissionControl:
     def isSupportedAsset(_asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
-    def assetStakersPointsAlloc(_asset: address) -> uint256: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def rewardVaultId(_asset: address) -> uint256: view
-    def accrualStartBlock(_asset: address, _vaultId: uint256) -> uint256: view
 
 interface StabilityPool:
     def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view

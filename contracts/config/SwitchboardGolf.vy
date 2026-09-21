@@ -464,10 +464,12 @@ def _isValidAssetLiqConfig(
         stabPool: address = staticcall VaultBook(vaultBook).getAddr(_specialStabPoolId)
         if stabPool == empty(address) or not stabPool.is_contract:
             return False
+
         # Retained Pool 1 lacks the bounded active-claim interface required by
         # special pools. Keep its ordinary priority-pool liquidation route.
         if stabPool == staticcall VaultBookCompatibility(vaultBook).LEGACY_POOL():
             return False
+
         numStabAssets: uint256 = staticcall StabilityPool(stabPool).getNumVaultAssets()
         hasStabAsset: bool = numStabAssets != 0
         stabAsset: address = savingsGreen

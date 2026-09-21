@@ -66,11 +66,11 @@ interface PythPrices:
 interface PriceSource:
     def addPriceSnapshot(_asset: address) -> bool: nonpayable
 
-interface Lootbox:
-    def updateRipeRewards(): nonpayable
-
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
+
+interface Lootbox:
+    def updateRipeRewards(): nonpayable
 
 flag ActionType:
     GEN_CONFIG_VAULT_LIMITS
@@ -1273,6 +1273,7 @@ def _validatePriorityVaults(
                 return 2
             if staticcall StabilityPool(vaultAddr).isPaused():
                 return 2
+
         if isProposal:
             self.vaultDedupe[vault.vaultId][vault.asset] = True
     return 0
