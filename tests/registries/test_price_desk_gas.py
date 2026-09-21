@@ -571,7 +571,7 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
         green_token,
         savings_green,
         1,
-        2, [], [],
+        2, [], ("0x" + "00" * 20, "0x" + "00" * 20, 0, "0x" + "00" * 20, 0, 0, 0, 0, 0, 0),
         name="four_coin_curve_gas_source",
     )
     assert curve.addNewPriceFeed(
@@ -750,7 +750,7 @@ def test_four_coin_curve_over_max_snapshot_bluechip_is_rejected_at_confirmation(
         green_token,
         savings_green,
         1,
-        2, [], [],
+        2, [], ("0x" + "00" * 20, "0x" + "00" * 20, 0, "0x" + "00" * 20, 0, 0, 0, 0, 0, 0),
         name="four_bluechip_coin_curve_gas_source",
     )
 
@@ -798,7 +798,7 @@ def test_four_coin_curve_over_max_snapshot_bluechip_is_rejected_at_confirmation(
         green_token,
         savings_green,
         1,
-        2, [], [],
+        2, [], ("0x" + "00" * 20, "0x" + "00" * 20, 0, "0x" + "00" * 20, 0, 0, 0, 0, 0, 0),
         name="four_bluechip_coin_new_curve_gas_source",
     )
     assert new_curve.addNewPriceFeed(

@@ -57,7 +57,7 @@ def _deploy(source: Path, capacity: int, stale_blocks: int):
         1,
         100,
         [],
-        [],
+        (ZERO, ZERO, 0, ZERO, 0, 0, 0, 0, 0, 0),
     )
     curve.setActionTimeLockAfterSetup(sender=governance)
     action_id = curve.setGreenRefPoolConfig(

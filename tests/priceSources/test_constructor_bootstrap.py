@@ -4,6 +4,7 @@ import pytest
 
 ZERO = "0x" + "00" * 20
 E18 = 10 ** 18
+EMPTY_REF = (ZERO, ZERO, 0, ZERO, 0, 0, 0, 0, 0, 0)
 
 
 @pytest.fixture
@@ -26,10 +27,10 @@ def chainlink(s, feeds, default_feed=ZERO):
                     1, 100, alt, eth, btc, default_feed, ZERO, 86400, feeds)
 
 
-def curve(s, feeds, ref=()):
+def curve(s, feeds, ref=EMPTY_REF):
     owner, green, _, savings, _, _, hq, _ = s
     return boa.load("contracts/priceSources/CurvePrices.vy", hq, ZERO, hq,
-                    green, savings, 1, 100, feeds, list(ref))
+                    green, savings, 1, 100, feeds, ref)
 
 
 def test_chainlink_bootstrap_conversion_anchor_order_and_decimals(system):
@@ -67,7 +68,7 @@ def test_chainlink_constructor_rejects_invalid_config(system, invalid):
 def test_curve_constructor_loads_routes_and_reference_pool_without_desk(system):
     _, green, alt, _, _, _, _, pool = system
     ref = (pool.address, pool.address, 1, alt.address, 6, 10, 6000, 100, 1000, 100_000 * E18)
-    c = curve(system, [(green.address, pool.address)], [ref])
+    c = curve(system, [(green.address, pool.address)], ref)
     assert c.curveConfig(green).pool == pool.address
     assert list(c.getPricedAssets()) == [green.address]
     assert tuple(c.greenRefPoolConfig()) == ref
@@ -78,12 +79,12 @@ def test_curve_constructor_loads_routes_and_reference_pool_without_desk(system):
 def test_curve_constructor_rejects_invalid_config(system, invalid):
     _, green, alt, _, _, _, _, pool = system
     feeds = [(green.address, pool.address)]
-    refs = []
+    refs = EMPTY_REF
     if invalid == "duplicate": feeds *= 2
     if invalid == "unregistered": feeds = [(green.address, boa.env.generate_address())]
     if invalid == "wrong_asset": feeds = [(boa.env.generate_address(), pool.address)]
     if invalid == "reference_decimals":
-        refs = [(pool.address, pool.address, 1, alt.address, 18, 10, 6000, 100, 1000, 100_000 * E18)]
+        refs = (pool.address, pool.address, 1, alt.address, 18, 10, 6000, 100, 1000, 100_000 * E18)
     with boa.reverts("invalid initial decimals" if invalid == "reference_decimals" else "invalid initial pool"):
         curve(system, feeds, refs)
 
@@ -94,3 +95,17 @@ def test_curve_constructor_rejects_dependency_cycle_in_either_order(system, reve
     feeds = [(green.address, pool.address), (alt.address, pool.address)]
     with boa.reverts("invalid initial pool"):
         curve(system, feeds[::-1] if reverse else feeds)
+
+
+def test_curve_constructor_empty_reference_pool(system):
+    c = curve(system, [])
+    assert tuple(c.greenRefPoolConfig()) == EMPTY_REF
+    assert c.greenRefPoolData().lastSnapshot.update == 0
+
+
+def test_curve_constructor_zero_pool_skips_reference_initialization(system):
+    ref = list(EMPTY_REF)
+    ref[5] = 10
+    c = curve(system, [], tuple(ref))
+    assert tuple(c.greenRefPoolConfig()) == EMPTY_REF
+    assert c.greenRefPoolData().lastSnapshot.update == 0

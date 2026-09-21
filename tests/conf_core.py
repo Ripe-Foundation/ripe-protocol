@@ -1056,7 +1056,7 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r, green_token, savings_green):
         green_token,
         savings_green,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
-        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"], [], [],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"], [], ("0x" + "00" * 20, "0x" + "00" * 20, 0, "0x" + "00" * 20, 0, 0, 0, 0, 0, 0),
         name="curve_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)

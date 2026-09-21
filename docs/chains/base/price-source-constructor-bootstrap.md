@@ -29,13 +29,15 @@ Append to CurvePrices' existing seven arguments:
 
 ```python
 initial_feeds = [(asset, pool)]
-initial_green_ref_pool = []  # or one full GreenRefPoolConfig tuple
+initial_green_ref_pool = (ZERO, ZERO, 0, ZERO, 0, 0, 0, 0, 0, 0)
+# Or supply the single full GreenRefPoolConfig tuple; this is not an array.
 ```
 
 The reference tuple fields are `pool, lpToken, greenIndex, altAsset,
 altAssetDecimals, maxNumSnapshots, dangerTrigger, staleBlocks,
 stabilizerAdjustWeight, stabilizerMaxPoolDebt`. Read them from the reviewed live
-source. Metadata is validated against the registry and token; a fresh pool
+source. Use the entirely zero-valued struct to leave it unconfigured; a zero
+pool skips reference-pool initialization. Metadata is validated against the registry and token; a fresh pool
 snapshot is seeded. Historical snapshots and accumulated danger time are not
 copied, and snapshot warmup must be reviewed before activation.
 

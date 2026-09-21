@@ -244,7 +244,7 @@ def __init__(
     _minPriceChangeTimeLock: uint256,
     _maxPriceChangeTimeLock: uint256,
     _initialFeeds: DynArray[InitialCurveFeed, 50],
-    _initialGreenRefPool: DynArray[GreenRefPoolConfig, 1],
+    _initialGreenRefPool: GreenRefPoolConfig,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -275,7 +275,8 @@ def __init__(
         priceData._addPricedAsset(entry.asset)
         log NewCurvePriceAdded(asset=entry.asset, pool=config.pool)
 
-    for refConfig: GreenRefPoolConfig in _initialGreenRefPool:
+    refConfig: GreenRefPoolConfig = _initialGreenRefPool
+    if refConfig.pool != empty(address):
         poolConfig: CurvePriceConfig = self._getCurvePoolConfig(refConfig.pool)
         assert self._isValidGreenRefPoolConfig(poolConfig, refConfig, refConfig.maxNumSnapshots, refConfig.dangerTrigger, refConfig.staleBlocks, refConfig.stabilizerAdjustWeight, refConfig.stabilizerMaxPoolDebt, GREEN) # dev: invalid initial ref pool
         assert convert(staticcall IERC20Detailed(refConfig.altAsset).decimals(), uint256) == refConfig.altAssetDecimals # dev: invalid initial decimals

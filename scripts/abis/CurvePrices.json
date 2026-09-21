@@ -2350,7 +2350,7 @@
       },
       {
         "name": "_initialGreenRefPool",
-        "type": "tuple[]",
+        "type": "tuple",
         "components": [
           {
             "name": "pool",

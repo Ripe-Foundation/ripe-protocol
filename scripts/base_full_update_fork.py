@@ -68,7 +68,7 @@ class DeploymentAdapter:
         if name == "ChainlinkPrices" and len(args) == 10:
             args = (*args, [])
         elif name == "CurvePrices" and len(args) == 7:
-            args = (*args, [], [])
+            args = (*args, [], (ZERO, ZERO, 0, ZERO, 0, 0, 0, 0, 0, 0))
         key = label.removesuffix(SUFFIX)
         path = self.defaults if name == "DefaultsBaseLive" else next((ROOT / "contracts").rglob(name + ".vy"))
         if name == "VaultBook":
