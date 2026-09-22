@@ -1,0 +1,105 @@
+{
+  "version": "1.0",
+  "chainId": "8453",
+  "createdAt": 1790039265550,
+  "meta": {
+    "name": "Base MC setup 1/3",
+    "description": "Register Foxtrot, bind inactive MC and Defaults, initialize general and governance-vault config. Ends at initStep 3, nextAssetIndex 0.",
+    "txBuilderVersion": "1.18.0",
+    "createdFromSafeAddress": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+    "createdFromOwnerAddress": ""
+  },
+  "transactions": [
+    {
+      "to": "0x20Fb680786004902DaCa00b1070B32F070716Cab",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "name": "_addr",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "_description",
+            "type": "string",
+            "internalType": "string"
+          }
+        ],
+        "name": "startAddNewAddressToRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "_addr": "0xbCAE06B1370eD192F53C5B5fc4E650c6Ca9b10C1",
+        "_description": "Switchboard Foxtrot"
+      }
+    },
+    {
+      "to": "0x20Fb680786004902DaCa00b1070B32F070716Cab",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "name": "_addr",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "name": "confirmNewAddressToRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "_addr": "0xbCAE06B1370eD192F53C5B5fc4E650c6Ca9b10C1"
+      }
+    },
+    {
+      "to": "0xbCAE06B1370eD192F53C5B5fc4E650c6Ca9b10C1",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "name": "_missionControl",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "_defaults",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "name": "startDefaultsInitialization",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "_missionControl": "0xb596054CF004B04fB61FfB2349b4e866E5aE3A4e",
+        "_defaults": "0x01a9bfb504280777b83f1179aB6204299E1943D7"
+      }
+    },
+    {
+      "to": "0xbCAE06B1370eD192F53C5B5fc4E650c6Ca9b10C1",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "initConfig",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    },
+    {
+      "to": "0xbCAE06B1370eD192F53C5B5fc4E650c6Ca9b10C1",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "initConfig",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    }
+  ]
+}
