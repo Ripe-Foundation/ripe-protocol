@@ -36,7 +36,7 @@ class VerifiedDefaults:
             raise RuntimeError("BASE_DEFAULTS_PREFLIGHT_ARTIFACT_CHANGED")
 
 
-def verify_before_deployment(path, rpc, *, rehearsal_block=None):
+def verify_before_deployment(path, rpc, *, rehearsal_block=None, mission_control_only=False):
     """Production always selects finalized now; only the fork adapter supplies a pin."""
     if not __debug__:
         raise RuntimeError("BASE_DEFAULTS_PREFLIGHT_OPTIMIZED_PYTHON")
@@ -50,10 +50,13 @@ def verify_before_deployment(path, rpc, *, rehearsal_block=None):
         number, block_hash = int(block["number"]), block["hash"].hex()
         env = os.environ.copy()
         env["BASE_MAINNET_RPC_URL"] = rpc
+        command = [sys.executable, str(ROOT / "scripts/verify_defaults.py"),
+                   "--network", "base-mainnet", "--defaults", str(path),
+                   "--block-number", str(number)]
+        if mission_control_only:
+            command.append("--mission-control-only")
         result = subprocess.run(
-            [sys.executable, str(ROOT / "scripts/verify_defaults.py"),
-             "--network", "base-mainnet", "--defaults", str(path),
-             "--block-number", str(number)],
+            command,
             cwd=ROOT, env=env, capture_output=True, text=True, timeout=600,
         )
         if result.returncode != 0:

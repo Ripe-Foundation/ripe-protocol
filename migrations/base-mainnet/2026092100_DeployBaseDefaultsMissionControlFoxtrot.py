@@ -21,7 +21,7 @@ def migrate(migration: Migration):
     params = migration.blueprint().PARAMS
 
     log.h1("1. Verify Defaults against current Base configuration")
-    verified = migration.verify_base_defaults()
+    verified = migration.verify_base_defaults(mission_control_only=True)
     log.info(f"Defaults preflight block {verified.block}: {verified.block_hash}")
 
     log.h1("2. Deploy Defaults, preserving the current Contributor template")

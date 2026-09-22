@@ -57,6 +57,16 @@ def test_changed_during_verification_is_rejected(setup_preflight, monkeypatch):
         preflight.verify_before_deployment(defaults, "https://provider.invalid/secret")
 
 
+def test_mc_only_scope_is_explicit_and_full_verification_remains_default(setup_preflight):
+    defaults, _, processes = setup_preflight
+    preflight.verify_before_deployment(defaults, "https://provider.invalid/secret")
+    assert "--mission-control-only" not in processes[-1][0]
+    preflight.verify_before_deployment(
+        defaults, "https://provider.invalid/secret", mission_control_only=True
+    )
+    assert processes[-1][0][-1] == "--mission-control-only"
+
+
 def test_failed_verification_redacts_provider(setup_preflight, monkeypatch):
     defaults, _, _ = setup_preflight
     rpc = "https://provider.invalid/SECRET_CREDENTIAL"

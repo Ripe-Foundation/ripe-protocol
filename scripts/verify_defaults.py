@@ -182,7 +182,7 @@ def compare_mission_control_config(replacement, live_call, compare, contributor=
     return assets
 
 
-def verify(network: Network, defaults_path: Path, block_number: int | None) -> int:
+def verify(network: Network, defaults_path: Path, block_number: int | None, *, mission_control_only: bool = False) -> int:
     import boa
     from web3 import Web3
 
@@ -320,19 +320,22 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     # constructor args are two addresses, not three. Pinning it to empty keeps
     # the replacement built for exactly one purpose: observing what Defaults
     # hands it at construction.
-    ledger_addr = _manifest_address(manifest, "Ledger")
-    live_ledger = w3.eth.contract(
-        address=ledger_addr, abi=manifest["Ledger"]["abi"]
-    )
-    replacement_ledger = boa.load(
-        LEDGER_SOURCE, hq_addr, defaults.address, "0x" + "00" * 20
-    )
-    for name in LEDGER_GETTERS:
-        compare(
-            f"Ledger.{name}",
-            getattr(replacement_ledger, name)(),
-            getattr(live_ledger.functions, name)().call(block_identifier=block),
+    if not mission_control_only:
+        ledger_addr = _manifest_address(manifest, "Ledger")
+        live_ledger = w3.eth.contract(
+            address=ledger_addr, abi=manifest["Ledger"]["abi"]
         )
+        replacement_ledger = boa.load(
+            LEDGER_SOURCE, hq_addr, defaults.address, "0x" + "00" * 20
+        )
+        for name in LEDGER_GETTERS:
+            compare(
+                f"Ledger.{name}",
+                getattr(replacement_ledger, name)(),
+                getattr(live_ledger.functions, name)().call(block_identifier=block),
+            )
+    else:
+        print("Scope: MissionControl only; retained Ledger budgets are not compared.")
 
     print(f"compared {compared} live values across {len(assets)} assets")
     if mismatches:
@@ -368,12 +371,17 @@ def main() -> int:
         type=Path,
         help="Verify a contract other than the network's default target.",
     )
+    parser.add_argument(
+        "--mission-control-only", action="store_true",
+        help="Verify MC configuration only, for deployments that retain the existing Ledger.",
+    )
     args = parser.parse_args()
 
     network = NETWORKS[args.network]
     defaults_path = args.defaults or network.target_path
     try:
-        return verify(network, defaults_path, args.block_number)
+        return verify(network, defaults_path, args.block_number,
+                      mission_control_only=args.mission_control_only)
     except VerificationError as exc:
         print(f"verification failed closed: {exc}", file=sys.stderr)
         return 2

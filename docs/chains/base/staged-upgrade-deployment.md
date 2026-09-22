@@ -400,8 +400,11 @@ python -m scripts.migrate --profile base-mainnet \
 
 After reviewing the fork result, the same command without `--fork` deploys
 DefaultsBaseLive, an empty MissionControl, and SwitchboardFoxtrot under new labels.
-The current Contributor template is reused. Defaults must pass the existing
-live-config preflight; regenerate them if it reports drift. There are no registry
+The current Contributor template is reused. Defaults must pass the MC-only
+live-config preflight; regenerate them if it reports MC drift. This migration
+retains Ledger, so its changing rewards/HR/bond balances are not compared. The
+standalone verifier still checks both MC and Ledger unless explicitly scoped
+with `--mission-control-only`. There are no registry
 writes, initialization calls, treasury transfers, or HQ proposals in this step.
 
 Governance then registers/confirms the new Foxtrot in the **current Switchboard**

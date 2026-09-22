@@ -604,9 +604,10 @@ class Migration:
     def rpc(self):
         return self._deploy_args.rpc
 
-    def verify_base_defaults(self):
+    def verify_base_defaults(self, *, mission_control_only=False):
         from scripts.utils.defaults_preflight import verify_before_deployment
-        return verify_before_deployment(self._files["DefaultsBaseLive"], self.rpc())
+        return verify_before_deployment(self._files["DefaultsBaseLive"], self.rpc(),
+                                        mission_control_only=mission_control_only)
 
     def is_local_preview(self):
         """Whether the CLI selected a verified local/fork execution path."""
