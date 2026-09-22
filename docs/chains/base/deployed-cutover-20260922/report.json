@@ -1,0 +1,1128 @@
+{
+  "block": 51663472,
+  "live_transactions_sent": 0,
+  "confirmation_passed": true,
+  "scope": "HQ proposals/confirmations and state/price checks; not full operational cutover qualification",
+  "candidates": {
+    "MissionControl": "0xb596054CF004B04fB61FfB2349b4e866E5aE3A4e",
+    "Switchboard": "0x4147D446645c6aE260Bcd4402E9bE5e03FB4E105",
+    "PriceDesk": "0xf5F7e492AAe690B126424A4DBAD884E51B41C11f",
+    "VaultBook": "0x6DFed28265032165Ae45Db02e3B1b95b5E655da4",
+    "AuctionHouse": "0xbF6eFbFB28fEa2057b976AD89390E57e988CFe9E",
+    "AuctionHouseNFT": "0x5c4e4DE576Dd6387b58eC8A0344355726552370b",
+    "Boardroom": "0xefc2C9a5d65d388D4852309894760D45130568aD",
+    "BondRoom": "0x9EF03204c465E836e5B66988c81EFcD2bEa4a9ef",
+    "CreditEngine": "0x1D816D4058D5dA79c5dF56822Bad67B90Feb6E8E",
+    "Endaoment": "0xDFf4c788dF6E2adA1740093fc9Ae233436E993F4",
+    "HumanResources": "0x9E78Bd070B9BC403117B6F267B65465712984B3e",
+    "Lootbox": "0x7Ff148B9FAbF58125c69F508ac9a3E74Dc52f611",
+    "Teller": "0xfc55b5c5eE2FA46aa9d4Cf416710c883044a5B21",
+    "Deleverage": "0xB46fC5ec144079C4f7A3E9e46CcA9823f414a27B",
+    "CreditRedeem": "0x16c69dCeA71FDDE530a48128BA76702Aac60ad24",
+    "TellerUtils": "0x2AeA442154b7cc868987b8eF6E5be57f2893Ce0D",
+    "EndaomentFunds": "0xe4Bb0d06F106E93f240934CC0C1Ac67B3f7f58Ae",
+    "EndaomentPSM": "0x48a1566e251C97226De0fC0de8f5f38E55ada1cF",
+    "VaultMigrator": "0x980c772036d952De00d3D2ee2371De44B738bD67",
+    "RipeReserveEngine": "0x86aEFB7d0bc788a2D455C1c2af7a46f4807303FE",
+    "RipeReserveVesting": "0x2601e1E1dC276CB8730FacC132B1d598745e3432"
+  },
+  "foxtrot": {
+    "initStep": 5,
+    "rewardsInitialized": false
+  },
+  "hq_delay_blocks": 21600,
+  "mc_asset_config_differences": [],
+  "before": {
+    "ledger": {
+      "totalDebt": 22998598854870196318331,
+      "badDebt": 0,
+      "ripeAvailForRewards": 858708021075241806703575,
+      "ripeAvailForHr": 800000000000000000000,
+      "ripeAvailForBonds": 288556649469530000000000
+    },
+    "borrower_debt": {
+      "0x2f537C2C1D263e66733DA492414359B6B70e1269": {
+        "amount": 53140647425866174476,
+        "principal": 50000000000000000000,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0x64DD1ABDF58f3066095E9240d66986fbE13709cB": {
+        "amount": 5788173299771834311,
+        "principal": 5495138917266273706,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8": {
+        "amount": 5440611234695509959223,
+        "principal": 5253725612722796120124,
+        "debtTerms": {
+          "ltv": 7558,
+          "redemptionThreshold": 8217,
+          "liqThreshold": 8679,
+          "liqFee": 631,
+          "borrowRate": 569,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0x7190081341F0e0223E237270b8479159951A5a46": {
+        "amount": 48679381455173323560,
+        "principal": 45897749764195345498,
+        "debtTerms": {
+          "ltv": 7104,
+          "redemptionThreshold": 7799,
+          "liqThreshold": 8127,
+          "liqFee": 933,
+          "borrowRate": 675,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0xbA49a3d456de4e670a94E13b8b1E5315929C97Ad": {
+        "amount": 407547430330659917,
+        "principal": 387616337112982852,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0xbb78B430C2020a8655c32AEF37Bcd1705A82a7b7": {
+        "amount": 1001784170442307538322,
+        "principal": 999784961028916559730,
+        "debtTerms": {
+          "ltv": 7292,
+          "redemptionThreshold": 7956,
+          "liqThreshold": 8320,
+          "liqFee": 839,
+          "borrowRate": 317,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0x69370c4D1916C8Fd50C8bBD6D166c93dD7dbBDf0": {
+        "amount": 6395716031326829563307,
+        "principal": 6322416750578753815310,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790039185,
+        "inLiquidation": false
+      },
+      "0xD7A48E684Da48cc384fD80bb1Fed7D8970bfe91b": {
+        "amount": 982796745232664627,
+        "principal": 982796745232664627,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": true
+      },
+      "0xE5aB77408c25E7C1562C09067A8Fa3d0C00ac999": {
+        "amount": 126807288588630824,
+        "principal": 126807288588630824,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": true
+      },
+      "0x0789f1A32872271e1A0a6be09FBc6988B9e68e76": {
+        "amount": 1018315934310771202,
+        "principal": 1000000000000000000,
+        "debtTerms": {
+          "ltv": 5322,
+          "redemptionThreshold": 6404,
+          "liqThreshold": 6904,
+          "liqFee": 1086,
+          "borrowRate": 751,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790039163,
+        "inLiquidation": false
+      },
+      "0x59b429647fCC0a29166BAF2707Db5D61F0572865": {
+        "amount": 160206765999,
+        "principal": 148755824443,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0x39fEdC7c60cB20d58Ed76a77793f9dDC8B70DFDc": {
+        "amount": 1001414926732250490145,
+        "principal": 999999962449950244953,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 250,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035711,
+        "inLiquidation": false
+      },
+      "0xD8Ac9b9f640699c7E6f4464a1A0da629017fe567": {
+        "amount": 53000637167585891534,
+        "principal": 49989681866840573456,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x7F3E52184F576149d5eA77a26d9273C6bE818b1f": {
+        "amount": 77504748920361841833,
+        "principal": 74158548261222822869,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x41BF39033C732F884A52ddf38F647aD63457CEEC": {
+        "amount": 7420509019944102246,
+        "principal": 7000000000000000000,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x19284cD63083583cf5C5e1F945fAE112a39976c6": {
+        "amount": 2356655171513108809,
+        "principal": 2282508786527996245,
+        "debtTerms": {
+          "ltv": 7902,
+          "redemptionThreshold": 8430,
+          "liqThreshold": 8913,
+          "liqFee": 543,
+          "borrowRate": 517,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660": {
+        "amount": 603998660879298273372,
+        "principal": 600835221774277273384,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0xd088BDC872076691aBb10eF128703E089e463047": {
+        "amount": 19019235598499365,
+        "principal": 18051128648721153,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x3A3af2ea20d59DA1cAAE5408C48a313ae12EEd90": {
+        "amount": 5049513033,
+        "principal": 5022444088,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x381490fF607bb11de75E730FF0698d72573fAedb": {
+        "amount": 1002912661405690920249,
+        "principal": 977219574964082744716,
+        "debtTerms": {
+          "ltv": 7930,
+          "redemptionThreshold": 8464,
+          "liqThreshold": 8964,
+          "liqFee": 508,
+          "borrowRate": 507,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0xF1133e9AeF370d8BD8a71abDd64ADbb9298b4f4F": {
+        "amount": 3741032513544967063899,
+        "principal": 3678685606611057343991,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x6fb737D1Ebb73cda6CFA36Fd16D9273065D1b084": {
+        "amount": 9298984760737684315,
+        "principal": 8682019093802451253,
+        "debtTerms": {
+          "ltv": 4999,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1200,
+          "borrowRate": 1100,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0xFC7c1D00b2eC6d3653E9De72590684456846c53D": {
+        "amount": 1750937009234,
+        "principal": 1746562797385,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x3BdFde86869874b101466035B57835A087EadC0f": {
+        "amount": 1125698119799937478,
+        "principal": 1121802591999553512,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035715,
+        "inLiquidation": false
+      },
+      "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0": {
+        "amount": 295829021122922489086,
+        "principal": 291843643986682351200,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790039219,
+        "inLiquidation": false
+      },
+      "0xda67c6423FCD8aBEa9A02Ef515EdfB62880D2738": {
+        "amount": 13700809940108052,
+        "principal": 13700809940108052,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1789085321,
+        "inLiquidation": true
+      },
+      "0x3cD41761Ae6E1AdbA6c85290dc78Ed6497Bb027D": {
+        "amount": 837113359793803401140,
+        "principal": 813456786237628048386,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789916915,
+        "inLiquidation": false
+      },
+      "0xE93c14611eF4D296bD3dc7C9f9b9be559bfF4D90": {
+        "amount": 261299044465473331573,
+        "principal": 260000979480463887249,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789722027,
+        "inLiquidation": false
+      },
+      "0xe0d8293733dCC20BD2aBE0E29bD9Bf4021EA7B4d": {
+        "amount": 1012952528585641673,
+        "principal": 1000000000000000000,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790039155,
+        "inLiquidation": false
+      },
+      "0xCA0073964efe7f9422CeB16901018b1DB0cC4785": {
+        "amount": 1862516423415608918,
+        "principal": 1814200429014661753,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x9bc27f929C72eCe55a0dcB0A1D845ec90be95275": {
+        "amount": 2810841328260473905,
+        "principal": 2711714019132242829,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x37a1621bd89b75FF761AC9d9145Bc34920e75AdE": {
+        "amount": 15627886171301409637,
+        "principal": 14769348525716101660,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5": {
+        "amount": 320246023970982928121,
+        "principal": 299999983520264552609,
+        "debtTerms": {
+          "ltv": 7456,
+          "redemptionThreshold": 8091,
+          "liqThreshold": 8489,
+          "liqFee": 755,
+          "borrowRate": 602,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0xCFFE08BDf20918007f8Ab268C32f8756494fC8D8": {
+        "amount": 1413445463583,
+        "principal": 1412509061748,
+        "debtTerms": {
+          "ltv": 7019,
+          "redemptionThreshold": 7718,
+          "liqThreshold": 8022,
+          "liqFee": 988,
+          "borrowRate": 695,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x7cb71C594FEBACE6b6bA11126abeB8Cc860cB24A": {
+        "amount": 23900374784505180921,
+        "principal": 21993459576765601221,
+        "debtTerms": {
+          "ltv": 4999,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1200,
+          "borrowRate": 1100,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0xd060D0C2bbd34AB116bd6c917147B560C66F875b": {
+        "amount": 68260520361387739,
+        "principal": 68260520361387739,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "0xeE6629D668FD86d1D3533c49D1A4dDfe6B8dBB45": {
+        "amount": 2867519860591,
+        "principal": 2672352267484,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x6b34e50bDfC20A0869BF28249bac24d12Cc3fbbd": {
+        "amount": 22905936042316810,
+        "principal": 22905936042316810,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "0x3D89d2653636eECDd286b7399C194D885Ac1A159": {
+        "amount": 2783487151251543630,
+        "principal": 2630596232567259341,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x465e1D1e73Ad725434a4ABe12eaa60C7A7ab792E": {
+        "amount": 257547140184901938,
+        "principal": 257547140184901938,
+        "debtTerms": {
+          "ltv": 0,
+          "redemptionThreshold": 0,
+          "liqThreshold": 0,
+          "liqFee": 0,
+          "borrowRate": 0,
+          "daowry": 0
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": true
+      },
+      "0xb4f6C55B3E51D1ECEF78F9c149E4aeA7E7ae86a1": {
+        "amount": 202501711167449861,
+        "principal": 193178802368185108,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x9215CF3316c162cFaF78b6669D9eEbEA4FBcAb4d": {
+        "amount": 1000415147042020764666,
+        "principal": 999000000000000000000,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8499,
+          "liqThreshold": 8999,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789189645,
+        "inLiquidation": false
+      },
+      "0xA0ed9aC5878983DA938a99f416AaDB29D98E778d": {
+        "amount": 95682450655878151773,
+        "principal": 90128983314705720704,
+        "debtTerms": {
+          "ltv": 8000,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788480513,
+        "inLiquidation": false
+      },
+      "0x45f1CF510e78e029a0dDf697dD37EBC5F7921753": {
+        "amount": 487639045489279944,
+        "principal": 468669901680211245,
+        "debtTerms": {
+          "ltv": 7945,
+          "redemptionThreshold": 8461,
+          "liqThreshold": 8951,
+          "liqFee": 524,
+          "borrowRate": 509,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0xe09e4C7b1FEB007aAEc6c66282031D6b8F7A6Ee2": {
+        "amount": 31779044768390691899,
+        "principal": 31339813768544768954,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790039171,
+        "inLiquidation": false
+      },
+      "0x9e949d2756933b3846816afdCCaa725f17dF86Cf": {
+        "amount": 546848351078710834300,
+        "principal": 526284678288916877671,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1789353007,
+        "inLiquidation": false
+      },
+      "0x5D58EDC7a7C91239Ec2FD56a646679780886323c": {
+        "amount": 41986104689758895,
+        "principal": 39246369728659901,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x2c1e54f815529467be8F3B78E46C14168852322A": {
+        "amount": 74774494739449816,
+        "principal": 69101601151134692,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x66212a3c4eB5c934A5cB998C8F5D74138022767c": {
+        "amount": 105443299200996024586,
+        "principal": 99651509335480145193,
+        "debtTerms": {
+          "ltv": 6999,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1788394067,
+        "inLiquidation": false
+      },
+      "0x8d804669c3E1DEc71Ba8d460CAAeD5bf9Fa415e2": {
+        "amount": 1303521233946,
+        "principal": 1274138174583,
+        "debtTerms": {
+          "ltv": 7638,
+          "redemptionThreshold": 8234,
+          "liqThreshold": 8668,
+          "liqFee": 665,
+          "borrowRate": 566,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790039149,
+        "inLiquidation": false
+      },
+      "0x902768128C224FEbFF1147aDd4fc9dCbF39d0C56": {
+        "amount": 10134796605265947,
+        "principal": 9351916316255251,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035721,
+        "inLiquidation": false
+      },
+      "0xdd2ba66B25DCC26d0850787f79678dE906bD6B98": {
+        "amount": 891495265146066038,
+        "principal": 848669456514386979,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035721,
+        "inLiquidation": false
+      },
+      "0xE87a10d5B212D169CCBC9a50Cf5E23DD3da27cb6": {
+        "amount": 887359363915198722,
+        "principal": 835449453393048496,
+        "debtTerms": {
+          "ltv": 5000,
+          "redemptionThreshold": 6000,
+          "liqThreshold": 6500,
+          "liqFee": 1000,
+          "borrowRate": 800,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035721,
+        "inLiquidation": false
+      },
+      "0xb53009E4dC25a494F3Bee03Ab121517e74b59F75": {
+        "amount": 4646618851501221142,
+        "principal": 4383067466263352528,
+        "debtTerms": {
+          "ltv": 7000,
+          "redemptionThreshold": 7700,
+          "liqThreshold": 8000,
+          "liqFee": 1000,
+          "borrowRate": 700,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035721,
+        "inLiquidation": false
+      },
+      "0xc6E4Ad3ccdfC65687D2d60a454a8bdDc1F4d6c06": {
+        "amount": 1841566658199,
+        "principal": 1819102603072,
+        "debtTerms": {
+          "ltv": 7999,
+          "redemptionThreshold": 8500,
+          "liqThreshold": 9000,
+          "liqFee": 500,
+          "borrowRate": 500,
+          "daowry": 25
+        },
+        "lastTimestamp": 1790035721,
+        "inLiquidation": false
+      }
+    },
+    "vault_totals": {
+      "1": {
+        "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 2265928998674208514597631813028,
+        "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 1868978082274059110703904376345
+      },
+      "2": {
+        "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 10329614842223736963842049477821,
+        "0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526": 0,
+        "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 15297460664220825953513588313
+      },
+      "3": {
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 0,
+        "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 1900134,
+        "0x4200000000000000000000000000000000000006": 1084189131038540202,
+        "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 14500000000,
+        "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 823425136048272240,
+        "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A": 0,
+        "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 100189614669483620066,
+        "0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6": 0,
+        "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 0,
+        "0xA88594D404727625A9437C3f886C7643872296AE": 11986269878969919127060,
+        "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 1054012762792834343376,
+        "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 0,
+        "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 0,
+        "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": 0,
+        "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 800000000000000000,
+        "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22": 0,
+        "0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca": 0,
+        "0x616a4E1db48e22028f6bbf20444Cd3b8e3273738": 0,
+        "0xf42f5795D9ac7e9D757dB633D693cD548Cfd9169": 0,
+        "0x0A1a3b5f2041F33522C4efc754a7D096f880eE16": 0,
+        "0xF877ACaFA28c19b96727966690b2f44d35aD5976": 0,
+        "0xa0E430870c4604CcfC7B38Ca7845B1FF653D0ff1": 0,
+        "0x27D8c7273fd3fcC6956a0B370cE5Fd4A7fc65c18": 0,
+        "0x859160DB5841E5cfB8D3f144C6b3381A85A4b410": 0,
+        "0x543257eF2161176D7C8cD90BA65C2d4CaEF5a796": 0,
+        "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 830694343423510974,
+        "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 0
+      },
+      "4": {
+        "0x784efeB622244d2348d4F2522f8860B96fbEcE89": 0,
+        "0xBdb9300b7CDE636d9cD4AFF00f6F009fFBBc8EE6": 0,
+        "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB": 0,
+        "0xD4a0e0b9149BCee3C920d2E00b5dE09138fd8bb7": 0,
+        "0xb125E6687d4313864e53df431d5425969c15Eb2F": 0,
+        "0x46e6b214b524310239732D51387075E0e70970bf": 0
+      },
+      "5": {
+        "0xcF9F72237d4135a6D8b3ee717DC414Ae5b56E41e": 0,
+        "0x01ECc16CE82CCf7e6f734351d5d3AdCf2f8D3497": 0,
+        "0x4cD99832E44D1154bd7841f5E5E9ce66dA0437d4": 0,
+        "0xcdD894E6c11d6444e0c3d974928Dd71b28b09356": 0,
+        "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 0,
+        "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 2805894,
+        "0x02981DB1a99A14912b204437e7a2E02679B57668": 1262075849141995041,
+        "0x96F1a7ce331F40afe866F3b707c223e377661087": 12029553531129772849,
+        "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 874302,
+        "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 39961172261
+      }
+    }
+  },
+  "treasury_known_asset_balances": {
+    "Endaoment": {
+      "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 0,
+      "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 0,
+      "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 0,
+      "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 0,
+      "0x4200000000000000000000000000000000000006": 0,
+      "0x02981DB1a99A14912b204437e7a2E02679B57668": 0,
+      "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 0,
+      "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 0,
+      "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 0,
+      "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 0,
+      "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 0,
+      "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 0,
+      "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 0,
+      "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 0,
+      "0x96F1a7ce331F40afe866F3b707c223e377661087": 0,
+      "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": 0,
+      "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 0,
+      "0xcb17C9Db87B595717C857a08468793f5bAb6445F": 0,
+      "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 0,
+      "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 0,
+      "0xA88594D404727625A9437C3f886C7643872296AE": 0,
+      "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 0,
+      "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 0,
+      "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 0,
+      "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 0,
+      "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": 0,
+      "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 0
+    },
+    "EndaomentFunds": {
+      "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 0,
+      "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 158734842,
+      "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 0,
+      "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 1655180,
+      "0x4200000000000000000000000000000000000006": 0,
+      "0x02981DB1a99A14912b204437e7a2E02679B57668": 0,
+      "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 0,
+      "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 0,
+      "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 0,
+      "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 0,
+      "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 0,
+      "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 0,
+      "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 0,
+      "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 0,
+      "0x96F1a7ce331F40afe866F3b707c223e377661087": 0,
+      "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": 0,
+      "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 0,
+      "0xcb17C9Db87B595717C857a08468793f5bAb6445F": 0,
+      "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 0,
+      "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 0,
+      "0xA88594D404727625A9437C3f886C7643872296AE": 0,
+      "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 8955765923992748325104908,
+      "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 102612568062220158239340,
+      "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 0,
+      "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 0,
+      "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": 0,
+      "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 0
+    },
+    "EndaomentPSM": {
+      "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 0,
+      "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 0,
+      "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 0,
+      "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 0,
+      "0x4200000000000000000000000000000000000006": 0,
+      "0x02981DB1a99A14912b204437e7a2E02679B57668": 0,
+      "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 0,
+      "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 0,
+      "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 0,
+      "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 0,
+      "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 0,
+      "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 0,
+      "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 0,
+      "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 0,
+      "0x96F1a7ce331F40afe866F3b707c223e377661087": 0,
+      "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": 0,
+      "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 0,
+      "0xcb17C9Db87B595717C857a08468793f5bAb6445F": 0,
+      "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 0,
+      "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 0,
+      "0xA88594D404727625A9437C3f886C7643872296AE": 0,
+      "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 0,
+      "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 0,
+      "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 0,
+      "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 0,
+      "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": 0,
+      "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 38290453208
+    }
+  },
+  "treasury_inventory_scope": "MC assets plus PSM underlying/yield token; not exhaustive incoming-transfer discovery",
+  "prices_before": {
+    "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 1023413028692680000,
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 999907210000000000,
+    "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 1248724460000000000,
+    "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 1163566949237760000,
+    "0x4200000000000000000000000000000000000006": 2744729416150000000000,
+    "0x02981DB1a99A14912b204437e7a2E02679B57668": 2777364086279114050071,
+    "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 3128545849970000000000,
+    "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 86126571521200000000000,
+    "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 3038940516723199942477,
+    "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 86181371274861793924000,
+    "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 746674170000000000,
+    "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 680502430000000000,
+    "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 118182689240000000000,
+    "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 100032500000000000,
+    "0x96F1a7ce331F40afe866F3b707c223e377661087": 692724114015526805,
+    "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": 251941640000000000,
+    "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 1563458200000000000,
+    "0xcb17C9Db87B595717C857a08468793f5bAb6445F": 62720948670000000000,
+    "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 1,
+    "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 1101670000000000,
+    "0xA88594D404727625A9437C3f886C7643872296AE": 2048920000000000,
+    "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 611024007076961826,
+    "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 1007297510038392608,
+    "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 1094326560685740017,
+    "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 0,
+    "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": 1000022098847044969,
+    "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 1015837731669720000,
+    "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": 1
+  },
+  "confirmation_gas": {
+    "6": 340,
+    "8": 340,
+    "5": 340,
+    "7": 340,
+    "9": 340,
+    "10": 340,
+    "11": 340,
+    "12": 340,
+    "13": 340,
+    "14": 340,
+    "15": 340,
+    "16": 340,
+    "17": 340,
+    "18": 340,
+    "19": 340,
+    "20": 340,
+    "21": 340,
+    "22": 340,
+    "25": 139151,
+    "26": 136351,
+    "27": 136351
+  },
+  "unchanged_ledger_borrower_records_vault_totals": true,
+  "prices_after_frozen_12h": {
+    "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 0,
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 999907210000000000,
+    "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 1248724460000000000,
+    "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 0,
+    "0x4200000000000000000000000000000000000006": 2744729416150000000000,
+    "0x02981DB1a99A14912b204437e7a2E02679B57668": 0,
+    "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 3128545849970000000000,
+    "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 86126571521200000000000,
+    "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 3038940516723199942477,
+    "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 0,
+    "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 746674170000000000,
+    "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 680502430000000000,
+    "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 118182689240000000000,
+    "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 100032500000000000,
+    "0x96F1a7ce331F40afe866F3b707c223e377661087": 0,
+    "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": 251941640000000000,
+    "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 1563458200000000000,
+    "0xcb17C9Db87B595717C857a08468793f5bAb6445F": 62720948670000000000,
+    "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 1,
+    "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 1101670000000000,
+    "0xA88594D404727625A9437C3f886C7643872296AE": 2048920000000000,
+    "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 0,
+    "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 1007297510038392608,
+    "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 1094326560685757444,
+    "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 0,
+    "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": 1000022098847060894,
+    "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 0,
+    "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": 1
+  },
+  "prices_current_timestamp_diagnostic": {
+    "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": 1023413028692680000,
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 999907210000000000,
+    "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": 1248724460000000000,
+    "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": 1163549803128960000,
+    "0x4200000000000000000000000000000000000006": 2744729416150000000000,
+    "0x02981DB1a99A14912b204437e7a2E02679B57668": 2777338729287519533476,
+    "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 3128545849970000000000,
+    "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": 86126571521200000000000,
+    "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": 3038940516723199942477,
+    "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": 86181222275893062248000,
+    "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": 746674170000000000,
+    "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 680502430000000000,
+    "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": 118182689240000000000,
+    "0xcbD06E5A2B0C65597161de254AA074E489dEb510": 100032500000000000,
+    "0x96F1a7ce331F40afe866F3b707c223e377661087": 692724114015526805,
+    "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": 251941640000000000,
+    "0xcb585250f852C6c6bf90434AB21A00f02833a4af": 1563458200000000000,
+    "0xcb17C9Db87B595717C857a08468793f5bAb6445F": 62720948670000000000,
+    "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 1,
+    "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": 1101670000000000,
+    "0xA88594D404727625A9437C3f886C7643872296AE": 2048920000000000,
+    "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": 0,
+    "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 1007297510038392608,
+    "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 1094326560685740017,
+    "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": 0,
+    "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": 1000022098847044969,
+    "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": 1015808734360630000,
+    "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": 1
+  },
+  "asset_symbols": {
+    "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf": "undyUSD",
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": "USDC",
+    "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2": "sUSDe",
+    "0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8": "undyEURC",
+    "0x4200000000000000000000000000000000000006": "WETH",
+    "0x02981DB1a99A14912b204437e7a2E02679B57668": "undyETH",
+    "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": "cbETH",
+    "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf": "cbBTC",
+    "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6": "wsuperOETHb",
+    "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493": "undyBTC",
+    "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b": "VIRTUAL",
+    "0x940181a94A35A4569E4529A3CDfB74e38FD98631": "AERO",
+    "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55": "uSOL",
+    "0xcbD06E5A2B0C65597161de254AA074E489dEb510": "cbDOGE",
+    "0x96F1a7ce331F40afe866F3b707c223e377661087": "undyAERO",
+    "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c": "cbADA",
+    "0xcb585250f852C6c6bf90434AB21A00f02833a4af": "cbXRP",
+    "0xcb17C9Db87B595717C857a08468793f5bAb6445F": "cbLTC",
+    "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": "VVV",
+    "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed": "DEGEN",
+    "0xA88594D404727625A9437C3f886C7643872296AE": "WELL",
+    "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0": "RIPE",
+    "0xd6c283655B42FA0eb2685F7AB819784F071459dc": "GREEN/USDC",
+    "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": "sGREEN",
+    "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9": "vAMM-RIPE/WETH",
+    "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707": "GREEN",
+    "0x99e65176F7FA8743E3fbaEF277d1Da448e361367": "undyUSDC",
+    "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": "mcbETH"
+  },
+  "sp_nav_current_timestamp": {
+    "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36": 24734124625938463052037,
+    "0xd6c283655B42FA0eb2685F7AB819784F071459dc": 19343559450988937407959
+  },
+  "dust_values": {
+    "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5": 1,
+    "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf": 1
+  },
+  "configuration_remaining": {
+    "CE_buybackRatio": 0,
+    "Teller_paused": true,
+    "PSM_canMint": false,
+    "PSM_canRedeem": false,
+    "PSM_enforceRedeemAllowlist": false,
+    "MC_rewardsInitialized": false
+  },
+  "post_activation_setting_calls_passed": true,
+  "proposal_count": 21
+}

@@ -1,0 +1,495 @@
+{
+  "version": "1.0",
+  "chainId": "8453",
+  "createdAt": 1790116291000,
+  "meta": {
+    "name": "Base department upgrade \u2014 START HQ timelocks only",
+    "description": "18 replacements plus 3 additions. No confirmations, funds transfers, or parameter changes. Recheck pending proposals and deployment addresses before execution.",
+    "createdFromSafeAddress": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf"
+  },
+  "transactions": [
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "5",
+        "_newAddr": "0xb596054CF004B04fB61FfB2349b4e866E5aE3A4e"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "6",
+        "_newAddr": "0x4147D446645c6aE260Bcd4402E9bE5e03FB4E105"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "7",
+        "_newAddr": "0xf5F7e492AAe690B126424A4DBAD884E51B41C11f"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "8",
+        "_newAddr": "0x6DFed28265032165Ae45Db02e3B1b95b5E655da4"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "9",
+        "_newAddr": "0xbF6eFbFB28fEa2057b976AD89390E57e988CFe9E"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "10",
+        "_newAddr": "0x5c4e4DE576Dd6387b58eC8A0344355726552370b"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "11",
+        "_newAddr": "0xefc2C9a5d65d388D4852309894760D45130568aD"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "12",
+        "_newAddr": "0x9EF03204c465E836e5B66988c81EFcD2bEa4a9ef"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "13",
+        "_newAddr": "0x1D816D4058D5dA79c5dF56822Bad67B90Feb6E8E"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "14",
+        "_newAddr": "0xDFf4c788dF6E2adA1740093fc9Ae233436E993F4"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "15",
+        "_newAddr": "0x9E78Bd070B9BC403117B6F267B65465712984B3e"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "16",
+        "_newAddr": "0x7Ff148B9FAbF58125c69F508ac9a3E74Dc52f611"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "17",
+        "_newAddr": "0xfc55b5c5eE2FA46aa9d4Cf416710c883044a5B21"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "18",
+        "_newAddr": "0xB46fC5ec144079C4f7A3E9e46CcA9823f414a27B"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "19",
+        "_newAddr": "0x16c69dCeA71FDDE530a48128BA76702Aac60ad24"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "20",
+        "_newAddr": "0x2AeA442154b7cc868987b8eF6E5be57f2893Ce0D"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "21",
+        "_newAddr": "0xe4Bb0d06F106E93f240934CC0C1Ac67B3f7f58Ae"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddressUpdateToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_regId",
+            "type": "uint256"
+          },
+          {
+            "name": "_newAddr",
+            "type": "address"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_regId": "22",
+        "_newAddr": "0x48a1566e251C97226De0fC0de8f5f38E55ada1cF"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddNewAddressToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_addr",
+            "type": "address"
+          },
+          {
+            "name": "_description",
+            "type": "string"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_addr": "0x980c772036d952De00d3D2ee2371De44B738bD67",
+        "_description": "VaultMigrator"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddNewAddressToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_addr",
+            "type": "address"
+          },
+          {
+            "name": "_description",
+            "type": "string"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_addr": "0x86aEFB7d0bc788a2D455C1c2af7a46f4807303FE",
+        "_description": "RipeReserveEngine"
+      }
+    },
+    {
+      "to": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "name": "startAddNewAddressToRegistry",
+        "payable": false,
+        "inputs": [
+          {
+            "name": "_addr",
+            "type": "address"
+          },
+          {
+            "name": "_description",
+            "type": "string"
+          }
+        ]
+      },
+      "contractInputsValues": {
+        "_addr": "0x2601e1E1dC276CB8730FacC132B1d598745e3432",
+        "_description": "RipeReserveVesting"
+      }
+    }
+  ]
+}
