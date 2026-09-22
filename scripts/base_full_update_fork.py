@@ -69,6 +69,10 @@ class DeploymentAdapter:
             args = (*args, [])
         elif name == "CurvePrices" and len(args) == 7:
             args = (*args, [], (ZERO, ZERO, 0, ZERO, 0, 0, 0, 0, 0, 0))
+        # Retain historical labels, but use the single current implementation
+        # when replaying old deployment steps in this fresh-code fork only.
+        if name == "SwitchboardFoxtrotSetup":
+            name = "SwitchboardFoxtrot"
         key = label.removesuffix(SUFFIX)
         path = self.defaults if name == "DefaultsBaseLive" else next((ROOT / "contracts").rglob(name + ".vy"))
         if name == "VaultBook":

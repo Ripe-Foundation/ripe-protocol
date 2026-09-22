@@ -233,7 +233,7 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
     defaults = boa.load(str(defaults_path), live_call("hrConfig")[0])
     replacement = boa.load(MISSION_CONTROL_SOURCE, hq_addr, "0x" + "00" * 20)
     initializer = boa.load(
-        "contracts/config/SwitchboardFoxtrotSetup.vy",
+        "contracts/config/SwitchboardFoxtrot.vy",
         hq_addr, "0x" + "00" * 20, 1, 100,
     )
     fork_hq = boa.loads_abi(json.dumps(manifest["RipeHq"]["abi"])).at(hq_addr)
