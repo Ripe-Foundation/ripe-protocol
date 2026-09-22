@@ -1,8 +1,0 @@
-{
-  "contracts": {
-    "PriceDeskBridgeBaseUpgradeCandidate20260914": {
-      "address": "0xad70893E2F51076b0e9bA18fC593e924593a073F",
-      "file": "contracts/registries/PriceDesk.vy"
-    }
-  }
-}

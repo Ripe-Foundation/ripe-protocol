@@ -386,7 +386,10 @@ standard-runner lifecycle coverage remains an explicit open gate.
 
 The September 14/19 staging migrations above are superseded and archived under
 `migrations/archive/base-mainnet`; the runner no longer discovers them. Their
-deployment manifests and logs remain historical records, not activation approval.
+staging checkpoints and candidate manifest entries have also been removed for
+redeployment (recoverable from Git at `b946b3b7`). Older completion records and
+canonical live-contract entries are retained. Historical diagnostics requiring
+the removed candidates must use that earlier revision.
 
 Run only the fresh deploy-only step:
 
