@@ -1,5 +1,9 @@
 # Base: deploy now, migrate later
 
+**Current flow:** use [the fresh three-contract deployment](#fresh-deployment-flow-2026-09-21).
+All older staging commands and qualification reports below are historical only.
+The September 14/19 migrations are archived and are not runnable by the normal CLI.
+
 ## Current phase-1 compatibility staging
 
 The current source uses a five-argument VaultBook constructor. **Do not resume
@@ -377,3 +381,31 @@ keeps Teller and PSM entry points closed, and keeps reserve sales disabled. Orac
 route compatibility, fresh snapshot history, permissions and outstanding actions
 must all be qualified before reopening. Focused review regressions are offline;
 standard-runner lifecycle coverage remains an explicit open gate.
+
+## Fresh deployment flow (2026-09-21)
+
+The September 14/19 staging migrations above are superseded and archived under
+`migrations/archive/base-mainnet`; the runner no longer discovers them. Their
+deployment manifests and logs remain historical records, not activation approval.
+
+Run only the fresh deploy-only step:
+
+```sh
+python -m scripts.migrate --profile base-mainnet \
+  --start-timestamp 2026092100 --single --fork
+```
+
+After reviewing the fork result, the same command without `--fork` deploys
+DefaultsBaseLive, an empty MissionControl, and SwitchboardFoxtrot under new labels.
+The current Contributor template is reused. Defaults must pass the existing
+live-config preflight; regenerate them if it reports drift. There are no registry
+writes, initialization calls, treasury transfers, or HQ proposals in this step.
+
+Governance then registers/confirms the new Foxtrot in the **current Switchboard**
+(inspect the live registry to choose add vs. replace). Once registered, governance
+calls `startDefaultsInitialization(newMC, newDefaults)` once, then `initConfig()`
+until `initStep() == 5`. Review the populated, still-inactive MC before proposing
+its HQ activation. `initRewards()` remains a separate call after MC activation;
+`initConfig()` does not initialize rewards or migrate per-user settings.
+
+No new fork qualification of this flow is claimed by the historical evidence above.

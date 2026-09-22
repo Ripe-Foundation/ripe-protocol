@@ -179,7 +179,7 @@ def test_orphan_user_asset_cannot_pass_census(tmp_path):
 
 
 def test_staging_timing_and_price_constructor_bindings():
-    paths = [ROOT / "migrations/base-mainnet" / name for name in (
+    paths = [ROOT / "migrations/archive/base-mainnet" / name for name in (
         "2026091400_StageBaseUpgrade.py", "2026091402_StageBaseOraclesPsmReserves.py")]
     calls = {}
     for path in paths:
@@ -260,7 +260,7 @@ def legacy_compat_staging(legacy_env, switchboard, monkeypatch):
     import importlib.util
     from types import SimpleNamespace
     e = legacy_env
-    path = ROOT / "migrations/base-mainnet/2026091900_StageLegacyVaultCompatibility.py"
+    path = ROOT / "migrations/archive/base-mainnet/2026091900_StageLegacyVaultCompatibility.py"
     spec = importlib.util.spec_from_file_location("legacy_compat_migration", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -400,13 +400,13 @@ def test_legacy_compat_staging_rejects_drift_before_deployments(legacy_compat_st
     assert not migration.deployed and not migration.calls
 
 
-def test_legacy_compat_migration_is_the_next_recorded_base_step():
+def test_fresh_config_migration_is_the_next_recorded_base_step():
     from types import SimpleNamespace
     from scripts.utils.migration_runner import MigrationRunner
     runner = MigrationRunner(ROOT / "migrations/base-mainnet", ROOT / "migration_history/base-mainnet/v1", {})
     # Honor the normal runner guard; the fresh step must not skip an unfinished
     # historical migration or require force-replaying a frozen constructor.
-    runner._require_start_point(SimpleNamespace(), "2026091900")
+    runner._require_start_point(SimpleNamespace(), "2026092100")
 
 
 @pytest.mark.parametrize("row", [2, 4, 5, 6])

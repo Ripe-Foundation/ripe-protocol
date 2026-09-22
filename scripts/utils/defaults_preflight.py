@@ -20,7 +20,8 @@ def artifact_hashes(defaults_path):
                               ("scripts", "*.py"), ("config", "*.py")):
         paths.update((ROOT / directory).rglob(suffix))
     paths.add(ROOT / "migration_history/base-mainnet/v1/current-manifest.json")
-    paths.add(ROOT / "migrations/base-mainnet/2026091401_StageBaseMissionControl.py")
+    paths.update((ROOT / "migrations/base-mainnet").glob("*.py"))
+    paths.update((ROOT / "migrations/archive/base-mainnet").glob("*.py"))
     return {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
             for path in sorted(paths)}
 

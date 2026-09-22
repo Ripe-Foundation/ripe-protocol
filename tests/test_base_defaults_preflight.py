@@ -76,7 +76,7 @@ def test_historical_pin_only_for_rehearsal(setup_preflight):
 def test_stage_two_preflight_failure_precedes_first_deployment():
     root = Path(__file__).resolve().parents[1]
     spec = importlib.util.spec_from_file_location("stage2", root /
-        "migrations/base-mainnet/2026091401_StageBaseMissionControl.py")
+        "migrations/archive/base-mainnet/2026091401_StageBaseMissionControl.py")
     stage = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(stage)
     deployments = []

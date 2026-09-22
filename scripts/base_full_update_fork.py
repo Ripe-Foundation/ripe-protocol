@@ -545,7 +545,7 @@ class FullUpdate(Rehearsal):
         adapter = DeploymentAdapter(self, defaults)
         for filename in ("2026091400_StageBaseUpgrade.py", "2026091401_StageBaseMissionControl.py",
                          "2026091402_StageBaseOraclesPsmReserves.py"):
-            spec = importlib.util.spec_from_file_location(filename, ROOT / "migrations/base-mainnet" / filename)
+            spec = importlib.util.spec_from_file_location(filename, ROOT / "migrations/archive/base-mainnet" / filename)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             module.migrate(adapter)
@@ -588,7 +588,7 @@ def execute_diagnostic(run, args):
     run.report.update(block_hash=header["hash"], snapshot_finalized=True, vault_migrations=False)
     run.report["full_update_harness_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     run.report["migration_source_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in sorted((ROOT / "migrations/base-mainnet").glob("20260914*.py"))}
+        for p in sorted((ROOT / "migrations/archive/base-mainnet").glob("20260914*.py"))}
     with boa.fork(run.rpc, block_identifier=args.block):
         assert boa.env.evm.patch.chain_id == 8453
         run.inventory()

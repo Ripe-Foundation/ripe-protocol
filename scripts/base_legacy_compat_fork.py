@@ -59,7 +59,7 @@ def staged_fork(rpc, block, report):
             env.set_balance(sender.address, 10**20)
             report["stager"] = sender.address
             args = DeployArgs(sender, "base-mainnet", False, "base", rpc, local_preview=True)
-            runner = MigrationRunner(ROOT / "migrations/base-mainnet", history, load_vyper_files())
+            runner = MigrationRunner(ROOT / "migrations/archive/base-mainnet", history, load_vyper_files())
             with patch("scripts.utils.migration_runner.Migration", ObservedMigration):
                 report["migration_gas"] = runner.run(args, "2026091900", "2026091900")
             report["candidate_manifest"] = json.loads((history / "2026091900-manifest.json").read_text())
