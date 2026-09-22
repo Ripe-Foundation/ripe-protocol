@@ -2,87 +2,90 @@
 
 Migration: `2026092101_DeployConfiguredBasePriceSources.py`.
 
-Deployment and activation are separate. The retained Aero and wrapped-OETH
-sources support the new desk's combined call when passed a valid PriceDesk.
-Do not test them with a zero desk address and interpret that revert as an absent
-selector. Aggregate routing still needs a canonical-PriceDesk fork check.
-
 ```sh
 python -m scripts.migrate --profile base-mainnet \
   --start-timestamp 2026092101 --single --fork
 ```
 
-Remove `--fork` only after reviewing the rehearsal. The previous deploy-only MC
-migration must be recorded complete. MC does not need to be activated for this step.
-All new deployments use distinct `BasePrices20260921` labels. Normal resume is
-supported by the migration journal; never force-replay or remove an in-progress
-journal. Live configuration drift during a partial deployment needs review.
+This revision retains the existing source order, including empty sources. Current
+compiled executable bytecode differs from the recorded live deployments for
+Chainlink, Curve, BlueChip, Pyth, Stork, wrapped-OETH, Undy and RedStone. Aero has
+changed to a UI-only monitor. Eight source implementations and PriceDesk are
+deployed anew; wrapped-OETH is deliberately retained for legacy StabilityPool
+compatibility. PriceDesk uses **3M quote and 3M snapshot budgets**.
 
-The migration deploys PriceDesk with **3M quote and 3M snapshot budgets**, then
-only the three updated source implementations: Chainlink, Curve and Undy.
-The existing Aero and wrapped-OETH sources are reused. Chainlink's complete feed configuration
-is loaded in its constructor (anchors first). Curve's routes and single GREEN
-reference pool are also loaded in the constructor. Other configurable sources use
-temporary governance and their normal add/confirm methods before relinquishing it.
-Feed policy is read from the active sources, not hardcoded from old deployment logs.
-Pyth, Stork, RedStone and disabled BlueChip are not redeployed. Their IDs are
-reserved with the old addresses and disabled in the new registry. If an assumed
-unused source gains feeds, preflight stops instead of omitting them silently.
-Source and registry delays are copied where configurable during setup.
-
-Source IDs remain:
-
-| ID | Source | Treatment |
+| ID | Source | Configuration |
 |---|---|---|
-| 1 | Chainlink | All live feed mappings copied |
-| 2 | Curve | All live routes and reference-pool policy copied |
-| 3 | BlueChip | Not redeployed; registry slot remains disabled |
-| 4 | Pyth | Empty live source; not redeployed; candidate slot disabled |
-| 5 | Stork | Empty live source; not redeployed; candidate slot disabled |
-| 6 | Legacy Aero | Current source retained for RIPE |
-| 7 | Wrapped superOETH | Current source retained unchanged |
-| 8 | Undy | Live vault metadata and snapshot policies copied |
-| 9 | RedStone | Empty live source; not redeployed; candidate slot disabled |
+| 1 | Chainlink | All live feed mappings, anchors first, in constructor |
+| 2 | Curve | All live pools and single GREEN reference configuration in constructor |
+| 3 | BlueChip | New implementation; slot remains disabled; no historical feeds revived |
+| 4 | Pyth | Current network/confidence policy, currently no feeds |
+| 5 | Stork | Current network, currently no feeds |
+| 6 | Aero | New UI-only monitor; no protocol RIPE feed |
+| 7 | Wrapped superOETH | Live source retained unchanged, including mcbETH/VVV fallbacks |
+| 8 | Undy | All six live vault configurations, fresh snapshots |
+| 9 | RedStone | Current ETH binding, currently no feeds |
 
-The new Aero implementation is UI-only and is not deployed here. Neither retained
-source's configuration, governance, snapshots or delay is modified. Wrapped-OETH's
-existing retired mcbETH/VVV fallback behavior is preserved, not newly enabled.
-Disabled BlueChip's old feed mappings are not re-enabled.
+MC priority stays **`[1, 8, 2, 9, 4, 5]`**. No MC writes or priority migration are
+needed. No legacy source is temporarily registered: the new BlueChip is registered
+then disabled solely to preserve the existing disabled ID 3. Other sources remain
+registered, including the Aero monitor at ID 6. The UI must call the monitor's
+`getRipeUsdMonitoringPrice()` directly (its oracle methods deliberately return no
+feed). Aero still obtains WETH/USD through the canonical PriceDesk.
 
-Only **fresh** Curve/Undy snapshots are seeded. Historical windows, danger counters,
-and accumulated observations are not imported. All token scales needed by the
-configured routes and current collateral are cached on the new PriceDesk.
+RIPE no longer has the legacy Aero protocol quote. Wrapped-OETH remains at
+`0x064488f53849616eeE3EE32c29307922B319bb7C`, with no deployment or state changes.
+The mcbETH/VVV one-wei fallbacks are required for legacy SP claim-basket dust,
+not collateral valuation. Historical BlueChip feeds and a new Morpho V2 factory
+are not enabled by this deployment.
 
-This migration does not change HQ, live sources, MC, vaults, or treasury balances.
-It does not propose activation. Configuration readback is not price equivalence:
-before activation, check all collateral quotes, fresh snapshot behavior after the
-governance wait, and full liquidation/deleverage gas on the intended department set.
+Chainlink/Curve/Undy policy is copied from live sources, not old logs. Empty-source
+preflight stops if Pyth, Stork or RedStone gains feeds, so newly added mappings are
+not silently lost. Setup governance is relinquished, but newly deployed source action
+timelocks and the new PriceDesk registry delay deliberately stay **zero** for this
+deployment wave. Neither `setActionTimeLockAfterSetup` nor
+`setRegistryTimeLockAfterSetup` is called. Constructor minimum/maximum bounds
+remain unchanged for future governance configuration. No live sources
+are modified. Wrapped-OETH and Aero have no temporary
+governor. Only fresh Curve/Undy observations are seeded; historical windows and
+danger counters are not imported. Token scales for configured assets are cached.
 
-The current RIPE/WETH LP already has a zero PriceDesk quote, and retired VVV
-has a one-wei legacy fallback. Neither is evidence of usable collateral pricing.
-Canonical-forward guards make candidate PriceDesk queries return zero while the
-old desk is active; aggregate qualification must make the candidate canonical on
-an isolated fork through governance, not bypass those guards in production.
+## Execution and validation
 
-## Fork rehearsal — 2026-09-21
+The preceding MC deployment must be recorded complete; MC need not be activated.
+All deployments use `BasePrices20260921` labels. This all-source revision changes
+transaction ordering from earlier drafts: do not resume an earlier partially
+executed draft with it or delete/force-replay its journal. Normal resume applies
+only to this unchanged revision. Live configuration drift during deployment
+requires review.
 
-At Base block **51,626,101**, the actual standard runner completed this migration:
-four deployments, 79 journaled deployment/setup transactions, and 19,745,255 total
-execution gas across those transactions. The 20 Chainlink configurations, two
-Curve route configurations/reference policy, and six Undy vault policies matched
-their live inputs. The active HQ slot and source registry were unchanged by staging.
+Deployment leaves HQ unchanged. Activation requires a separate governance action
+and fresh price checks. Do not treat zero quotes through an inactive candidate as
+proof of a broken source: canonical-forward guards require the candidate to be
+activated inside a fork for aggregate comparisons.
 
-A separate fork-only governance proposal, 21,600-block wait (12 hours), and HQ
-slot-7 confirmation exercised the candidate as canonical PriceDesk. Across all
-27 MC-listed assets, no nonzero old quote became zero on the new desk. Retained
-Aero RIPE and wrapped-OETH quotes matched. Freshly seeded Undy observations can
-produce small differences from the old weighted snapshot window; exact price
-equality is not claimed.
+Undy's existing contract test suite passed **82 tests** on 2026-09-21. The revised
+superseded ten-deployment sequence, before the zero-delay and retained-source edits,
+completed on a read-only-upstream Base fork at block
+**51,627,234**: 84 journaled transactions and 36,158,243 aggregate execution gas.
+Feed configuration readbacks passed and staging left HQ unchanged. A separate
+fork-only HQ proposal, 21,600-block wait and confirmation exercised the new desk.
+Across 27 MC assets, the only nonzero-to-zero changes were the intentional RIPE
+and retired VVV removals. Aero's UI quote was nonzero. Undy prices can differ
+slightly because its snapshot windows are freshly seeded.
 
-This is **not** an all-prices-healthy or activation approval: seven routes were
-zero on both desks after the frozen-feed wait (USDC, undyUSD, undyUSDC, GREEN,
-sGREEN, GREEN/USDC LP, and RIPE/WETH LP). The USDC dependency became stale without
-real future oracle updates; RIPE/WETH LP was already zero before waiting. Retired
-VVV remained at its existing one-wei fallback. Fresh upstream quotes and full
-operation gas still need checking before real activation. No transactions were
-broadcast, no oracle updates were fabricated, and no live manifest was rewritten.
+Seven other routes were zero on both desks after the frozen-feed wait: USDC,
+undyUSD, undyUSDC, GREEN, sGREEN, GREEN/USDC LP and RIPE/WETH LP. The stale USDC
+dependency and pre-existing unpriced RIPE LP remain activation caveats, not new
+source losses. No future oracle updates were fabricated. No live transactions
+were sent and the user's deployment history was not modified.
+Full liquidation/deleverage and department activation qualification remain
+separate from this price-source migration.
+
+At block **51,628,844**, a focused fork proved why wrapped-OETH must be retained:
+the live GREEN/USDC SP basket contained one raw unit each of mcbETH and VVV.
+Its total-value call succeeded before replacing the source and reverted after
+replacement, without advancing time. The MC-only price scan was insufficient
+to qualify these outstanding claim liabilities. This revised nine-deployment
+migration retains the live source; syntax/static checks passed, but the complete
+revised sequence has not yet been rerun on a fork.

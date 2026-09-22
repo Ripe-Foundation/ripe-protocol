@@ -2,6 +2,7 @@
 
 from scripts.utils import log
 from scripts.utils.migration import Migration
+from boa.contracts.abi.abi_contract import ABIContractFactory
 
 ZERO = "0x" + "00" * 20
 HQ = "0x6162df1b329e157479f8f1407e888260e0ec3d2b"
@@ -36,15 +37,17 @@ def migrate(migration: Migration):
     assets = {}
     locks = {}
     for i, name in enumerate(SOURCE_NAMES, 1):
-        if i in (3, 6):  # disabled BlueChip and retained legacy Aero
+        if i == 6:  # legacy Aero is replaced by the UI-only implementation
             continue
-        source = migration.get_contract(name, rows[i-1])
+        source = migration.get_contract(name) if i == 3 else migration.get_contract(name, rows[i-1])
         old[name] = source
         assets[name] = list(source.getPricedAssets())
-        locks[name] = (source.minActionTimeLock(), source.maxActionTimeLock(), source.actionTimeLock())
+        locks[name] = (source.minActionTimeLock(), source.maxActionTimeLock())
     for name in ("PythPrices", "StorkPrices", "RedStone"):
         if assets[name]:
             raise RuntimeError(f"BASE_PRICES_UNUSED_SOURCE_NOW_HAS_FEEDS:{name}")
+    # This setting is switchboard-only, not accessible to a setup governor.
+    assert old["PythPrices"].maxConfidenceRatio() == 300, "Pyth confidence policy needs governance review"
     cl = old["ChainlinkPrices"]
     eth, btc = cl.ETH(), cl.BTC()
     chainlink_configs = [(a, tuple(cl.feedConfig(a))) for a in assets["ChainlinkPrices"]]
@@ -59,6 +62,16 @@ def migrate(migration: Migration):
     for a, c in undy_configs:
         if desk.getPrice(c[0], False) == 0:
             raise RuntimeError(f"BASE_PRICES_UNDY_UNDERLYING_UNPRICEABLE:{a}:{c[0]}")
+    blue = old["BlueChipYieldPrices"]
+    # The live BlueChip generation exposes indexed factory getters.
+    blue_arrays = ABIContractFactory("LegacyBlueChipFactories", [
+        {"type": "function", "name": name, "stateMutability": "view",
+         "inputs": [{"name": "index", "type": "uint256"}],
+         "outputs": [{"name": "", "type": "address"}]}
+        for name in ("MORPHO_ADDRS", "EULER_ADDRS")
+    ]).at(blue.address)
+    morpho = [blue_arrays.MORPHO_ADDRS(i) for i in range(2)]
+    euler = [blue_arrays.EULER_ADDRS(i) for i in range(2)]
 
     log.h1("2. Deploy PriceDesk and constructor-configured Chainlink/Curve sources")
     new = {}
@@ -79,18 +92,49 @@ def migrate(migration: Migration):
         initial_curve, green_ref, label=f"CurvePrices{SUFFIX}",
     )
 
-    log.h1("3. Deploy updated Undy source; retain current wrapped-OETH and Aero")
+    log.h1("3. Deploy the other changed implementations in their existing slots")
     new["UndyVaultPrices"] = migration.deploy(
         "UndyVaultPrices", hq.address, migration.account(), *locks["UndyVaultPrices"][:2],
         label=f"UndyVaultPrices{SUFFIX}",
     )
+    new["BlueChipYieldPrices"] = migration.deploy(
+        "BlueChipYieldPrices", hq.address, migration.account(), *locks["BlueChipYieldPrices"][:2],
+        morpho, euler, blue.FLUID_ADDR(), blue.COMPOUND_V3_ADDR(),
+        blue.MOONWELL_ADDR(), blue.AAVE_V3_ADDR(), ZERO,
+        label=f"BlueChipYieldPrices{SUFFIX}",
+    )
+    # BlueChip remains disabled. Do not revive its historical feed mappings or
+    # introduce a new Morpho V2 factory as part of this replacement.
+    new["PythPrices"] = migration.deploy(
+        "PythPrices", hq.address, migration.account(), old["PythPrices"].PYTH(),
+        *locks["PythPrices"][:2], label=f"PythPrices{SUFFIX}",
+    )
+    new["StorkPrices"] = migration.deploy(
+        "StorkPrices", hq.address, migration.account(), old["StorkPrices"].STORK(),
+        *locks["StorkPrices"][:2], label=f"StorkPrices{SUFFIX}",
+    )
+    new["RedStone"] = migration.deploy(
+        "RedStone", hq.address, migration.account(), old["RedStone"].ETH(),
+        *locks["RedStone"][:2], label=f"RedStone{SUFFIX}",
+    )
+    # Retain the live wrapped-OETH source: legacy SP baskets still need its
+    # nonzero mcbETH/VVV dust prices. Do not deploy or mutate its replacement.
+    new["AeroRipePrices"] = migration.deploy(
+        "AeroRipePrices", hq.address, migration.get_address("RipePoolAero"),
+        hq.getAddr(3), cl.WETH(), label=f"AeroRipePrices{SUFFIX}",
+    )
+    assert new["AeroRipePrices"].isMonitoringOnly()
+    assert new["AeroRipePrices"].getPriceAndHasFeed(hq.getAddr(3)) == (0, False)
+    for name in ("BlueChipYieldPrices", "PythPrices", "StorkPrices", "RedStone"):
+        assert not new[name].getPricedAssets()
+    assert new["PythPrices"].maxConfidenceRatio() == old["PythPrices"].maxConfidenceRatio()
 
     log.h1("4. Configure remaining feeds and seed fresh Undy snapshots")
     # No historical snapshots are imported. Undy config confirmations seed
     # convertToAssets observations; policy/metadata must match live exactly.
     for a, c in undy_configs:
         migration.execute(new["UndyVaultPrices"].addNewPriceFeed, a, *c[3:7])
-        migration.execute(new["UndyVaultPrices"].confirmNewPriceFeed, a)
+        migration.execute(new["UndyVaultPrices"].confirmNewPriceFeed, a, gas=15_000_000)
         assert tuple(new["UndyVaultPrices"].priceConfigs(a))[:7] == c
     for a, c in chainlink_configs:
         assert tuple(new["ChainlinkPrices"].feedConfig(a)) == c
@@ -102,23 +146,16 @@ def migrate(migration: Migration):
 
     log.h1("5. Populate PriceDesk, preserving source IDs")
     for i, name in enumerate(SOURCE_NAMES, 1):
-        # Reserve unused IDs with the historical source, then disable the row.
-        # Never renumber MC priority routes or deploy unused replacements.
-        if i == 3:
-            target = migration.get_contract("BlueChipYieldPrices").address
-        elif i in (4, 5, 6, 7, 9):
-            target = rows[i-1]
-        else:
-            target = new[name].address
+        target = rows[6] if i == 7 else new[name].address
         migration.execute(new_desk.startAddNewAddressToRegistry, target, name)
         migration.execute(new_desk.confirmNewAddressToRegistry, target)
         assert address(new_desk.getAddr(i)) == address(target)
-        if i in (3, 4, 5, 9):
+        if i == 3:  # Preserve the existing disabled BlueChip slot only.
             migration.execute(new_desk.startAddressDisableInRegistry, i)
             migration.execute(new_desk.confirmAddressDisableInRegistry, i)
             assert address(new_desk.getAddr(i)) == ZERO
 
-    log.h1("6. Cache token scales, restore delays, relinquish setup governance")
+    log.h1("6. Cache token scales, keep setup delays at zero, relinquish setup governance")
     tokens = {address(mc.assets(i)) for i in range(1, int(mc.numAssets()))}
     for name in new:
         tokens.update(address(a) for a in new[name].getPricedAssets())
@@ -131,23 +168,26 @@ def migrate(migration: Migration):
         migration.execute(new_desk.syncTokenScale, token)
         assert new_desk.tokenScale(token) != 0
     for name, source in new.items():
-        if locks[name][2] != 0:
-            migration.execute(source.setActionTimeLockAfterSetup, locks[name][2])
-        assert source.actionTimeLock() == locks[name][2]
+        assert source.actionTimeLock() == 0
+        if name == "AeroRipePrices":  # Immutable, permissionless UI monitor.
+            continue
         migration.execute(source.relinquishGov)
         assert address(source.governance()) == ZERO
-    if desk.registryChangeTimeLock() != 0:
-        migration.execute(new_desk.setRegistryTimeLockAfterSetup, desk.registryChangeTimeLock())
+        assert source.actionTimeLock() == 0
+    # Keep the candidate registry delay at zero for this deployment wave.
     migration.execute(new_desk.relinquishGov)
     assert address(new_desk.governance()) == ZERO
-    assert new_desk.registryChangeTimeLock() == desk.registryChangeTimeLock()
+    assert new_desk.registryChangeTimeLock() == 0
     assert new_desk.PRICE_SOURCE_PRICE_GAS() == 3_000_000
     assert new_desk.PRICE_SOURCE_SNAPSHOT_GAS() == 3_000_000
     assert address(hq.getAddr(7)) == address(active_desk)
     assert rows == [desk.getAddr(i) for i in range(1, 10)]
+    assert address(new_desk.getAddr(7)) == address(rows[6])
+
     log.info(f"CONFIGURED, INACTIVE PRICEDESK: {new_desk.address}")
     for name, source in new.items():
         log.info(f"{name}: {source.address}")
-    log.info("No HQ proposal sent. Unused slots disabled; live Aero and wrapped-OETH retained unchanged.")
-    log.info("Existing retired mcbETH/VVV fallback behavior is unchanged, not newly enabled.")
+    log.info("No HQ proposal sent. All source IDs preserved; only BlueChip remains disabled.")
+    log.info(f"RETAINED wrapped-OETH (ID 7, including SP dust fallbacks): {rows[6]}")
+    log.info("Aero is UI-only. The live wrapped-OETH source is not modified.")
     log.info("Fresh Curve/Undy snapshots only: recheck warmup and every collateral route before activation.")

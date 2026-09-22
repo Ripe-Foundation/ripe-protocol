@@ -1,0 +1,16 @@
+{
+  "contracts": {
+    "DefaultsBaseLiveBaseConfig20260921": {
+      "address": "0x01a9bfb504280777b83f1179aB6204299E1943D7",
+      "file": "contracts/config/DefaultsBaseLive.vy"
+    },
+    "MissionControlBaseConfig20260921": {
+      "address": "0xb596054CF004B04fB61FfB2349b4e866E5aE3A4e",
+      "file": "contracts/data/MissionControl.vy"
+    },
+    "SwitchboardFoxtrotBaseConfig20260921": {
+      "address": "0xbCAE06B1370eD192F53C5B5fc4E650c6Ca9b10C1",
+      "file": "contracts/config/SwitchboardFoxtrot.vy"
+    }
+  }
+}
