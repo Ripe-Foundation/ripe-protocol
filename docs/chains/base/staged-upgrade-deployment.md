@@ -141,13 +141,17 @@ untouched. The Underscore vault candidate has its own label and address, despite
 using the same SimpleErc20 source as the ordinary ERC20 vault.
 
 PriceDesk now takes separate `_priceSourcePriceGas` and `_priceSourceSnapshotGas`
-constructor arguments and exposes both as immutable getters. Stage 3 supplies
-**1,500,000 gas each** for Base's nested quotes and snapshot refreshes. These are
-staged/unqualified budgets. Local/Robinhood retain 250k quote and 150k snapshot
+constructor arguments and exposes both as immutable getters. New Base deployments
+must supply **3,000,000 gas each** for nested quotes and snapshot refreshes, as
+configured in `BluePrint.PARAMS["base"]`. These are not yet operation-qualified
+budgets. Local/Robinhood retain 250k quote and 150k snapshot
 budgets; has-feed stays 75k. There is no governance setter; changing a budget
-requires another PriceDesk deployment. The earlier targeted quote replay confirms undyETH
-and undyUSDC return matching direct-source and aggregate PriceDesk prices at this
-budget. This is not a full aggregate-operation gas qualification for reopening.
+requires another PriceDesk deployment. Historical Stage 3 used 1,500,000 each;
+its recorded assertions, manifests, and earlier quote-replay evidence are not
+3M qualification. Do not rerun that historical migration to redeploy: its fixed
+1.5M assertions and recorded deployment labels belong to the old generation.
+Use a new deployment label/migration for the 3M candidate and requalify aggregate
+operations before activation or reopening.
 
 Retain RipeHq, tokens, Ledger, pools and CCIP contracts. The separate Underscore
 repository's contracts still need their own deployment. PriceDesk slot 3 is

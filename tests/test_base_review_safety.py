@@ -196,7 +196,8 @@ def test_staging_timing_and_price_constructor_bindings():
     assert argument("VaultBook", 3) == "BASE_ACTIVE_VAULT_BOOK_MIN_TIMELOCK"
     assert argument("PriceDesk", 6) == "params['PRICE_DESK_PRICE_SOURCE_GAS']"
     assert argument("PriceDesk", 7) == "params['PRICE_DESK_SNAPSHOT_SOURCE_GAS']"
-    assert PARAMS["base"]["PRICE_DESK_PRICE_SOURCE_GAS"] == 1_500_000
+    assert PARAMS["base"]["PRICE_DESK_PRICE_SOURCE_GAS"] == 3_000_000
+    assert PARAMS["base"]["PRICE_DESK_SNAPSHOT_SOURCE_GAS"] == 3_000_000
     assert PARAMS["local"]["PRICE_DESK_PRICE_SOURCE_GAS"] == 250_000
     assert PARAMS["robinhood"]["PRICE_DESK_PRICE_SOURCE_GAS"] == 250_000
 

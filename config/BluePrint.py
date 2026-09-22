@@ -53,8 +53,8 @@ ADDYS = {
 
 PARAMS = {
     "base": {
-        "PRICE_DESK_PRICE_SOURCE_GAS": 1_500_000,  # staged, NOT operation-qualified
-        "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 1_500_000,  # staged; prior cold undyUSDC ~924k, margin ~62%
+        "PRICE_DESK_PRICE_SOURCE_GAS": 3_000_000,  # new deployments; operation qualification still required
+        "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 3_000_000,  # immutable per-source snapshot budget
         # ripe hq - gov changes (blocks)
         "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,  # 1 day on Base
         "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,  # 7 days on Base
