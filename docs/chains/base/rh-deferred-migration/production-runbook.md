@@ -1,5 +1,12 @@
 # Base RH Deployment and Transition Runbook
 
+> **Superseded deployment scope:** start with the [current staging guide](../staged-upgrade-deployment.md)
+> and [review gates](../review-231.md). This older plan's retention of PriceDesk/children,
+> unused reserves, preferred retained BondBooster and five-child Switchboard limit
+> are replaced by staged oracle/reserve/booster candidates and Alpha–Golf. Retention
+> of HQ/Ledger/tokens/CCIP, old positions, and the need for safe custody/state handoff
+> remain applicable. Dated observations below are historical, not live instructions.
+
 > **DRAFT — DO NOT EXECUTE**
 
 This is the practical transaction map for deploying RH contracts on Base while
@@ -93,9 +100,10 @@ manifest immediately before deployment and again before the execution window.
 | Relevant `vaultIds` / special routes | sGREEN `[1]`; GREEN/USDC LP `[1]`; WETH `[3]`; cbBTC `[3]`. Separately, at block `50,467,473`, all 27 active MissionControl assets had `specialStabPoolId = 0`; none was `1` |
 | Current EndaomentPSM state | Unpaused; `canMint = true`; `canRedeem = true`. Disable both through Echo before custody disposition |
 
-The committed `DefaultsBaseLive` still contains a `40,000 GREEN` global debt
-limit. Live MissionControl is already at `24,000 GREEN`; therefore it cannot be
-used unchanged as the transition Defaults.
+The September 14 `DefaultsBaseLive` review snapshot contains a `24,000 GREEN`
+global debt limit and accepts the Contributor template as a constructor argument.
+It still requires fresh verification and source review before deployment; dated
+August observations do not qualify the current transition artifact.
 
 ## 3. Core deployment and RipeHQ cutover
 

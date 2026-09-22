@@ -316,6 +316,12 @@ class EtherscanVerifier:
                 ),
                 "contractaddress": address,
                 "codeformat": "vyper-json",
+                # Required by the explorer even for Vyper standard JSON;
+                # the submitted compiler settings remain unchanged.
+                "optimizationUsed": (
+                    "0" if standard_json.get("settings", {}).get("optimize")
+                    in (False, "none") else "1"
+                ),
                 "contractname": f"{source_path}:{contract_name}",
                 "compilerversion": _compiler_version(
                     manifest_data, standard_json

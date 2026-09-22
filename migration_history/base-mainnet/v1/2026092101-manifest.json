@@ -1,0 +1,40 @@
+{
+  "contracts": {
+    "PriceDeskBasePrices20260921": {
+      "address": "0xf5F7e492AAe690B126424A4DBAD884E51B41C11f",
+      "file": "contracts/registries/PriceDesk.vy"
+    },
+    "ChainlinkPricesBasePrices20260921": {
+      "address": "0x73813E81A47AaDEe7D149573548176B73deA6cFA",
+      "file": "contracts/priceSources/ChainlinkPrices.vy"
+    },
+    "CurvePricesBasePrices20260921": {
+      "address": "0x8073FFB274326F98a4cD9889f901875505abD969",
+      "file": "contracts/priceSources/CurvePrices.vy"
+    },
+    "UndyVaultPricesBasePrices20260921": {
+      "address": "0x48A4677dDAe58A26D0a565CEB973b9D47fA4EaCd",
+      "file": "contracts/priceSources/UndyVaultPrices.vy"
+    },
+    "BlueChipYieldPricesBasePrices20260921": {
+      "address": "0x1A5577954468B03487b5c4D2EebF9d168FDDcAc0",
+      "file": "contracts/priceSources/BlueChipYieldPrices.vy"
+    },
+    "PythPricesBasePrices20260921": {
+      "address": "0x102146497E84e7bAe5ae134996d1852AD52d6153",
+      "file": "contracts/priceSources/PythPrices.vy"
+    },
+    "StorkPricesBasePrices20260921": {
+      "address": "0x169ed2A9046D80ed39F16Fa8A6D23605142e6b9C",
+      "file": "contracts/priceSources/StorkPrices.vy"
+    },
+    "RedStoneBasePrices20260921": {
+      "address": "0xa5f88Fa6c4aE215c239534a83A086D0dE7a32460",
+      "file": "contracts/priceSources/RedStone.vy"
+    },
+    "AeroRipePricesBasePrices20260921": {
+      "address": "0x4D2046a6Ca72513f587d750902D69AB5562A113A",
+      "file": "contracts/priceSources/AeroRipePrices.vy"
+    }
+  }
+}

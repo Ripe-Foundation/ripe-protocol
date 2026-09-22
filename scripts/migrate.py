@@ -24,6 +24,7 @@ from scripts.utils.migration_helpers import get_account, load_vyper_files
 from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.mock_account import MockAccount
+from scripts.utils.migration_rpc import MigrationRPC
 import os
 
 
@@ -567,6 +568,9 @@ def cli(
                 deploy_args, start_timestamp, end_timestamp, not single)
     else:
         with boa.set_network_env(final_rpc) as env:
+            # Retry only read-only estimation, never the enclosing transaction.
+            env._rpc = MigrationRPC(env._rpc)
+            env.tx_settings.estimate_gas_block_identifier = "latest"
             env.add_account(sender)
             # Disable boa's transaction tracer. It probes the node with a
             # dummy `debug_traceTransaction` on first use, which providers can

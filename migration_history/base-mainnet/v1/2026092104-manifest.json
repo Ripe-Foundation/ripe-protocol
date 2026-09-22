@@ -1,0 +1,32 @@
+{
+  "contracts": {
+    "SwitchboardAlphaBaseDepartments20260921": {
+      "address": "0x268Fb74C6eacfF5c41ED365DD0a9491Dc4a586aE",
+      "file": "contracts/config/SwitchboardAlpha.vy"
+    },
+    "SwitchboardBravoBaseDepartments20260921": {
+      "address": "0x9517d76179F797aC4023f8DE36102Feb4F9CFF5D",
+      "file": "contracts/config/SwitchboardBravo.vy"
+    },
+    "SwitchboardCharlieBaseDepartments20260921": {
+      "address": "0x38800F22cC2bdad3fdB27EcAB8C83E3fA2e0e61c",
+      "file": "contracts/config/SwitchboardCharlie.vy"
+    },
+    "SwitchboardDeltaBaseDepartments20260921": {
+      "address": "0x88F6B854807d6FA534B264928602E6524aDef96A",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    },
+    "SwitchboardEchoBaseDepartments20260921": {
+      "address": "0x2B9d8d810d737E763d8Baaa04f8a36A3D294AF48",
+      "file": "contracts/config/SwitchboardEcho.vy"
+    },
+    "SwitchboardGolfBaseDepartments20260921": {
+      "address": "0x1EB0973A17832bf274C2bDcAF041C393931FBF4A",
+      "file": "contracts/config/SwitchboardGolf.vy"
+    },
+    "SwitchboardBaseDepartments20260921": {
+      "address": "0x4147D446645c6aE260Bcd4402E9bE5e03FB4E105",
+      "file": "contracts/registries/Switchboard.vy"
+    }
+  }
+}

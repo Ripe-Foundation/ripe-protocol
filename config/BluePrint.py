@@ -53,6 +53,8 @@ ADDYS = {
 
 PARAMS = {
     "base": {
+        "PRICE_DESK_PRICE_SOURCE_GAS": 3_000_000,  # new deployments; operation qualification still required
+        "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 3_000_000,  # immutable per-source snapshot budget
         # ripe hq - gov changes (blocks)
         "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,  # 1 day on Base
         "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,  # 7 days on Base
@@ -79,6 +81,8 @@ PARAMS = {
         "VAULT_BOOK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
     },
     "local": {
+        "PRICE_DESK_PRICE_SOURCE_GAS": 250_000,
+        "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 150_000,
         # ripe hq - gov changes (blocks)
         "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,
         "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,
@@ -1385,6 +1389,8 @@ validate_robinhood_stock_launch_qualification()
 # deployment-produced pool address remain fail-closed in the authority rows.
 ADDYS["robinhood"] = ROBINHOOD_ADDRESSES
 PARAMS["robinhood"] = {
+    "PRICE_DESK_PRICE_SOURCE_GAS": 250_000,
+    "PRICE_DESK_SNAPSHOT_SOURCE_GAS": 150_000,
     "DEPLOYMENT_INPUTS": ROBINHOOD_DEPLOYMENT_INPUTS,
     "CHAIN": ROBINHOOD_CHAIN,
     "COMPONENTS": ROBINHOOD_COMPONENTS,

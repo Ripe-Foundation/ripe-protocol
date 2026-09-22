@@ -505,6 +505,30 @@ def _slim_step_manifest(manifest, contract_names):
     }
 
 
+def authenticate_deployed_record(record, *, expected_source_path, expected_constructor_args):
+    """Read-only use of the same source/ABI/constructor/runtime checks as resume.
+
+    Immutable semantics (HQ, timelocks, bindings) must also be read back by the
+    caller, just as the promotion path checks its independent activation intent.
+    """
+    validated = _validated_promotable_record(
+        record, expected_source_path=expected_source_path,
+        expected_constructor_args=expected_constructor_args,
+    )
+    _validate_runtime_bytes(validated, bytes(boa.env.get_code(validated.address)))
+    return boa.loads_abi(json.dumps(record["abi"]), name=Path(expected_source_path).stem).at(validated.address)
+
+
+def _validate_runtime_bytes(record, deployed_code, *, activation=False):
+    kind = "ACTIVATION_CANDIDATE" if activation else "CANDIDATE"
+    if not deployed_code:
+        raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_MISSING")
+    if len(deployed_code) != record.deployed_runtime_size:
+        raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_LENGTH_MISMATCH")
+    if not deployed_code.startswith(record.runtime_template):
+        raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_PREFIX_MISMATCH")
+
+
 class Migration:
     def __init__(
         self,
@@ -579,6 +603,11 @@ class Migration:
 
     def rpc(self):
         return self._deploy_args.rpc
+
+    def verify_base_defaults(self, *, mission_control_only=False):
+        from scripts.utils.defaults_preflight import verify_before_deployment
+        return verify_before_deployment(self._files["DefaultsBaseLive"], self.rpc(),
+                                        mission_control_only=mission_control_only)
 
     def is_local_preview(self):
         """Whether the CLI selected a verified local/fork execution path."""
@@ -750,11 +779,14 @@ class Migration:
         self._save_log_file()
         return contract
 
-    def deploy_bp(self, name):
+    def deploy_bp(self, name, *, label=None):
         """
         Deploys contract with given name as blueprint or skips if already deployed
         Returns the deployed contract.
         """
+        label = name if label is None else label
+        if not isinstance(label, str) or not label:
+            raise ValueError("MIGRATION_BLUEPRINT_LABEL_EMPTY")
         args = []
         kwargs = {}
 
@@ -762,19 +794,19 @@ class Migration:
             c = boa.load_partial(self._files[name]).deploy_as_blueprint()
             return c
 
-        # ``name`` is also the manifest label needed by ``_run`` when a
-        # durable deployment log is resumed.  The wrapper deliberately
+        # The ``name`` keyword carries the manifest label needed by ``_run``
+        # when a durable deployment log is resumed. The wrapper deliberately
         # accepts and ignores it on a fresh deployment.
         contract = self._run(
             name,
             deploy_bp_wrapper,
             *args,
-            name=name,
+            name=label,
             **kwargs,
         )
         return self._register_contract(
             name,
-            name,
+            label,
             contract,
             args,
             blueprint=True,
@@ -897,6 +929,10 @@ class Migration:
         )
         return self._register_contract(name, name, contract, args)
 
+    def get_record(self, name):
+        """Copy a manifest record for independent read-only authentication."""
+        return copy.deepcopy(self._previous_manifest["contracts"][name])
+
     def get_address(self, name):
         return self._previous_manifest["contracts"][name]["address"]
 
@@ -1016,14 +1052,7 @@ class Migration:
             raise RuntimeError("MIGRATION_CANDIDATE_CODE_READ_FAILED") from None
 
     def _validate_deployed_code(self, record, *, activation=False):
-        kind = "ACTIVATION_CANDIDATE" if activation else "CANDIDATE"
-        deployed_code = self._get_deployed_code(record.address)
-        if not deployed_code:
-            raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_MISSING")
-        if len(deployed_code) != record.deployed_runtime_size:
-            raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_LENGTH_MISMATCH")
-        if not deployed_code.startswith(record.runtime_template):
-            raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_PREFIX_MISMATCH")
+        _validate_runtime_bytes(record, self._get_deployed_code(record.address), activation=activation)
 
     @staticmethod
     def _validate_registry_identity(contracts, spec):

@@ -2333,6 +2333,66 @@
       {
         "name": "_maxPriceChangeTimeLock",
         "type": "uint256"
+      },
+      {
+        "name": "_initialFeeds",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "pool",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "name": "_initialGreenRefPool",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "pool",
+            "type": "address"
+          },
+          {
+            "name": "lpToken",
+            "type": "address"
+          },
+          {
+            "name": "greenIndex",
+            "type": "uint256"
+          },
+          {
+            "name": "altAsset",
+            "type": "address"
+          },
+          {
+            "name": "altAssetDecimals",
+            "type": "uint256"
+          },
+          {
+            "name": "maxNumSnapshots",
+            "type": "uint256"
+          },
+          {
+            "name": "dangerTrigger",
+            "type": "uint256"
+          },
+          {
+            "name": "staleBlocks",
+            "type": "uint256"
+          },
+          {
+            "name": "stabilizerAdjustWeight",
+            "type": "uint256"
+          },
+          {
+            "name": "stabilizerMaxPoolDebt",
+            "type": "uint256"
+          }
+        ]
       }
     ],
     "outputs": []

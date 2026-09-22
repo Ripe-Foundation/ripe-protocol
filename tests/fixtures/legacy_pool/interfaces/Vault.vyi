@@ -1,0 +1,192 @@
+# @version 0.4.3
+
+import contracts.modules.Addys as addys
+
+struct VaultDataOnDeposit:
+    hasPosition: bool
+    numAssets: uint256
+    userBalance: uint256
+    totalBalance: uint256
+
+
+########
+# Core #
+########
+
+
+@external
+def depositTokensInVault(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    ...
+
+
+@external
+def withdrawTokensFromVault(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+    _recipient: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> (uint256, bool):
+    ...
+
+
+@external
+def transferBalanceWithinVault(
+    _asset: address,
+    _fromUser: address,
+    _toUser: address,
+    _transferAmount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> (uint256, bool):
+    ...
+
+
+####################
+# Needs For Others #
+####################
+
+
+@view
+@external
+def numUserAssets(_user: address) -> uint256:
+    # used in AuctionHouse.vy
+    ...
+
+
+@view
+@external
+def userAssets(_user: address, _index: uint256) -> address:
+    # used in Lootbox.vy
+    ...
+
+
+@view
+@external
+def getVaultDataOnDeposit(_user: address, _asset: address) -> VaultDataOnDeposit:
+    # used in Teller.vy
+    ...
+
+
+@view
+@external
+def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    # used in Lootbox.vy
+    ...
+
+
+@view
+@external
+def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    # used in CreditEngine.vy
+    ...
+
+
+@view
+@external
+def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
+    # used in Lootbox.vy and AuctionHouse.vy
+    ...
+
+
+###############
+# Other Utils #
+###############
+
+
+@view
+@external
+def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
+    ...
+
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    ...
+
+
+########
+# Data #
+########
+
+
+@view
+@external
+def isUserInVaultAsset(_user: address, _asset: address) -> bool:
+    ...
+
+
+@view
+@external
+def doesUserHaveBalance(_user: address, _asset: address) -> bool:
+    ...
+
+
+@view
+@external
+def isSupportedVaultAsset(_asset: address) -> bool:
+    ...
+
+
+# remove data
+
+
+@external
+def deregisterUserAsset(_user: address, _asset: address) -> bool:
+    ...
+
+
+@external
+def deregisterVaultAsset(_asset: address) -> bool:
+    ...
+
+
+# utils
+
+
+@view
+@external
+def getNumUserAssets(_user: address) -> uint256:
+    ...
+
+
+@view
+@external
+def getNumVaultAssets() -> uint256:
+    ...
+
+
+@view
+@external
+def doesVaultHaveAnyFunds() -> bool:
+    ...
+
+
+########
+# Ripe #
+########
+
+
+@view
+@external
+def isPaused() -> bool:
+    ...
+
+
+@external
+def pause(_shouldPause: bool):
+    ...
+
+
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    ...
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    ...

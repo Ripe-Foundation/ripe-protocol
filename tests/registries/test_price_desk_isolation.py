@@ -87,6 +87,50 @@ def _isolated_price_desk(ripe_hq, deploy3r, sources, price_gas=250_000, snapshot
     return desk
 
 
+def test_price_source_gas_is_set_per_deployment(ripe_hq, deploy3r):
+    source = _gas_source(price=EIGHTEEN_DECIMALS, has_feed=True)
+    small = _isolated_price_desk(ripe_hq, deploy3r, [source], price_gas=1)
+    large = _isolated_price_desk(ripe_hq, deploy3r, [source], price_gas=1_500_000)
+    assert small.PRICE_SOURCE_PRICE_GAS() == 1
+    assert large.PRICE_SOURCE_PRICE_GAS() == 1_500_000
+    assert small.getPrice(ETH) == 0
+    with boa.reverts():
+        small.getPrice(ETH, True)
+    assert large.getPrice(ETH, True) == EIGHTEEN_DECIMALS
+
+
+def test_price_source_gas_rejects_zero(ripe_hq, deploy3r):
+    with boa.reverts("invalid price source gas"):
+        _isolated_price_desk(ripe_hq, deploy3r, [], price_gas=0)
+
+
+def test_snapshot_gas_rejects_zero(ripe_hq, deploy3r):
+    with boa.reverts("invalid snapshot gas"):
+        _isolated_price_desk(ripe_hq, deploy3r, [], snapshot_gas=0)
+
+
+def test_snapshot_budget_is_independent(ripe_hq, deploy3r, teller):
+    source = boa.loads('''# @version 0.4.3
+timestamp: public(uint256)
+@view
+@external
+def hasPriceFeed(asset: address) -> bool:
+    return True
+@external
+def addPriceSnapshot(asset: address) -> bool:
+    self.timestamp = block.timestamp
+    return True
+''')
+    small = _isolated_price_desk(ripe_hq, deploy3r, [source], snapshot_gas=1)
+    large = _isolated_price_desk(ripe_hq, deploy3r, [source], snapshot_gas=1_500_000)
+    assert small.PRICE_SOURCE_SNAPSHOT_GAS() == 1
+    assert large.PRICE_SOURCE_SNAPSHOT_GAS() == 1_500_000
+    assert not small.addPriceSnapshot(ETH, sender=teller.address)
+    assert source.timestamp() == 0
+    assert large.addPriceSnapshot(ETH, sender=teller.address)
+    assert source.timestamp() == boa.env.evm.patch.timestamp
+
+
 STALE_TIME_PROBE = """
 # @version 0.4.3
 

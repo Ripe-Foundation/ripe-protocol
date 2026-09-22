@@ -21,6 +21,10 @@ broadcast/
 
 migration_history/dev
 
+# Superseded Base staging attempts; fresh deployment starts at 2026092100.
+/migration_history/base-mainnet/v1/202609140[0-3]-*.json
+/migration_history/base-mainnet/v1/2026091900-*.json
+
 .hypothesis/
 
 migration_history/*/dev

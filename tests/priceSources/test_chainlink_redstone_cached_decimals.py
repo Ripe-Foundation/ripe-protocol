@@ -125,7 +125,7 @@ def _load_source(kind, ripe_hq, fork, *, eth_feed=ZERO_ADDRESS):
             ADDYS[fork]["BTC"],
             eth_feed,
             ZERO_ADDRESS,
-            ONE_DAY_IN_SECS,
+            ONE_DAY_IN_SECS, [],
             name="chainlink_confirmation_decimals",
         )
     return boa.load(

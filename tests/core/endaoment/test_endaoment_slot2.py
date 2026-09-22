@@ -64,7 +64,7 @@ def test_paused_curve_get_green_stabilizer_config_still_serves_configured_pool(
         green_token,
         savings_green,
         1,
-        100,
+        100, [], ("0x" + "00" * 20, "0x" + "00" * 20, 0, "0x" + "00" * 20, 0, 0, 0, 0, 0, 0),
         name="paused_curve_ref_views",
     )
     assert curve.setActionTimeLockAfterSetup(sender=governance.address)

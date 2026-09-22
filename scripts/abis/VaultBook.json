@@ -1591,6 +1591,101 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canAcceptLiquidationAsset",
+    "inputs": [
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      },
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getDeleverageTraversalAsset",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      },
+      {
+        "name": "_index",
+        "type": "uint256"
+      },
+      {
+        "name": "_isStabVault",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasStabilityPoolInterface",
+    "inputs": [
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      },
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_probeClaimAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "LEGACY_POOL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "constructor",
     "inputs": [
@@ -1609,6 +1704,10 @@
       {
         "name": "_maxRegistryTimeLock",
         "type": "uint256"
+      },
+      {
+        "name": "_legacyPool",
+        "type": "address"
       }
     ],
     "outputs": []

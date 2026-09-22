@@ -31,6 +31,7 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+from interfaces import VaultBookCompatibility
 import interfaces.ConfigStructs as cs
 
 from ethereum.ercs import IERC4626
@@ -55,17 +56,16 @@ interface MissionControl:
     def getGenLiqConfig() -> GenLiqConfig: view
     def underscoreRegistry() -> address: view
 
-interface StabilityPool:
-    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
-    def swapWithClaimableGreen(_stabAsset: address, _greenAmount: uint256, _liqAsset: address, _liqAmountSent: uint256, _greenToken: address) -> uint256: nonpayable
-    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
-    def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
-
 interface CreditEngine:
     def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getUserDebtAmount(_user: address) -> uint256: view
+
+interface StabilityPool:
+    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
+    def swapWithClaimableGreen(_stabAsset: address, _greenAmount: uint256, _liqAsset: address, _liqAmountSent: uint256, _greenToken: address) -> uint256: nonpayable
+    def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -636,7 +636,7 @@ def _swapWithSpecificStabPool(
     collateralValueOut: uint256 = _collateralValueOut
 
     # skip incompatible or full pools before collateral moves
-    if not staticcall StabilityPool(_stabPool.vaultAddr).canAcceptLiquidationAsset(_stabPool.asset, _liqAsset):
+    if not staticcall VaultBookCompatibility(_a.vaultBook).canAcceptLiquidationAsset(_stabPool.vaultAddr, _stabPool.asset, _liqAsset):
         return remainingToRepay, collateralValueOut, False, False
 
     # check for green redemptions for this stab asset

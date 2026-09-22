@@ -1,0 +1,20 @@
+{
+  "contracts": {
+    "EndaomentPSMBaseDepartments20260921": {
+      "address": "0x48a1566e251C97226De0fC0de8f5f38E55ada1cF",
+      "file": "contracts/core/EndaomentPSM.vy"
+    },
+    "VaultMigratorBaseDepartments20260921": {
+      "address": "0x980c772036d952De00d3D2ee2371De44B738bD67",
+      "file": "contracts/core/VaultMigrator.vy"
+    },
+    "RipeReserveEngineBaseDepartments20260921": {
+      "address": "0x86aEFB7d0bc788a2D455C1c2af7a46f4807303FE",
+      "file": "contracts/core/RipeReserveEngine.vy"
+    },
+    "RipeReserveVestingBaseDepartments20260921": {
+      "address": "0x2601e1E1dC276CB8730FacC132B1d598745e3432",
+      "file": "contracts/core/RipeReserveVesting.vy"
+    }
+  }
+}

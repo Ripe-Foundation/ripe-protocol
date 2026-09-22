@@ -1,0 +1,320 @@
+{
+  "qualified": false,
+  "live_writes": false,
+  "block": 51135337,
+  "block_hash": "0x6e981b6f8c318546dcd3ffbec24d277a7156b806c83728afe8c7ed56b56e001e",
+  "source_commit": "1ede38351e6da918806dff70d34b2066bf8cde8c",
+  "census": {
+    "1": {
+      "registered_positions": 223,
+      "funded_positions": 82,
+      "funded_users": 72,
+      "totals_reconciled": true
+    },
+    "2": {
+      "registered_positions": 548,
+      "funded_positions": 402,
+      "funded_users": 376,
+      "totals_reconciled": true
+    },
+    "3": {
+      "registered_positions": 148,
+      "funded_positions": 40,
+      "funded_users": 31,
+      "totals_reconciled": true
+    },
+    "4": {
+      "registered_positions": 15,
+      "funded_positions": 0,
+      "funded_users": 0,
+      "totals_reconciled": true
+    },
+    "5": {
+      "registered_positions": 97,
+      "funded_positions": 45,
+      "funded_users": 39,
+      "totals_reconciled": true
+    }
+  },
+  "core_storage_parity": {
+    "ledger_globals_equal": true,
+    "borrower_records_equal": true,
+    "borrowers_checked": 56
+  },
+  "reward_parity": [
+    {
+      "name": "retained_ledger_reward_continuity",
+      "results": [
+        {
+          "user": "0x0a8f4E308B17F836eAb6493F42E48ac07D30946D",
+          "before": 124424324930868742959,
+          "borrow_before": 0,
+          "after": 124769980166095422861,
+          "borrow_after": 0,
+          "equal": false
+        },
+        {
+          "user": "0x0e1f4AF8F4233dB542Ac7D858382b30F87C93660",
+          "before": 9196294961710784304,
+          "borrow_before": 4844533150074984019,
+          "after": 9771549877949308612,
+          "borrow_after": 4876210785273729306,
+          "equal": false
+        },
+        {
+          "user": "0x135b51920B362fCB4037Ed8D5e0B4315E4Bd9BB7",
+          "before": 474597306903801280,
+          "borrow_before": 0,
+          "after": 1102634018156293129,
+          "borrow_after": 240182929646364321,
+          "equal": false
+        },
+        {
+          "user": "0x15040E3857f1BE911c8Ca16484B8d3496f7BB51A",
+          "before": 2227830605867769840,
+          "borrow_before": 1139890152958819769,
+          "after": 3022578109725553576,
+          "borrow_after": 1370229272127325378,
+          "equal": false
+        },
+        {
+          "user": "0x16c7E68Ca75eb0B7ca65eaDd4D067aF7D7654E11",
+          "before": 195428206145551346470,
+          "borrow_before": 0,
+          "after": 196444957987533758028,
+          "borrow_after": 7229250445482778,
+          "equal": false
+        },
+        {
+          "user": "0x172A91eE5941D31F0937F7b64D37F84139b27ad7",
+          "before": 0,
+          "borrow_before": 0,
+          "after": 99154747016489547,
+          "borrow_after": 0,
+          "equal": false
+        },
+        {
+          "user": "0x1816227b996A38C7f3a332011ce1Dc57e64D8987",
+          "before": 1186193936377882894,
+          "borrow_before": 0,
+          "after": 1224252888814000235,
+          "borrow_after": 0,
+          "equal": false
+        },
+        {
+          "user": "0x192a3911918a641D5B32eD7766376cf9fe095f4C",
+          "before": 847281383127059210,
+          "borrow_before": 0,
+          "after": 887809787813499793,
+          "borrow_after": 0,
+          "equal": false
+        },
+        {
+          "user": "0x1a9836F6Dcc253332eE707Bd9808aB3d79d973D5",
+          "before": 229326868578376896835,
+          "borrow_before": 128237642207867224048,
+          "after": 229652979206766386190,
+          "borrow_after": 128244216111038680289,
+          "equal": false
+        },
+        {
+          "user": "0x214F32A20aEB13f0e525456107021282D30Def90",
+          "before": 0,
+          "borrow_before": 0,
+          "after": 199861020747570242,
+          "borrow_after": 0,
+          "equal": false
+        },
+        {
+          "user": "0x2f537C2C1D263e66733DA492414359B6B70e1269",
+          "before": 23651649903408389343,
+          "borrow_before": 22227857982696985501,
+          "after": 24166282434511938166,
+          "borrow_after": 22381070971122210438,
+          "equal": false
+        },
+        {
+          "user": "0x64DD1ABDF58f3066095E9240d66986fbE13709cB",
+          "before": 5755252693210416100,
+          "borrow_before": 1994807767677934596,
+          "after": 6351828416779046384,
+          "borrow_after": 2209130904315146775,
+          "equal": false
+        },
+        {
+          "user": "0x955aF4de9Ca03f84c9462457D075aCABf1A8AfC8",
+          "before": 23262763431696108840,
+          "borrow_before": 9974038838389672981,
+          "after": 23732301158938014635,
+          "borrow_after": 10116356673081523557,
+          "equal": false
+        }
+      ],
+      "passed": false
+    }
+  ],
+  "legacy_sweep": {
+    "status": "running",
+    "users": 376,
+    "passed_users": 56,
+    "passed_positions": 59
+  },
+  "ordinary_sweep": {
+    "3": {
+      "target_id": 8,
+      "status": "positions_moved_routes_and_rewards_not_finalized",
+      "passed_users": 31,
+      "passed_positions": 40
+    },
+    "4": {
+      "target_id": 9,
+      "status": "positions_moved_routes_and_rewards_not_finalized",
+      "passed_users": 0,
+      "passed_positions": 0
+    },
+    "5": {
+      "target_id": 10,
+      "status": "running",
+      "passed_users": 2,
+      "passed_positions": 3
+    }
+  },
+  "legacy_isolated": {
+    "attempt": {
+      "user": "0x28E2b238a3a7634C6C7e23b895790505B1C31Cd0",
+      "healthy_before": false,
+      "collateral_and_debt_before": [
+        368504001270526553948,
+        295390360230950243836
+      ]
+    },
+    "error_frames": [
+      {
+        "address": "0x2e5ccdbd412588cee58516fa732658cef7944233",
+        "selector": "0xbdb77610",
+        "error": "Revert(b'')",
+        "output": "0x"
+      },
+      {
+        "address": "0xab032bfa41ad31090c2744727c2cda502e9025e0",
+        "selector": "0xbdb77610",
+        "error": "Revert(b'')",
+        "output": "0x"
+      },
+      {
+        "address": "0x8512b12cb48b05af19bde28dead6b6ab479f4409",
+        "selector": "0xefc5b8cf",
+        "error": "Revert(b'')",
+        "output": "0x"
+      }
+    ]
+  },
+  "ordinary_isolated": {
+    "3": {
+      "target_id": 8,
+      "status": "positions_moved_routes_and_rewards_not_finalized",
+      "results": [
+        {
+          "user": "0x19284cD63083583cf5C5e1F945fAE112a39976c6",
+          "positions": 1,
+          "underlying_equal": true,
+          "current_debt_equal": true
+        }
+      ],
+      "attempt": {
+        "user": "0x19284cD63083583cf5C5e1F945fAE112a39976c6",
+        "healthy_before": true
+      }
+    },
+    "4": {
+      "target_id": 9,
+      "status": "positions_moved_routes_and_rewards_not_finalized",
+      "results": []
+    },
+    "5": {
+      "target_id": 10,
+      "status": "positions_moved_routes_and_rewards_not_finalized",
+      "results": [
+        {
+          "user": "0x19284cD63083583cf5C5e1F945fAE112a39976c6",
+          "positions": 1,
+          "underlying_equal": true,
+          "current_debt_equal": true
+        }
+      ],
+      "attempt": {
+        "user": "0x19284cD63083583cf5C5e1F945fAE112a39976c6",
+        "healthy_before": true
+      }
+    }
+  },
+  "stability_claim_inventory": [
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+      "raw_claim_balance": 2
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x4200000000000000000000000000000000000006",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xA88594D404727625A9437C3f886C7643872296AE",
+      "raw_claim_balance": 56
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x96F1a7ce331F40afe866F3b707c223e377661087",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+      "raw_claim_balance": 1
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+      "raw_claim_balance": 12
+    },
+    {
+      "deposit_asset": "0xd6c283655B42FA0eb2685F7AB819784F071459dc",
+      "claim_asset": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+      "raw_claim_balance": 227659999726272947914
+    }
+  ],
+  "source_reports_sha256": {
+    "legacy_sweep": "0cc24145a8c95a90e7d629dc2b5a6a6983429810f43bf4d991671a59ce36ae5f",
+    "ordinary_sweep": "df13c11e17f72891696ce9f5d771a6132d492906c2a9e80c721dbcbe48bfc07b",
+    "core": "de83e9327df5d4bfa8563d14f85c17c15b54fb823c3e8e3c143600282b39585a",
+    "legacy_isolated": "c5a737775e6306fddeac51172342e85029cdd24ac6719c3acb60d4cef326362e",
+    "ordinary_isolated": "ba581187044c4b56983de9342da8ecb122fc0152d3f1cddbaf1fa2d20b10e54b"
+  }
+}

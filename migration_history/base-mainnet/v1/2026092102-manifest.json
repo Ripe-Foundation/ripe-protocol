@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "VaultBookBaseDepartments20260921": {
+      "address": "0x6DFed28265032165Ae45Db02e3B1b95b5E655da4",
+      "file": "contracts/registries/VaultBook.vy"
+    }
+  }
+}

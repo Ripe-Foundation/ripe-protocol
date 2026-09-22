@@ -1,0 +1,60 @@
+{
+  "contracts": {
+    "AuctionHouseBaseDepartments20260921": {
+      "address": "0xbF6eFbFB28fEa2057b976AD89390E57e988CFe9E",
+      "file": "contracts/core/AuctionHouse.vy"
+    },
+    "AuctionHouseNFTBaseDepartments20260921": {
+      "address": "0x5c4e4DE576Dd6387b58eC8A0344355726552370b",
+      "file": "contracts/core/AuctionHouseNFT.vy"
+    },
+    "BoardroomBaseDepartments20260921": {
+      "address": "0xefc2C9a5d65d388D4852309894760D45130568aD",
+      "file": "contracts/core/Boardroom.vy"
+    },
+    "CreditRedeemBaseDepartments20260921": {
+      "address": "0x16c69dCeA71FDDE530a48128BA76702Aac60ad24",
+      "file": "contracts/core/CreditRedeem.vy"
+    },
+    "TellerUtilsBaseDepartments20260921": {
+      "address": "0x2AeA442154b7cc868987b8eF6E5be57f2893Ce0D",
+      "file": "contracts/core/TellerUtils.vy"
+    },
+    "EndaomentFundsBaseDepartments20260921": {
+      "address": "0xe4Bb0d06F106E93f240934CC0C1Ac67B3f7f58Ae",
+      "file": "contracts/core/EndaomentFunds.vy"
+    },
+    "BondBoosterBaseDepartments20260921": {
+      "address": "0xd21fB84093939895793b960983FcE16919B1DED8",
+      "file": "contracts/config/BondBooster.vy"
+    },
+    "BondRoomBaseDepartments20260921": {
+      "address": "0x9EF03204c465E836e5B66988c81EFcD2bEa4a9ef",
+      "file": "contracts/core/BondRoom.vy"
+    },
+    "CreditEngineBaseDepartments20260921": {
+      "address": "0x1D816D4058D5dA79c5dF56822Bad67B90Feb6E8E",
+      "file": "contracts/core/CreditEngine.vy"
+    },
+    "EndaomentBaseDepartments20260921": {
+      "address": "0xDFf4c788dF6E2adA1740093fc9Ae233436E993F4",
+      "file": "contracts/core/Endaoment.vy"
+    },
+    "HumanResourcesBaseDepartments20260921": {
+      "address": "0x9E78Bd070B9BC403117B6F267B65465712984B3e",
+      "file": "contracts/core/HumanResources.vy"
+    },
+    "LootboxBaseDepartments20260921": {
+      "address": "0x7Ff148B9FAbF58125c69F508ac9a3E74Dc52f611",
+      "file": "contracts/core/Lootbox.vy"
+    },
+    "TellerBaseDepartments20260921": {
+      "address": "0xfc55b5c5eE2FA46aa9d4Cf416710c883044a5B21",
+      "file": "contracts/core/Teller.vy"
+    },
+    "DeleverageBaseDepartments20260921": {
+      "address": "0xB46fC5ec144079C4f7A3E9e46CcA9823f414a27B",
+      "file": "contracts/core/Deleverage.vy"
+    }
+  }
+}
