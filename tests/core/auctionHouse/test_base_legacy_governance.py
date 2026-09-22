@@ -495,7 +495,7 @@ def test_retained_base_defaults_initialize_existing_vault_routes(
     defaults = boa.load("contracts/config/DefaultsBaseLive.vy", contributor_template)
     candidate = boa.load("contracts/data/MissionControl.vy", e.hq, ZERO_ADDRESS)
     setup = boa.load(
-        "contracts/config/SwitchboardFoxtrotSetup.vy", e.hq, ZERO_ADDRESS, 1, 1000
+        "contracts/config/SwitchboardFoxtrot.vy", e.hq, ZERO_ADDRESS, 1, 1000
     )
     assert candidate.coreRipeGovVaultId() == 2
     assert candidate.isRipeGovVaultId(2)

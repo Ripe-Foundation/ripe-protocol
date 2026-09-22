@@ -54,7 +54,7 @@ def mock_chainlink(ripe_hq, fork):
         ADDYS[fork]["BTC"],
         CHAINLINK_ETH_USD,
         CHAINLINK_BTC_USD,
-        ONE_DAY_IN_SECS,
+        ONE_DAY_IN_SECS, [],
         name="chainlink",
     )
     assert c.setActionTimeLockAfterSetup(sender=ripe_hq.governance())
@@ -656,7 +656,7 @@ def test_zero_timelock_live_confirmation_still_qualifies_atomically(
             mock_chainlink.BTC(),
             ZERO_ADDRESS,
             ZERO_ADDRESS,
-            ONE_DAY_IN_SECS,
+            ONE_DAY_IN_SECS, [],
             name="zero_timelock_live_chainlink",
         )
         assert source.actionTimeLock() == 0
@@ -739,7 +739,7 @@ def test_pre_price_desk_bootstrap_confirmation_succeeds_at_registry_boundary(
             mock_chainlink.BTC(),
             ZERO_ADDRESS,
             ZERO_ADDRESS,
-            ONE_DAY_IN_SECS,
+            ONE_DAY_IN_SECS, [],
             name="pre_price_desk_bootstrap_chainlink",
         )
         mock_chainlink_alpha.setMockData(

@@ -53,6 +53,13 @@ struct PendingChainlinkConfig:
     actionId: uint256
     config: ChainlinkConfig
 
+struct InitialChainlinkFeed:
+    asset: address
+    feed: address
+    staleTime: uint256
+    needsEthToUsd: bool
+    needsBtcToUsd: bool
+
 event NewChainlinkFeedPending:
     asset: indexed(address)
     feed: indexed(address)
@@ -140,6 +147,7 @@ def __init__(
     _ethUsdFeed: address,
     _btcUsdFeed: address,
     _defaultStaleTime: uint256,
+    _initialFeeds: DynArray[InitialChainlinkFeed, 50],
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -158,6 +166,17 @@ def __init__(
         assert self._setDefaultFeedOnDeploy(_wethAddr, _ethUsdFeed, _defaultStaleTime) # dev: invalid feed
     if _btcUsdFeed != empty(address):
         assert self._setDefaultFeedOnDeploy(_btcAddr, _btcUsdFeed, _defaultStaleTime) # dev: invalid feed
+
+    # Constructor-only bootstrap: no call back through the active PriceDesk.
+    # Supply conversion anchors before feeds that depend on them.
+    for entry: InitialChainlinkFeed in _initialFeeds:
+        hasDecimals: bool = False
+        decimals: uint256 = 0
+        hasDecimals, decimals = self._readFeedDecimals(entry.feed)
+        assert hasDecimals and self._isValidNewFeed(entry.asset, entry.feed, decimals, entry.needsEthToUsd, entry.needsBtcToUsd, entry.staleTime) # dev: invalid initial feed
+        self.feedConfig[entry.asset] = ChainlinkConfig(feed=entry.feed, decimals=decimals, needsEthToUsd=entry.needsEthToUsd, needsBtcToUsd=entry.needsBtcToUsd, staleTime=entry.staleTime)
+        priceData._addPricedAsset(entry.asset)
+        log NewChainlinkFeedAdded(asset=entry.asset, feed=entry.feed, needsEthToUsd=entry.needsEthToUsd, needsBtcToUsd=entry.needsBtcToUsd, staleTime=entry.staleTime)
 
 
 # set default feeds

@@ -28,10 +28,8 @@ EXPECTED_SWITCHBOARDS = tuple(
         "Golf",
     )
 )
-# Source audit includes the alternate setup-capable Foxtrot. The registered
-# authority inventory still has seven roles and binds the deployed Foxtrot.
-EXPECTED_SWITCHBOARD_SOURCES = tuple(sorted((*EXPECTED_SWITCHBOARDS, "SwitchboardFoxtrotSetup")))
-FOXTROT_SOURCES = ("SwitchboardFoxtrot", "SwitchboardFoxtrotSetup")
+EXPECTED_SWITCHBOARD_SOURCES = tuple(sorted(EXPECTED_SWITCHBOARDS))
+FOXTROT_SOURCES = ("SwitchboardFoxtrot",)
 ENGINE_MUTATORS = (
     "setConfig",
     "setCanAcquireRipe",

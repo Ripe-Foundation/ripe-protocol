@@ -24,7 +24,7 @@ EXPECTED_RUNTIME_BYTES = {
     "SwitchboardBravo": 16423,
     "SwitchboardCharlie": 22326,
     "SwitchboardEcho": 23930,
-    "SwitchboardFoxtrot": 18278,
+    "SwitchboardFoxtrot": 18339,
     "SwitchboardGolf": 21035,
     "VaultMigrator": 15626,
     "VaultBook": 18382,

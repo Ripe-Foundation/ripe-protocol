@@ -644,7 +644,7 @@ def addGreenRefPoolSnapshot(_curvePricesId: uint256) -> bool:
 @external
 def startDefaultsInitialization(_missionControl: address, _defaults: address):
     hq: address = gov._getRipeHqFromGov()
-    assert msg.sender == staticcall RipeHq(hq).governance() # dev: HQ governance only
+    assert gov._canGovern(msg.sender) # dev: governance or temporary setup governor
     assert self.initStep == 0 # dev: already bound
     assert _missionControl != empty(address) and _defaults != empty(address)
     assert staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID) != _missionControl
@@ -658,7 +658,7 @@ def startDefaultsInitialization(_missionControl: address, _defaults: address):
 
 @external
 def initConfig():
-    assert msg.sender == staticcall RipeHq(gov._getRipeHqFromGov()).governance() # dev: governance only
+    assert gov._canGovern(msg.sender) # dev: governance or temporary setup governor
     assert staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(5) != self.missionControl # dev: candidate only
     assert 0 < self.initStep and self.initStep < 5 # dev: already staged
     if self.initStep == 1:

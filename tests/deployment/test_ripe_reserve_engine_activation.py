@@ -306,7 +306,7 @@ def test_switchboard_source_inventory_and_mutators_are_pinned():
         EXPECTED_SWITCHBOARD_SOURCES
     )
     assert len(EXPECTED_SWITCHBOARDS) == 7
-    assert "SwitchboardFoxtrotSetup" in EXPECTED_SWITCHBOARD_SOURCES
+    assert "SwitchboardFoxtrotSetup" not in EXPECTED_SWITCHBOARD_SOURCES
     assert ENGINE_MUTATORS == (
         "setConfig",
         "setCanAcquireRipe",
@@ -540,8 +540,8 @@ def test_manifest_is_canonical_json_with_one_trailing_newline():
     assert MANIFEST.read_bytes() == expected
 
 
-@pytest.mark.parametrize("variant", ["SwitchboardFoxtrot", "SwitchboardFoxtrotSetup"])
-def test_both_foxtrot_sources_are_checked_for_semantic_mutator_drift(tmp_path, variant):
+@pytest.mark.parametrize("variant", ["SwitchboardFoxtrot"])
+def test_foxtrot_source_is_checked_for_semantic_mutator_drift(tmp_path, variant):
     import shutil
     shutil.copytree(ROOT / "contracts", tmp_path / "contracts")
     path = tmp_path / "contracts" / "config" / f"{variant}.vy"
