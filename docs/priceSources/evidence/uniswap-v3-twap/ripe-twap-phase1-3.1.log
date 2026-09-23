@@ -1,0 +1,24 @@
+TWAP_SLOAD_CONTROL cold=2171 warm=171 reset_cold=2171
+.TWAP_GAS_SETUP python=3.12.0 machine=arm64 seconds=6.460 pool_runtime_sha256=a2ad4226f924f98e8d9a7a97ce0e034b05c4fc9d2b19d1e5b58f8bd43a2feb3a source_bytes=19527 synthetic_ring=65535
+TWAP_COLD ring=65535 index=65534 initialized=65535 window=1800 model_depth=14 observation_slots=30 source=152578 desk=190797 observe=80733 source_target_overrun=0
+.TWAP_COLD ring=20000 index=19999 initialized=20000 window=1800 model_depth=10 observation_slots=22 source=131400 desk=169619 observe=59555 source_target_overrun=0
+.TWAP_COLD ring=65535 index=12345 initialized=65535 window=1800 model_depth=14 observation_slots=30 source=152578 desk=190797 observe=80733 source_target_overrun=0
+.TWAP_COLD ring=65535 index=29999 initialized=30000 window=1800 model_depth=13 observation_slots=30 source=152059 desk=190278 observe=80214 source_target_overrun=0
+.TWAP_COLD ring=65535 index=65534 initialized=65535 window=14400 model_depth=15 observation_slots=32 source=157687 desk=195906 observe=85842 source_target_overrun=0
+.TWAP_COLD ring=20000 index=19999 initialized=20000 window=14400 model_depth=14 observation_slots=29 source=150228 desk=188447 observe=78383 source_target_overrun=0
+.TWAP_COLD ring=65535 index=12345 initialized=65535 window=14400 model_depth=15 observation_slots=32 source=157687 desk=195906 observe=85842 source_target_overrun=0
+.TWAP_COLD ring=65535 index=29999 initialized=30000 window=14400 model_depth=14 observation_slots=32 source=157168 desk=195387 observe=85323 source_target_overrun=0
+.TWAP_DEPENDENCIES {"call_counts": [6, 6], "cold_warm_calls": [[{"gas": 2696, "selector": "3850c7bd"}, {"gas": 2428, "selector": "1a686502"}, {"gas": 2635, "selector": "252c09d7"}, {"gas": 85842, "selector": "883bdbfd"}, {"gas": 2340, "selector": "d81f84b7"}, {"gas": 45709, "selector": "76d69760"}], [{"gas": 696, "selector": "3850c7bd"}, {"gas": 428, "selector": "1a686502"}, {"gas": 635, "selector": "252c09d7"}, {"gas": 23842, "selector": "883bdbfd"}, {"gas": 340, "selector": "d81f84b7"}, {"gas": 8209, "selector": "76d69760"}]], "target": "source"}
+TWAP_WARM target=source source_cold=178326 direct_total=178326 transaction_children=[178326, 43326] source_children=[178326, 43326] wrapper_overhead=3444
+.TWAP_DEPENDENCIES {"call_counts": [5, 5], "cold_warm_calls": [[{"gas": 2696, "selector": "3850c7bd"}, {"gas": 2428, "selector": "1a686502"}, {"gas": 2635, "selector": "252c09d7"}, {"gas": 85842, "selector": "883bdbfd"}, {"gas": 32709, "selector": "76d69760"}], [{"gas": 696, "selector": "3850c7bd"}, {"gas": 428, "selector": "1a686502"}, {"gas": 635, "selector": "252c09d7"}, {"gas": 23842, "selector": "883bdbfd"}, {"gas": 8209, "selector": "76d69760"}]], "target": "desk"}
+TWAP_WARM target=desk source_cold=157687 direct_total=195906 transaction_children=[195906, 48906] source_children=[157687, 42687] wrapper_overhead=3444
+.TWAP_LATE_FAILURE kind=stale observe=85842 source=169991 desk=208262
+.TWAP_LATE_FAILURE kind=empty observe=85842 source=169277 desk=207548
+.TWAP_LATE_FAILURE kind=invalid_round observe=85842 source=169850 desk=208121
+.TWAP_LATE_FAILURE kind=burn observe=85842 source=248064 desk=286141
+..TWAP_ROTATED source=157687 desk=195906
+.TWAP_SIZE deployed=19527 eip170_headroom=5049 target_overrun=0 coverage=2478 snapshot=307 compiler=Vyper-0.4.3 optimize=gas evm=prague action_delay=2 expiration_duration=100
+.TWAP_DENSE_TICK tick=524287 reverse=False direct_source=181395 forwarded_source=160756 desk=198975 source_target_overrun=0
+.TWAP_DENSE_TICK tick=-524287 reverse=True direct_source=179565 forwarded_source=158926 desk=197145 source_target_overrun=0
+.
+20 passed in 14.50s

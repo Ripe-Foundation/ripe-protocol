@@ -33,6 +33,7 @@ NON_STANDALONE_VYPER_SOURCES = frozenset(
         "modules/DeptBasics.vy",
         "modules/TimeLock.vy",
         "priceSources/modules/PriceSourceData.vy",
+        "priceSources/modules/UniswapV3TwapMath.vy",
         "registries/modules/AddressRegistry.vy",
         "tokens/modules/Erc4626Token.vy",
         "vaults/modules/BasicVault.vy",

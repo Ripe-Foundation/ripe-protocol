@@ -1,0 +1,293 @@
+{
+  "retrieved_date": "2026-09-07",
+  "v3_core_commit": "e3589b192d0be27e100cd0daaf6c97204fdb1899",
+  "v3_periphery_commit": "0682387198a24c7cd63566a2c58398533860a5d1",
+  "files": [
+    {
+      "name": "TickMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/TickMath.sol",
+      "sha256": "83cf64b2ca84001effd16e007b49bac5359143b6c3132bfe42907b2426a0c5f5",
+      "role": "v3_behavioral_reference",
+      "spdx_header": "GPL-2.0-or-later"
+    },
+    {
+      "name": "FullMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/FullMath.sol",
+      "sha256": "54087aee268a6938a85a408d7b14481b5c2c956c21508d5583f1bf48ec6d69ba",
+      "role": "v3_behavioral_reference",
+      "spdx_header": "MIT"
+    },
+    {
+      "name": "Oracle.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/Oracle.sol",
+      "sha256": "eea86662877614f800344bbe432098f9edf55735f5d1c9474ebd64b55097771b",
+      "role": "v3_behavioral_reference",
+      "spdx_header": "BUSL-1.1"
+    },
+    {
+      "name": "OracleLibrary.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-periphery/0682387198a24c7cd63566a2c58398533860a5d1/contracts/libraries/OracleLibrary.sol",
+      "sha256": "3e4967a8d77a63127219d22852199551b614f12a16d66c0c415329b8c2cbe5a0",
+      "role": "v3_behavioral_reference",
+      "spdx_header": "GPL-2.0-or-later"
+    }
+  ],
+  "schema_version": 2,
+  "v4_core_commit": "46c6834698c48bc4a463a86d8420f4eb1d7f3b75",
+  "production_math_decision": "selected 2026-09-07: MIT derivation from pinned V4 TickMath/FullMath; V3 remains separately licensed behavioral reference",
+  "production_math_files": [
+    {
+      "name": "v4-TickMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/TickMath.sol",
+      "sha256": "272d4f6d3ff9ae33596ebcdb84a71a3c2d4542ae8fb5c88ddf1aca8043f5d06b",
+      "role": "production_port_reference",
+      "license": "MIT"
+    },
+    {
+      "name": "v4-FullMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/FullMath.sol",
+      "sha256": "a9607255a6fd604d9c92f6b7416811c38b9d86e5dfdb0c345a494ebd35f7a4a3",
+      "role": "production_port_reference",
+      "license": "MIT"
+    },
+    {
+      "name": "v4-BitMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/BitMath.sol",
+      "sha256": "e8a45eb3d57f9427fc47bbb2543c1a6a5f394113b378123ac7ca9f113a7502b4",
+      "role": "v4_harness_dependency_or_license",
+      "license": "MIT"
+    },
+    {
+      "name": "v4-CustomRevert.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/CustomRevert.sol",
+      "sha256": "9d3dbe6b742cb1ac30f57df89d879ade9649389de1165fc637114bd062d39fca",
+      "role": "v4_harness_dependency_or_license",
+      "license": "MIT"
+    },
+    {
+      "name": "v4-MIT",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/licenses/MIT_LICENSE",
+      "sha256": "b7b0c4379346af0701f5e4df9c861295d4a3af91dc3b15eb4356ebc571303df9",
+      "role": "v4_harness_dependency_or_license",
+      "license": "MIT"
+    }
+  ],
+  "reference_license_files": [
+    {
+      "name": "v3-LICENSE",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/LICENSE",
+      "sha256": "85c5cbc5be388d8bb38d8618de93c96e247ae5af20eb79dbafc1fb5b13b57b54"
+    }
+  ],
+  "licensing_notes": [
+    "Production port inputs are the two pinned MIT math files; retain their copyright and full permission notices. This does not add V4 pool integration.",
+    "Write quote and consult composition from the arithmetic specification; do not copy V3 GPL implementation text into production code or claim this is formal clean-room clearance.",
+    "V3 Oracle.sol retains a BUSL-1.1 header. The pinned repository LICENSE specifies a Change Date no later than 2023-04-01 and Change License GPL-2.0-or-later; do not describe current testing as relying only on the original BUSL non-production grant.",
+    "Keep V3 reference code, licenses and generated reference-artifact provenance in a separate test subtree. Record the actual distribution/license boundary; test-only labeling does not waive license obligations.",
+    "Owner selection of the engineering provenance path is not a legal opinion or permission to disregard upstream terms.",
+    "Production Vyper excludes BitMath, CustomRevert and getTickAtSqrtPrice. Retain the pinned imports needed by the separate Solidity reference project.",
+    "The plan calls for legal review of the completed derivation, notices and reference-artifact distribution before mainnet deployment; this is not an additional prerequisite to local implementation after the provenance decision is selected."
+  ],
+  "reference_dependencies": [
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/LICENSE",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/LICENSE",
+      "sha256": "85c5cbc5be388d8bb38d8618de93c96e247ae5af20eb79dbafc1fb5b13b57b54"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/NoDelegateCall.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/NoDelegateCall.sol",
+      "sha256": "c2b03bbf6ae73415e9f60fb2bcdad1ee9dbb3ab1f27f9b12384c44d11a5624e0"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/UniswapV3Factory.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/UniswapV3Factory.sol",
+      "sha256": "a9b78256f8a0ea95d464c96995015103e9681d0e1a144ab4e947d3de8715a38e"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/UniswapV3Pool.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/UniswapV3Pool.sol",
+      "sha256": "d515775b7f3ffe921dd70aca86b8bad16280fa4c122425d82b4dbea4dc564a7a"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/UniswapV3PoolDeployer.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/UniswapV3PoolDeployer.sol",
+      "sha256": "1e27540bc60c4dccff5add8a04da61b7b30ee0c6b1fd25ff6806fec855db6cd1"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/IERC20Minimal.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/IERC20Minimal.sol",
+      "sha256": "bb0bf574bdfd637eb7d3c0869e8170314d5aac37df8e86cd3ca808f828c7c22a"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/IUniswapV3Factory.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/IUniswapV3Factory.sol",
+      "sha256": "17c72e89a7d0eecca7929ca08d97f46e80930ef7024e4ccbc7b294c588477107"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/IUniswapV3Pool.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/IUniswapV3Pool.sol",
+      "sha256": "b0f97121de74f3c916503f6ec37fa1ba196affd1cc02157e47ab00125dde91fe"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/IUniswapV3PoolDeployer.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/IUniswapV3PoolDeployer.sol",
+      "sha256": "48908460f444abc497b261e38a38540effecbf5c99d17e60d849f1d0acfb1fe6"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/callback/IUniswapV3FlashCallback.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/callback/IUniswapV3FlashCallback.sol",
+      "sha256": "612135b515e651db56cd80191cd56c0b982eaae954c5b1c4d1dc111f8968d5b8"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/callback/IUniswapV3MintCallback.sol",
+      "sha256": "4dbecbcec83e4f5609d72309f40be3eac554f8517ed46e6345bd35069c9bbc23"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/callback/IUniswapV3SwapCallback.sol",
+      "sha256": "171a9a692e71b6d532df655695b0b672bd8ea5dcca3b3363131700b45b0171c6"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/pool/IUniswapV3PoolActions.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/pool/IUniswapV3PoolActions.sol",
+      "sha256": "7fc763acbf5e7044d88cae4a6ed7b1c99b5268d647ae794ba5ee1085060e6a2c"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/pool/IUniswapV3PoolDerivedState.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/pool/IUniswapV3PoolDerivedState.sol",
+      "sha256": "9f670bdfed3a283e0557b208a5d4bc561afd2df771d67c4368dddaae2dc1b6e3"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/pool/IUniswapV3PoolEvents.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/pool/IUniswapV3PoolEvents.sol",
+      "sha256": "2c2b798ca4288dfdf746bca8516b4e725b79ca6636af3d38a5a64801e50020a7"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/pool/IUniswapV3PoolImmutables.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/pool/IUniswapV3PoolImmutables.sol",
+      "sha256": "ac6332f7e174db7fa3852a6c5ae3da3bd013e72c2ff8fa1cf2ec37f6916e2951"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/pool/IUniswapV3PoolOwnerActions.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/pool/IUniswapV3PoolOwnerActions.sol",
+      "sha256": "5f4cd982d6abe55237bc770da3b667f96edf048c230cfe3d7f6309c92cc0e205"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/interfaces/pool/IUniswapV3PoolState.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/interfaces/pool/IUniswapV3PoolState.sol",
+      "sha256": "d8d3937703d08d95f7f867a0f49c2aa73c3f3ef5508a54d431e829295f5175ea"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/BitMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/BitMath.sol",
+      "sha256": "32f71ea9156f55572a72efb0b2a913df88de66ff33d042043fb3e51a6050a557"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/FixedPoint128.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/FixedPoint128.sol",
+      "sha256": "cfc3aef8851f183492547dccc168bf72398fba2aad4c4d9d4784f542a8ccda34"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/FixedPoint96.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/FixedPoint96.sol",
+      "sha256": "219deb88ffbcdefa482be35051db586378e8523062bee592dd2c5fa7fb47ebd6"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/FullMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/FullMath.sol",
+      "sha256": "54087aee268a6938a85a408d7b14481b5c2c956c21508d5583f1bf48ec6d69ba"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/LiquidityMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/LiquidityMath.sol",
+      "sha256": "84d20a16d5346f6ec4c12dff4df23dda5d46e52d33f18aaaaac2e9e36ce4a072"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/LowGasSafeMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/LowGasSafeMath.sol",
+      "sha256": "394107ff2dbbaded5612452af5e77b4af9d0871b096c1514b0ea659b862fc46f"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/Oracle.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/Oracle.sol",
+      "sha256": "eea86662877614f800344bbe432098f9edf55735f5d1c9474ebd64b55097771b"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/Position.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/Position.sol",
+      "sha256": "a9130c72e3adb7d3fa10ee5050fc9375d6119a8250125fe7daacec94450be21d"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/SafeCast.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/SafeCast.sol",
+      "sha256": "9aed494b56d3dd16b7d6535583ded2cdfb03dc80aaa919347b13d35fd597e8bf"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/SqrtPriceMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/SqrtPriceMath.sol",
+      "sha256": "ddd62e3a94346248677f30f1ab009ef015e71e4b8696dcca890eeabc9dc6c149"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/SwapMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/SwapMath.sol",
+      "sha256": "d6cb9a153be4ea9fb2377ef88641ef7979b5cee6933162f1b732d0289e26e1b6"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/Tick.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/Tick.sol",
+      "sha256": "749121625ab364e653971fae786a9c8e0859c8327e746d9edd999ae9d16f3d71"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/TickBitmap.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/TickBitmap.sol",
+      "sha256": "bd7a17c5134f0718eb7d856ddfc58d8347d32a8f661bed53aa3ad17c9aea09ba"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/TickMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/TickMath.sol",
+      "sha256": "83cf64b2ca84001effd16e007b49bac5359143b6c3132bfe42907b2426a0c5f5"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/TransferHelper.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/TransferHelper.sol",
+      "sha256": "f15b94bc000ee68e434c3ff4c28696c3f5bc23222bd6249744a7228b063e267b"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-core/contracts/libraries/UnsafeMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-core/e3589b192d0be27e100cd0daaf6c97204fdb1899/contracts/libraries/UnsafeMath.sol",
+      "sha256": "4d02353eb503e3111e25bd50104ac9b279f99e88d848e455262a3fbeb55c50e7"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v3/vendor/v3-periphery/contracts/libraries/OracleLibrary.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v3-periphery/0682387198a24c7cd63566a2c58398533860a5d1/contracts/libraries/OracleLibrary.sol",
+      "sha256": "3e4967a8d77a63127219d22852199551b614f12a16d66c0c415329b8c2cbe5a0"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/licenses/MIT_LICENSE",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/licenses/MIT_LICENSE",
+      "sha256": "b7b0c4379346af0701f5e4df9c861295d4a3af91dc3b15eb4356ebc571303df9"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/src/libraries/BitMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/BitMath.sol",
+      "sha256": "e8a45eb3d57f9427fc47bbb2543c1a6a5f394113b378123ac7ca9f113a7502b4"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/src/libraries/CustomRevert.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/CustomRevert.sol",
+      "sha256": "9d3dbe6b742cb1ac30f57df89d879ade9649389de1165fc637114bd062d39fca"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/src/libraries/FullMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/FullMath.sol",
+      "sha256": "a9607255a6fd604d9c92f6b7416811c38b9d86e5dfdb0c345a494ebd35f7a4a3"
+    },
+    {
+      "path": "tests/priceSources/uniswap_v3/reference/v4/vendor/v4-core/src/libraries/TickMath.sol",
+      "url": "https://raw.githubusercontent.com/Uniswap/v4-core/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/TickMath.sol",
+      "sha256": "272d4f6d3ff9ae33596ebcdb84a71a3c2d4542ae8fb5c88ddf1aca8043f5d06b"
+    }
+  ]
+}

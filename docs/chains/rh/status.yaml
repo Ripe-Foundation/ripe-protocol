@@ -471,7 +471,7 @@ owner_priority_overlay:
         configuration, or operational work or implement the provisional H-09 path.
       reopen_condition: RH-D028 or RH-D038 for their exact candidates; otherwise explicit owner instruction plus H-09 ceiling reseal for any fork-suite work.
     - id: PARK-UNISWAP-TWAP
-      subject: Uniswap V2 price-source admission and activation
+      subject: Uniswap V2 price-source admission and activation (V2 only; does not cover V3)
       state: parked_nonblocking
       blocker_effect: nonblocking
       instruction: >

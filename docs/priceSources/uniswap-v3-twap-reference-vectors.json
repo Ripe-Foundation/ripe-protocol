@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "purpose": "Frozen numerical vectors from reviewer A; not proof of present availability or collateral admission",
+  "chain_id": 4663,
+  "block_number": 57037442,
+  "block_hash": "0x2488e1b687eaa880ee85ddbe92b903039500f7e03ef6ead1bdb1374a4659fc27",
+  "block_timestamp": 1788804620,
+  "factory": "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
+  "weth": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  "anchor": {
+    "address": "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9",
+    "decimals": 8,
+    "round_id": "18446744073709553653",
+    "answer": "249098276109",
+    "updated_at": 1788801662,
+    "started_at": null,
+    "answered_in_round": null,
+    "age_seconds": 2958,
+    "price18": "2490982761090000000000"
+  },
+  "provenance": {
+    "raw_inputs": "Reviewer A, UNISWAP-V3-TWAP-PLAN-REVIEW.md Appendix B",
+    "source_report_sha256": "a7425d0c77cd4914368f3f51d341522a68ef0444992d28f0803d672fa5c73d13",
+    "header_recheck": "Block number, hash and timestamp matched the public RPC on 2026-09-07",
+    "historical_contract_recheck": "unverified: eth_call by number and block hash returned RPC -32000 metadata is not found, 57037445",
+    "integer_verification": "All 12 numeric rows recomputed and matched using Python integers and constants extracted from revision-pinned upstream TickMath on 2026-09-07",
+    "compiled_upstream_differential": "unverified: required in implementation; no independent compiled harness run during planning",
+    "missing_inputs": "Full historical call payloads, full slot0, startedAt and answeredInRound are absent from reviewer input. Null fields are unknown, not zero."
+  },
+  "assets": [
+    {
+      "label": "CASHCAT",
+      "asset": "0x020bfC650A365f8BB26819deAAbF3E21291018b4",
+      "pool": "0xA70fc67C9F69da90B63a0e4C05D229954574E313",
+      "asset_decimals": 18,
+      "asset_is_token0": true,
+      "fee": 10000,
+      "tick_spacing": 200,
+      "reported_slot0_tick": -94332,
+      "reported_observation_index": 19001,
+      "reported_observation_cardinality": 20000,
+      "reported_current_liquidity": "208137033439741701112642",
+      "reported_latest_observation_age_seconds": 13,
+      "vectors": [
+        {
+          "window_seconds": 1800,
+          "tick_cumulatives": [
+            "-768752529449",
+            "-768922264481"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "20182810731040514753835",
+            "20185770056482654510698"
+          ],
+          "tick_delta": "-169735032",
+          "seconds_per_liquidity_delta": "2959325442139756863",
+          "mean_tick": -94298,
+          "harmonic_liquidity": "206975634290094062884840",
+          "sqrt_ratio_x96": "710112090261583473372152310",
+          "weth_per_whole_asset_raw": "80333122194428",
+          "usd_price18": "200108422530856619"
+        },
+        {
+          "window_seconds": 3600,
+          "tick_cumulatives": [
+            "-768582772866",
+            "-768922264481"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "20179801741491849498107",
+            "20185770056482654510698"
+          ],
+          "tick_delta": "-339491615",
+          "seconds_per_liquidity_delta": "5968314990805012591",
+          "mean_tick": -94304,
+          "harmonic_liquidity": "205253329089144967230813",
+          "sqrt_ratio_x96": "709899099234130358141564966",
+          "weth_per_whole_asset_raw": "80284939186569",
+          "usd_price18": "199988399488902386"
+        },
+        {
+          "window_seconds": 14400,
+          "tick_cumulatives": [
+            "-767564965725",
+            "-768922264481"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "20161648490027092590815",
+            "20185770056482654510698"
+          ],
+          "tick_delta": "-1357298756",
+          "seconds_per_liquidity_delta": "24121566455561919883",
+          "mean_tick": -94257,
+          "harmonic_liquidity": "203140459086215891896988",
+          "sqrt_ratio_x96": "711569240258800714654331309",
+          "weth_per_whole_asset_raw": "80663147584192",
+          "usd_price18": "200930510087480751"
+        }
+      ]
+    },
+    {
+      "label": "PONS",
+      "asset": "0x39dBED3a2bd333467115dE45665cC57F813C4571",
+      "pool": "0x10CC6BD38112cAc182db90B6a71d8Bb5939526bA",
+      "asset_decimals": 18,
+      "asset_is_token0": false,
+      "fee": 10000,
+      "tick_spacing": 200,
+      "reported_slot0_tick": 81510,
+      "reported_observation_index": 13091,
+      "reported_observation_cardinality": 20000,
+      "reported_current_liquidity": "189404422557790060434326",
+      "reported_latest_observation_age_seconds": 24,
+      "vectors": [
+        {
+          "window_seconds": 1800,
+          "tick_cumulatives": [
+            "513295462417",
+            "513442061054"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "11174332797389256059689",
+            "11177547947914229199495"
+          ],
+          "tick_delta": "146598637",
+          "seconds_per_liquidity_delta": "3215150524973139806",
+          "mean_tick": 81443,
+          "harmonic_liquidity": "190506869180815814431768",
+          "sqrt_ratio_x96": "4648399421923212888209330847598",
+          "weth_per_whole_asset_raw": "290504116276662",
+          "usd_price18": "723640745670849919"
+        },
+        {
+          "window_seconds": 3600,
+          "tick_cumulatives": [
+            "513148869732",
+            "513442061054"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "11171097311000113505974",
+            "11177547947914229199495"
+          ],
+          "tick_delta": "293191322",
+          "seconds_per_liquidity_delta": "6450636914115693521",
+          "mean_tick": 81442,
+          "harmonic_liquidity": "189906289444801875138098",
+          "sqrt_ratio_x96": "4648167019382162062050851029090",
+          "weth_per_whole_asset_raw": "290533166688290",
+          "usd_price18": "723713109745417835"
+        },
+        {
+          "window_seconds": 14400,
+          "tick_cumulatives": [
+            "512272513161",
+            "513442061054"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "11154628995185887989977",
+            "11177547947914229199495"
+          ],
+          "tick_delta": "1169547893",
+          "seconds_per_liquidity_delta": "22918952728341209518",
+          "mean_tick": 81218,
+          "harmonic_liquidity": "213799737786542519910638",
+          "sqrt_ratio_x96": "4596400570263229441466920470576",
+          "weth_per_whole_asset_raw": "297114213136054",
+          "usd_price18": "740106382996730540"
+        }
+      ]
+    },
+    {
+      "label": "AI",
+      "asset": "0x2E8c31162b855A2ffa90F6F8634643Ad6F111e18",
+      "pool": "0xc4a21f9d6485FC5893DD4A491B320a83DAF4Da1D",
+      "asset_decimals": 18,
+      "asset_is_token0": false,
+      "fee": 10000,
+      "tick_spacing": 200,
+      "reported_slot0_tick": 93416,
+      "reported_observation_index": 1767,
+      "reported_observation_cardinality": 20000,
+      "reported_current_liquidity": "249821025982436729577643",
+      "reported_latest_observation_age_seconds": 9,
+      "vectors": [
+        {
+          "window_seconds": 1800,
+          "tick_cumulatives": [
+            "483112189770",
+            "483280124088"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "314420907034947140290505101709461791909667",
+            "314420907034947140290507535639304249364846"
+          ],
+          "tick_delta": "167934318",
+          "seconds_per_liquidity_delta": "2433929842457455179",
+          "mean_tick": 93296,
+          "harmonic_liquidity": "251654032820954579348919",
+          "sqrt_ratio_x96": "8407661045937543723452080005926",
+          "weth_per_whole_asset_raw": "88799143694168",
+          "usd_price18": "221197136141726267"
+        },
+        {
+          "window_seconds": 3600,
+          "tick_cumulatives": [
+            "482943886661",
+            "483280124088"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "314420907034947140290502624309222295409127",
+            "314420907034947140290507535639304249364846"
+          ],
+          "tick_delta": "336237427",
+          "seconds_per_liquidity_delta": "4911330081953955719",
+          "mean_tick": 93399,
+          "harmonic_liquidity": "249426631986423090184027",
+          "sqrt_ratio_x96": "8451070012061738553840672986228",
+          "weth_per_whole_asset_raw": "87889251993985",
+          "usd_price18": "218930611602111543"
+        },
+        {
+          "window_seconds": 14400,
+          "tick_cumulatives": [
+            "481925830982",
+            "483280124088"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "314420907034947140290486708948903389821144",
+            "314420907034947140290507535639304249364846"
+          ],
+          "tick_delta": "1354293106",
+          "seconds_per_liquidity_delta": "20826690400859543702",
+          "mean_tick": 94048,
+          "harmonic_liquidity": "235278192998887715009316",
+          "sqrt_ratio_x96": "8729791091463914656575937880065",
+          "weth_per_whole_asset_raw": "82366661913355",
+          "usd_price18": "205173934914695580"
+        }
+      ]
+    },
+    {
+      "label": "INDEX",
+      "asset": "0x56910D4409F3a0C78C64DD8D0545FF0705389870",
+      "pool": "0xD29893fFac8b29eC4Db2cfE0CDB3FE1377c028Ff",
+      "asset_decimals": 18,
+      "asset_is_token0": false,
+      "fee": 10000,
+      "tick_spacing": 200,
+      "reported_slot0_tick": 110515,
+      "reported_observation_index": 1452,
+      "reported_observation_cardinality": 1801,
+      "reported_current_liquidity": "182549719416591477340135",
+      "reported_latest_observation_age_seconds": 22,
+      "vectors": [
+        {
+          "window_seconds": 1800,
+          "tick_cumulatives": [
+            "612492672489",
+            "612691551613"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "229728115649573478534015291",
+            "229728119005572264529678562"
+          ],
+          "tick_delta": "198879124",
+          "seconds_per_liquidity_delta": "3355998785995663271",
+          "mean_tick": 110488,
+          "harmonic_liquidity": "182511466635101678193593",
+          "sqrt_ratio_x96": "19859854699402147053121624009825",
+          "weth_per_whole_asset_raw": "15915014329930",
+          "usd_price18": "39644026338355947"
+        },
+        {
+          "window_seconds": 3600,
+          "tick_cumulatives": [
+            "612293445737",
+            "612691551613"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "229728112125995201959846683",
+            "229728119005572264529678562"
+          ],
+          "tick_delta": "398105876",
+          "seconds_per_liquidity_delta": "6879577062569831879",
+          "mean_tick": 110584,
+          "harmonic_liquidity": "178065673190930086761249",
+          "sqrt_ratio_x96": "19955406365003106853739027979491",
+          "weth_per_whole_asset_raw": "15762968780799",
+          "usd_price18": "39265283496570163"
+        },
+        {
+          "window_seconds": 14400,
+          "tick_cumulatives": [
+            "611098313265",
+            "612691551613"
+          ],
+          "seconds_per_liquidity_cumulative_x128": [
+            "229728089557091875512803909",
+            "229728119005572264529678562"
+          ],
+          "tick_delta": "1593238348",
+          "seconds_per_liquidity_delta": "29448480389016874653",
+          "mean_tick": 110641,
+          "harmonic_liquidity": "166394531022695686027661",
+          "sqrt_ratio_x96": "20012357542513003010944829402635",
+          "weth_per_whole_asset_raw": "15673379908952",
+          "usd_price18": "39042119161213785"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+[profile.default]
+src = "src"
+out = "out"
+cache_path = "cache"
+solc = "0.7.6"
+evm_version = "istanbul"
+optimizer = true
+optimizer_runs = 800
+bytecode_hash = "none"
+extra_output = ["storageLayout"]
+remappings = ["@uniswap/v3-core/=vendor/v3-core/"]
