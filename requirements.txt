@@ -242,6 +242,7 @@ pytest==8.4.2
     # via
     #   -r requirements.in
     #   pytest-cov
+    #   pytest-xdist
     #   titanoboa
 pytest-cov==7.0.0
     # via titanoboa
@@ -315,7 +316,7 @@ typing-extensions==4.15.0
     #   web3
 typing-inspection==0.4.1
     # via pydantic
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   -r requirements.in
     #   requests
