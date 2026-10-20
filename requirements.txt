@@ -6,7 +6,7 @@
 #
 aiohappyeyeballs==2.7.1
     # via aiohttp
-aiohttp==3.14.3
+aiohttp==3.14.4
     # via web3
 aiosignal==1.4.0
     # via aiohttp
@@ -242,6 +242,7 @@ pytest==8.4.2
     # via
     #   -r requirements.in
     #   pytest-cov
+    #   pytest-xdist
     #   titanoboa
 pytest-cov==7.0.0
     # via titanoboa
@@ -338,5 +339,5 @@ wheel==0.46.2
     # via
     #   -r requirements.in
     #   vyper
-yarl==1.24.5
+yarl==1.25.1
     # via aiohttp
