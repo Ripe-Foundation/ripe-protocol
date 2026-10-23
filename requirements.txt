@@ -30,7 +30,7 @@ cbor2==5.9.0
     # via
     #   -r requirements.in
     #   vyper
-certifi==2025.8.3
+certifi==2026.10.19
     # via requests
 charset-normalizer==3.4.3
     # via requests
@@ -242,6 +242,7 @@ pytest==8.4.2
     # via
     #   -r requirements.in
     #   pytest-cov
+    #   pytest-xdist
     #   titanoboa
 pytest-cov==7.0.0
     # via titanoboa
